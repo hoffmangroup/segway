@@ -27,7 +27,7 @@ dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.z
 classifiers = ["Natural Language :: English",
                "Programming Language :: Python"]
 
-install_requires = ["optbuild"]
+install_requires = ["Python>=2.5", "optbuild"]
 
 setup(name=name,
       version=__version__,
