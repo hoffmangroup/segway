@@ -1,0 +1,21 @@
+#include "${include_filename}"
+
+GRAPHICAL_MODEL model_seg
+
+frame: 0 {
+   variable: seg {
+     type: discrete hidden cardinality CARD_SEG;
+     conditionalparents: nil using DenseCPT("start_seg");
+   }
+
+${observations}}
+
+frame: 1 {
+   variable: seg {
+     type: discrete hidden cardinality CARD_SEG;
+     conditionalparents: seg(-1) using DenseCPT("seg_seg");
+   }
+
+${observations}}
+
+chunk 1:1

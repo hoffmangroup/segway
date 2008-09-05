@@ -1,0 +1,8 @@
+% XXX: these can all be combined into one file
+
+DENSE_CPT_OUT_FILE dense_cpt.txt ASCII
+MEAN_OUT_FILE mean.txt ASCII
+COVAR_OUT_FILE covar.txt ASCII
+MC_OUT_FILE mc.txt ASCII
+MX_OUT_FILE mx.txt ASCII
+NAME_COLLECTIO_OUT_FILE names.txt

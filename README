@@ -1,0 +1,27 @@
+======
+ gmseg
+======
+by Michael Hoffman <mmh1@u.washington.edu>
+
+Description
+===========
+DESCRIPTION
+
+Prerequisites
+=============
+- Python 2.5
+- gmtk
+
+These should be installed automatically:
+- setuptools
+- optbuild
+
+Installation
+============
+python setup.py install
+
+License
+=======
+gmseg is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.
