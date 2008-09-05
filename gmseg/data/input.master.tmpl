@@ -1,0 +1,66 @@
+#include "${include_filename}"
+
+DPMF_IN_FILE	inline
+
+1
+
+0	dpmfOne	1	1.0
+
+DT_IN_FILE inline
+1
+
+0
+seg_obs0
+1
+    0 2 0 default
+    -1 0
+    -1 1
+
+DENSE_CPT_IN_FILE inline
+2
+
+0
+start_seg
+0
+CARD_SEG
+0.9 0.1
+
+1
+seg_seg
+1
+CARD_SEG CARD_SEG
+0.9 0.1
+0.1 0.9
+
+MEAN_IN_FILE inline
+2
+
+0 mean_seg0_obs0 1 0.0
+1 mean_seg1_obs0 1 0.0
+
+COVAR_IN_FILE inline
+2
+
+0 covar_seg0_obs0 1 1.0
+1 covar_seg1_obs0 1 1.0
+
+MC_IN_FILE inline
+2
+
+0 1 0 mc_seg0_obs0 mean_seg0_obs0 covar_seg0_obs0
+1 1 0 mc_seg1_obs0 mean_seg1_obs0 covar_seg1_obs0
+
+MX_IN_FILE inline
+2
+
+0 1 mx_seg0_obs0 1 dpmfOne mc_seg0_obs0 
+1 1 mx_seg1_obs0 1 dpmfOne mc_seg1_obs0
+
+NAME_COLLECTION_IN_FILE inline
+1
+
+0
+collection_seg_obs0
+2
+mx_seg0_obs0
+mx_seg1_obs0
