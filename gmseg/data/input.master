@@ -1,4 +1,0 @@
-DENSE_CPT_IN_FILE dense_cpt.txt ASCII
-MEAN_IN_FILE mean.txt ASCII
-COVAR_IN_FILE covar.txt ASCII
-GC_IN_FILE gc.txt ASCII

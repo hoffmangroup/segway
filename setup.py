@@ -9,6 +9,10 @@ __version__ = "0.1.0a1"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@u.washington.edu>
 
+import sys
+
+assert sys.version_info >= (2, 5)
+
 from ez_setup import use_setuptools
 use_setuptools()
 
@@ -27,7 +31,12 @@ dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.z
 classifiers = ["Natural Language :: English",
                "Programming Language :: Python"]
 
-install_requires = ["Python>=2.5", "optbuild"]
+entry_points = """
+[console_scripts]
+gmseg = gmseg.run:main
+"""
+
+install_requires = ["optbuild"]
 
 setup(name=name,
       version=__version__,
@@ -44,5 +53,6 @@ setup(name=name,
 
       # XXX: this should be based off of __file__ instead
       packages=find_packages("."),
-      include_package_data=True
+      include_package_data=True,
+      entry_points=entry_points
       )
