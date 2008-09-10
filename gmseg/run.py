@@ -11,10 +11,10 @@ __version__ = "$Revision$"
 
 from itertools import izip
 from math import floor, log10
-from os import close, fdopen
+from os import close, extsep, fdopen
 import shutil
 from string import Template
-from struct import unpack
+from struct import calcsize, unpack
 import sys
 from tempfile import mkstemp
 
@@ -45,7 +45,14 @@ MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmfOne mc_${seg}_${obs}"
 NAME_COLLECTION_TMPL = "$obs_index collection_seg_${obs} 2"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${obs}"
 
-WIG_EXT = ".wig"
+WIG_EXT = "wig"
+
+TRACK_FMT = "browser position %s:%s-%s"
+
+# XXX: this could be a dict instead
+WIG_HEADER = 'track type=wiggle_0 name=gmseg ' \
+    'description="segmentation by gmseg" visibility=full viewLimits=0:1' \
+    'autoScale=off'
 
 def save_include():
     return data_filename("seg.inc")
@@ -161,11 +168,14 @@ def save_input_master(include_filename, num_obs, tempdirname):
 
 def load_observations_bed(bed_filename):
     with open(bed_filename) as bed_file:
+
+        # XXXopt: this copy/paste is necessary because otherwise the
+        # bed_file will be closed before the iterator values are received
         for datum in read(bed_file):
-            yield datum.score
+            yield datum
 
     # returns an iterator
-    # each iteration yields a score
+    # each iteration yields a .bed.Datum
 
 def load_observations_list(bed_filelistname):
     with open(bed_filelistname) as bed_filelist:
@@ -176,7 +186,7 @@ def load_observations_list(bed_filelistname):
 
     # returns an iterator
     # each iteration yields an iterator
-    # each iteration yields a score
+    # each iteration yields a .bed.Datum
 
 def load_observations_lists(bed_filelistnames):
     res = []
@@ -193,7 +203,7 @@ def load_observations_lists(bed_filelistnames):
     # returns a list
     # each item is a list
     # each subitem is a tuple
-    # each sub-subitem is a str
+    # each sub-subitem is a .bed.Datum
     return res
 
 def save_observations_gmtk(observation_rows, prefix, tempdirname):
@@ -201,7 +211,8 @@ def save_observations_gmtk(observation_rows, prefix, tempdirname):
 
     with fdopen(temp_fd, "w+") as temp_file:
         for observation_row in observation_rows:
-            print >>temp_file, " ".join(observation_row)
+            print >>temp_file, " ".join(datum.score
+                                        for datum in observation_row)
 
     return temp_filename
 
@@ -255,22 +266,40 @@ def save_dumpnames(num_segs, tempdirname):
 def read_gmtk_out(infile):
     data = infile.read()
 
-    fmt = "%dL" % (len(data) / struct.calcsize("L"))
+    fmt = "%dL" % (len(data) / calcsize("L"))
     return unpack(fmt, data)
 
-def write_wig(outfile):
-    XXX
+def write_wig(outfile, output, observations):
+    first_datum = observations[0][0]
+    last_datum = observations[-1][0]
 
-def load_gmtk_out_save_wig(filename):
-    wigfilename = os.extsep.join(filename.rpartition(".")[0], WIG_EXT)
+    chrom = first_datum.chrom
+    start = first_datum.chromStart
+    end = last_datum.chromEnd
+
+    print >>outfile, TRACK_FMT % (chrom, start, end)
+    print >>outfile, WIG_HEADER
+
+    for score, data in zip(output, observations):
+        # this assumes that the relevant values for all items in data
+        # are the same
+        #
+        # XXX: check this
+        datum = data[0]
+
+        row = [datum.chrom, datum.chromStart, datum.chromEnd, str(score)]
+        print >>outfile, "\t".join(row)
+
+def load_gmtk_out_save_wig(filename, observations):
+    wigfilename = extsep.join([filename.rpartition(".")[0], WIG_EXT])
 
     with open(filename) as gmtkfile:
         with open(wigfilename, "w") as wigfile:
-            return write_wig(read_gmtk_out(gmtkfile))
+            return write_wig(wigfile, read_gmtk_out(gmtkfile), observations)
 
 def gmtk_out2wig(filenames, observations_list):
-    for filename, observation in filenames:
-        load_gmtk_out_save_wig(filename)
+    for filename, observations in zip(filenames, observations_list):
+        load_gmtk_out_save_wig(filename, observations)
 
 def run_triangulate(structure_filename):
     TRIANGULATE_PROG(strFile=structure_filename)
@@ -334,6 +363,8 @@ def run(*bed_filelistnames):
         # output: one list -> multiple_filenames -> multiple columns
         observations_list = load_observations_lists(bed_filelistnames)
 
+        # XXX: assert that the appropriate coordinates for each Datum
+        # are aligned
         gmtk_filelistname = save_observations_list(observations_list,
                                                    tempdirname)
 

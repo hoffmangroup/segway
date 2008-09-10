@@ -14,6 +14,10 @@ FIELDNAMES = ["chrom", "chromStart", "chromEnd", # required
 class Datum(object):
     def __init__(self, words):
         self.__dict__ = dict(zip(FIELDNAMES, words))
+        self._words = tuple(words)
+
+    def __repr__(self):
+        return "%s%s" % (self.__class__.__name__, self._words)
 
 def read(iterator):
     for line in iterator:
