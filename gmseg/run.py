@@ -10,20 +10,24 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@u.washington.edu>
 
 from itertools import izip
-from os import remove
+from math import floor, log10
+from os import close, fdopen
+import shutil
 from string import Template
+from struct import unpack
 import sys
-from tempfile import NamedTemporaryFile
+from tempfile import mkstemp
 
 from optbuild import OptionBuilder_ShortOptWithSpace
 
 # XXX: change to relative import after entry points defined
-from gmseg._util import data_filename, data_string
+from gmseg._util import data_filename, data_string, NamedTemporaryDir
 from gmseg.bed import read
 
 # XXX: should be options
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
+TEMPDIR_PREFIX = "gmseg-"
 
 # XXX: should be an option, including a temporary file
 OUTPUT_FILENAME = "output.out"
@@ -41,10 +45,12 @@ MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmfOne mc_${seg}_${obs}"
 NAME_COLLECTION_TMPL = "$obs_index collection_seg_${obs} 2"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${obs}"
 
+WIG_EXT = ".wig"
+
 def save_include():
     return data_filename("seg.inc")
 
-def save_template(resource, mapping):
+def save_template(resource, mapping, tempdirname):
     tmpl = Template(data_string(resource))
 
     text = tmpl.substitute(mapping)
@@ -52,17 +58,17 @@ def save_template(resource, mapping):
     resource_part = resource.rpartition(".tmpl")
     stem = resource_part[0] or resource_part[2]
     stem_part = stem.rpartition(".")
-    prefix = stem_part[0]
+    prefix = stem_part[0] + "."
     suffix = "." + stem_part[2]
 
-    temp_file = NamedTemporaryFile(prefix=prefix + ".", suffix=suffix)
+    temp_fd, temp_filename = mkstemp(suffix, prefix, tempdirname)
 
-    temp_file.write(text)
-    temp_file.flush()
+    with fdopen(temp_fd, "w+") as temp_file:
+        temp_file.write(text)
 
-    return temp_file, temp_file.name
+    return temp_filename
 
-def save_structure(include_filename, num_obs):
+def save_structure(include_filename, num_obs, tempdirname):
     observation_tmpl = Template(data_string("observation.tmpl"))
     observation_substitute = observation_tmpl.substitute
 
@@ -73,7 +79,7 @@ def save_structure(include_filename, num_obs):
     mapping = dict(include_filename=include_filename,
                    observations=observations)
 
-    return save_template("seg.str.tmpl", mapping)
+    return save_template("seg.str.tmpl", mapping, tempdirname)
 
 #def save_output_master():
 #    return data_filename("output.master")
@@ -142,7 +148,7 @@ def make_name_collection_spec(num_obs):
 
     return make_spec("NAME_COLLECTION", items)
 
-def save_input_master(include_filename, num_obs):
+def save_input_master(include_filename, num_obs, tempdirname):
     mapping = dict(include_filename=include_filename,
                    dt_spec=make_dt_spec(num_obs),
                    mean_spec=make_mean_spec(num_obs),
@@ -151,7 +157,7 @@ def save_input_master(include_filename, num_obs):
                    mx_spec=make_mx_spec(num_obs),
                    name_collection_spec=make_name_collection_spec(num_obs))
 
-    return save_template("input.master.tmpl", mapping)
+    return save_template("input.master.tmpl", mapping, tempdirname)
 
 def load_observations_bed(bed_filename):
     with open(bed_filename) as bed_file:
@@ -184,55 +190,87 @@ def load_observations_lists(bed_filelistnames):
     for observations_bed_iterators in observations_lists_zipped:
         res.append(zip(*observations_bed_iterators))
 
+    # returns a list
+    # each item is a list
+    # each subitem is a tuple
+    # each sub-subitem is a str
     return res
 
-def save_observations_gmtk(observation_rows):
-    res = NamedTemporaryFile(suffix=".obs")
+def save_observations_gmtk(observation_rows, prefix, tempdirname):
+    temp_fd, temp_filename = mkstemp(".obs", prefix, tempdirname)
 
-    for observation_row in observation_rows:
-        print >>res, " ".join(observation_row)
+    with fdopen(temp_fd, "w+") as temp_file:
+        for observation_row in observation_rows:
+            print >>temp_file, " ".join(observation_row)
 
-    res.flush()
+    return temp_filename
 
-    return res
+def save_observations_list(observation_rows_list, tempdirname):
+    prefix_tmpl = "obs" + make_prefix_tmpl(len(observation_rows_list))
 
-def save_observations_list(observation_rows_list):
-    temp_files = []
+    temp_fd, temp_filename = mkstemp(".list", dir=tempdirname)
 
-    for observation_rows in observation_rows_list:
-        temp_files.append(save_observations_gmtk(observation_rows))
+    with fdopen(temp_fd, "w+") as temp_file:
+        for index, observation_rows in enumerate(observation_rows_list):
+            prefix = prefix_tmpl % index
+            text = save_observations_gmtk(observation_rows, prefix,
+                                          tempdirname)
 
-    observations_list_file = NamedTemporaryFile(suffix=".list")
-    for temp_file in temp_files:
-        print >>observations_list_file, temp_file.name
+            print >>temp_file, text
 
-    observations_list_file.flush()
+    return temp_filename
 
-    temp_files.append(observations_list_file)
+def mkstemp_closed(*args, **kwargs):
+    temp_fd, temp_filename = mkstemp(*args, **kwargs)
+    close(temp_fd)
 
-    # keep temp_files to keep files around
-    # they are unlinked when the object is deleted
-    return observations_list_file.name, temp_files
+    return temp_filename
 
-def save_output_filelist(num_filenames):
-    res = NamedTemporaryFile(prefix="output.", suffix=".list")
+def make_prefix_tmpl(num_filenames):
+    # make sure there aresufficient leading zeros
+    return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
 
-    for index in xrange(num_filenames):
-        # XXX: should be more sophisticated
-        print >>res, "out/%d.out" % index
+def save_output_filelist(num_filenames, tempdirname):
+    temp_fd, temp_filename = mkstemp(".list", "output", tempdirname)
 
-    res.flush()
+    prefix_tmpl = "out" + make_prefix_tmpl(num_filenames)
+    output_filenames = \
+        [mkstemp_closed(".out", prefix_tmpl % index, tempdirname)
+         for index in xrange(num_filenames)]
 
-    return res, res.name
+    with fdopen(temp_fd, "w+") as temp_file:
+        for output_filename in output_filenames:
+            print >>temp_file, output_filename
 
-def save_dumpnames(num_segs):
-    res = NamedTemporaryFile(prefix="dumpnames.", suffix=".list")
+    return output_filenames, temp_filename
 
-    print >>res, "seg"
+def save_dumpnames(num_segs, tempdirname):
+    temp_fd, temp_filename = mkstemp(".list", "dumpnames", tempdirname)
 
-    res.flush()
+    with fdopen(temp_fd, "w+") as temp_file:
+        print >>temp_file, "seg"
 
-    return res, res.name
+    return temp_filename
+
+def read_gmtk_out(infile):
+    data = infile.read()
+
+    fmt = "%dL" % (len(data) / struct.calcsize("L"))
+    return unpack(fmt, data)
+
+def write_wig(outfile):
+    XXX
+
+def load_gmtk_out_save_wig(filename):
+    wigfilename = os.extsep.join(filename.rpartition(".")[0], WIG_EXT)
+
+    with open(filename) as gmtkfile:
+        with open(wigfilename, "w") as wigfile:
+            return write_wig(read_gmtk_out(gmtkfile))
+
+def gmtk_out2wig(filenames, observations_list):
+    for filename, observation in filenames:
+        load_gmtk_out_save_wig(filename)
 
 def run_triangulate(structure_filename):
     TRIANGULATE_PROG(strFile=structure_filename)
@@ -275,38 +313,45 @@ def run_viterbi(structure_filename, input_master_filename, output_filename,
                  cppCommandOptions="-DVITERBI")
 
 def run(*bed_filelistnames):
-    # XXX register atexit for cleanup_resources
+    # XXX: use binary I/O to gmtk rather than ascii
+    # XXX: register atexit for cleanup_resources
 
-    num_obs = len(bed_filelistnames)
+    # XXX: allow specification of directory instead of tmp
+    with NamedTemporaryDir(prefix=TEMPDIR_PREFIX) as tempdir:
+        tempdirname = tempdir.name
 
-    include_filename = save_include()
-    structure_file, structure_filename = save_structure(include_filename,
-                                                        num_obs)
-    run_triangulate(structure_filename)
+        num_obs = len(bed_filelistnames)
 
-    input_master_file, input_master_filename = \
-        save_input_master(include_filename, num_obs)
+        include_filename = save_include()
+        structure_filename = save_structure(include_filename, num_obs,
+                                            tempdirname)
+        run_triangulate(structure_filename)
 
-    # input: multiple lists -> multiple filenames -> one column
-    # output: one list -> multiple_filenames -> multiple columns
-    observations_list = load_observations_lists(bed_filelistnames)
+        input_master_filename = save_input_master(include_filename, num_obs,
+                                                  tempdirname)
 
-    gmtk_filelistname, temp_files = save_observations_list(observations_list)
+        # input: multiple lists -> multiple filenames -> one column
+        # output: one list -> multiple_filenames -> multiple columns
+        observations_list = load_observations_lists(bed_filelistnames)
 
-    # XXX: add option to skip EM training
-    run_em_train(structure_filename, input_master_filename, OUTPUT_FILENAME,
-                 gmtk_filelistname, num_obs)
+        gmtk_filelistname = save_observations_list(observations_list,
+                                                   tempdirname)
 
-    output_filelist, output_filelistname = \
-        save_output_filelist(len(observations_list))
-    dumpnames_file, dumpnames_filename = save_dumpnames(NUM_SEGS)
+        # XXX: add option to skip EM training
+        run_em_train(structure_filename, input_master_filename,
+                     OUTPUT_FILENAME, gmtk_filelistname, num_obs)
 
-    run_viterbi(structure_filename, input_master_filename, OUTPUT_FILENAME,
-                gmtk_filelistname, num_obs, output_filelistname,
-                dumpnames_filename)
-    import pdb; pdb.set_trace()
+        output_filenames, output_filelistname = \
+            save_output_filelist(len(observations_list), tempdirname)
+        dumpnames_filename = save_dumpnames(NUM_SEGS, tempdirname)
 
-    # XXX: convert binary data to wig format
+        run_viterbi(structure_filename, input_master_filename, OUTPUT_FILENAME,
+                    gmtk_filelistname, num_obs, output_filelistname,
+                    dumpnames_filename)
+
+        gmtk_out2wig(output_filenames, observations_list)
+
+        import pdb; pdb.set_trace()
 
 def parse_options(args):
     from optparse import OptionParser
