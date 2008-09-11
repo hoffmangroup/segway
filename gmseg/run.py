@@ -28,6 +28,7 @@ from gmseg.bed import read
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = "gmseg-"
+VERBOSITY = 0
 
 # XXX: should be an option, including a temporary file
 OUTPUT_FILENAME = "output.out"
@@ -302,7 +303,8 @@ def gmtk_out2wig(filenames, observations_list):
         load_gmtk_out_save_wig(filename, observations)
 
 def run_triangulate(structure_filename):
-    TRIANGULATE_PROG(strFile=structure_filename)
+    TRIANGULATE_PROG(strFile=structure_filename,
+                     verbosity=VERBOSITY)
     # XXX: creates trifile that needs to be destroyed
     # XXX: best to use a temporary directory for everything--see poly source
 
@@ -319,7 +321,8 @@ def run_em_train(structure_filename, input_master_filename,
                   nf1=num_obs,
                   ni1=0,
 
-                  maxEmIters=MAX_EM_ITERS)
+                  maxEmIters=MAX_EM_ITERS,
+                  verbosity=VERBOSITY)
 
 def run_viterbi(structure_filename, input_master_filename, output_filename,
                 gmtk_filelistname, num_obs, output_filelistname,
@@ -339,7 +342,8 @@ def run_viterbi(structure_filename, input_master_filename, output_filename,
                  nf1=num_obs,
                  ni1=0,
 
-                 cppCommandOptions="-DVITERBI")
+                 cppCommandOptions="-DVITERBI",
+                 verbosity=VERBOSITY)
 
 def run(*bed_filelistnames):
     # XXX: use binary I/O to gmtk rather than ascii
