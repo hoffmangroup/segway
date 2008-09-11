@@ -1,0 +1,97 @@
+#include "/net/noble/vol2/home/mmh1/src/projects/gmseg/gmseg/data/seg.inc"
+
+DT_IN_FILE inline
+1
+
+0 map_parent
+1
+    -1 { p0 }
+
+NAME_COLLECTION_IN_FILE inline
+4
+
+0 collection_seg_obs0 2
+mx_seg0_obs0
+mx_seg1_obs0
+1 collection_seg_obs1 2
+mx_seg0_obs1
+mx_seg1_obs1
+2 collection_seg_obs2 2
+mx_seg0_obs2
+mx_seg1_obs2
+3 collection_seg_obs3 2
+mx_seg0_obs3
+mx_seg1_obs3
+
+#ifndef USE_TRAINABLE_PARAMS
+DPMF_IN_FILE inline
+1
+
+0 dpmf_always 1 1.0
+
+DENSE_CPT_IN_FILE inline
+2
+
+0
+start_seg
+0
+CARD_SEG
+2.5663993810991484e-53 1.0
+
+1
+seg_seg
+1
+CARD_SEG CARD_SEG
+0.9973770600135393 0.002622939986746211
+0.0034731137880383224 0.9965268862118478
+
+MEAN_IN_FILE inline
+8
+
+0 mean_seg0_obs0 1 4.0516137766561275
+1 mean_seg0_obs1 1 0.5291423211505971
+2 mean_seg0_obs2 1 0.8301102252914682
+3 mean_seg0_obs3 1 0.9318370575373977
+4 mean_seg1_obs0 1 3.1769722237032805
+5 mean_seg1_obs1 1 3.244865773504687
+6 mean_seg1_obs2 1 1.3382102503478481
+7 mean_seg1_obs3 1 0.4334801539052185
+
+COVAR_IN_FILE inline
+8
+
+0 covar_seg0_obs0 1 0.31454656672721826
+1 covar_seg0_obs1 1 0.33480862269285944
+2 covar_seg0_obs2 1 0.01643889453242561
+3 covar_seg0_obs3 1 0.9077748205469952
+4 covar_seg1_obs0 1 0.32097880815153684
+5 covar_seg1_obs1 1 25.723391976980526
+6 covar_seg1_obs2 1 0.2081355269496329
+7 covar_seg1_obs3 1 0.14122317846406135
+
+MC_IN_FILE inline
+8
+
+0 1 0 mc_seg0_obs0 mean_seg0_obs0 covar_seg0_obs0
+1 1 0 mc_seg0_obs1 mean_seg0_obs1 covar_seg0_obs1
+2 1 0 mc_seg0_obs2 mean_seg0_obs2 covar_seg0_obs2
+3 1 0 mc_seg0_obs3 mean_seg0_obs3 covar_seg0_obs3
+4 1 0 mc_seg1_obs0 mean_seg1_obs0 covar_seg1_obs0
+5 1 0 mc_seg1_obs1 mean_seg1_obs1 covar_seg1_obs1
+6 1 0 mc_seg1_obs2 mean_seg1_obs2 covar_seg1_obs2
+7 1 0 mc_seg1_obs3 mean_seg1_obs3 covar_seg1_obs3
+
+MX_IN_FILE inline
+8
+
+0 1 mx_seg0_obs0 1 dpmf_always mc_seg0_obs0
+1 1 mx_seg0_obs1 1 dpmf_always mc_seg0_obs1
+2 1 mx_seg0_obs2 1 dpmf_always mc_seg0_obs2
+3 1 mx_seg0_obs3 1 dpmf_always mc_seg0_obs3
+4 1 mx_seg1_obs0 1 dpmf_always mc_seg1_obs0
+5 1 mx_seg1_obs1 1 dpmf_always mc_seg1_obs1
+6 1 mx_seg1_obs2 1 dpmf_always mc_seg1_obs2
+7 1 mx_seg1_obs3 1 dpmf_always mc_seg1_obs3
+
+
+#endif

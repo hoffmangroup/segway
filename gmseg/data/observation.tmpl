@@ -1,5 +1,5 @@
    variable: obs$observation_index {
      type: continuous observed $observation_index:$observation_index;
      conditionalparents: seg(0) using mixture collection("collection_seg_obs$observation_index")
-                         mapping("seg_obs$observation_index");
+                         mapping("map_parent");
    }

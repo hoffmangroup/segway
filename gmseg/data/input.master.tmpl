@@ -1,15 +1,19 @@
 #include "${include_filename}"
 
-#define BINARY_DT 1 0 2 0 default -1 0 -1 1
+DT_IN_FILE inline
+1
 
-$dt_spec
+0 map_parent
+1
+    -1 { p0 }
+
 $name_collection_spec
 
-#ifndef VITERBI
+#ifndef USE_TRAINABLE_PARAMS
 DPMF_IN_FILE inline
 1
 
-0 dpmfOne 1 1.0
+0 dpmf_always 1 1.0
 
 DENSE_CPT_IN_FILE inline
 2
