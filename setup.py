@@ -36,7 +36,9 @@ entry_points = """
 gmseg = gmseg.run:main
 """
 
-install_requires = ["optbuild"]
+# make sure you have LDFLAGS unset if you are building numpy
+
+install_requires = ["numpy", "optbuild"]
 
 setup(name=name,
       version=__version__,

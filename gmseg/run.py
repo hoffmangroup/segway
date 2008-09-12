@@ -11,7 +11,7 @@ __version__ = "$Revision$"
 
 from itertools import count, izip
 from math import floor, log10
-from os import close as os_close, extsep, fdopen
+from os import close as os_close, extsep, fdopen, makedirs
 import shutil
 from random import random
 from shutil import move
@@ -34,14 +34,25 @@ MAX_EM_ITERS = 100
 VERBOSITY = 0
 TEMPDIR_PREFIX = "gmseg-"
 COVAR_TIED = True # would need to expand to MC, MX to fix
+WIG_DIRNAME = "out"
 
 # defaults
 RANDOM_STARTS = 1
 
+# programs
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace("gmtkEMtrainNew")
 VITERBI_PROG = OptionBuilder_ShortOptWithSpace("gmtkViterbiNew")
 
+# extensions and suffixes
+EXT_WIG = "wig"
+EXT_LIST = "list"
+EXT_OUT = "out"
+
+SUFFIX_LIST = extsep + EXT_LIST
+SUFFIX_OUT = extsep + EXT_OUT
+
+# templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
 RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_DONT_TRAIN = "dont_train.list"
@@ -60,12 +71,7 @@ MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmf_always mc_${seg}_${obs}"
 NAME_COLLECTION_TMPL = "$obs_index collection_seg_${obs} 2"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${obs}"
 
-EXT_WIG = "wig"
-EXT_LIST = "list"
-EXT_OUT = "out"
-
-SUFFIX_LIST = extsep + EXT_LIST
-SUFFIX_OUT = extsep + EXT_OUT
+WIG_FILENAME_FMT = extsep.join(["%d", EXT_WIG])
 
 TRACK_FMT = "browser position %s:%s-%s"
 
@@ -335,13 +341,6 @@ def load_gmtk_out_save_wig(observations, gmtk_outfilename, wig_filename):
         with open(wig_filename, "w") as wig_file:
             return write_wig(wig_file, data, observations)
 
-def gmtk_out2wig(filenames, observations_list):
-    zipper = izip(count(), filenames, observations_list)):
-
-    for index, gmtk_outfilename, observations in zipper:
-        wig_filename = extsep.join([filename.rpartition(".")[0], EXT_WIG])
-        load_gmtk_out_save_wig(observations, gmtk_outfilename, wig_filename)
-
 class Runner(object):
     def __init__(self, **kwargs):
         # filenames
@@ -360,6 +359,8 @@ class Runner(object):
         self.dumpnames_filename = None
         self.output_filelistname = None
         self.output_filenames = None
+
+        self.wig_dirname = WIG_DIRNAME
 
         # data
         self.observations_list = None
@@ -413,6 +414,9 @@ class Runner(object):
 
         self.log_likelihood_filename = \
             mkstemp_closed(".ll", "likelihood-", self.tempdirname)
+
+    def make_wig_dir(self):
+        makedirs(self.wig_dirname)
 
     def save_include(self):
         self.include_filename = data_filename("seg.inc")
@@ -520,6 +524,7 @@ class Runner(object):
         if self.identify:
             self.save_output_filelist()
             self.save_dumpnames()
+            self.make_wig_dir()
 
     def move_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -528,6 +533,17 @@ class Runner(object):
             dst_filename = src_filename
 
         setattr(self, name, dst_filename)
+
+    def gmtk_out2wig(self):
+        zipper = izip(count(), self.output_filenames, self.observations_list)
+        wig_dirpath = path(self.wig_dirname)
+        wig_filepath_fmt = wig_dirpath / WIG_FILENAME_FMT
+
+        for index, gmtk_outfilename, observations in zipper:
+            wig_filename = wig_filepath_fmt % index
+
+            load_gmtk_out_save_wig(observations, gmtk_outfilename,
+                                   wig_filename)
 
     def run_triangulate(self):
         # XXX: should specify the triangulation file
@@ -605,7 +621,7 @@ class Runner(object):
                      cppCommandOptions=cpp_options,
                      verbosity=VERBOSITY)
 
-        gmtk_out2wig(self.output_filenames, self.observations_list)
+        self.gmtk_out2wig()
 
     def __call__(self):
         # XXX: use binary I/O to gmtk rather than ascii
@@ -627,9 +643,6 @@ class Runner(object):
 
                 if self.identify:
                     self.run_identify()
-
-                # XXX: write the wig files somewhere sensible
-                import pdb; pdb.set_trace()
         finally:
             self.tempdirname = None
 
