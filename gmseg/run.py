@@ -9,11 +9,12 @@ __version__ = "$Revision$"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
-from itertools import izip
+from itertools import count, izip
 from math import floor, log10
 from os import close as os_close, extsep, fdopen
 import shutil
 from random import random
+from shutil import move
 from string import Template
 from struct import calcsize, unpack
 import sys
@@ -33,6 +34,9 @@ MAX_EM_ITERS = 100
 VERBOSITY = 0
 TEMPDIR_PREFIX = "gmseg-"
 COVAR_TIED = True # would need to expand to MC, MX to fix
+
+# defaults
+RANDOM_STARTS = 1
 
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace("gmtkEMtrainNew")
@@ -69,6 +73,8 @@ TRACK_FMT = "browser position %s:%s-%s"
 WIG_HEADER = 'track type=wiggle_0 name=gmseg ' \
     'description="segmentation by gmseg" visibility=dense viewLimits=0:1' \
     'autoScale=off'
+
+TRAIN_ATTRNAMES = ["input_master_filename", "trainable_params_filename"]
 
 def mkstemp_file(*args, **kwargs):
     temp_fd, temp_filename = mkstemp(*args, **kwargs)
@@ -322,16 +328,19 @@ def write_wig(outfile, output, observations):
         row = [datum.chrom, datum.chromStart, datum.chromEnd, str(score)]
         print >>outfile, "\t".join(row)
 
-def load_gmtk_out_save_wig(filename, observations):
-    wigfilename = extsep.join([filename.rpartition(".")[0], EXT_WIG])
+def load_gmtk_out_save_wig(observations, gmtk_outfilename, wig_filename):
+    with open(gmtk_outfilename) as gmtk_outfile:
+        data = read_gmtk_out(gmtk_outfile)
 
-    with open(filename) as gmtkfile:
-        with open(wigfilename, "w") as wigfile:
-            return write_wig(wigfile, read_gmtk_out(gmtkfile), observations)
+        with open(wig_filename, "w") as wig_file:
+            return write_wig(wig_file, data, observations)
 
 def gmtk_out2wig(filenames, observations_list):
-    for filename, observations in zip(filenames, observations_list):
-        load_gmtk_out_save_wig(filename, observations)
+    zipper = izip(count(), filenames, observations_list)):
+
+    for index, gmtk_outfilename, observations in zipper:
+        wig_filename = extsep.join([filename.rpartition(".")[0], EXT_WIG])
+        load_gmtk_out_save_wig(observations, gmtk_outfilename, wig_filename)
 
 class Runner(object):
     def __init__(self, **kwargs):
@@ -345,6 +354,7 @@ class Runner(object):
 
         self.trainable_params_filename = None
         self.tempdirname = None
+        self.log_likelihood_filename = None
         self.dont_train_filename = None
 
         self.dumpnames_filename = None
@@ -358,6 +368,7 @@ class Runner(object):
 
         # variables
         self.num_segs = NUM_SEGS
+        self.random_starts = RANDOM_STARTS
 
         # flags
         self.delete_existing = False
@@ -379,6 +390,30 @@ class Runner(object):
         # XXX: wrong format, butunused so far
         self.observation_offsets = observation_offsets
 
+    def load_log_likelihood(self):
+        with open(self.log_likelihood_filename) as infile:
+            return float(infile.read().strip())
+
+    def set_trainable_params_filename(self, new=False):
+        # if this is not run and trainable_params_filename is
+        # unspecified, then it won't be passed to gmtkViterbiNew
+
+        trainable_params_filename = self.trainable_params_filename
+        if not new and trainable_params_filename:
+            if (not self.delete_existing
+                and path(trainable_params_filename).exists()):
+                # it already exists and you don't want to force regen
+                self.train = False
+        else:
+            self.trainable_params_filename = \
+                mkstemp_closed(".params", "params-", self.tempdirname)
+
+    def set_log_likelihood_filename(self):
+        # XXX: for now, this is always a tempfile
+
+        self.log_likelihood_filename = \
+            mkstemp_closed(".ll", "likelihood-", self.tempdirname)
+
     def save_include(self):
         self.include_filename = data_filename("seg.inc")
 
@@ -393,9 +428,9 @@ class Runner(object):
         mapping = dict(include_filename=self.include_filename,
                        observations=observations)
 
-        self.structure_filename = save_template(self.outfilename, RES_STR_TMPL,
-                                                mapping, self.tempdirname,
-                                                self.delete_existing)
+        self.structure_filename = \
+            save_template(self.structure_filename, RES_STR_TMPL, mapping,
+                          self.tempdirname, self.delete_existing)
 
     def save_observations(self):
         observation_rows_list = self.observations_list
@@ -417,22 +452,27 @@ class Runner(object):
         # XXX: assert that the appropriate coordinates for each Datum
         # are aligned
 
-    def save_input_master(self):
+    def save_input_master(self, new=False):
         num_segs = self.num_segs
         num_obs = self.num_obs
         observation_array = self.observation_array
 
-        include_filename=self.include_filename
+        include_filename = self.include_filename
 
-        dense_cpt_spec = make_dense_cpt_spec(num_segs),
+        if new:
+            input_master_filename = None
+        else:
+            input_master_filename = self.input_master_filename
+
+        dense_cpt_spec = make_dense_cpt_spec(num_segs)
         mean_spec = make_mean_spec(num_segs, num_obs, observation_array)
         covar_spec = make_covar_spec(num_segs, num_obs, observation_array)
-        mc_spec = make_mc_spec(num_segs, num_obs),
-        mx_spec = make_mx_spec(num_segs, num_obs),
+        mc_spec = make_mc_spec(num_segs, num_obs)
+        mx_spec = make_mx_spec(num_segs, num_obs)
         name_collection_spec = make_name_collection_spec(num_segs, num_obs)
 
         self.input_master_filename = \
-            save_template(self.input_master_filename, RES_INPUT_MASTER_TMPL,
+            save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
                           locals(), self.tempdirname, self.delete_existing)
 
     def save_dont_train(self):
@@ -472,14 +512,22 @@ class Runner(object):
         self.load_observations()
         self.save_observations()
 
-        self.save_input_master()
-
         if self.train:
             self.save_dont_train()
+            self.set_trainable_params_filename() # might turn off self.train
+            self.set_log_likelihood_filename()
 
         if self.identify:
             self.save_output_filelist()
             self.save_dumpnames()
+
+    def move_results(self, name, src_filename, dst_filename):
+        if dst_filename:
+            move(src_filename, dst_filename)
+        else:
+            dst_filename = src_filename
+
+        setattr(self, name, dst_filename)
 
     def run_triangulate(self):
         # XXX: should specify the triangulation file
@@ -487,25 +535,10 @@ class Runner(object):
                          verbosity=VERBOSITY)
 
     def run_train(self):
-        # if this is not run and trainable_params_filename is
-        # unspecified, then it won't be passed to gmtkViterbiNew
-
-        trainable_params_filename = self.trainable_params_filename
-        if trainable_params_filename:
-            if (not self.delete_existing
-                  and path(trainable_params_filename).exists()):
-                return
-        else:
-            trainable_params_filename = mkstemp_closed(".params", "params-",
-                                                       self.tempdirname)
-
-            self.trainable_params_filename = trainable_params_filename
-
-        EM_TRAIN_PROG(strFile=self.structure_filename,
-
-                      inputMasterFile=self.input_master_filename,
-                      outputTrainableParameters=trainable_params_filename,
-                      objsNotToTrain=dont_train_filename,
+        # XXX: this can be a parallel departure point
+        kwargs = dict(strFile=self.structure_filename,
+                      objsNotToTrain=self.dont_train_filename,
+                      llStoreFile=self.log_likelihood_filename,
 
                       of1=self.gmtk_obs_filelistname,
                       fmt1="ascii",
@@ -515,7 +548,41 @@ class Runner(object):
                       maxEmIters=MAX_EM_ITERS,
                       verbosity=VERBOSITY)
 
+        dst_filenames = [self.input_master_filename,
+                         self.trainable_params_filename]
+
+        # list of tuples(log_likelihood, input_master_filename,
+        #                trainable_params_filename)
+        start_params = []
+
+        for start_index in xrange(self.random_starts):
+            # XXX: re-add the ability to set your own starting parameters,
+            # with new=start_index
+            # (copy from existing rather than using it on command-line)
+            self.save_input_master(new=True)
+            self.set_trainable_params_filename(new=True)
+
+            input_master_filename = self.input_master_filename
+            trainable_params_filename = self.trainable_params_filename
+
+            EM_TRAIN_PROG(inputMasterFile=input_master_filename,
+                          outputTrainableParameters=trainable_params_filename,
+                          **kwargs)
+
+            start_params.append((self.load_log_likelihood(),
+                                 input_master_filename,
+                                 trainable_params_filename))
+
+        src_filenames = max(start_params)[1:]
+
+        zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
+        for name, src_filename, dst_filename in zipper:
+            self.move_results(name, src_filename, dst_filename)
+
     def run_identify(self):
+        if not self.input_master_filename:
+            self.save_input_master()
+
         trainable_params_filename = self.trainable_params_filename
         if trainable_params_filename:
             cpp_options = "-DUSE_TRAINABLE_PARAMS"
@@ -572,7 +639,7 @@ def parse_options(args):
     usage = "%prog [OPTION]... FILELIST..."
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
-    # XXX: group here
+    # XXX: group here: filenames
     parser.add_option("--input-master", "-i", metavar="FILE",
                       help="use input master file FILE; "
                       "create if it doesn't exist")
@@ -581,11 +648,16 @@ def parse_options(args):
                       help="use structure file FILE; "
                       "create if it doesn't exist")
 
-    parser.add_option("--trainable-parameters", "-t", metavar="FILE",
+    parser.add_option("--trainable-params", "-t", metavar="FILE",
                       help="use trainable parameters file FILE; "
                       "create if it doesn't exist")
 
-    # XXX: group here
+    # XXX: group here: variables
+    parser.add_option("--random-starts", "-r", type=int, default=RANDOM_STARTS,
+                      metavar="NUM",
+                      help="randomize start parameters NUM times")
+
+    # XXX: group here: flag options
     parser.add_option("--force", "-f", action="store_true",
                       help="delete any preexisting files")
     parser.add_option("--no-identify", "-I", action="store_true",
@@ -604,13 +676,19 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    runner = Runner(bed_obs_filelistnames=args,
-                    input_master_filename=options.input_master,
-                    structure_filename=options.structure,
-                    trainable_params_filename=options.trainable_parameters,
-                    delete_existing=options.force,
-                    train=not options.no_train,
-                    identify=not options.no_identify)
+    runner = Runner()
+
+    runner.bed_obs_filelistnames = args
+    runner.input_master_filename = options.input_master
+    runner.structure_filename = options.structure
+    runner.trainable_params_filename = options.trainable_params
+
+    runner.random_starts = options.random_starts
+
+    runner.delete_existing = options.force
+    runner.train = not options.no_train
+    runner.identify = not options.no_identify
+
     return runner()
 
 if __name__ == "__main__":
