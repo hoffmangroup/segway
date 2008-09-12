@@ -197,7 +197,9 @@ def make_covar_spec(num_segs, num_obs, observation_array):
     else:
         tmpl = COVAR_TMPL_UNTIED
 
-    rands = make_rands(0, calc_range_array(observation_array), num_segs)
+    # always start with maximum variance
+    data = array([amax(observation_array, 0) - amin(observation_array, 0)
+                  for seg_idnex in xrange(num_segs)])
 
     return make_spec_multiseg("COVAR", tmpl, num_segs, num_obs, data)
 
@@ -250,6 +252,9 @@ def save_input_master(input_master_filename, include_filename,
     return save_template(input_master_filename, "input.master.tmpl",
                          mapping, tempdirname, delete_existing)
 
+def save_dont_train():
+    return data_filename("dont_train.list")
+
 def load_observations_bed(bed_filename):
     with open(bed_filename) as bed_file:
 
@@ -301,9 +306,6 @@ def lists2array(observations_list):
     observation_offsets = map(len, observations_list)
 
     return observation_array, observation_offsets
-
-def calc_range_array(arr):
-    return amax(arr, 0) - amin(arr, 0)
 
 def save_observations_gmtk(observation_rows, prefix, tempdirname):
     temp_file, temp_filename = mkstemp_file(".obs", prefix, tempdirname)
@@ -482,8 +484,6 @@ def run(bed_filelistnames, input_master_filename=None,
         observations_list = load_observations_lists(bed_filelistnames)
         observation_array, observation_offsets = lists2array(observations_list)
 
-        range_array = calc_range_array(observation_array)
-
         # XXX: assert that the appropriate coordinates for each Datum
         # are aligned
         gmtk_filelistname = save_observations_list(observations_list,
@@ -495,6 +495,8 @@ def run(bed_filelistnames, input_master_filename=None,
 
         # XXX: make tempfile to specify for -jtFile for both em and viterbi
         if train:
+            dont_train_filename = save_dont_train()
+
             # if this is not run and trainable_params_filename is
             # unspecified, then it won't be passed to gmtkViterbiNew
             trainable_params_filename = \
@@ -513,8 +515,8 @@ def run(bed_filelistnames, input_master_filename=None,
                         output_filelistname, dumpnames_filename)
 
             gmtk_out2wig(output_filenames, observations_list)
-
-        import pdb; pdb.set_trace()
+            # XXX: we have got to write the wig files somewhere sensible
+            import pdb; pdb.set_trace()
 
 def parse_options(args):
     from optparse import OptionParser

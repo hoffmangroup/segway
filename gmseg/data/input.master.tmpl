@@ -10,27 +10,13 @@ DT_IN_FILE inline
 $name_collection_spec
 
 #ifndef USE_TRAINABLE_PARAMS
+
 DPMF_IN_FILE inline
 1
 
 0 dpmf_always 1 1.0
 
-DENSE_CPT_IN_FILE inline
-2
-
-0
-start_seg
-0
-CARD_SEG
-0.9 0.1
-
-1
-seg_seg
-1
-CARD_SEG CARD_SEG
-0.9 0.1
-0.1 0.9
-
+$dense_cpt_spec
 $mean_spec
 $covar_spec
 $mc_spec
