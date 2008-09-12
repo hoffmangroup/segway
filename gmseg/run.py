@@ -19,6 +19,8 @@ from struct import calcsize, unpack
 import sys
 from tempfile import mkstemp
 
+from numpy import amin, amax, array
+from numpy.random import uniform
 from optbuild import OptionBuilder_ShortOptWithSpace
 from path import path
 
@@ -30,6 +32,7 @@ NUM_SEGS = 2
 MAX_EM_ITERS = 100
 VERBOSITY = 0
 TEMPDIR_PREFIX = "gmseg-"
+COVAR_TIED = True # would need to expand to MC, MX to fix
 
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace("gmtkEMtrainNew")
@@ -38,8 +41,11 @@ VITERBI_PROG = OptionBuilder_ShortOptWithSpace("gmtkViterbiNew")
 DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
 DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
 
-MEAN_TMPL = "$index mean_${seg}_${obs} 1 0.0"
-COVAR_TMPL = "$index covar_${obs} 1 1.0"
+MEAN_TMPL = "$index mean_${seg}_${obs} 1 ${rand}"
+
+COVAR_TMPL_TIED = "$index covar_${obs} 1 ${rand}"
+COVAR_TMPL_UNTIED = "$index covar_${seg}_${obs} 1 ${rand}" # unused as of yet
+
 MC_TMPL = "$index 1 0 mc_${seg}_${obs} mean_${seg}_${obs} covar_${obs}"
 MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmf_always mc_${seg}_${obs}"
 
@@ -120,7 +126,7 @@ def make_spec(name, items):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
 #                             for index in xrange(num_obs)])
 
-def make_items_multiseg(tmpl, num_segs, num_obs):
+def make_items_multiseg(tmpl, num_segs, num_obs, data=None):
     substitute = Template(tmpl).substitute
 
     res = []
@@ -132,6 +138,8 @@ def make_items_multiseg(tmpl, num_segs, num_obs):
             mapping = dict(seg=seg, obs=obs,
                            seg_index=seg_index, obs_index=obs_index,
                            index=num_obs*seg_index + obs_index)
+            if data is not None:
+                mapping["rand"] = data[seg_index, obs_index]
 
             res.append(substitute(mapping))
 
@@ -140,7 +148,7 @@ def make_items_multiseg(tmpl, num_segs, num_obs):
 def make_spec_multiseg(name, *args, **kwargs):
     return make_spec(name, make_items_multiseg(*args, **kwargs))
 
-# XXXopt: numpy
+# XXX: numpy
 def make_normalized_random_rows(num_rows, num_cols):
     res = []
 
@@ -172,11 +180,26 @@ def make_dense_cpt_spec(num_segs):
 
     return make_spec("DENSE_CPT", items)
 
-def make_mean_spec(num_segs, num_obs):
-    return make_spec_multiseg("MEAN", MEAN_TMPL, num_segs, num_obs)
+def make_rands(low, high, num_segs):
+    return array([uniform(low, high)
+                  for seg_index in xrange(num_segs)])
 
-def make_covar_spec(num_segs, num_obs):
-    return make_spec_multiseg("COVAR", COVAR_TMPL, 1, num_obs)
+def make_mean_spec(num_segs, num_obs, observation_array):
+    rands = make_rands(amin(observation_array, 0), amax(observation_array, 0),
+                       num_segs)
+
+    return make_spec_multiseg("MEAN", MEAN_TMPL, num_segs, num_obs, rands)
+
+def make_covar_spec(num_segs, num_obs, observation_array):
+    if COVAR_TIED:
+        num_segs = 1
+        tmpl = COVAR_TMPL_TIED
+    else:
+        tmpl = COVAR_TMPL_UNTIED
+
+    rands = make_rands(0, calc_range_array(observation_array), num_segs)
+
+    return make_spec_multiseg("COVAR", tmpl, num_segs, num_obs, data)
 
 def make_mc_spec(num_segs, num_obs):
     return make_spec_multiseg("MC", MC_TMPL, num_segs, num_obs)
@@ -207,14 +230,18 @@ def make_name_collection_spec(num_segs, num_obs):
 
     return make_spec("NAME_COLLECTION", items)
 
-def save_input_master(input_master_filename, include_filename, num_obs,
-                      tempdirname, delete_existing):
+def save_input_master(input_master_filename, include_filename,
+                      observation_array, tempdirname, delete_existing):
     num_segs = NUM_SEGS
+    num_obs = observation_array.shape[1]
+
+    mean_spec = make_mean_spec(num_segs, num_obs, observation_array)
+    covar_spec = make_covar_spec(num_segs, num_obs, observation_array)
 
     mapping = dict(include_filename=include_filename,
                    dense_cpt_spec=make_dense_cpt_spec(num_segs),
-                   mean_spec=make_mean_spec(num_segs, num_obs),
-                   covar_spec=make_covar_spec(num_segs, num_obs),
+                   mean_spec=mean_spec,
+                   covar_spec=covar_spec,
                    mc_spec=make_mc_spec(num_segs, num_obs),
                    mx_spec=make_mx_spec(num_segs, num_obs),
                    name_collection_spec=make_name_collection_spec(num_segs,
@@ -258,40 +285,25 @@ def load_observations_lists(bed_filelistnames):
         res.append(zip(*observations_bed_iterators))
 
     # returns a list
-    # each item (data) is a list
-    # each subitem (vector) is a tuple
-    # each sub-subitem (scalar) is a .bed.Datum
+    # each item (observation_rows) is a list
+    # each subitem (observation_row) is a tuple
+    # each sub-subitem (datum) is a .bed.Datum
     return res
 
-# XXX: I'm doing it twice
-# at some point, I should get rid of the non-array reading method
-def load_observations_array(bed_filelistnames):
-    """
-    returns a list (filename) of arrays (filelist, row)
-    """
-    res = []
+# XXXopt: read in directly into this format
+def lists2array(observations_list):
+    # shape of each array = (num_rows, num_obs)
+    observation_array = array([[float(datum.score)
+                                for datum in observation_row]
+                               for observation_rows in observations_list
+                               for observation_row in observation_rows])
+    # XXX: should become cumulative
+    observation_offsets = map(len, observations_list)
 
-    for bed_filelistname in bed_filelistnames:
-        with open(bed_filelistname) as bed_filelist:
-            scores = []
+    return observation_array, observation_offsets
 
-            for line in bed_filelist:
-                bed_filename = line.rstrip()
-
-                with open(bed_filename) as bed_file:
-                    scores.append([float(datum.score)
-                                   for datum in read(bed_file)])
-
-    return res
-
-# XXXopt: numpy
-def get_range_observations(observations_list):
-    mins, maxs = XXX
-
-    for observations in observations_list:
-        for observation in observations:
-            for observation_component in observation:
-                XXX
+def calc_range_array(arr):
+    return amax(arr, 0) - amin(arr, 0)
 
 def save_observations_gmtk(observation_rows, prefix, tempdirname):
     temp_file, temp_filename = mkstemp_file(".obs", prefix, tempdirname)
@@ -468,8 +480,9 @@ def run(bed_filelistnames, input_master_filename=None,
         # input: multiple lists -> multiple filenames -> one column
         # output: one list -> multiple_filenames -> multiple columns
         observations_list = load_observations_lists(bed_filelistnames)
+        observation_array, observation_offsets = lists2array(observations_list)
 
-        range_observations = get_range_observations(observations_list)
+        range_array = calc_range_array(observation_array)
 
         # XXX: assert that the appropriate coordinates for each Datum
         # are aligned
@@ -477,8 +490,8 @@ def run(bed_filelistnames, input_master_filename=None,
                                                    tempdirname)
 
         input_master_filename = \
-            save_input_master(input_master_filename, include_filename, num_obs,
-                              tempdirname, delete_existing)
+            save_input_master(input_master_filename, include_filename,
+                              observation_array, tempdirname, delete_existing)
 
         # XXX: make tempfile to specify for -jtFile for both em and viterbi
         if train:
@@ -525,8 +538,10 @@ def parse_options(args):
     # XXX: group here
     parser.add_option("--force", "-f", action="store_true",
                       help="delete any preexisting files")
+    parser.add_option("--no-identify", "-I", action="store_true",
+                      help="do not identify segments")
     parser.add_option("--no-train", "-T", action="store_true",
-                      help="do not engage in EM training")
+                      help="do not train model")
 
     options, args = parser.parse_args(args)
 
@@ -542,7 +557,8 @@ def main(args=sys.argv[1:]):
     return run(args, input_master_filename=options.input_master,
                structure_filename=options.structure,
                trainable_params_filename=options.trainable_parameters,
-               delete_existing=options.force, train=not options.no_train)
+               delete_existing=options.force, train=not options.no_train,
+               identify=not options.no_identify)
 
 if __name__ == "__main__":
     sys.exit(main())
