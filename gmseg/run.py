@@ -13,6 +13,7 @@ from itertools import izip
 from math import floor, log10
 from os import close as os_close, extsep, fdopen
 import shutil
+from random import random
 from string import Template
 from struct import calcsize, unpack
 import sys
@@ -33,6 +34,9 @@ TEMPDIR_PREFIX = "gmseg-"
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace("gmtkEMtrainNew")
 VITERBI_PROG = OptionBuilder_ShortOptWithSpace("gmtkViterbiNew")
+
+DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
+DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
 
 MEAN_TMPL = "$index mean_${seg}_${obs} 1 0.0"
 COVAR_TMPL = "$index covar_${obs} 1 1.0"
@@ -136,19 +140,51 @@ def make_items_multiseg(tmpl, num_segs, num_obs):
 def make_spec_multiseg(name, *args, **kwargs):
     return make_spec(name, make_items_multiseg(*args, **kwargs))
 
-def make_mean_spec(num_obs):
-    return make_spec_multiseg("MEAN", MEAN_TMPL, NUM_SEGS, num_obs)
+# XXXopt: numpy
+def make_normalized_random_rows(num_rows, num_cols):
+    res = []
 
-def make_covar_spec(num_obs):
+    for row_index in xrange(num_rows):
+        row_raw = []
+        for col_index in xrange(num_cols):
+            row_raw.append(random())
+
+        total = sum(row_raw)
+
+        res.extend([item_raw/total for item_raw in row_raw])
+
+    return res
+
+def make_random_spec(frag, *args, **kwargs):
+    random_rows = make_normalized_random_rows(*args, **kwargs)
+
+    return " ".join([frag] + [str(row) for row in random_rows])
+
+def make_dense_cpt_start_seg_spec(num_segs):
+    return make_random_spec(DENSE_CPT_START_SEG_FRAG, 1, num_segs)
+
+def make_dense_cpt_seg_seg_spec(num_segs):
+    return make_random_spec(DENSE_CPT_SEG_SEG_FRAG, num_segs, num_segs)
+
+def make_dense_cpt_spec(num_segs):
+    items = [make_dense_cpt_start_seg_spec(num_segs),
+             make_dense_cpt_seg_seg_spec(num_segs)]
+
+    return make_spec("DENSE_CPT", items)
+
+def make_mean_spec(num_segs, num_obs):
+    return make_spec_multiseg("MEAN", MEAN_TMPL, num_segs, num_obs)
+
+def make_covar_spec(num_segs, num_obs):
     return make_spec_multiseg("COVAR", COVAR_TMPL, 1, num_obs)
 
-def make_mc_spec(num_obs):
-    return make_spec_multiseg("MC", MC_TMPL, NUM_SEGS, num_obs)
+def make_mc_spec(num_segs, num_obs):
+    return make_spec_multiseg("MC", MC_TMPL, num_segs, num_obs)
 
-def make_mx_spec(num_obs):
-    return make_spec_multiseg("MX", MX_TMPL, NUM_SEGS, num_obs)
+def make_mx_spec(num_segs, num_obs):
+    return make_spec_multiseg("MX", MX_TMPL, num_segs, num_obs)
 
-def make_name_collection_spec(num_obs):
+def make_name_collection_spec(num_segs, num_obs):
     num_segs = NUM_SEGS
     substitute = Template(NAME_COLLECTION_TMPL).substitute
     substitute_contents = Template(NAME_COLLECTION_CONTENTS_TMPL).substitute
@@ -173,13 +209,16 @@ def make_name_collection_spec(num_obs):
 
 def save_input_master(input_master_filename, include_filename, num_obs,
                       tempdirname, delete_existing):
+    num_segs = NUM_SEGS
+
     mapping = dict(include_filename=include_filename,
-                   #dt_spec=make_dt_spec(num_obs),
-                   mean_spec=make_mean_spec(num_obs),
-                   covar_spec=make_covar_spec(num_obs),
-                   mc_spec=make_mc_spec(num_obs),
-                   mx_spec=make_mx_spec(num_obs),
-                   name_collection_spec=make_name_collection_spec(num_obs))
+                   dense_cpt_spec=make_dense_cpt_spec(num_segs),
+                   mean_spec=make_mean_spec(num_segs, num_obs),
+                   covar_spec=make_covar_spec(num_segs, num_obs),
+                   mc_spec=make_mc_spec(num_segs, num_obs),
+                   mx_spec=make_mx_spec(num_segs, num_obs),
+                   name_collection_spec=make_name_collection_spec(num_segs,
+                                                                  num_obs))
 
     return save_template(input_master_filename, "input.master.tmpl",
                          mapping, tempdirname, delete_existing)
@@ -219,10 +258,40 @@ def load_observations_lists(bed_filelistnames):
         res.append(zip(*observations_bed_iterators))
 
     # returns a list
-    # each item is a list
-    # each subitem is a tuple
-    # each sub-subitem is a .bed.Datum
+    # each item (data) is a list
+    # each subitem (vector) is a tuple
+    # each sub-subitem (scalar) is a .bed.Datum
     return res
+
+# XXX: I'm doing it twice
+# at some point, I should get rid of the non-array reading method
+def load_observations_array(bed_filelistnames):
+    """
+    returns a list (filename) of arrays (filelist, row)
+    """
+    res = []
+
+    for bed_filelistname in bed_filelistnames:
+        with open(bed_filelistname) as bed_filelist:
+            scores = []
+
+            for line in bed_filelist:
+                bed_filename = line.rstrip()
+
+                with open(bed_filename) as bed_file:
+                    scores.append([float(datum.score)
+                                   for datum in read(bed_file)])
+
+    return res
+
+# XXXopt: numpy
+def get_range_observations(observations_list):
+    mins, maxs = XXX
+
+    for observations in observations_list:
+        for observation in observations:
+            for observation_component in observation:
+                XXX
 
 def save_observations_gmtk(observation_rows, prefix, tempdirname):
     temp_file, temp_filename = mkstemp_file(".obs", prefix, tempdirname)
@@ -380,7 +449,7 @@ def run_viterbi(structure_filename, input_master_filename,
 
 def run(bed_filelistnames, input_master_filename=None,
         structure_filename=None, trainable_params_filename=None,
-        delete_existing=False, train=True):
+        delete_existing=False, train=True, identify=True):
     # XXX: use binary I/O to gmtk rather than ascii
     # XXX: register atexit for cleanup_resources
 
@@ -396,18 +465,20 @@ def run(bed_filelistnames, input_master_filename=None,
                                             tempdirname, delete_existing)
         run_triangulate(structure_filename)
 
-        input_master_filename = \
-            save_input_master(input_master_filename, include_filename, num_obs,
-                              tempdirname, delete_existing)
-
         # input: multiple lists -> multiple filenames -> one column
         # output: one list -> multiple_filenames -> multiple columns
         observations_list = load_observations_lists(bed_filelistnames)
+
+        range_observations = get_range_observations(observations_list)
 
         # XXX: assert that the appropriate coordinates for each Datum
         # are aligned
         gmtk_filelistname = save_observations_list(observations_list,
                                                    tempdirname)
+
+        input_master_filename = \
+            save_input_master(input_master_filename, include_filename, num_obs,
+                              tempdirname, delete_existing)
 
         # XXX: make tempfile to specify for -jtFile for both em and viterbi
         if train:
@@ -419,15 +490,16 @@ def run(bed_filelistnames, input_master_filename=None,
                              num_obs, tempdirname,
                              delete_existing=delete_existing)
 
-        output_filenames, output_filelistname = \
-            save_output_filelist(len(observations_list), tempdirname)
-        dumpnames_filename = save_dumpnames(NUM_SEGS, tempdirname)
+        if identify:
+            output_filenames, output_filelistname = \
+                save_output_filelist(len(observations_list), tempdirname)
+            dumpnames_filename = save_dumpnames(NUM_SEGS, tempdirname)
 
-        run_viterbi(structure_filename, input_master_filename,
-                    trainable_params_filename, gmtk_filelistname, num_obs,
-                    output_filelistname, dumpnames_filename)
+            run_viterbi(structure_filename, input_master_filename,
+                        trainable_params_filename, gmtk_filelistname, num_obs,
+                        output_filelistname, dumpnames_filename)
 
-        gmtk_out2wig(output_filenames, observations_list)
+            gmtk_out2wig(output_filenames, observations_list)
 
         import pdb; pdb.set_trace()
 
