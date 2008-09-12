@@ -9,12 +9,12 @@ __version__ = "$Revision$"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
+from errno import ENOENT
 from itertools import count, izip
 from math import floor, log10
 from os import close as os_close, extsep, fdopen, makedirs
-import shutil
 from random import random
-from shutil import move
+from shutil import move, rmtree
 from string import Template
 from struct import calcsize, unpack
 import sys
@@ -70,8 +70,6 @@ MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmf_always mc_${seg}_${obs}"
 
 NAME_COLLECTION_TMPL = "$obs_index collection_seg_${obs} 2"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${obs}"
-
-WIG_FILENAME_FMT = extsep.join(["%d", EXT_WIG])
 
 TRACK_FMT = "browser position %s:%s-%s"
 
@@ -303,7 +301,7 @@ def mkstemp_closed(*args, **kwargs):
 
     return temp_filename
 
-def make_prefix_tmpl(num_filenames):
+def make_prefix_fmt(num_filenames):
     # make sure there aresufficient leading zeros
     return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
 
@@ -416,7 +414,16 @@ class Runner(object):
             mkstemp_closed(".ll", "likelihood-", self.tempdirname)
 
     def make_wig_dir(self):
-        makedirs(self.wig_dirname)
+        wig_dirname = self.wig_dirname
+        if self.delete_existing:
+            # just always try to delete it
+            try:
+                rmtree(self.wig_dirname)
+            except OSError, err:
+                if err.errno != ENOENT:
+                    raise
+
+        makedirs(wig_dirname)
 
     def save_include(self):
         self.include_filename = data_filename("seg.inc")
@@ -440,7 +447,7 @@ class Runner(object):
         observation_rows_list = self.observations_list
         tempdirname = self.tempdirname
 
-        prefix_tmpl = "obs" + make_prefix_tmpl(len(observation_rows_list))
+        prefix_tmpl = "obs" + make_prefix_fmt(len(observation_rows_list))
 
         temp_file, self.gmtk_obs_filelistname = mkstemp_file(SUFFIX_LIST,
                                                              dir=tempdirname)
@@ -486,7 +493,7 @@ class Runner(object):
         num_filenames = len(self.observations_list)
         tempdirname = self.tempdirname
 
-        prefix_tmpl = "out" + make_prefix_tmpl(num_filenames)
+        prefix_tmpl = "out" + make_prefix_fmt(num_filenames)
         output_filenames = \
             [mkstemp_closed(SUFFIX_OUT, prefix_tmpl % index, tempdirname)
              for index in xrange(num_filenames)]
@@ -535,10 +542,15 @@ class Runner(object):
         setattr(self, name, dst_filename)
 
     def gmtk_out2wig(self):
-        zipper = izip(count(), self.output_filenames, self.observations_list)
-        wig_dirpath = path(self.wig_dirname)
-        wig_filepath_fmt = wig_dirpath / WIG_FILENAME_FMT
+        output_filenames = self.output_filenames
 
+        prefix_fmt = make_prefix_fmt(len(output_filenames)
+        wig_filebasename_fmt = extsep.join("gmseg", prefix_fmt, EXT_WIG))
+
+        wig_dirpath = path(self.wig_dirname)
+        wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
+
+        zipper = izip(count(), output_filenames, self.observations_list)
         for index, gmtk_outfilename, observations in zipper:
             wig_filename = wig_filepath_fmt % index
 
