@@ -38,6 +38,10 @@ TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace("gmtkEMtrainNew")
 VITERBI_PROG = OptionBuilder_ShortOptWithSpace("gmtkViterbiNew")
 
+RES_STR_TMPL = "seg.str.tmpl"
+RES_INPUT_MASTER_TMPL = "input.master.tmpl"
+RES_DONT_TRAIN = "dont_train.list"
+
 DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
 DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
 
@@ -52,7 +56,12 @@ MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmf_always mc_${seg}_${obs}"
 NAME_COLLECTION_TMPL = "$obs_index collection_seg_${obs} 2"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${obs}"
 
-WIG_EXT = "wig"
+EXT_WIG = "wig"
+EXT_LIST = "list"
+EXT_OUT = "out"
+
+SUFFIX_LIST = extsep + EXT_LIST
+SUFFIX_OUT = extsep + EXT_OUT
 
 TRACK_FMT = "browser position %s:%s-%s"
 
@@ -65,9 +74,6 @@ def mkstemp_file(*args, **kwargs):
     temp_fd, temp_filename = mkstemp(*args, **kwargs)
 
     return fdopen(temp_fd, "w+"), temp_filename
-
-def save_include():
-    return data_filename("seg.inc")
 
 # def is_need_new_filename(XXXXXXXXXXXXXXXX):
 #     XXXX
@@ -98,21 +104,6 @@ def save_template(filename, resource, mapping, tempdirname=None,
         outfile.write(text)
 
     return filename
-
-def save_structure(outfilename, include_filename, num_obs, tempdirname,
-                   delete_existing):
-    observation_tmpl = Template(data_string("observation.tmpl"))
-    observation_substitute = observation_tmpl.substitute
-
-    observations = \
-        "\n".join(observation_substitute(observation_index=observation_index)
-                  for observation_index in xrange(num_obs))
-
-    mapping = dict(include_filename=include_filename,
-                   observations=observations)
-
-    return save_template(outfilename, "seg.str.tmpl", mapping, tempdirname,
-                         delete_existing)
 
 #def save_output_master():
 #    return data_filename("output.master")
@@ -232,29 +223,6 @@ def make_name_collection_spec(num_segs, num_obs):
 
     return make_spec("NAME_COLLECTION", items)
 
-def save_input_master(input_master_filename, include_filename,
-                      observation_array, tempdirname, delete_existing):
-    num_segs = NUM_SEGS
-    num_obs = observation_array.shape[1]
-
-    mean_spec = make_mean_spec(num_segs, num_obs, observation_array)
-    covar_spec = make_covar_spec(num_segs, num_obs, observation_array)
-
-    mapping = dict(include_filename=include_filename,
-                   dense_cpt_spec=make_dense_cpt_spec(num_segs),
-                   mean_spec=mean_spec,
-                   covar_spec=covar_spec,
-                   mc_spec=make_mc_spec(num_segs, num_obs),
-                   mx_spec=make_mx_spec(num_segs, num_obs),
-                   name_collection_spec=make_name_collection_spec(num_segs,
-                                                                  num_obs))
-
-    return save_template(input_master_filename, "input.master.tmpl",
-                         mapping, tempdirname, delete_existing)
-
-def save_dont_train():
-    return data_filename("dont_train.list")
-
 def load_observations_bed(bed_filename):
     with open(bed_filename) as bed_file:
 
@@ -317,21 +285,6 @@ def save_observations_gmtk(observation_rows, prefix, tempdirname):
 
     return temp_filename
 
-def save_observations_list(observation_rows_list, tempdirname):
-    prefix_tmpl = "obs" + make_prefix_tmpl(len(observation_rows_list))
-
-    temp_file, temp_filename = mkstemp_file(".list", dir=tempdirname)
-
-    with temp_file as temp_file:
-        for index, observation_rows in enumerate(observation_rows_list):
-            prefix = prefix_tmpl % index
-            text = save_observations_gmtk(observation_rows, prefix,
-                                          tempdirname)
-
-            print >>temp_file, text
-
-    return temp_filename
-
 def mkstemp_closed(*args, **kwargs):
     temp_fd, temp_filename = mkstemp(*args, **kwargs)
     os_close(temp_fd)
@@ -341,28 +294,6 @@ def mkstemp_closed(*args, **kwargs):
 def make_prefix_tmpl(num_filenames):
     # make sure there aresufficient leading zeros
     return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
-
-def save_output_filelist(num_filenames, tempdirname):
-    temp_file, temp_filename = mkstemp_file(".list", "output-", tempdirname)
-
-    prefix_tmpl = "out" + make_prefix_tmpl(num_filenames)
-    output_filenames = \
-        [mkstemp_closed(".out", prefix_tmpl % index, tempdirname)
-         for index in xrange(num_filenames)]
-
-    with temp_file as temp_file:
-        for output_filename in output_filenames:
-            print >>temp_file, output_filename
-
-    return output_filenames, temp_filename
-
-def save_dumpnames(num_segs, tempdirname):
-    temp_file, temp_filename = mkstemp_file(".list", "dumpnames-", tempdirname)
-
-    with temp_file as temp_file:
-        print >>temp_file, "seg"
-
-    return temp_filename
 
 def read_gmtk_out(infile):
     data = infile.read()
@@ -392,7 +323,7 @@ def write_wig(outfile, output, observations):
         print >>outfile, "\t".join(row)
 
 def load_gmtk_out_save_wig(filename, observations):
-    wigfilename = extsep.join([filename.rpartition(".")[0], WIG_EXT])
+    wigfilename = extsep.join([filename.rpartition(".")[0], EXT_WIG])
 
     with open(filename) as gmtkfile:
         with open(wigfilename, "w") as wigfile:
@@ -402,121 +333,238 @@ def gmtk_out2wig(filenames, observations_list):
     for filename, observations in zip(filenames, observations_list):
         load_gmtk_out_save_wig(filename, observations)
 
-def run_triangulate(structure_filename):
-    TRIANGULATE_PROG(strFile=structure_filename,
-                     verbosity=VERBOSITY)
-    # XXX: creates trifile that needs to be destroyed
-    # XXX: best to use a temporary directory for everything--see poly source
+class Runner(object):
+    def __init__(self, **kwargs):
+        # filenames
+        self.bed_obs_filelistnames = None
+        self.gmtk_obs_filelistname = None
 
-def run_em_train(structure_filename, input_master_filename,
-                 trainable_params_filename, gmtk_filelistname,
-                 num_obs, tempdirname=None, delete_existing=False):
-    if trainable_params_filename:
-        if not delete_existing and path(trainable_params_filename).exists():
-            return trainable_params_filename
-    else:
-        trainable_params_filename = mkstemp_closed(".params", "params-",
-                                                   tempdirname)
+        self.include_filename = None
+        self.input_master_filename = None
+        self.structure_filename = None
 
-    EM_TRAIN_PROG(strFile=structure_filename,
+        self.trainable_params_filename = None
+        self.tempdirname = None
+        self.dont_train_filename = None
 
-                  inputMasterFile=input_master_filename,
-                  outputTrainableParameters=trainable_params_filename,
+        self.dumpnames_filename = None
+        self.output_filelistname = None
+        self.output_filenames = None
 
-                  of1=gmtk_filelistname,
-                  fmt1="ascii",
-                  nf1=num_obs,
-                  ni1=0,
+        # data
+        self.observations_list = None
+        self.observation_array = None
+        self.observation_offsets = None
 
-                  maxEmIters=MAX_EM_ITERS,
-                  verbosity=VERBOSITY)
+        # variables
+        self.num_segs = NUM_SEGS
 
-    return trainable_params_filename
+        # flags
+        self.delete_existing = False
+        self.triangulate = True
+        self.train = True # EM train # this should become an int for num_starts
+        self.identify = True # viterbi
 
-def run_viterbi(structure_filename, input_master_filename,
-                trainable_params_filename, gmtk_filelistname, num_obs,
-                output_filelistname, dumpnames_filename):
-    if trainable_params_filename:
-        cpp_options = "-DUSE_TRAINABLE_PARAMS"
-    else:
-        cpp_options = None
+        self.__dict__.update(kwargs)
 
-    VITERBI_PROG(strFile=structure_filename,
-
-                 inputMasterFile=input_master_filename,
-                 inputTrainableParameters=trainable_params_filename,
-
-                 ofilelist=output_filelistname,
-                 dumpNames=dumpnames_filename,
-
-                 of1=gmtk_filelistname,
-                 fmt1="ascii",
-                 nf1=num_obs,
-                 ni1=0,
-
-                 cppCommandOptions=cpp_options,
-                 verbosity=VERBOSITY)
-
-# XXX: redo this all as a class?
-# class Runner(object):
-#     pass
-
-def run(bed_filelistnames, input_master_filename=None,
-        structure_filename=None, trainable_params_filename=None,
-        delete_existing=False, train=True, identify=True):
-    # XXX: use binary I/O to gmtk rather than ascii
-    # XXX: register atexit for cleanup_resources
-
-    # XXX: allow specification of directory instead of tmp
-    with NamedTemporaryDir(prefix=TEMPDIR_PREFIX) as tempdir:
-        tempdirname = tempdir.name
-
-        num_obs = len(bed_filelistnames)
-
-        include_filename = save_include()
-        structure_filename = save_structure(structure_filename,
-                                            include_filename, num_obs,
-                                            tempdirname, delete_existing)
-        run_triangulate(structure_filename)
-
+    def load_observations(self):
         # input: multiple lists -> multiple filenames -> one column
         # output: one list -> multiple_filenames -> multiple columns
-        observations_list = load_observations_lists(bed_filelistnames)
+        observations_list = load_observations_lists(self.bed_obs_filelistnames)
         observation_array, observation_offsets = lists2array(observations_list)
+
+        self.observations_list = observations_list
+        self.observation_array = observation_array
+
+        # XXX: wrong format, butunused so far
+        self.observation_offsets = observation_offsets
+
+    def save_include(self):
+        self.include_filename = data_filename("seg.inc")
+
+    def save_structure(self):
+        observation_tmpl = Template(data_string("observation.tmpl"))
+        observation_sub = observation_tmpl.substitute
+
+        observations = \
+            "\n".join(observation_sub(observation_index=observation_index)
+                      for observation_index in xrange(self.num_obs))
+
+        mapping = dict(include_filename=self.include_filename,
+                       observations=observations)
+
+        self.structure_filename = save_template(self.outfilename, RES_STR_TMPL,
+                                                mapping, self.tempdirname,
+                                                self.delete_existing)
+
+    def save_observations(self):
+        observation_rows_list = self.observations_list
+        tempdirname = self.tempdirname
+
+        prefix_tmpl = "obs" + make_prefix_tmpl(len(observation_rows_list))
+
+        temp_file, self.gmtk_obs_filelistname = mkstemp_file(SUFFIX_LIST,
+                                                             dir=tempdirname)
+
+        with temp_file as temp_file:
+            for index, observation_rows in enumerate(observation_rows_list):
+                prefix = prefix_tmpl % index
+                text = save_observations_gmtk(observation_rows, prefix,
+                                              tempdirname)
+
+                print >>temp_file, text
 
         # XXX: assert that the appropriate coordinates for each Datum
         # are aligned
-        gmtk_filelistname = save_observations_list(observations_list,
-                                                   tempdirname)
 
-        input_master_filename = \
-            save_input_master(input_master_filename, include_filename,
-                              observation_array, tempdirname, delete_existing)
+    def save_input_master(self):
+        num_segs = self.num_segs
+        num_obs = self.num_obs
+        observation_array = self.observation_array
 
-        # XXX: make tempfile to specify for -jtFile for both em and viterbi
-        if train:
-            dont_train_filename = save_dont_train()
+        include_filename=self.include_filename
 
-            # if this is not run and trainable_params_filename is
-            # unspecified, then it won't be passed to gmtkViterbiNew
-            trainable_params_filename = \
-                run_em_train(structure_filename, input_master_filename,
-                             trainable_params_filename, gmtk_filelistname,
-                             num_obs, tempdirname,
-                             delete_existing=delete_existing)
+        dense_cpt_spec = make_dense_cpt_spec(num_segs),
+        mean_spec = make_mean_spec(num_segs, num_obs, observation_array)
+        covar_spec = make_covar_spec(num_segs, num_obs, observation_array)
+        mc_spec = make_mc_spec(num_segs, num_obs),
+        mx_spec = make_mx_spec(num_segs, num_obs),
+        name_collection_spec = make_name_collection_spec(num_segs, num_obs)
 
-        if identify:
-            output_filenames, output_filelistname = \
-                save_output_filelist(len(observations_list), tempdirname)
-            dumpnames_filename = save_dumpnames(NUM_SEGS, tempdirname)
+        self.input_master_filename = \
+            save_template(self.input_master_filename, RES_INPUT_MASTER_TMPL,
+                          locals(), self.tempdirname, self.delete_existing)
 
-            run_viterbi(structure_filename, input_master_filename,
-                        trainable_params_filename, gmtk_filelistname, num_obs,
-                        output_filelistname, dumpnames_filename)
+    def save_dont_train(self):
+        self.dont_train_filename = data_filename(RES_DONT_TRAIN)
 
-            gmtk_out2wig(output_filenames, observations_list)
-            # XXX: we have got to write the wig files somewhere sensible
-            import pdb; pdb.set_trace()
+    def save_output_filelist(self):
+        num_filenames = len(self.observations_list)
+        tempdirname = self.tempdirname
+
+        prefix_tmpl = "out" + make_prefix_tmpl(num_filenames)
+        output_filenames = \
+            [mkstemp_closed(SUFFIX_OUT, prefix_tmpl % index, tempdirname)
+             for index in xrange(num_filenames)]
+
+        temp_file, self.output_filelistname = \
+            mkstemp_file(SUFFIX_LIST, "output-", tempdirname)
+
+        with temp_file as temp_file:
+            for output_filename in output_filenames:
+                print >>temp_file, output_filename
+
+        self.output_filenames = output_filenames
+
+    def save_dumpnames(self):
+        temp_file, self.dumpnames_filename = \
+            mkstemp_file(SUFFIX_LIST, "dumpnames-", self.tempdirname)
+
+        with temp_file as temp_file:
+            print >>temp_file, "seg"
+
+    def save_params(self):
+        self.num_obs = len(self.bed_obs_filelistnames)
+
+        self.save_include()
+        self.save_structure()
+
+        self.load_observations()
+        self.save_observations()
+
+        self.save_input_master()
+
+        if self.train:
+            self.save_dont_train()
+
+        if self.identify:
+            self.save_output_filelist()
+            self.save_dumpnames()
+
+    def run_triangulate(self):
+        # XXX: should specify the triangulation file
+        TRIANGULATE_PROG(strFile=self.structure_filename,
+                         verbosity=VERBOSITY)
+
+    def run_train(self):
+        # if this is not run and trainable_params_filename is
+        # unspecified, then it won't be passed to gmtkViterbiNew
+
+        trainable_params_filename = self.trainable_params_filename
+        if trainable_params_filename:
+            if (not self.delete_existing
+                  and path(trainable_params_filename).exists()):
+                return
+        else:
+            trainable_params_filename = mkstemp_closed(".params", "params-",
+                                                       self.tempdirname)
+
+            self.trainable_params_filename = trainable_params_filename
+
+        EM_TRAIN_PROG(strFile=self.structure_filename,
+
+                      inputMasterFile=self.input_master_filename,
+                      outputTrainableParameters=trainable_params_filename,
+                      objsNotToTrain=dont_train_filename,
+
+                      of1=self.gmtk_obs_filelistname,
+                      fmt1="ascii",
+                      nf1=self.num_obs,
+                      ni1=0,
+
+                      maxEmIters=MAX_EM_ITERS,
+                      verbosity=VERBOSITY)
+
+    def run_identify(self):
+        trainable_params_filename = self.trainable_params_filename
+        if trainable_params_filename:
+            cpp_options = "-DUSE_TRAINABLE_PARAMS"
+        else:
+            cpp_options = None
+
+        VITERBI_PROG(strFile=self.structure_filename,
+
+                     inputMasterFile=self.input_master_filename,
+                     inputTrainableParameters=trainable_params_filename,
+
+                     ofilelist=self.output_filelistname,
+                     dumpNames=self.dumpnames_filename,
+
+                     of1=self.gmtk_obs_filelistname,
+                     fmt1="ascii",
+                     nf1=self.num_obs,
+                     ni1=0,
+
+                     cppCommandOptions=cpp_options,
+                     verbosity=VERBOSITY)
+
+        gmtk_out2wig(self.output_filenames, self.observations_list)
+
+    def __call__(self):
+        # XXX: use binary I/O to gmtk rather than ascii
+        # XXX: register atexit for cleanup_resources
+
+        try:
+            # XXX: allow specification of directory instead of tmp
+            with NamedTemporaryDir(prefix=TEMPDIR_PREFIX) as tempdir:
+                self.tempdirname = tempdir.name
+                self.save_params()
+
+                if self.triangulate:
+                    self.run_triangulate()
+
+                # XXX: make tempfile to specify for -jtFile for both
+                # em and viterbi
+                if self.train:
+                    self.run_train()
+
+                if self.identify:
+                    self.run_identify()
+
+                # XXX: write the wig files somewhere sensible
+                import pdb; pdb.set_trace()
+        finally:
+            self.tempdirname = None
 
 def parse_options(args):
     from optparse import OptionParser
@@ -556,11 +604,14 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    return run(args, input_master_filename=options.input_master,
-               structure_filename=options.structure,
-               trainable_params_filename=options.trainable_parameters,
-               delete_existing=options.force, train=not options.no_train,
-               identify=not options.no_identify)
+    runner = Runner(bed_obs_filelistnames=args,
+                    input_master_filename=options.input_master,
+                    structure_filename=options.structure,
+                    trainable_params_filename=options.trainable_parameters,
+                    delete_existing=options.force,
+                    train=not options.no_train,
+                    identify=not options.no_identify)
+    return runner()
 
 if __name__ == "__main__":
     sys.exit(main())
