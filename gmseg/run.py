@@ -80,10 +80,18 @@ WIG_HEADER = 'track type=wiggle_0 name=gmseg ' \
 
 TRAIN_ATTRNAMES = ["input_master_filename", "trainable_params_filename"]
 
+# XXX: uses of these two can become methods of Runner, that
+# automatically pull in self.tempdirname
 def mkstemp_file(*args, **kwargs):
     temp_fd, temp_filename = mkstemp(*args, **kwargs)
 
     return fdopen(temp_fd, "w+"), temp_filename
+
+def mkstemp_closed(*args, **kwargs):
+    temp_fd, temp_filename = mkstemp(*args, **kwargs)
+    os_close(temp_fd)
+
+    return temp_filename
 
 # def is_need_new_filename(XXXXXXXXXXXXXXXX):
 #     XXXX
@@ -292,12 +300,6 @@ def save_observations_gmtk(observation_rows, prefix, tempdirname):
         for observation_row in observation_rows:
             print >>temp_file, " ".join(datum.score
                                         for datum in observation_row)
-
-    return temp_filename
-
-def mkstemp_closed(*args, **kwargs):
-    temp_fd, temp_filename = mkstemp(*args, **kwargs)
-    os_close(temp_fd)
 
     return temp_filename
 
