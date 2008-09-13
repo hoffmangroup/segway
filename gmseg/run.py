@@ -544,8 +544,8 @@ class Runner(object):
     def gmtk_out2wig(self):
         output_filenames = self.output_filenames
 
-        prefix_fmt = make_prefix_fmt(len(output_filenames)
-        wig_filebasename_fmt = extsep.join("gmseg", prefix_fmt, EXT_WIG))
+        prefix_fmt = make_prefix_fmt(len(output_filenames))
+        wig_filebasename_fmt = extsep.join("gmseg", prefix_fmt, EXT_WIG)
 
         wig_dirpath = path(self.wig_dirname)
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
