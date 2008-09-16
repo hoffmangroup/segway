@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2008 Michael M. Hoffman <mmh1@u.washington.edu>
+# Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
@@ -19,7 +19,16 @@ class Datum(object):
     def __repr__(self):
         return "%s%s" % (self.__class__.__name__, self._words)
 
-def read(iterator):
+class NativeDatum(Datum):
+    def __init__(self, *args, **kwargs):
+        Datum.__init__(self, *args, **kwargs)
+
+        # zero-based, http://genome.ucsc.edu/FAQ/FAQformat#format1
+        self.chromStart = int(self.chromStart)
+        self.chromEnd = int(self.chromEnd)
+        self.score = float(self.score)
+
+def read(iterator, datum_cls=Datum):
     for line in iterator:
         words = line.split()
         if words[0] == "track":
@@ -27,7 +36,10 @@ def read(iterator):
 
         assert len(words) >= 3
 
-        yield Datum(words)
+        yield datum_cls(words)
+
+def read_native(*args, **kwargs):
+    return read(datum_cls=NativeDatum, *args, **kwargs)
 
 def main(args=sys.argv[1:]):
     pass
