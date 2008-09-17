@@ -14,22 +14,18 @@ __version__ = "$Revision$"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
-from collections import defaultdict
-from errno import EEXIST
+from functools import partial
 from os import extsep
 import sys
 
-from numpy import append, insert, zeros
+from numpy import append, array, empty, float64, insert, NAN
 from path import path
 from tables import Filters, Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
 
 SUPERCONTIG_ONLY = "only"
-NAME_CONTINUOUS = "continuous"
-ATOM = Float64Atom()
-
-EXT_H5 = "h5"
+ATOM = Float64Atom(dflt=NAN)
 
 class KeyPassingDefaultdict(defaultdict):
     """
@@ -44,21 +40,22 @@ class KeyPassingDefaultdict(defaultdict):
 
         return res
 
-def chromosome_metafactory(outdirpath, num_cols):
-    def chromosome_factory(key):
-        filename = outdirpath / extsep.join([key, EXT_H5])
-        filters = Filters(complevel=1)
-        res = openFile(filename, "w", key, filters=filters)
+def chromosome_factory(outdirpath, key):
+    # only runs when there is not already a dictionary entry
+    filename = outdirpath / extsep.join([key, EXT_H5])
 
-        supercontig = res.createGroup("/", SUPERCONTIG_ONLY) # supercontig
-        supercontig._v_attrs.offset = None
+    return openFile(filename)
 
-        shape = (0, num_cols)
-        res.createEArray(supercontig, NAME_CONTINUOUS, ATOM, shape)
+def fill_array(scalar, shape, dtype=None, *args, **kwargs):
+    if dtype is None:
+        dtype = array(scalar).dtype
 
-        return res
+    res = empty(shape, dtype, *args, **kwargs)
+    res.fill(scalar)
 
-    return chromosome_factory
+    return res
+
+nans = partial(fill_array, NAN, dtype=float64)
 
 def import_bedfile(bedfile, chromosomes, col_index, num_cols):
     for datum in read_native(bedfile):
@@ -70,60 +67,65 @@ def import_bedfile(bedfile, chromosomes, col_index, num_cols):
         # throughout
 
         chromosome = chromosomes[datum.chrom]
-        supercontig = chromosome.getNode("/", SUPERCONTIG_ONLY)
-        offset_start = supercontig._v_attrs.offset
-
-        continuous = chromosome.getNode(supercontig, NAME_CONTINUOUS)
 
         start = datum.chromStart
         end = datum.chromEnd
         score = datum.score
 
+        for supercontig in chromosome.root.walkGroups():
+            attrs = supercontig._v_attrs
+
+            if attrs.start <= start and attrs.end >= end:
+                break
+        else:
+            raise ValueError, "datum does not fit into a single supercontig"
+
+        try:
+            continuous = supercontig.continuous
+        except NoSuchNodeError:
+            shape = (supercontig.end - supercontig.start, num_cols)
+            continuous = chromosome.createCArray(supercontig, "continuous",
+                                                 ATOM, shape)
+
+        XXXXXXXXXXXXXXX
         if offset_start is None:
             offset_start = start
 
-            data = zeros((end - start, num_cols))
+            data = nans((end - start, num_cols))
             data[:, col_index] = score
-            continuous.append(data)
         else:
-            offset_end = offset_start + continuous.shape[0]
+            data = chromosome.getNode(supercontig, NAME_CONTINUOUS).read()
+            offset_end = offset_start + data.shape[0]
 
             if start < offset_start:
-                # extend the data with zeros, but do not write
-                extended_data = zeros((offset_start - start, num_cols))
-                data = insert(continuous.read(), 0, extended_data, 0)
-
-                chromosome.removeNode(supercontig, NAME_CONTINUOUS)
-                continuous = chromosome.createEArray(supercontig,
-                                                     NAME_CONTINUOUS, ATOM,
-                                                     (0, num_cols))
-                continuous.append(data)
+                # extend the data with nans, but do not write
+                extended_data = nans((offset_start - start, num_cols))
+                data = insert(data, 0, extended_data, 0)
 
                 offset_start = start
                 assert offset_end == offset_start + data.shape[0]
 
             if end > offset_end:
-                # extend the data with zeros, but do not write
-                extended_data = zeros((end - offset_end, num_cols))
+                # extend the data with nans, but do not write
+                extended_data = nans((end - offset_end, num_cols))
                 data = append(data, extended_data, 0)
 
             # write
-            continuous[start-offset_start:end-offset_start, col_index] = score
+            data[start-offset_start:end-offset_start, col_index] = score
+
+        chromosome.removeNode(supercontig, NAME_CONTINUOUS)
+        continuous = chromosome.createCArray(supercontig, NAME_CONTINUOUS,
+                                             ATOM, data.shape)
+        continuous[...] = data
 
         supercontig._v_attrs.offset = offset_start
 
 def importdata(filelistnames, outdirname):
     outdirpath = path(outdirname)
-    try:
-        outdirpath.makedirs()
-    except OSError, err:
-        if err.errno != EEXIST:
-            raise
-
     num_cols = len(filelistnames)
 
-    chromosome_factory = chromosome_metafactory(outdirpath, num_cols)
-    chromosomes = KeyPassingDefaultdict(chromosome_factory)
+    configured_chromosome_factory = partial(chromosome_factory, outdirpath)
+    chromosomes = KeyPassingDefaultdict(configured_chromosome_factory)
 
     try:
         for filelist_index, filelistname in enumerate(filelistnames):
