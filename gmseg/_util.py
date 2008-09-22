@@ -47,6 +47,37 @@ class NamedTemporaryDir(object):
     def __exit__(self, exc, value, tb):
         self.close()
 
+class LightIterator(object):
+    def __init__(self, handle):
+        self._handle = handle
+        self._defline = None
+
+    def __iter__(self):
+        return self
+
+    def next(self):
+        lines = []
+        defline_old = self._defline
+
+        while 1:
+            line = self._handle.readline()
+            if not line:
+                if not defline_old and not lines:
+                    raise StopIteration
+                if defline_old:
+                    self._defline = None
+                    break
+            elif line[0] == '>':
+                self._defline = line[1:].rstrip()
+                if defline_old or lines:
+                    break
+                else:
+                    defline_old = self._defline
+            else:
+                lines.append(line.rstrip())
+
+        return defline_old, ''.join(lines)
+
 def main(args=sys.argv[1:]):
     pass
 

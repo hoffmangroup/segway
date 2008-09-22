@@ -34,11 +34,13 @@ classifiers = ["Natural Language :: English",
 entry_points = """
 [console_scripts]
 gmseg = gmseg.run:main
+gmsegimport = gmseg.importdata:main
+gmsegimportseq = gmseg.importseq:main
 """
 
 # make sure you have LDFLAGS unset if you are building numpy
 
-install_requires = ["numpy", "optbuild"]
+install_requires = ["numpy", "optbuild", "tables"]
 
 setup(name=name,
       version=__version__,

@@ -14,18 +14,20 @@ __version__ = "$Revision$"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
+from collections import defaultdict
 from functools import partial
 from os import extsep
 import sys
 
-from numpy import append, array, empty, float64, insert, NAN
+from numpy import NAN
 from path import path
-from tables import Filters, Float64Atom, NoSuchNodeError, openFile
+from tables import Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
 
-SUPERCONTIG_ONLY = "only"
 ATOM = Float64Atom(dflt=NAN)
+
+EXT_H5 = "h5"
 
 class KeyPassingDefaultdict(defaultdict):
     """
@@ -44,18 +46,7 @@ def chromosome_factory(outdirpath, key):
     # only runs when there is not already a dictionary entry
     filename = outdirpath / extsep.join([key, EXT_H5])
 
-    return openFile(filename)
-
-def fill_array(scalar, shape, dtype=None, *args, **kwargs):
-    if dtype is None:
-        dtype = array(scalar).dtype
-
-    res = empty(shape, dtype, *args, **kwargs)
-    res.fill(scalar)
-
-    return res
-
-nans = partial(fill_array, NAN, dtype=float64)
+    return openFile(filename, "r+")
 
 def import_bedfile(bedfile, chromosomes, col_index, num_cols):
     for datum in read_native(bedfile):
@@ -67,15 +58,21 @@ def import_bedfile(bedfile, chromosomes, col_index, num_cols):
         # throughout
 
         chromosome = chromosomes[datum.chrom]
+        root = chromosome.root
 
         start = datum.chromStart
         end = datum.chromEnd
         score = datum.score
 
-        for supercontig in chromosome.root.walkGroups():
-            attrs = supercontig._v_attrs
+        for supercontig in chromosome.walkGroups():
+            if supercontig == root: # not really a supercontig
+                continue
 
-            if attrs.start <= start and attrs.end >= end:
+            attrs = supercontig._v_attrs
+            supercontig_start = attrs.start
+            supercontig_end = attrs.end
+
+            if supercontig_start <= start and supercontig_end >= end:
                 break
         else:
             raise ValueError, "datum does not fit into a single supercontig"
@@ -83,42 +80,13 @@ def import_bedfile(bedfile, chromosomes, col_index, num_cols):
         try:
             continuous = supercontig.continuous
         except NoSuchNodeError:
-            shape = (supercontig.end - supercontig.start, num_cols)
+            shape = (supercontig_end - supercontig_start, num_cols)
             continuous = chromosome.createCArray(supercontig, "continuous",
                                                  ATOM, shape)
 
-        XXXXXXXXXXXXXXX
-        if offset_start is None:
-            offset_start = start
-
-            data = nans((end - start, num_cols))
-            data[:, col_index] = score
-        else:
-            data = chromosome.getNode(supercontig, NAME_CONTINUOUS).read()
-            offset_end = offset_start + data.shape[0]
-
-            if start < offset_start:
-                # extend the data with nans, but do not write
-                extended_data = nans((offset_start - start, num_cols))
-                data = insert(data, 0, extended_data, 0)
-
-                offset_start = start
-                assert offset_end == offset_start + data.shape[0]
-
-            if end > offset_end:
-                # extend the data with nans, but do not write
-                extended_data = nans((end - offset_end, num_cols))
-                data = append(data, extended_data, 0)
-
-            # write
-            data[start-offset_start:end-offset_start, col_index] = score
-
-        chromosome.removeNode(supercontig, NAME_CONTINUOUS)
-        continuous = chromosome.createCArray(supercontig, NAME_CONTINUOUS,
-                                             ATOM, data.shape)
-        continuous[...] = data
-
-        supercontig._v_attrs.offset = offset_start
+        row_start = start - supercontig_start
+        row_end = end - supercontig_start
+        continuous[row_start:row_end, col_index] = score
 
 def importdata(filelistnames, outdirname):
     outdirpath = path(outdirname)
@@ -132,6 +100,7 @@ def importdata(filelistnames, outdirname):
             with open(filelistname) as filelist:
                 for line in filelist:
                     bedfilename = line.rstrip()
+                    print >>sys.stderr, bedfilename
 
                     with open(bedfilename) as bedfile:
                         import_bedfile(bedfile, chromosomes,
