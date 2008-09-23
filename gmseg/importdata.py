@@ -24,6 +24,7 @@ from path import path
 from tables import Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
+from ._util import walk_supercontigs
 
 ATOM = Float64Atom(dflt=-99)
 
@@ -60,16 +61,12 @@ def import_bedfile(bedfile, chromosomes, col_index, num_cols):
         # throughout
 
         chromosome = chromosomes[datum.chrom]
-        root = chromosome.root
 
         start = datum.chromStart
         end = datum.chromEnd
         score = datum.score
 
-        for supercontig in chromosome.walkGroups():
-            if supercontig == root: # not really a supercontig
-                continue
-
+        for supercontig in walk_supercontigs(chromosome):
             attrs = supercontig._v_attrs
             supercontig_start = attrs.start
             supercontig_end = attrs.end

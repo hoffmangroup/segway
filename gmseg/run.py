@@ -20,13 +20,19 @@ from struct import calcsize, unpack
 import sys
 from tempfile import mkstemp
 
-from numpy import amin, amax, array
+from numpy import amin, amax, array, NAN, NINF, PINF
 from numpy.random import uniform
 from optbuild import OptionBuilder_ShortOptWithSpace
 from path import path
+from tables import NoSuchNodeError, openFile
 
-from ._util import data_filename, data_string, NamedTemporaryDir
+from ._util import (data_filename, data_string, fill_array, NamedTemporaryDir,
+                    walk_supercontigs)
 from .bed import read
+from .importseq import MIN_GAP_LEN
+
+# XXXXXXXXXXXX: this is temporary until the dflt=nan issues are fixed in tables
+NAN = 0
 
 # XXX: should be options
 NUM_SEGS = 2
@@ -35,6 +41,7 @@ VERBOSITY = 0
 TEMPDIR_PREFIX = "gmseg-"
 COVAR_TIED = True # would need to expand to MC, MX to fix
 WIG_DIRNAME = "out"
+MAX_SEGMENTS = 1000
 
 # defaults
 RANDOM_STARTS = 1
@@ -48,6 +55,9 @@ VITERBI_PROG = OptionBuilder_ShortOptWithSpace("gmtkViterbiNew")
 EXT_WIG = "wig"
 EXT_LIST = "list"
 EXT_OUT = "out"
+
+PREFIX_SEGMENT = "segment"
+
 
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
@@ -87,14 +97,16 @@ def mkstemp_file(*args, **kwargs):
 
     return fdopen(temp_fd, "w+"), temp_filename
 
+def new_extrema(func, data, extrema):
+    curr_extrema = func(data, 0)
+
+    return func([extrema, curr_extrema], 0)
+
 def mkstemp_closed(*args, **kwargs):
     temp_fd, temp_filename = mkstemp(*args, **kwargs)
     os_close(temp_fd)
 
     return temp_filename
-
-# def is_need_new_filename(XXXXXXXXXXXXXXXX):
-#     XXXX
 
 def save_template(filename, resource, mapping, tempdirname=None,
                   delete_existing=False):
@@ -193,13 +205,12 @@ def make_rands(low, high, num_segs):
     return array([uniform(low, high)
                   for seg_index in xrange(num_segs)])
 
-def make_mean_spec(num_segs, num_obs, observation_array):
-    rands = make_rands(amin(observation_array, 0), amax(observation_array, 0),
-                       num_segs)
+def make_mean_spec(num_segs, num_obs, mins, maxs):
+    rands = make_rands(mins, maxs, num_segs)
 
     return make_spec_multiseg("MEAN", MEAN_TMPL, num_segs, num_obs, rands)
 
-def make_covar_spec(num_segs, num_obs, observation_array):
+def make_covar_spec(num_segs, num_obs, mins, maxs):
     if COVAR_TIED:
         num_segs = 1
         tmpl = COVAR_TMPL_TIED
@@ -207,8 +218,7 @@ def make_covar_spec(num_segs, num_obs, observation_array):
         tmpl = COVAR_TMPL_UNTIED
 
     # always start with maximum variance
-    data = array([amax(observation_array, 0) - amin(observation_array, 0)
-                  for seg_idnex in xrange(num_segs)])
+    data = array([maxs - mins for seg_idnex in xrange(num_segs)])
 
     return make_spec_multiseg("COVAR", tmpl, num_segs, num_obs, data)
 
@@ -241,58 +251,6 @@ def make_name_collection_spec(num_segs, num_obs):
 
     return make_spec("NAME_COLLECTION", items)
 
-def load_observations_bed(bed_filename):
-    with open(bed_filename) as bed_file:
-
-        # XXXopt: this copy/paste is necessary because otherwise the
-        # bed_file will be closed before the iterator values are received
-        for datum in read(bed_file):
-            yield datum
-
-    # returns an iterator
-    # each iteration yields a .bed.Datum
-
-def load_observations_list(bed_filelistname):
-    with open(bed_filelistname) as bed_filelist:
-        for line in bed_filelist:
-            bed_filename = line.rstrip()
-
-            yield load_observations_bed(bed_filename)
-
-    # returns an iterator
-    # each iteration yields an iterator
-    # each iteration yields a .bed.Datum
-
-def load_observations_lists(bed_filelistnames):
-    res = []
-
-    observations_lists = [load_observations_list(bed_filelistname)
-                          for bed_filelistname in bed_filelistnames]
-
-    # each iteration yields an iterator
-    observations_lists_zipped = izip(*observations_lists)
-
-    for observations_bed_iterators in observations_lists_zipped:
-        res.append(zip(*observations_bed_iterators))
-
-    # returns a list
-    # each item (observation_rows) is a list
-    # each subitem (observation_row) is a tuple
-    # each sub-subitem (datum) is a .bed.Datum
-    return res
-
-# XXXopt: read in directly into this format
-def lists2array(observations_list):
-    # shape of each array = (num_rows, num_obs)
-    observation_array = array([[float(datum.score)
-                                for datum in observation_row]
-                               for observation_rows in observations_list
-                               for observation_row in observation_rows])
-    # XXX: should become cumulative
-    observation_offsets = map(len, observations_list)
-
-    return observation_array, observation_offsets
-
 def save_observations_gmtk(observation_rows, prefix, tempdirname):
     temp_file, temp_filename = mkstemp_file(".obs", prefix, tempdirname)
 
@@ -313,9 +271,11 @@ def read_gmtk_out(infile):
     fmt = "%dL" % (len(data) / calcsize("L"))
     return unpack(fmt, data)
 
-def write_wig(outfile, output, observations):
-    first_datum = observations[0][0]
-    last_datum = observations[-1][0]
+def write_wig(outfile, output, XXXobservations):
+    XXX switch to a variableStep output
+
+    first_datum = XXXobservations[0][0]
+    last_datum = XXXobservations[-1][0]
 
     chrom = first_datum.chrom
     start = first_datum.chromStart
@@ -324,7 +284,7 @@ def write_wig(outfile, output, observations):
     print >>outfile, TRACK_FMT % (chrom, start, end)
     print >>outfile, WIG_HEADER
 
-    for score, data in zip(output, observations):
+    for score, data in zip(output, XXXobservations):
         # this assumes that the relevant values for all items in data
         # are the same
         #
@@ -334,17 +294,17 @@ def write_wig(outfile, output, observations):
         row = [datum.chrom, datum.chromStart, datum.chromEnd, str(score)]
         print >>outfile, "\t".join(row)
 
-def load_gmtk_out_save_wig(observations, gmtk_outfilename, wig_filename):
+def load_gmtk_out_save_wig(XXXobservations, gmtk_outfilename, wig_filename):
     with open(gmtk_outfilename) as gmtk_outfile:
         data = read_gmtk_out(gmtk_outfile)
 
         with open(wig_filename, "w") as wig_file:
-            return write_wig(wig_file, data, observations)
+            return write_wig(wig_file, data, XXXobservations)
 
 class Runner(object):
     def __init__(self, **kwargs):
         # filenames
-        self.bed_obs_filelistnames = None
+        self.h5filenames = None
         self.gmtk_obs_filelistname = None
 
         self.include_filename = None
@@ -363,9 +323,8 @@ class Runner(object):
         self.wig_dirname = WIG_DIRNAME
 
         # data
-        self.observations_list = None
-        self.observation_array = None
-        self.observation_offsets = None
+        self.mins = None
+        self.maxs = None
 
         # variables
         self.num_segs = NUM_SEGS
@@ -378,18 +337,6 @@ class Runner(object):
         self.identify = True # viterbi
 
         self.__dict__.update(kwargs)
-
-    def load_observations(self):
-        # input: multiple lists -> multiple filenames -> one column
-        # output: one list -> multiple_filenames -> multiple columns
-        observations_list = load_observations_lists(self.bed_obs_filelistnames)
-        observation_array, observation_offsets = lists2array(observations_list)
-
-        self.observations_list = observations_list
-        self.observation_array = observation_array
-
-        # XXX: wrong format, butunused so far
-        self.observation_offsets = observation_offsets
 
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
@@ -446,29 +393,85 @@ class Runner(object):
                           self.tempdirname, self.delete_existing)
 
     def save_observations(self):
-        observation_rows_list = self.observations_list
+        prefix_tmpl = PREFIX_SEGMENT + make_prefix_fmt(MAX_SEGMENTS)
         tempdirname = self.tempdirname
-
-        prefix_tmpl = "obs" + make_prefix_fmt(len(observation_rows_list))
+        num_obs = None
+        segment_index = 0
 
         temp_file, self.gmtk_obs_filelistname = mkstemp_file(SUFFIX_LIST,
                                                              dir=tempdirname)
 
         with temp_file as temp_file:
-            for index, observation_rows in enumerate(observation_rows_list):
-                prefix = prefix_tmpl % index
-                text = save_observations_gmtk(observation_rows, prefix,
-                                              tempdirname)
+            for h5filename in self.h5filenames:
+                with openFile(h5filename) as h5file:
+                    for supercontig in walk_supercontigs(h5file):
+                        ## read data
+                        try:
+                            continuous = supercontig.continuous
+                        except NoSuchNodeError:
+                            continue
 
-                print >>temp_file, text
+                        curr_num_obs = continuous.shape[1]
+                        if num_obs is None:
+                            ## setup at first array
+                            num_obs = curr_num_obs
+                            extrema_shape = (num_obs,)
+                            mins = fill_array(PINF, extrema_shape)
+                            maxs = fill_array(NINF, extrema_shape)
+                        else:
+                            ## ensure homogeneity
+                            assert num_obs == curr_num_obs
 
-        # XXX: assert that the appropriate coordinates for each Datum
-        # are aligned
+                        ## read data
+                        observations = continuous.read()
+
+                        ## XXXopt: this could be precomputed
+                        mins = new_extrema(amin, observations, mins)
+                        maxs = new_extrema(amax, observations, maxs)
+
+                        ## find segments that have less than
+                        ## MIN_GAP_LEN missing data gaps in a row
+                        ## XXXopt: this could be precomputed
+                        mask_nonmissing = (continuous == NAN).sum(1) != num_obs
+                        indices_nonmissing = where(mask_nonmissing)
+
+                        starts = []
+                        ends = []
+
+                        last_index = -MIN_GAP_LEN
+                        for index in indices_nonmissing:
+                            if index - last_index >= MIN_GAP_LEN:
+                                if starts:
+                                    ends.append(last_index)
+
+                                starts.append(index)
+                                last_index = index
+
+                        ends.append(last_index)
+
+                        assert len(starts) == len(ends)
+
+                        ## iterate through segments and write
+                        for start, end in zip(starts, ends):
+                            prefix = prefix_tmpl % segment_index
+
+                            # XXX: add writing of exist data
+                            rows = continuous[start:end, ...]
+                            filename = save_observations_gmtk(rows, prefix,
+                                                              tempdirname)
+                            print >>temp_file, filename
+                            print >>sys.stderr, filename
+                            segment_index += 0
+
+        self.num_obs = num_obs
+        self.mins = mins
+        self.maxs = maxs
 
     def save_input_master(self, new=False):
         num_segs = self.num_segs
         num_obs = self.num_obs
-        observation_array = self.observation_array
+        mins = self.mins
+        maxs = self.maxs
 
         include_filename = self.include_filename
 
@@ -478,8 +481,8 @@ class Runner(object):
             input_master_filename = self.input_master_filename
 
         dense_cpt_spec = make_dense_cpt_spec(num_segs)
-        mean_spec = make_mean_spec(num_segs, num_obs, observation_array)
-        covar_spec = make_covar_spec(num_segs, num_obs, observation_array)
+        mean_spec = make_mean_spec(num_segs, num_obs, mins, maxs)
+        covar_spec = make_covar_spec(num_segs, num_obs, mins, maxs)
         mc_spec = make_mc_spec(num_segs, num_obs)
         mx_spec = make_mx_spec(num_segs, num_obs)
         name_collection_spec = make_name_collection_spec(num_segs, num_obs)
@@ -492,10 +495,9 @@ class Runner(object):
         self.dont_train_filename = data_filename(RES_DONT_TRAIN)
 
     def save_output_filelist(self):
-        num_filenames = len(self.observations_list)
         tempdirname = self.tempdirname
 
-        prefix_tmpl = "out" + make_prefix_fmt(num_filenames)
+        prefix_tmpl = "out" + make_prefix_fmt(MAX_SEGMENTS)
         output_filenames = \
             [mkstemp_closed(SUFFIX_OUT, prefix_tmpl % index, tempdirname)
              for index in xrange(num_filenames)]
@@ -517,13 +519,10 @@ class Runner(object):
             print >>temp_file, "seg"
 
     def save_params(self):
-        self.num_obs = len(self.bed_obs_filelistnames)
+        self.save_observations() # do first, because it sets self.num_obs
 
         self.save_include()
         self.save_structure()
-
-        self.load_observations()
-        self.save_observations()
 
         if self.train:
             self.save_dont_train()
@@ -552,11 +551,12 @@ class Runner(object):
         wig_dirpath = path(self.wig_dirname)
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
 
-        zipper = izip(count(), output_filenames, self.observations_list)
-        for index, gmtk_outfilename, observations in zipper:
+        zipper = izip(count(), output_filenames, self.XXXobservations_list)
+        for index, gmtk_outfilename, XXXobservations in zipper:
             wig_filename = wig_filepath_fmt % index
 
-            load_gmtk_out_save_wig(observations, gmtk_outfilename,
+            XXX going to need to get this data directly from array
+            load_gmtk_out_save_wig(XXXobservations, gmtk_outfilename,
                                    wig_filename)
 
     def run_triangulate(self):
@@ -663,7 +663,7 @@ class Runner(object):
 def parse_options(args):
     from optparse import OptionParser
 
-    usage = "%prog [OPTION]... FILELIST..."
+    usage = "%prog [OPTION]... H5FILE..."
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
     # XXX: group here: filenames
@@ -694,7 +694,7 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
-    if not len(args) >= 1:
+    if not len(args) == 1:
         parser.print_usage()
         sys.exit(1)
 
@@ -705,7 +705,7 @@ def main(args=sys.argv[1:]):
 
     runner = Runner()
 
-    runner.bed_obs_filelistnames = args
+    runner.h5filenames = args
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
     runner.trainable_params_filename = options.trainable_params

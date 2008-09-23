@@ -10,6 +10,7 @@ import shutil
 import sys
 from tempfile import mkdtemp
 
+from numpy import array, empty
 from pkg_resources import resource_filename, resource_string
 
 DATA_PKG = "gmseg.data"
@@ -77,6 +78,24 @@ class LightIterator(object):
                 lines.append(line.rstrip())
 
         return defline_old, ''.join(lines)
+
+def walk_supercontigs(h5file):
+    root = h5file.root
+
+    for supercontig in h5file.walkGroups():
+        if supercontig == root:
+            continue
+
+        yield supercontig
+
+def fill_array(scalar, shape, dtype=None, *args, **kwargs):
+    if dtype is None:
+        dtype = array(scalar).dtype
+
+    res = empty(shape, dtype, *args, **kwargs)
+    res.fill(scalar)
+
+    return res
 
 def main(args=sys.argv[1:]):
     pass
