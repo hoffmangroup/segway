@@ -18,7 +18,6 @@ from collections import defaultdict
 from functools import partial
 from os import extsep
 import sys
-from warnings import warn
 
 from numpy import NAN
 from path import path
@@ -26,7 +25,7 @@ from tables import Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
 
-ATOM = Float64Atom(dflt=NAN)
+ATOM = Float64Atom(dflt=-99)
 
 EXT_H5 = "h5"
 
@@ -78,8 +77,8 @@ def import_bedfile(bedfile, chromosomes, col_index, num_cols):
             if supercontig_start <= start and supercontig_end >= end:
                 break
         else:
-            warn("%r does not fit into a single supercontig" % datum)
-            continue
+            raise DataForGapError("%r does not fit into a single supercontig"
+                                  % datum)
 
         try:
             continuous = supercontig.continuous

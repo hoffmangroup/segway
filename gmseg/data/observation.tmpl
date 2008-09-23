@@ -1,5 +1,15 @@
+   variable: exists_obs$observation_index {
+     type: discrete observed $observation_index:$observation_index cardinality CARD_EXISTS;
+
+     conditionalparents: nil using DenseCPT("internal:UnityScore");
+   }
+
    variable: obs$observation_index {
      type: continuous observed $observation_index:$observation_index;
-     conditionalparents: seg(0) using mixture collection("collection_seg_obs$observation_index")
-                         mapping("map_parent");
+
+     switchingparents: exists_obs$observation_index(0) using mapping("map_parent");
+
+     conditionalparents: nil using mixture("internal:UnityScore")
+                         | seg(0) using mixture collection("collection_seg_obs$observation_index")
+                           mapping("map_parent");
    }
