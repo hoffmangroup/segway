@@ -11,7 +11,7 @@ __version__ = "$Revision$"
 
 from errno import EEXIST
 from os import extsep
-from re import compile
+from re import compile, VERBOSE
 import sys
 
 from path import path
@@ -20,9 +20,13 @@ from tables import Filters, openFile
 from ._util import LightIterator
 
 MIN_GAP_LEN = 100000
+assert not MIN_GAP_LEN % 2 # must be even for division
+
+# sre_constants.MAXREPEAT is 65535, so I have to break repeats into
+# two segments
+REGEX_SEGMENT_LEN = MIN_GAP_LEN // 2 # max == MAXREPEAT
 
 DNA_LETTERS_UNAMBIG = "ACGTacgt"
-DNA_LETTERS_UNAMBIG_SET = set("ACGTacgt")
 
 EXT_H5 = "h5"
 FILTERS = Filters(complevel=1)
@@ -36,33 +40,32 @@ def create_supercontig(h5file, index, start, end):
     attrs.start = start
     attrs.end = end
 
-# matches either a run of gaps or a run of non-gaps
-re_gap_segment = compile(r"(?:[%s]+|[^%s]+)" % (DNA_LETTERS_UNAMBIG,
-                                                DNA_LETTERS_UNAMBIG))
+# XXXopt: the all-regex approach is much slower than the hybrid
+# approach (3 min to load chr21, 6 min to load chr1), but it is easier
+# to understand the code and get it correct
+#
+# the previous code (r22) might have worked fine. Consider backing down to
+# it at some point.
+#
+re_gap_segment = compile(r"""
+(?:([^%s]{%d}[^%s]{%d,})                                  # group(0): ambig
+   |                                                      #  OR
+   ((?:(?:[%s]+|^)(?:[^%s]{1,%d}[^%s]{,%d}(?![^%s]))*)+)) # group(1): unambig
+""" % (DNA_LETTERS_UNAMBIG, REGEX_SEGMENT_LEN,
+       DNA_LETTERS_UNAMBIG, REGEX_SEGMENT_LEN,
+       DNA_LETTERS_UNAMBIG, DNA_LETTERS_UNAMBIG, REGEX_SEGMENT_LEN,
+       DNA_LETTERS_UNAMBIG, REGEX_SEGMENT_LEN-1,
+       DNA_LETTERS_UNAMBIG), VERBOSE)
 
 def importseq_single(h5file, seq):
     supercontig_index = 0
-    offset_start = 0 # XXX: rename to something sensible
 
     for m_segment in re_gap_segment.finditer(seq):
-        if m_segment.group()[0] not in DNA_LETTERS_UNAMBIG_SET:
-            segment_start = m_segment.start()
-
-            if segment_end - segment_start >= MIN_GAP_LEN:
-                if offset_start != segment_start:
-                    create_supercontig(h5file, supercontig_index, offset_start,
-                                       segment_start)
-
-                    supercontig_index += 1
-                offset_start = segment_end
+        if m_segment.group(2):
+            create_supercontig(h5file, supercontig_index, *m_segment.span())
+            supercontig_index += 1
         else:
-            # I don't want to extend the final group
-            # to include ambiguous letters
-            segment_end = m_segment.end()
-
-    if offset_start != segment_end:
-        create_supercontig(h5file, supercontig_index, offset_start,
-                           segment_end)
+            assert m_segment.group(1)
 
 def importseq(filenames, outdirname):
     outdirpath = path(outdirname)

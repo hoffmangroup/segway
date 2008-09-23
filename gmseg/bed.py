@@ -28,6 +28,9 @@ class NativeDatum(Datum):
         self.chromEnd = int(self.chromEnd)
         self.score = float(self.score)
 
+        self._words = (self.chrom, self.chromStart, self.chromEnd, self.name,
+                       self.score) + self._words[5:]
+
 def read(iterator, datum_cls=Datum):
     for line in iterator:
         words = line.split()
