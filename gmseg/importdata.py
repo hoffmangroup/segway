@@ -4,8 +4,12 @@ from __future__ import division, with_statement
 """
 importdata: DESCRIPTION
 
-each SRCLIST is a newline-delimited list of files
-each file is a BED file which has a single observation
+each SRC is either
+- *.list: a newline-delimited list of files
+  - each file is a BED file which has a single observation
+- *.wigVar.gz: a variableStep wiggle file
+- *.txt.gz: tabular representation of wiggle track (described in
+   unused .sql file)
 
 DST is a directory, which will contain one HDF5 file for each chrom in the data
 """
@@ -26,7 +30,7 @@ from tables import Float64Atom, NoSuchNodeError, openFile
 from .bed import read_native
 from ._util import walk_supercontigs
 
-ATOM = Float64Atom(dflt=-99)
+ATOM = Float64Atom(dflt=NAN)
 
 EXT_H5 = "h5"
 
@@ -112,7 +116,7 @@ def importdata(filelistnames, outdirname):
 def parse_options(args):
     from optparse import OptionParser
 
-    usage = "%prog [OPTION]... SRCLIST... DST"
+    usage = "%prog [OPTION]... SRC... DST"
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
 

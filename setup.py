@@ -7,7 +7,7 @@ LONG_DESCRIPTION
 
 __version__ = "0.1.0a1"
 
-# Copyright 2008 Michael M. Hoffman <mmh1@u.washington.edu>
+# Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
@@ -26,7 +26,8 @@ url = "http://noble.gs.washington.edu/~mmh1/software/%s/" % name.lower()
 download_url = "%s%s-%s.tar.gz" % (url, name, __version__)
 
 # XXX: remove these when the upstream packages are updated to fix these issues
-dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip"]
+dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip",
+                    "http://pytables.org/svn/pytables/branches/std-2.0#egg=tables-2.0.5.dev"]
 
 classifiers = ["Natural Language :: English",
                "Programming Language :: Python"]
@@ -38,15 +39,16 @@ gmsegimport = gmseg.importdata:main
 gmsegimportseq = gmseg.importseq:main
 """
 
-# make sure you have LDFLAGS unset if you are building numpy
+# XXX: warn: make sure you have LDFLAGS unset if you are building numpy
 
-install_requires = ["numpy", "optbuild", "tables"]
+# need tables>2.04 (>=r3761) because there is a CArray fill bug until then
+install_requires = ["optbuild", "tables>2.0.4", "numpy"]
 
 setup(name=name,
       version=__version__,
       description=short_description,
       author="Michael Hoffman",
-      author_email="mmh1@u.washington.edu",
+      author_email="mmh1@washington.edu",
       url=url,
       download_url=download_url,
       classifiers=classifiers,

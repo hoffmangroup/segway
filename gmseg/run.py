@@ -20,7 +20,7 @@ from struct import calcsize, unpack
 import sys
 from tempfile import mkstemp
 
-from numpy import amin, amax, array, NAN, NINF, PINF
+from numpy import amin, amax, array, NAN, NINF, PINF, where
 from numpy.random import uniform
 from optbuild import OptionBuilder_ShortOptWithSpace
 from path import path
@@ -31,9 +31,6 @@ from ._util import (data_filename, data_string, fill_array, NamedTemporaryDir,
 from .bed import read
 from .importseq import MIN_GAP_LEN
 
-# XXXXXXXXXXXX: this is temporary until the dflt=nan issues are fixed in tables
-NAN = 0
-
 # XXX: should be options
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
@@ -41,7 +38,7 @@ VERBOSITY = 0
 TEMPDIR_PREFIX = "gmseg-"
 COVAR_TIED = True # would need to expand to MC, MX to fix
 WIG_DIRNAME = "out"
-MAX_SEGMENTS = 1000
+MAX_CHUNKS = 1000
 
 # defaults
 RANDOM_STARTS = 1
@@ -54,13 +51,14 @@ VITERBI_PROG = OptionBuilder_ShortOptWithSpace("gmtkViterbiNew")
 # extensions and suffixes
 EXT_WIG = "wig"
 EXT_LIST = "list"
+EXT_OBS = "obs"
 EXT_OUT = "out"
 
-PREFIX_SEGMENT = "segment"
-
+PREFIX_CHUNK = "chunk"
 
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
+SUFFIX_OBS = extsep + EXT_OBS
 
 # templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
@@ -82,6 +80,7 @@ NAME_COLLECTION_TMPL = "$obs_index collection_seg_${obs} 2"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${obs}"
 
 TRACK_FMT = "browser position %s:%s-%s"
+FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
 # XXX: this could be specified as a dict instead
 WIG_HEADER = 'track type=wiggle_0 name=gmseg ' \
@@ -251,13 +250,13 @@ def make_name_collection_spec(num_segs, num_obs):
 
     return make_spec("NAME_COLLECTION", items)
 
-def save_observations_gmtk(observation_rows, prefix, tempdirname):
-    temp_file, temp_filename = mkstemp_file(".obs", prefix, tempdirname)
+def save_observations_gmtk(rows, prefix, tempdirname):
+    temp_file, temp_filename = mkstemp_file(SUFFIX_OBS, prefix, tempdirname)
 
     with temp_file as temp_file:
-        for observation_row in observation_rows:
-            print >>temp_file, " ".join(datum.score
-                                        for datum in observation_row)
+        for row in rows:
+            ## XXX: use textinput.ListWriter
+            print >>temp_file, " ".join(map(str, row))
 
     return temp_filename
 
@@ -271,41 +270,25 @@ def read_gmtk_out(infile):
     fmt = "%dL" % (len(data) / calcsize("L"))
     return unpack(fmt, data)
 
-def write_wig(outfile, output, XXXobservations):
-    XXX switch to a variableStep output
-
-    first_datum = XXXobservations[0][0]
-    last_datum = XXXobservations[-1][0]
-
-    chrom = first_datum.chrom
-    start = first_datum.chromStart
-    end = last_datum.chromEnd
-
+def write_wig(outfile, output, (chrom, start, end)):
     print >>outfile, TRACK_FMT % (chrom, start, end)
     print >>outfile, WIG_HEADER
+    print >>outfile, FIXEDSTEP_FMT % (chrom, start)
 
-    for score, data in zip(output, XXXobservations):
-        # this assumes that the relevant values for all items in data
-        # are the same
-        #
-        # XXX: check this
-        datum = data[0]
+    print >>outfile, "\n".join(map(str, output))
 
-        row = [datum.chrom, datum.chromStart, datum.chromEnd, str(score)]
-        print >>outfile, "\t".join(row)
-
-def load_gmtk_out_save_wig(XXXobservations, gmtk_outfilename, wig_filename):
+def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename):
     with open(gmtk_outfilename) as gmtk_outfile:
         data = read_gmtk_out(gmtk_outfile)
 
         with open(wig_filename, "w") as wig_file:
-            return write_wig(wig_file, data, XXXobservations)
+            return write_wig(wig_file, data, chunk_coord)
 
 class Runner(object):
     def __init__(self, **kwargs):
         # filenames
         self.h5filenames = None
-        self.gmtk_obs_filelistname = None
+        self.feature_filelistname = None
 
         self.include_filename = None
         self.input_master_filename = None
@@ -323,6 +306,8 @@ class Runner(object):
         self.wig_dirname = WIG_DIRNAME
 
         # data
+        self.num_chunks = None
+        self.chunk_coords = None
         self.mins = None
         self.maxs = None
 
@@ -381,9 +366,11 @@ class Runner(object):
         observation_tmpl = Template(data_string("observation.tmpl"))
         observation_sub = observation_tmpl.substitute
 
+        num_obs = self.num_obs
         observations = \
-            "\n".join(observation_sub(observation_index=observation_index)
-                      for observation_index in xrange(self.num_obs))
+            "\n".join(observation_sub(obs_index=obs_index,
+                                      exists_index=num_obs+obs_index)
+                      for obs_index in xrange(num_obs))
 
         mapping = dict(include_filename=self.include_filename,
                        observations=observations)
@@ -393,18 +380,24 @@ class Runner(object):
                           self.tempdirname, self.delete_existing)
 
     def save_observations(self):
-        prefix_tmpl = PREFIX_SEGMENT + make_prefix_fmt(MAX_SEGMENTS)
+        prefix_feature_tmpl = PREFIX_CHUNK + make_prefix_fmt(MAX_CHUNKS)
+
         tempdirname = self.tempdirname
         num_obs = None
-        segment_index = 0
+        chunk_index = 0
+        chunk_coords = []
 
-        temp_file, self.gmtk_obs_filelistname = mkstemp_file(SUFFIX_LIST,
-                                                             dir=tempdirname)
+        feature_tempfile, self.feature_filelistname = \
+            mkstemp_file(SUFFIX_LIST, dir=tempdirname)
 
-        with temp_file as temp_file:
+        with feature_tempfile as feature_tempfile:
             for h5filename in self.h5filenames:
+                print >>sys.stderr, h5filename
+                chrom = path(h5filename).namebase
+
                 with openFile(h5filename) as h5file:
                     for supercontig in walk_supercontigs(h5file):
+                        # XXX: this is a refactoring point
                         ## read data
                         try:
                             continuous = supercontig.continuous
@@ -429,11 +422,12 @@ class Runner(object):
                         mins = new_extrema(amin, observations, mins)
                         maxs = new_extrema(amax, observations, maxs)
 
-                        ## find segments that have less than
+                        ## find chunks that have less than
                         ## MIN_GAP_LEN missing data gaps in a row
                         ## XXXopt: this could be precomputed
-                        mask_nonmissing = (continuous == NAN).sum(1) != num_obs
-                        indices_nonmissing = where(mask_nonmissing)
+                        rows_num_missing = (observations == NAN).sum(1)
+                        mask_nonmissing = rows_num_missing < num_obs
+                        indices_nonmissing = where(mask_nonmissing)[0]
 
                         starts = []
                         ends = []
@@ -442,28 +436,33 @@ class Runner(object):
                         for index in indices_nonmissing:
                             if index - last_index >= MIN_GAP_LEN:
                                 if starts:
-                                    ends.append(last_index)
+                                    # add 1 because we want
+                                    # slice(start, end) to include the
+                                    # last_index
+                                    ends.append(last_index + 1)
 
                                 starts.append(index)
-                                last_index = index
+                            last_index = index
 
-                        ends.append(last_index)
+                        ends.append(last_index + 1)
 
                         assert len(starts) == len(ends)
 
-                        ## iterate through segments and write
+                        ## iterate through chunks and write
                         for start, end in zip(starts, ends):
-                            prefix = prefix_tmpl % segment_index
+                            chunk_coords.append((chrom, start, end))
+                            prefix = prefix_feature_tmpl % chunk_index
 
-                            # XXX: add writing of exist data
+                            # XXX: add writing of existing data
                             rows = continuous[start:end, ...]
                             filename = save_observations_gmtk(rows, prefix,
                                                               tempdirname)
-                            print >>temp_file, filename
-                            print >>sys.stderr, filename
-                            segment_index += 0
+                            print >>feature_tempfile, filename
+                            print >>sys.stderr, " " + filename
+                            chunk_index += 1
 
         self.num_obs = num_obs
+        self.num_chunks = chunk_index
         self.mins = mins
         self.maxs = maxs
 
@@ -497,10 +496,10 @@ class Runner(object):
     def save_output_filelist(self):
         tempdirname = self.tempdirname
 
-        prefix_tmpl = "out" + make_prefix_fmt(MAX_SEGMENTS)
+        prefix_tmpl = "out" + make_prefix_fmt(num_chunks)
         output_filenames = \
             [mkstemp_closed(SUFFIX_OUT, prefix_tmpl % index, tempdirname)
-             for index in xrange(num_filenames)]
+             for index in xrange(num_chunks)]
 
         temp_file, self.output_filelistname = \
             mkstemp_file(SUFFIX_LIST, "output-", tempdirname)
@@ -543,20 +542,18 @@ class Runner(object):
         setattr(self, name, dst_filename)
 
     def gmtk_out2wig(self):
-        output_filenames = self.output_filenames
-
-        prefix_fmt = make_prefix_fmt(len(output_filenames))
+        prefix_fmt = make_prefix_fmt(self.num_chunks)
         wig_filebasename_fmt = extsep.join("gmseg", prefix_fmt, EXT_WIG)
 
         wig_dirpath = path(self.wig_dirname)
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
 
-        zipper = izip(count(), output_filenames, self.XXXobservations_list)
-        for index, gmtk_outfilename, XXXobservations in zipper:
+        # chunk_coord = (chrom, chromStart, chromEnd)
+        zipper = izip(count(), self.output_filenames, self.chunk_coords)
+        for index, gmtk_outfilename, chunk_coord in zipper:
             wig_filename = wig_filepath_fmt % index
 
-            XXX going to need to get this data directly from array
-            load_gmtk_out_save_wig(XXXobservations, gmtk_outfilename,
+            load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
                                    wig_filename)
 
     def run_triangulate(self):
@@ -570,7 +567,7 @@ class Runner(object):
                       objsNotToTrain=self.dont_train_filename,
                       llStoreFile=self.log_likelihood_filename,
 
-                      of1=self.gmtk_obs_filelistname,
+                      of1=self.feature_filelistname,
                       fmt1="ascii",
                       nf1=self.num_obs,
                       ni1=0,
@@ -627,7 +624,7 @@ class Runner(object):
                      ofilelist=self.output_filelistname,
                      dumpNames=self.dumpnames_filename,
 
-                     of1=self.gmtk_obs_filelistname,
+                     of1=self.feature_filelistname,
                      fmt1="ascii",
                      nf1=self.num_obs,
                      ni1=0,
@@ -657,6 +654,8 @@ class Runner(object):
 
                 if self.identify:
                     self.run_identify()
+
+                import pdb; pdb.set_trace()
         finally:
             self.tempdirname = None
 
@@ -694,7 +693,7 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
-    if not len(args) == 1:
+    if not len(args) >= 1:
         parser.print_usage()
         sys.exit(1)
 

@@ -15,11 +15,13 @@ You must have the following installed before installing gmseg:
 
 - Python_ 2.5.1
 - HDF5_ 1.6.5
+- NumPy_ 1.0.5
+
+XXX: NumPy should install automatically, but it doesn't.
 
 Additionally, the Sunflower setup script will automatically install
 the following packages or newer versions:
 
-- NumPy_ 1.0.5
 - path.py 2.2
 - PyTables_ 2.0
 - setuptools
