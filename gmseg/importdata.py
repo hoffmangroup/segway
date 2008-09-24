@@ -26,6 +26,7 @@ import sys
 
 from numpy import NAN
 from path import path
+from tabdelim import DictReader
 from tables import Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
@@ -39,6 +40,9 @@ KEYEQ_CHROM = "chrom="
 LEN_KEYEQ_CHROM = len(KEYEQ_CHROM)
 
 DEFAULT_WIGVAR_PARAMS = dict(span=1)
+
+# XXX: hacky: should really load into a real MySQL database instead
+FIELDNAMES_MYSQL_TAB = ["bin", "chrom", "chromStart", "chromEnd", "dataValue"]
 
 class DataForGapError(ValueError): pass
 
@@ -134,14 +138,20 @@ def read_wigvar(filename_index, infile, num_cols, chromosomes):
         else:
             assert num_words == 2
 
-            start = int(words[0])
+            start = int(words[0]) - 1 # one-based
             end = start + span
             score = float(words[1])
 
             write_score(chromosome, start, end, score)
 
 def read_mysql_tab(filename_index, infile, num_cols, chromosomes):
-    XXX
+    for row in DictReader(infile, FIELDNAMES_MYSQL_TAB):
+        chromosome = chromosomes[row["chrom"]]
+        start = int(row["chromStart"])
+        end = int(row["chromEnd"])
+        score = float(row["dataValue"])
+
+        write_score(chromosome, start, end, score)
 
 def read_any(filename_index, filename, infile, num_cols, chromosomes):
     if filename.endswith(".list"):
