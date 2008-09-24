@@ -20,6 +20,7 @@ __version__ = "$Revision$"
 
 from collections import defaultdict
 from functools import partial
+from gzip import open as gzip_open
 from os import extsep
 import sys
 
@@ -33,6 +34,11 @@ from ._util import walk_supercontigs
 ATOM = Float64Atom(dflt=NAN)
 
 EXT_H5 = "h5"
+
+KEYEQ_CHROM = "chrom="
+LEN_KEYEQ_CHROM = len(KEYEQ_CHROM)
+
+DEFAULT_WIGVAR_PARAMS = dict(span=1)
 
 class DataForGapError(ValueError): pass
 
@@ -49,66 +55,136 @@ class KeyPassingDefaultdict(defaultdict):
 
         return res
 
+def pairs2dict(texts):
+    res = {}
+
+    for text in texts:
+        text_part = text.partition("=")
+        res[text_part[0]] = text_part[2]
+
+    return res
+
 def chromosome_factory(outdirpath, key):
     # only runs when there is not already a dictionary entry
     filename = outdirpath / extsep.join([key, EXT_H5])
 
     return openFile(filename, "r+")
 
-def import_bedfile(bedfile, chromosomes, col_index, num_cols):
+def write_score(chromosome, start, end, score):
+    # XXXopt: do profiling first:
+    # XXXopt: some caching and lazy-writing of all this would be
+    # good; in most cases, the chromosome will be the same
+    # throughout
+
+    for supercontig in walk_supercontigs(chromosome):
+        attrs = supercontig._v_attrs
+        supercontig_start = attrs.start
+        supercontig_end = attrs.end
+
+        if supercontig_start <= start and supercontig_end >= end:
+            break
+    else:
+        raise DataForGapError("%r does not fit into a single supercontig"
+                              % datum)
+
+    try:
+        continuous = supercontig.continuous
+    except NoSuchNodeError:
+        shape = (supercontig_end - supercontig_start, num_cols)
+        continuous = chromosome.createCArray(supercontig, "continuous", ATOM,
+                                             shape)
+
+    row_start = start - supercontig_start
+    row_end = end - supercontig_start
+    continuous[row_start:row_end, col_index] = score
+
+def read_bed(col_index, bedfile, num_cols, chromosomes):
     for datum in read_native(bedfile):
-        # XXXopt: use EArrays
-
-        # XXXopt: do profiling first:
-        # XXXopt: some caching and lazy-writing of all this would be
-        # good; in most cases, the chromosome will be the same
-        # throughout
-
         chromosome = chromosomes[datum.chrom]
 
         start = datum.chromStart
         end = datum.chromEnd
         score = datum.score
 
-        for supercontig in walk_supercontigs(chromosome):
-            attrs = supercontig._v_attrs
-            supercontig_start = attrs.start
-            supercontig_end = attrs.end
+        write_score(chromosome, start, end, score)
 
-            if supercontig_start <= start and supercontig_end >= end:
-                break
+def read_filelist(filename_index, infile, num_cols, chromosomes):
+    for line in infile:
+        filename = line.rstrip()
+        print >>sys.stderr, filename
+
+        # recursion, whee!
+        load_any(filename_index, filename, num_cols, chromosomes)
+
+def read_wigvar(filename_index, infile, num_cols, chromosomes):
+    chromosome = None
+    span = None
+
+    for line in infile:
+        words = line.rstrip().split()
+        num_words = len(words)
+
+        # fixedStep not supported
+        if word[0] == "variableStep":
+            params = DEFAULT_WIGVAR_PARAMS.copy()
+            params.update(pairs2dict(words[1:]))
+
+            chromosome = chromosomes[params["chrom"]]
+            span = int(params["span"])
         else:
-            raise DataForGapError("%r does not fit into a single supercontig"
-                                  % datum)
+            assert num_words == 2
 
-        try:
-            continuous = supercontig.continuous
-        except NoSuchNodeError:
-            shape = (supercontig_end - supercontig_start, num_cols)
-            continuous = chromosome.createCArray(supercontig, "continuous",
-                                                 ATOM, shape)
+            start = int(words[0])
+            end = start + span
+            score = float(words[1])
 
-        row_start = start - supercontig_start
-        row_end = end - supercontig_start
-        continuous[row_start:row_end, col_index] = score
+            write_score(chromosome, start, end, score)
 
-def importdata(filelistnames, outdirname):
+def read_mysql_tab(filename_index, infile, num_cols, chromosomes):
+    XXX
+
+def read_any(filename_index, filename, infile, num_cols, chromosomes):
+    if filename.endswith(".list"):
+        reader = read_filelist
+    elif filename.endswith(".bed"):
+        reader = read_bed
+    elif filename.endswith(".wigVar"):
+        reader = read_wigvar
+    elif filename.endswith(".txt"):
+        reader = read_mysql_tab
+    else:
+        raise ValueError, "file extension not recognized"
+
+    return reader(filename_index, infile, num_cols, chromosomes)
+
+def load_uncompressed(filename_index, filename, num_cols, chromosomes):
+    with open(filename) as infile:
+        read_any(filename_index, filename, infile, num_cols, chromosomes):
+
+def load_gzip(filename_index, filename, num_cols, chromosomes):
+    # remove .gz for further type sniffing
+    filename_stem = filename.rpartition(extsep)[0]
+
+    with gzip_open(filename) as infile:
+        return read_any(filename_index, filename_stem, infile, num_cols,
+                        chromosomes)
+
+def load_any(filename_index, filename, num_cols, chromosomes):
+    if filename.endswith(".gz"):
+        return load_gzip(filename_index, filename, num_cols, chromosomes)
+    else:
+        return load_uncompressed(filename_index, filename, num_cols,
+                                 chromosomes)
+def importdata(filenames, outdirname):
     outdirpath = path(outdirname)
-    num_cols = len(filelistnames)
+    num_cols = len(filenames)
 
     configured_chromosome_factory = partial(chromosome_factory, outdirpath)
     chromosomes = KeyPassingDefaultdict(configured_chromosome_factory)
 
     try:
-        for filelist_index, filelistname in enumerate(filelistnames):
-            with open(filelistname) as filelist:
-                for line in filelist:
-                    bedfilename = line.rstrip()
-                    print >>sys.stderr, bedfilename
-
-                    with open(bedfilename) as bedfile:
-                        import_bedfile(bedfile, chromosomes,
-                                       filelist_index, num_cols)
+        for filename_index, filename in enumerate(filenames):
+            load_any(filename_index, filename, num_cols, chromosomes)
     finally:
         for chromosome in chromosomes.itervalues():
             chromosome.close()
