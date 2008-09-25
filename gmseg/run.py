@@ -20,28 +20,31 @@ from struct import calcsize, unpack
 import sys
 from tempfile import mkstemp
 
-from numpy import amin, amax, array, NAN, NINF, PINF, where
+from numpy import amin, amax, array, finfo, float32, isfinite, isnan, NAN
 from numpy.random import uniform
 from optbuild import OptionBuilder_ShortOptWithSpace
 from path import path
 from tables import NoSuchNodeError, openFile
 
-from ._util import (data_filename, data_string, fill_array, NamedTemporaryDir,
-                    walk_supercontigs)
 from .bed import read
-from .importseq import MIN_GAP_LEN
+from ._util import (data_filename, data_string, init_mins_maxs,
+                    NamedTemporaryDir, new_extrema, walk_supercontigs)
 
 # XXX: should be options
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
 VERBOSITY = 0
 TEMPDIR_PREFIX = "gmseg-"
-COVAR_TIED = True # would need to expand to MC, MX to fix
+COVAR_TIED = True # would need to expand to MC, MX to change
 WIG_DIRNAME = "out"
 MAX_CHUNKS = 1000
 
 # defaults
 RANDOM_STARTS = 1
+
+# replace NAN with SENTINEL to avoid warnings
+MIN_FLOAT = finfo(float32).min
+SENTINEL = MIN_FLOAT
 
 # programs
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace("gmtkTriangulate")
@@ -54,11 +57,14 @@ EXT_LIST = "list"
 EXT_OBS = "obs"
 EXT_OUT = "out"
 
+PREFIX_LIST = "features"
 PREFIX_CHUNK = "chunk"
 
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_OBS = extsep + EXT_OBS
+
+FEATURE_FILELISTBASENAME = extsep.join([PREFIX_LIST, EXT_LIST])
 
 # templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
@@ -95,11 +101,6 @@ def mkstemp_file(*args, **kwargs):
     temp_fd, temp_filename = mkstemp(*args, **kwargs)
 
     return fdopen(temp_fd, "w+"), temp_filename
-
-def new_extrema(func, data, extrema):
-    curr_extrema = func(data, 0)
-
-    return func([extrema, curr_extrema], 0)
 
 def mkstemp_closed(*args, **kwargs):
     temp_fd, temp_filename = mkstemp(*args, **kwargs)
@@ -250,16 +251,6 @@ def make_name_collection_spec(num_segs, num_obs):
 
     return make_spec("NAME_COLLECTION", items)
 
-def save_observations_gmtk(rows, prefix, tempdirname):
-    temp_file, temp_filename = mkstemp_file(SUFFIX_OBS, prefix, tempdirname)
-
-    with temp_file as temp_file:
-        for row in rows:
-            ## XXX: use textinput.ListWriter
-            print >>temp_file, " ".join(map(str, row))
-
-    return temp_filename
-
 def make_prefix_fmt(num_filenames):
     # make sure there aresufficient leading zeros
     return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
@@ -303,6 +294,7 @@ class Runner(object):
         self.output_filelistname = None
         self.output_filenames = None
 
+        self.obs_dirname = None
         self.wig_dirname = WIG_DIRNAME
 
         # data
@@ -369,7 +361,7 @@ class Runner(object):
         num_obs = self.num_obs
         observations = \
             "\n".join(observation_sub(obs_index=obs_index,
-                                      exists_index=num_obs+obs_index)
+                                      nonmissing_index=num_obs+obs_index)
                       for obs_index in xrange(num_obs))
 
         mapping = dict(include_filename=self.include_filename,
@@ -379,92 +371,88 @@ class Runner(object):
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.tempdirname, self.delete_existing)
 
-    def save_observations(self):
+    def save_observations_chunk(self, data, prefix):
+        outfilename = self.obs_dirpath / (prefix + EXT_OBS)
+
+        with open(outfilename, "w") as outfile:
+            mask_missing = isnan(data)
+            mask_nonmissing = (~ mask_missing).astype(int)
+
+            data[mask_missing] = SENTINEL
+
+            for data_row, mask_nonmissing_row in zip(data, mask_nonmissing):
+                ## XXX: use textinput.ListWriter
+                outrow = data_row.tolist() + mask_nonmissing_row.tolist()
+
+                print >>outfile, " ".join(map(str, outrow))
+
+        return outfilename
+
+    def make_obs_dirname(self):
+        obs_dirname = self.obs_dirname
+        if not obs_dirname:
+            self.obs_dirname = obs_dirname = self.tempdirname
+
+        obs_dirpath = path(obs_dirname)
+
+        self.obs_dirpath = obs_dirpath
+        self.feature_filelistname = obs_dirpath / FEATURE_FILELISTBASENAME
+
+    def write_observations(self, feature_filelist):
+        save_observations_chunk = self.save_observations_chunk
+
         prefix_feature_tmpl = PREFIX_CHUNK + make_prefix_fmt(MAX_CHUNKS)
 
-        tempdirname = self.tempdirname
         num_obs = None
+        mins = None
+        maxs = None
+
         chunk_index = 0
         chunk_coords = []
 
-        feature_tempfile, self.feature_filelistname = \
-            mkstemp_file(SUFFIX_LIST, dir=tempdirname)
+        for h5filename in self.h5filenames:
+            print >>sys.stderr, h5filename
+            chrom = path(h5filename).namebase
 
-        with feature_tempfile as feature_tempfile:
-            for h5filename in self.h5filenames:
-                print >>sys.stderr, h5filename
-                chrom = path(h5filename).namebase
+            with openFile(h5filename) as chromosome:
+                for supercontig in walk_supercontigs(chromosome):
+                    try:
+                        continuous = supercontig.continuous
+                    except NoSuchNodeError:
+                        continue
 
-                with openFile(h5filename) as h5file:
-                    for supercontig in walk_supercontigs(h5file):
-                        # XXX: this is a refactoring point
-                        ## read data
-                        try:
-                            continuous = supercontig.continuous
-                        except NoSuchNodeError:
-                            continue
+                    num_obs, mins, maxs = init_mins_maxs(num_obs, mins, maxs,
+                                                         continuous)
 
-                        curr_num_obs = continuous.shape[1]
-                        if num_obs is None:
-                            ## setup at first array
-                            num_obs = curr_num_obs
-                            extrema_shape = (num_obs,)
-                            mins = fill_array(PINF, extrema_shape)
-                            maxs = fill_array(NINF, extrema_shape)
-                        else:
-                            ## ensure homogeneity
-                            assert num_obs == curr_num_obs
+                    supercontig_attrs = supercontig._v_attrs
+                    starts = supercontig_attrs.chunk_starts
+                    ends = supercontig_attrs.chunk_ends
 
-                        ## read data
-                        observations = continuous.read()
+                    ## iterate through chunks and write
+                    for start, end in zip(starts, ends):
+                        chunk_coords.append((chrom, start, end))
+                        prefix = prefix_feature_tmpl % chunk_index
 
-                        ## XXXopt: this could be precomputed
-                        mins = new_extrema(amin, observations, mins)
-                        maxs = new_extrema(amax, observations, maxs)
+                        # XXX: this is where we should NOT read or
+                        # write if the file already exists
+                        rows = continuous[start:end, ...]
+                        filename = save_observations_chunk(rows, prefix)
+                        print >>feature_filelist, filename
+                        print >>sys.stderr, " " + filename
+                        chunk_index += 1
 
-                        ## find chunks that have less than
-                        ## MIN_GAP_LEN missing data gaps in a row
-                        ## XXXopt: this could be precomputed
-                        rows_num_missing = (observations == NAN).sum(1)
-                        mask_nonmissing = rows_num_missing < num_obs
-                        indices_nonmissing = where(mask_nonmissing)[0]
-
-                        starts = []
-                        ends = []
-
-                        last_index = -MIN_GAP_LEN
-                        for index in indices_nonmissing:
-                            if index - last_index >= MIN_GAP_LEN:
-                                if starts:
-                                    # add 1 because we want
-                                    # slice(start, end) to include the
-                                    # last_index
-                                    ends.append(last_index + 1)
-
-                                starts.append(index)
-                            last_index = index
-
-                        ends.append(last_index + 1)
-
-                        assert len(starts) == len(ends)
-
-                        ## iterate through chunks and write
-                        for start, end in zip(starts, ends):
-                            chunk_coords.append((chrom, start, end))
-                            prefix = prefix_feature_tmpl % chunk_index
-
-                            # XXX: add writing of existing data
-                            rows = continuous[start:end, ...]
-                            filename = save_observations_gmtk(rows, prefix,
-                                                              tempdirname)
-                            print >>feature_tempfile, filename
-                            print >>sys.stderr, " " + filename
-                            chunk_index += 1
+                chromosome_attrs = chromosome.root._v_attrs
+                mins = amin([chromosome_attrs.mins, mins], 0)
+                maxs = amax([chromosome_attrs.maxs, maxs], 0)
 
         self.num_obs = num_obs
         self.num_chunks = chunk_index
         self.mins = mins
         self.maxs = maxs
+
+    def save_observations(self):
+        with open(self.feature_filelistname, "w") as feature_filelist:
+            self.write_observations(feature_filelist)
 
     def save_input_master(self, new=False):
         num_segs = self.num_segs
@@ -518,6 +506,7 @@ class Runner(object):
             print >>temp_file, "seg"
 
     def save_params(self):
+        self.make_obs_dirname()
         self.save_observations() # do first, because it sets self.num_obs
 
         self.save_include()
@@ -562,7 +551,7 @@ class Runner(object):
                          verbosity=VERBOSITY)
 
     def run_train(self):
-        # XXX: this can be a parallel departure point
+        # XXX: this can be a parallelization point
         kwargs = dict(strFile=self.structure_filename,
                       objsNotToTrain=self.dont_train_filename,
                       llStoreFile=self.log_likelihood_filename,
@@ -570,7 +559,7 @@ class Runner(object):
                       of1=self.feature_filelistname,
                       fmt1="ascii",
                       nf1=self.num_obs,
-                      ni1=0,
+                      ni1=self.num_obs,
 
                       maxEmIters=MAX_EM_ITERS,
                       verbosity=VERBOSITY)
@@ -627,7 +616,7 @@ class Runner(object):
                      of1=self.feature_filelistname,
                      fmt1="ascii",
                      nf1=self.num_obs,
-                     ni1=0,
+                     ni1=self.num_obs,
 
                      cppCommandOptions=cpp_options,
                      verbosity=VERBOSITY)
@@ -666,17 +655,17 @@ def parse_options(args):
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
     # XXX: group here: filenames
+    parser.add_option("--observations", "-o", metavar="DIR",
+                      help="use or create observations in DIR; ")
+
     parser.add_option("--input-master", "-i", metavar="FILE",
-                      help="use input master file FILE; "
-                      "create if it doesn't exist")
+                      help="use or create input master in FILE")
 
     parser.add_option("--structure", "-s", metavar="FILE",
-                      help="use structure file FILE; "
-                      "create if it doesn't exist")
+                      help="use or create structure in FILE")
 
     parser.add_option("--trainable-params", "-t", metavar="FILE",
-                      help="use trainable parameters file FILE; "
-                      "create if it doesn't exist")
+                      help="use or create trainable parameters in FILE")
 
     # XXX: group here: variables
     parser.add_option("--random-starts", "-r", type=int, default=RANDOM_STARTS,
@@ -705,6 +694,7 @@ def main(args=sys.argv[1:]):
     runner = Runner()
 
     runner.h5filenames = args
+    runner.obs_dirname = options.observations
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
     runner.trainable_params_filename = options.trainable_params

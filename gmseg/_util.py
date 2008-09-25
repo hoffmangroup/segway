@@ -10,7 +10,7 @@ import shutil
 import sys
 from tempfile import mkdtemp
 
-from numpy import array, empty
+from numpy import array, empty, NINF, PINF
 from pkg_resources import resource_filename, resource_string
 
 DATA_PKG = "gmseg.data"
@@ -96,6 +96,28 @@ def fill_array(scalar, shape, dtype=None, *args, **kwargs):
     res.fill(scalar)
 
     return res
+
+
+def new_extrema(func, data, extrema):
+    curr_extrema = func(data, 0)
+
+    return func([extrema, curr_extrema], 0)
+
+# because this would otherwise be duplicative
+def init_mins_maxs(num_obs, mins, maxs, continuous):
+    curr_num_obs = continuous.shape[1]
+    if num_obs is None:
+        ## setup at first array
+        num_obs = curr_num_obs
+
+        extrema_shape = (num_obs,)
+        mins = fill_array(PINF, extrema_shape)
+        maxs = fill_array(NINF, extrema_shape)
+    else:
+        ## ensure homogeneity
+        assert num_obs == curr_num_obs
+
+    return num_obs, mins, maxs
 
 def main(args=sys.argv[1:]):
     pass

@@ -1,5 +1,5 @@
-   variable: exists_obs$obs_index {
-     type: discrete observed $exists_index:$exists_index cardinality CARD_EXISTS;
+   variable: nonmissing_obs$obs_index {
+     type: discrete observed $nonmissing_index:$nonmissing_index cardinality CARD_NONMISSING;
 
      conditionalparents: nil using DenseCPT("internal:UnityScore");
    }
@@ -7,7 +7,7 @@
    variable: obs$obs_index {
      type: continuous observed $obs_index:$obs_index;
 
-     switchingparents: exists_obs$obs_index(0) using mapping("map_parent");
+     switchingparents: nonmissing_obs$obs_index(0) using mapping("map_parent");
 
      conditionalparents: nil using mixture("internal:UnityScore")
                          | seg(0) using mixture collection("collection_seg_obs$obs_index")
