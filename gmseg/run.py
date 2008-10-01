@@ -9,7 +9,8 @@ __version__ = "$Revision$"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
-from errno import ENOENT
+from cStringIO import StringIO
+from errno import EEXIST, ENOENT
 from itertools import count, izip
 from math import floor, log10
 from os import close as os_close, extsep, fdopen, makedirs
@@ -20,24 +21,31 @@ from struct import calcsize, unpack
 import sys
 from tempfile import mkstemp
 
-from numpy import amin, amax, array, finfo, float32, isfinite, isnan, NAN
+from numpy import amin, amax, array, finfo, float32, isnan
 from numpy.random import uniform
-from optbuild import OptionBuilder_ShortOptWithSpace
+from optbuild import OptionBuilder_ShortOptWithSpace_TF
 from path import path
-from tables import NoSuchNodeError, openFile
+from tables import openFile
 
-from .bed import read
-from ._util import (data_filename, data_string, init_mins_maxs,
-                    NamedTemporaryDir, new_extrema, walk_supercontigs)
+from ._util import (data_filename, data_string, init_num_obs,
+                    NamedTemporaryDir, walk_continuous_supercontigs)
 
 # XXX: should be options
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
-VERBOSITY = 0
+VERBOSITY = 30
 TEMPDIR_PREFIX = "gmseg-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 WIG_DIRNAME = "out"
 MAX_CHUNKS = 1000
+ISLAND = False
+
+# for extra memory savings, set to (False) or (not ISLAND)
+COMPONENT_CACHE = True
+
+# number of frames in a segment must be at least number of frames in model
+MIN_FRAMES = 2
+MAX_FRAMES = 10000000 # 10 million
 
 # defaults
 RANDOM_STARTS = 1
@@ -47,9 +55,9 @@ MIN_FLOAT = finfo(float32).min
 SENTINEL = MIN_FLOAT
 
 # programs
-TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace("gmtkTriangulate")
-EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace("gmtkEMtrainNew")
-VITERBI_PROG = OptionBuilder_ShortOptWithSpace("gmtkViterbiNew")
+TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkTriangulate")
+EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkEMtrainNew")
+VITERBI_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkViterbiNew")
 
 # extensions and suffixes
 EXT_WIG = "wig"
@@ -90,13 +98,13 @@ FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
 # XXX: this could be specified as a dict instead
 WIG_HEADER = 'track type=wiggle_0 name=gmseg ' \
-    'description="segmentation by gmseg" visibility=dense viewLimits=0:1' \
+    'description="Segmentation by gmseg" visibility=dense viewLimits=0:1 ' \
     'autoScale=off'
 
 TRAIN_ATTRNAMES = ["input_master_filename", "trainable_params_filename"]
 
 # XXX: uses of these two can become methods of Runner, that
-# automatically pull in self.tempdirname
+# automatically pull in self.dirname
 def mkstemp_file(*args, **kwargs):
     temp_fd, temp_filename = mkstemp(*args, **kwargs)
 
@@ -108,7 +116,7 @@ def mkstemp_closed(*args, **kwargs):
 
     return temp_filename
 
-def save_template(filename, resource, mapping, tempdirname=None,
+def save_template(filename, resource, mapping, dirname=None,
                   delete_existing=False):
     """
     creates a temporary file if filename is None or empty
@@ -125,7 +133,7 @@ def save_template(filename, resource, mapping, tempdirname=None,
         prefix = stem_part[0] + "."
         suffix = "." + stem_part[2]
 
-        outfile, filename = mkstemp_file(suffix, prefix, tempdirname)
+        outfile, filename = mkstemp_file(suffix, prefix, dirname)
 
     with outfile as outfile:
         tmpl = Template(data_string(resource))
@@ -134,9 +142,6 @@ def save_template(filename, resource, mapping, tempdirname=None,
         outfile.write(text)
 
     return filename
-
-#def save_output_master():
-#    return data_filename("output.master")
 
 def make_spec(name, items):
     items[:0] = ["%s_IN_FILE inline" % name, str(len(items)), ""]
@@ -218,7 +223,7 @@ def make_covar_spec(num_segs, num_obs, mins, maxs):
         tmpl = COVAR_TMPL_UNTIED
 
     # always start with maximum variance
-    data = array([maxs - mins for seg_idnex in xrange(num_segs)])
+    data = array([maxs - mins for seg_index in xrange(num_segs)])
 
     return make_spec_multiseg("COVAR", tmpl, num_segs, num_obs, data)
 
@@ -279,14 +284,15 @@ class Runner(object):
     def __init__(self, **kwargs):
         # filenames
         self.h5filenames = None
-        self.feature_filelistname = None
+        self.feature_filelistpath = None
 
         self.include_filename = None
         self.input_master_filename = None
         self.structure_filename = None
 
         self.trainable_params_filename = None
-        self.tempdirname = None
+        self.dirname = None
+        self.is_dirname_temp = False
         self.log_likelihood_filename = None
         self.dont_train_filename = None
 
@@ -312,6 +318,7 @@ class Runner(object):
         self.triangulate = True
         self.train = True # EM train # this should become an int for num_starts
         self.identify = True # viterbi
+        self.dry_run = False
 
         self.__dict__.update(kwargs)
 
@@ -331,28 +338,65 @@ class Runner(object):
                 self.train = False
         else:
             self.trainable_params_filename = \
-                mkstemp_closed(".params", "params-", self.tempdirname)
+                mkstemp_closed(".params", "params-", self.dirname)
 
     def set_log_likelihood_filename(self):
         # XXX: for now, this is always a tempfile
 
         self.log_likelihood_filename = \
-            mkstemp_closed(".ll", "likelihood-", self.tempdirname)
+            mkstemp_closed(".ll", "likelihood-", self.dirname)
 
-    def make_wig_dir(self):
-        wig_dirname = self.wig_dirname
+    def make_dir(self, dirname):
         if self.delete_existing:
             # just always try to delete it
             try:
-                rmtree(self.wig_dirname)
+                rmtree(dirname)
             except OSError, err:
                 if err.errno != ENOENT:
                     raise
 
-        makedirs(wig_dirname)
+        return makedirs(dirname)
+
+    def make_wig_dir(self):
+        self.make_dir(self.wig_dirname)
+
+    def make_obs_dir(self):
+        obs_dirname = self.obs_dirname
+        if not obs_dirname:
+            self.obs_dirname = obs_dirname = self.dirname
+
+        obs_dirpath = path(obs_dirname)
+
+        try:
+            self.make_dir(obs_dirname)
+        except OSError, err:
+            if not (err.errno == EEXIST and obs_dirpath.isdir()):
+                raise
+
+        self.obs_dirpath = obs_dirpath
+        self.feature_filelistpath = obs_dirpath / FEATURE_FILELISTBASENAME
+
+    def make_obs_filepath(self, chunk_index):
+        prefix_feature_tmpl = PREFIX_CHUNK + make_prefix_fmt(MAX_CHUNKS)
+        prefix = prefix_feature_tmpl % chunk_index
+
+        return path(self.obs_dirpath / (prefix + EXT_OBS))
+
+
+    def save_resource(self, resname):
+        orig_filename = data_filename(resname)
+
+        if self.is_dirname_temp:
+            return orig_filename
+        else:
+            orig_filepath = path(orig_filename)
+            dirpath = path(self.dirname)
+
+            orig_filepath.copy(dirpath)
+            return dirpath / orig_filepath.name
 
     def save_include(self):
-        self.include_filename = data_filename("seg.inc")
+        self.include_filename = self.save_resource("seg.inc")
 
     def save_structure(self):
         observation_tmpl = Template(data_string("observation.tmpl"))
@@ -369,11 +413,9 @@ class Runner(object):
 
         self.structure_filename = \
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
-                          self.tempdirname, self.delete_existing)
+                          self.dirname, self.delete_existing)
 
-    def save_observations_chunk(self, data, prefix):
-        outfilename = self.obs_dirpath / (prefix + EXT_OBS)
-
+    def save_observations_chunk(self, outfilename, data):
         with open(outfilename, "w") as outfile:
             mask_missing = isnan(data)
             mask_nonmissing = (~ mask_missing).astype(int)
@@ -386,22 +428,10 @@ class Runner(object):
 
                 print >>outfile, " ".join(map(str, outrow))
 
-        return outfilename
-
-    def make_obs_dirname(self):
-        obs_dirname = self.obs_dirname
-        if not obs_dirname:
-            self.obs_dirname = obs_dirname = self.tempdirname
-
-        obs_dirpath = path(obs_dirname)
-
-        self.obs_dirpath = obs_dirpath
-        self.feature_filelistname = obs_dirpath / FEATURE_FILELISTBASENAME
-
     def write_observations(self, feature_filelist):
+        make_obs_filepath = self.make_obs_filepath
         save_observations_chunk = self.save_observations_chunk
-
-        prefix_feature_tmpl = PREFIX_CHUNK + make_prefix_fmt(MAX_CHUNKS)
+        delete_existing = self.delete_existing
 
         num_obs = None
         mins = None
@@ -415,43 +445,71 @@ class Runner(object):
             chrom = path(h5filename).namebase
 
             with openFile(h5filename) as chromosome:
-                for supercontig in walk_supercontigs(chromosome):
-                    try:
-                        continuous = supercontig.continuous
-                    except NoSuchNodeError:
-                        continue
+                chromosome_attrs = chromosome.root._v_attrs
 
-                    num_obs, mins, maxs = init_mins_maxs(num_obs, mins, maxs,
-                                                         continuous)
+                try:
+                    chromosome_mins = chromosome_attrs.mins
+                    chromosome_maxs = chromosome_attrs.maxs
+                except AttributeError:
+                    # this means there is no data for that chromosome
+                    continue
+
+                if mins is None:
+                    mins = chromosome_mins
+                    maxs = chromosome_maxs
+                else:
+                    mins = amin([chromosome_mins, mins], 0)
+                    maxs = amax([chromosome_maxs, maxs], 0)
+
+                for supercontig, continuous in \
+                        walk_continuous_supercontigs(chromosome):
+                    num_obs = init_num_obs(num_obs, continuous)
 
                     supercontig_attrs = supercontig._v_attrs
+                    supercontig_start = supercontig_attrs.start
+
                     starts = supercontig_attrs.chunk_starts
                     ends = supercontig_attrs.chunk_ends
 
                     ## iterate through chunks and write
                     for start, end in zip(starts, ends):
-                        chunk_coords.append((chrom, start, end))
-                        prefix = prefix_feature_tmpl % chunk_index
+                        num_frames = end - start
+                        if not MIN_FRAMES <= num_frames <= MAX_FRAMES:
+                            text = " skipping segment of length %d" \
+                                % num_frames
+                            print >>sys.stderr, text
+                            continue
 
-                        # XXX: this is where we should NOT read or
-                        # write if the file already exists
-                        rows = continuous[start:end, ...]
-                        filename = save_observations_chunk(rows, prefix)
-                        print >>feature_filelist, filename
-                        print >>sys.stderr, " " + filename
+                        chunk_start = supercontig_start + start
+                        chunk_end = supercontig_start + end
+                        chunk_coords.append((chrom, chunk_start, chunk_end))
+
+                        chunk_filepath = make_obs_filepath(chunk_index)
+
+                        print >>feature_filelist, chunk_filepath
+                        print >>sys.stderr, " " + chunk_filepath
+
+                        if not chunk_filepath.exists():
+                            rows = continuous[start:end, ...]
+                            save_observations_chunk(chunk_filepath, rows)
+
                         chunk_index += 1
-
-                chromosome_attrs = chromosome.root._v_attrs
-                mins = amin([chromosome_attrs.mins, mins], 0)
-                maxs = amax([chromosome_attrs.maxs, maxs], 0)
 
         self.num_obs = num_obs
         self.num_chunks = chunk_index
+        self.chunk_coords = chunk_coords
         self.mins = mins
         self.maxs = maxs
 
     def save_observations(self):
-        with open(self.feature_filelistname, "w") as feature_filelist:
+        feature_filelistpath = self.feature_filelistpath
+
+        if self.delete_existing or feature_filelistpath.exists():
+            feature_filelist = StringIO() # dummy output
+        else:
+            feature_filelist = open(self.feature_filelistpath, "w")
+
+        with feature_filelist as feature_filelist:
             self.write_observations(feature_filelist)
 
     def save_input_master(self, new=False):
@@ -476,21 +534,21 @@ class Runner(object):
 
         self.input_master_filename = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
-                          locals(), self.tempdirname, self.delete_existing)
-
+                          locals(), self.dirname, self.delete_existing)
     def save_dont_train(self):
-        self.dont_train_filename = data_filename(RES_DONT_TRAIN)
+        self.dont_train_filename = self.save_resource(RES_DONT_TRAIN)
 
     def save_output_filelist(self):
-        tempdirname = self.tempdirname
+        dirname = self.dirname
+        num_chunks = self.num_chunks
 
         prefix_tmpl = "out" + make_prefix_fmt(num_chunks)
         output_filenames = \
-            [mkstemp_closed(SUFFIX_OUT, prefix_tmpl % index, tempdirname)
+            [mkstemp_closed(SUFFIX_OUT, prefix_tmpl % index, dirname)
              for index in xrange(num_chunks)]
 
         temp_file, self.output_filelistname = \
-            mkstemp_file(SUFFIX_LIST, "output-", tempdirname)
+            mkstemp_file(SUFFIX_LIST, "output-", dirname)
 
         with temp_file as temp_file:
             for output_filename in output_filenames:
@@ -500,13 +558,13 @@ class Runner(object):
 
     def save_dumpnames(self):
         temp_file, self.dumpnames_filename = \
-            mkstemp_file(SUFFIX_LIST, "dumpnames-", self.tempdirname)
+            mkstemp_file(SUFFIX_LIST, "dumpnames-", self.dirname)
 
         with temp_file as temp_file:
             print >>temp_file, "seg"
 
     def save_params(self):
-        self.make_obs_dirname()
+        self.make_obs_dir()
         self.save_observations() # do first, because it sets self.num_obs
 
         self.save_include()
@@ -532,7 +590,7 @@ class Runner(object):
 
     def gmtk_out2wig(self):
         prefix_fmt = make_prefix_fmt(self.num_chunks)
-        wig_filebasename_fmt = extsep.join("gmseg", prefix_fmt, EXT_WIG)
+        wig_filebasename_fmt = "gmseg%s%s" % (prefix_fmt, EXT_WIG)
 
         wig_dirpath = path(self.wig_dirname)
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
@@ -545,24 +603,42 @@ class Runner(object):
             load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
                                    wig_filename)
 
+    def prog_factory(self, prog):
+        """
+        allows dry_run
+        """
+        def dry_run_prog(self, *args, **kwargs):
+            print " ".join(prog.build_cmdline(args, kwargs))
+
+        if self.dry_run:
+            return dry_run_prog
+        else:
+            return prog
+
     def run_triangulate(self):
         # XXX: should specify the triangulation file
-        TRIANGULATE_PROG(strFile=self.structure_filename,
+        prog = self.prog_factory(TRIANGULATE_PROG)
+
+        prog(strFile=self.structure_filename,
                          verbosity=VERBOSITY)
 
     def run_train(self):
+        prog = self.prog_factory(EM_TRAIN_PROG)
+
         # XXX: this can be a parallelization point
         kwargs = dict(strFile=self.structure_filename,
                       objsNotToTrain=self.dont_train_filename,
                       llStoreFile=self.log_likelihood_filename,
 
-                      of1=self.feature_filelistname,
+                      of1=self.feature_filelistpath,
                       fmt1="ascii",
                       nf1=self.num_obs,
                       ni1=self.num_obs,
 
                       maxEmIters=MAX_EM_ITERS,
-                      verbosity=VERBOSITY)
+                      verbosity=VERBOSITY,
+                      island=ISLAND,
+                      componentCache=COMPONENT_CACHE)
 
         dst_filenames = [self.input_master_filename,
                          self.trainable_params_filename]
@@ -581,9 +657,9 @@ class Runner(object):
             input_master_filename = self.input_master_filename
             trainable_params_filename = self.trainable_params_filename
 
-            EM_TRAIN_PROG(inputMasterFile=input_master_filename,
-                          outputTrainableParameters=trainable_params_filename,
-                          **kwargs)
+            prog(inputMasterFile=input_master_filename,
+                 outputTrainableParameters=trainable_params_filename,
+                 **kwargs)
 
             start_params.append((self.load_log_likelihood(),
                                  input_master_filename,
@@ -605,48 +681,66 @@ class Runner(object):
         else:
             cpp_options = None
 
-        VITERBI_PROG(strFile=self.structure_filename,
+        prog = self.prog_factory(VITERBI_PROG)
 
-                     inputMasterFile=self.input_master_filename,
-                     inputTrainableParameters=trainable_params_filename,
+        prog(strFile=self.structure_filename,
 
-                     ofilelist=self.output_filelistname,
-                     dumpNames=self.dumpnames_filename,
+             inputMasterFile=self.input_master_filename,
+             inputTrainableParameters=trainable_params_filename,
 
-                     of1=self.feature_filelistname,
-                     fmt1="ascii",
-                     nf1=self.num_obs,
-                     ni1=self.num_obs,
+             ofilelist=self.output_filelistname,
+             dumpNames=self.dumpnames_filename,
 
-                     cppCommandOptions=cpp_options,
-                     verbosity=VERBOSITY)
+             of1=self.feature_filelistpath,
+             fmt1="ascii",
+             nf1=self.num_obs,
+             ni1=self.num_obs,
+
+             cppCommandOptions=cpp_options,
+             verbosity=VERBOSITY)
 
         self.gmtk_out2wig()
 
-    def __call__(self):
+    def _run(self):
+        """
+        main run, after dirname is specified
+        """
         # XXX: use binary I/O to gmtk rather than ascii
+
+        self.save_params()
+
+        if self.triangulate:
+            self.run_triangulate()
+
+        # XXX: make tempfile to specify for -jtFile for both
+        # em and viterbi
+        if self.train:
+            self.run_train()
+
+        if self.identify:
+            self.run_identify()
+
+    def __call__(self):
         # XXX: register atexit for cleanup_resources
 
-        try:
-            # XXX: allow specification of directory instead of tmp
-            with NamedTemporaryDir(prefix=TEMPDIR_PREFIX) as tempdir:
-                self.tempdirname = tempdir.name
-                self.save_params()
+        dirname = self.dirname
+        if dirname:
+            if self.delete_existing or not path(dirname).isdir():
+                self.make_dir(dirname)
 
-                if self.triangulate:
-                    self.run_triangulate()
-
-                # XXX: make tempfile to specify for -jtFile for both
-                # em and viterbi
-                if self.train:
-                    self.run_train()
-
-                if self.identify:
-                    self.run_identify()
-
-                import pdb; pdb.set_trace()
-        finally:
-            self.tempdirname = None
+            self._run()
+        else:
+            try:
+                with NamedTemporaryDir(prefix=TEMPDIR_PREFIX) as tempdir:
+                    self.dirname = tempdir.name
+                    self.is_dirname_temp = True
+                    self._run()
+            finally:
+                # the temporary directory has already been deleted (after
+                # unwinding of the with block), so let's stop referring to
+                # it
+                self.dirname = None
+                self.is_dirname_temp = False
 
 def parse_options(args):
     from optparse import OptionParser
@@ -656,7 +750,7 @@ def parse_options(args):
     parser = OptionParser(usage=usage, version=version)
     # XXX: group here: filenames
     parser.add_option("--observations", "-o", metavar="DIR",
-                      help="use or create observations in DIR; ")
+                      help="use or create observations in DIR")
 
     parser.add_option("--input-master", "-i", metavar="FILE",
                       help="use or create input master in FILE")
@@ -666,6 +760,9 @@ def parse_options(args):
 
     parser.add_option("--trainable-params", "-t", metavar="FILE",
                       help="use or create trainable parameters in FILE")
+
+    parser.add_option("--directory", "-d", metavar="DIR",
+                      help="create all other files in DIR")
 
     # XXX: group here: variables
     parser.add_option("--random-starts", "-r", type=int, default=RANDOM_STARTS,
@@ -679,6 +776,8 @@ def parse_options(args):
                       help="do not identify segments")
     parser.add_option("--no-train", "-T", action="store_true",
                       help="do not train model")
+    parser.add_option("--dry-run", "-n", action="store_true",
+                      help="write all files, but do not run any executables")
 
     options, args = parser.parse_args(args)
 
@@ -698,12 +797,14 @@ def main(args=sys.argv[1:]):
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
     runner.trainable_params_filename = options.trainable_params
+    runner.dirname = options.directory
 
     runner.random_starts = options.random_starts
 
     runner.delete_existing = options.force
     runner.train = not options.no_train
     runner.identify = not options.no_identify
+    runner.dry_run = options.dry_run
 
     return runner()
 

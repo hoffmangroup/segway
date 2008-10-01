@@ -32,7 +32,8 @@ from tables import Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
 from .importseq import MIN_GAP_LEN
-from ._util import init_mins_maxs, new_extrema, walk_supercontigs
+from ._util import (fill_array, init_num_obs, new_extrema,
+                    walk_continuous_supercontigs, walk_supercontigs)
 
 ATOM = Float64Atom(dflt=NAN)
 
@@ -202,14 +203,18 @@ def write_metadata(chromosome):
     mins = None
     maxs = None
 
-    for supercontig in walk_supercontigs(chromosome):
-        ## read data
-        try:
-            continuous = supercontig.continuous
-        except NoSuchNodeError:
-            continue
+    for supercontig, continuous in walk_continuous_supercontigs(chromosome):
+        if num_obs is None:
+            ## initialize at first array
+            num_obs = init_num_obs(num_obs, continuous)
 
-        num_obs, mins, maxs = init_mins_maxs(num_obs, mins, maxs, continuous)
+            extrema_shape = (num_obs,)
+            mins = fill_array(PINF, extrema_shape)
+            maxs = fill_array(NINF, extrema_shape)
+
+        # only runs when assertions checked
+        elif __debug__:
+            init_num_obs(num_obs, continuous) # for the assertion
 
         ## read data
         observations = continuous.read()
@@ -264,8 +269,8 @@ def importdata(filenames, outdirname):
         for col_index, filename in enumerate(filenames):
             load_any(col_index, filename, num_cols, chromosomes)
 
-        for chromosome in chromosomes:
-            write_metadata(chromosomes)
+        for chromosome in chromosomes.itervalues():
+            write_metadata(chromosome)
     finally:
         for chromosome in chromosomes.itervalues():
             chromosome.close()

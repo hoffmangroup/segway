@@ -10,8 +10,9 @@ import shutil
 import sys
 from tempfile import mkdtemp
 
-from numpy import array, empty, NINF, PINF
+from numpy import array, empty
 from pkg_resources import resource_filename, resource_string
+from tables import NoSuchNodeError
 
 DATA_PKG = "gmseg.data"
 
@@ -88,6 +89,13 @@ def walk_supercontigs(h5file):
 
         yield supercontig
 
+def walk_continuous_supercontigs(h5file):
+    for supercontig in walk_supercontigs(h5file):
+        try:
+            yield supercontig, supercontig.continuous
+        except NoSuchNodeError:
+            continue
+
 def fill_array(scalar, shape, dtype=None, *args, **kwargs):
     if dtype is None:
         dtype = array(scalar).dtype
@@ -97,27 +105,16 @@ def fill_array(scalar, shape, dtype=None, *args, **kwargs):
 
     return res
 
-
 def new_extrema(func, data, extrema):
     curr_extrema = func(data, 0)
 
     return func([extrema, curr_extrema], 0)
 
-# because this would otherwise be duplicative
-def init_mins_maxs(num_obs, mins, maxs, continuous):
+def init_num_obs(num_obs, continuous):
     curr_num_obs = continuous.shape[1]
-    if num_obs is None:
-        ## setup at first array
-        num_obs = curr_num_obs
+    assert num_obs is None or num_obs == curr_num_obs
 
-        extrema_shape = (num_obs,)
-        mins = fill_array(PINF, extrema_shape)
-        maxs = fill_array(NINF, extrema_shape)
-    else:
-        ## ensure homogeneity
-        assert num_obs == curr_num_obs
-
-    return num_obs, mins, maxs
+    return curr_num_obs
 
 def main(args=sys.argv[1:]):
     pass
