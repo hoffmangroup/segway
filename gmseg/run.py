@@ -10,16 +10,16 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
+from contextlib import closing
 from errno import EEXIST, ENOENT
 from itertools import count, izip
 from math import floor, log10
-from os import close as os_close, extsep, fdopen, makedirs
+from os import extsep, makedirs
 from random import random
 from shutil import move, rmtree
 from string import Template
 from struct import calcsize, unpack
 import sys
-from tempfile import mkstemp
 
 from numpy import amin, amax, array, finfo, float32, isnan
 from numpy.random import uniform
@@ -36,9 +36,9 @@ MAX_EM_ITERS = 100
 VERBOSITY = 30
 TEMPDIR_PREFIX = "gmseg-"
 COVAR_TIED = True # would need to expand to MC, MX to change
-WIG_DIRNAME = "out"
 MAX_CHUNKS = 1000
 ISLAND = False
+WIG_DIRNAME = "out"
 
 # for extra memory savings, set to (False) or (not ISLAND)
 COMPONENT_CACHE = True
@@ -78,6 +78,7 @@ FEATURE_FILELISTBASENAME = extsep.join([PREFIX_LIST, EXT_LIST])
 RES_STR_TMPL = "seg.str.tmpl"
 RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_DONT_TRAIN = "dont_train.list"
+RES_INC = "seg.inc"
 
 DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
 DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
@@ -103,18 +104,8 @@ WIG_HEADER = 'track type=wiggle_0 name=gmseg ' \
 
 TRAIN_ATTRNAMES = ["input_master_filename", "trainable_params_filename"]
 
-# XXX: uses of these two can become methods of Runner, that
-# automatically pull in self.dirname
-def mkstemp_file(*args, **kwargs):
-    temp_fd, temp_filename = mkstemp(*args, **kwargs)
-
-    return fdopen(temp_fd, "w+"), temp_filename
-
-def mkstemp_closed(*args, **kwargs):
-    temp_fd, temp_filename = mkstemp(*args, **kwargs)
-    os_close(temp_fd)
-
-    return temp_filename
+def extjoin(*args):
+    return extsep.join(args)
 
 def save_template(filename, resource, mapping, dirname=None,
                   delete_existing=False):
@@ -124,18 +115,16 @@ def save_template(filename, resource, mapping, dirname=None,
     if filename:
         if not delete_existing and path(filename).exists():
             return filename
-        else:
-            outfile = open(filename, "w+")
     else:
         resource_part = resource.rpartition(".tmpl")
         stem = resource_part[0] or resource_part[2]
-        stem_part = stem.rpartition(".")
-        prefix = stem_part[0] + "."
-        suffix = "." + stem_part[2]
+        stem_part = stem.rpartition(extsep)
+        prefix = stem_part[0]
+        ext = stem_part[2]
 
-        outfile, filename = mkstemp_file(suffix, prefix, dirname)
+        filename = path(dirname) / extjoin(prefix, ext)
 
-    with outfile as outfile:
+    with open(filename, "w+") as outfile:
         tmpl = Template(data_string(resource))
         text = tmpl.substitute(mapping)
 
@@ -301,7 +290,7 @@ class Runner(object):
         self.output_filenames = None
 
         self.obs_dirname = None
-        self.wig_dirname = WIG_DIRNAME
+        self.wig_dirname = None
 
         # data
         self.num_chunks = None
@@ -337,14 +326,12 @@ class Runner(object):
                 # it already exists and you don't want to force regen
                 self.train = False
         else:
-            self.trainable_params_filename = \
-                mkstemp_closed(".params", "params-", self.dirname)
+            filenamebase = extjoin("params", "params")
+            self.trainable_params_filename = self.dirpath / filenamebase
 
     def set_log_likelihood_filename(self):
-        # XXX: for now, this is always a tempfile
-
-        self.log_likelihood_filename = \
-            mkstemp_closed(".ll", "likelihood-", self.dirname)
+        filenamebase = extjoin("likelihood", "ll")
+        self.log_likelihood_filename = self.dirpath / filenamebase
 
     def make_dir(self, dirname):
         if self.delete_existing:
@@ -382,7 +369,6 @@ class Runner(object):
 
         return path(self.obs_dirpath / (prefix + EXT_OBS))
 
-
     def save_resource(self, resname):
         orig_filename = data_filename(resname)
 
@@ -396,7 +382,7 @@ class Runner(object):
             return dirpath / orig_filepath.name
 
     def save_include(self):
-        self.include_filename = self.save_resource("seg.inc")
+        self.include_filename = self.save_resource(RES_INC)
 
     def save_structure(self):
         observation_tmpl = Template(data_string("observation.tmpl"))
@@ -505,7 +491,7 @@ class Runner(object):
         feature_filelistpath = self.feature_filelistpath
 
         if self.delete_existing or feature_filelistpath.exists():
-            feature_filelist = StringIO() # dummy output
+            feature_filelist = closing(StringIO()) # dummy output
         else:
             feature_filelist = open(self.feature_filelistpath, "w")
 
@@ -539,29 +525,29 @@ class Runner(object):
         self.dont_train_filename = self.save_resource(RES_DONT_TRAIN)
 
     def save_output_filelist(self):
-        dirname = self.dirname
+        dirpath = self.dirpath
         num_chunks = self.num_chunks
 
-        prefix_tmpl = "out" + make_prefix_fmt(num_chunks)
-        output_filenames = \
-            [mkstemp_closed(SUFFIX_OUT, prefix_tmpl % index, dirname)
-             for index in xrange(num_chunks)]
+        output_filename_fmt = "out" + make_prefix_fmt(num_chunks) + EXT_OUT
+        output_filenames = [dirpath / output_filename_fmt % index
+                            for index in xrange(num_chunks)]
 
-        temp_file, self.output_filelistname = \
-            mkstemp_file(SUFFIX_LIST, "output-", dirname)
+        output_filelistname = dirpath / extjoin("output", EXT_LIST)
+        self.output_filelistname = output_filelistname
 
-        with temp_file as temp_file:
+        with open(output_filelistname, "w") as output_filelist:
             for output_filename in output_filenames:
-                print >>temp_file, output_filename
+                print >>output_filelist, output_filename
 
         self.output_filenames = output_filenames
 
     def save_dumpnames(self):
-        temp_file, self.dumpnames_filename = \
-            mkstemp_file(SUFFIX_LIST, "dumpnames-", self.dirname)
+        dirpath = self.dirpath
+        dumpnames_filename = dirpath / extjoin("dumpnames", EXT_LIST)
+        self.dumpnames_filename = dumpnames_filename
 
-        with temp_file as temp_file:
-            print >>temp_file, "seg"
+        with open(dumpnames_filename, "w") as dumpnames_file:
+            print >>dumpnames_file, "seg"
 
     def save_params(self):
         self.make_obs_dir()
@@ -607,7 +593,7 @@ class Runner(object):
         """
         allows dry_run
         """
-        def dry_run_prog(self, *args, **kwargs):
+        def dry_run_prog(*args, **kwargs):
             print " ".join(prog.build_cmdline(args, kwargs))
 
         if self.dry_run:
@@ -661,15 +647,17 @@ class Runner(object):
                  outputTrainableParameters=trainable_params_filename,
                  **kwargs)
 
-            start_params.append((self.load_log_likelihood(),
-                                 input_master_filename,
-                                 trainable_params_filename))
+            if not self.dry_run:
+                start_params.append((self.load_log_likelihood(),
+                                     input_master_filename,
+                                     trainable_params_filename))
 
-        src_filenames = max(start_params)[1:]
+        if not self.dry_run:
+            src_filenames = max(start_params)[1:]
 
-        zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
-        for name, src_filename, dst_filename in zipper:
-            self.move_results(name, src_filename, dst_filename)
+            zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
+            for name, src_filename, dst_filename in zipper:
+                self.move_results(name, src_filename, dst_filename)
 
     def run_identify(self):
         if not self.input_master_filename:
@@ -699,7 +687,8 @@ class Runner(object):
              cppCommandOptions=cpp_options,
              verbosity=VERBOSITY)
 
-        self.gmtk_out2wig()
+        if not self.dry_run:
+            self.gmtk_out2wig()
 
     def _run(self):
         """
@@ -707,6 +696,7 @@ class Runner(object):
         """
         # XXX: use binary I/O to gmtk rather than ascii
 
+        self.dirpath = path(self.dirname)
         self.save_params()
 
         if self.triangulate:
@@ -752,6 +742,9 @@ def parse_options(args):
     parser.add_option("--observations", "-o", metavar="DIR",
                       help="use or create observations in DIR")
 
+    parser.add_option("--wiggle", "-w", metavar="DIR",
+                      help="use or create wiggle tracks in DIR")
+
     parser.add_option("--input-master", "-i", metavar="FILE",
                       help="use or create input master in FILE")
 
@@ -789,15 +782,21 @@ def parse_options(args):
 
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
+    dirname = options.directory
+    wig_dirname = options.wiggle
+
+    if dirname and not wig_dirname:
+        wig_dirname = path(dirname) / WIG_DIRNAME
 
     runner = Runner()
 
     runner.h5filenames = args
+    runner.dirname = dirname
     runner.obs_dirname = options.observations
+    runner.wig_dirname = wig_dirname
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
     runner.trainable_params_filename = options.trainable_params
-    runner.dirname = options.directory
 
     runner.random_starts = options.random_starts
 
