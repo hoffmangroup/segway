@@ -1,0 +1,11 @@
+  variable: nonmissing_dinucleotide {
+     type: discrete observed $nonmissing_index:$nonmissing_index cardinality CARD_NONMISSING;
+
+     conditionalparents: CONDITIONALPARENTS_NONMISSING;
+  }
+
+  variable: dinucleotide {
+     type: discrete observed $dinucleotide_index:$dinucleotide_index cardinality CARD_DINUCLEOTIDE;
+
+     conditionalparents: seg(0) using DenseCPT("seg_dinucleotide");
+  }

@@ -9,9 +9,15 @@
 % which segment?
 #define CARD_SEG 2
 
+% AA .. TT
+#define CARD_DINUCLEOTIDE 16
+
 %% types
 
 #define TYPE_SEG discrete hidden cardinality CARD_SEG
-#define TYPE_DINUCLEOTIDE discrete observed
+
+%% conditionalparents
+
+#define CONDITIONALPARENTS_NONMISSING nil using DenseCPT("internal:UnityScore")
 
 #endif

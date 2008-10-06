@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-"""gmseg: DESCRIPTION
+"""segway: DESCRIPTION
 
 LONG_DESCRIPTION
 """
@@ -34,9 +34,9 @@ classifiers = ["Natural Language :: English",
 
 entry_points = """
 [console_scripts]
-gmseg = gmseg.run:main
-gmsegimport = gmseg.importdata:main
-gmsegimportseq = gmseg.importseq:main
+segway = segway.run:main
+segway-load-seq = segway.importseq:main
+segway-load-data = segway.importdata:main
 """
 
 # XXX: warn: make sure you have LDFLAGS unset if you are building numpy

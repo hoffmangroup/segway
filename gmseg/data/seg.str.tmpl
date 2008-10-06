@@ -8,14 +8,7 @@ frame: 0 {
      conditionalparents: nil using DenseCPT("start_seg");
    }
 
-  variable: dinucleotide {
-     type: TYPE_DINUCLEOTIDE;
-     conditionalparents: seg(0) using XXX;
-  }
-
-${observations}
-
-}
+${observations}}
 
 frame: 1 {
    variable: seg {
@@ -23,8 +16,6 @@ frame: 1 {
      conditionalparents: seg(-1) using DenseCPT("seg_seg");
    }
 
-${observations}
-
-}
+${observations}}
 
 chunk 1:1

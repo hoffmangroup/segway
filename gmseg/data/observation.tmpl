@@ -1,7 +1,7 @@
    variable: nonmissing_obs$obs_index {
      type: discrete observed $nonmissing_index:$nonmissing_index cardinality CARD_NONMISSING;
 
-     conditionalparents: nil using DenseCPT("internal:UnityScore");
+     conditionalparents: CONDITIONALPARENTS_NONMISSING;
    }
 
    variable: obs$obs_index {
