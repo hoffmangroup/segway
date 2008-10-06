@@ -28,13 +28,13 @@ from path import path
 from tables import openFile
 
 from ._util import (data_filename, data_string, init_num_obs,
-                    NamedTemporaryDir, walk_continuous_supercontigs)
+                    NamedTemporaryDir, PKG, walk_continuous_supercontigs)
 
 # XXX: should be options
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
 VERBOSITY = 30
-TEMPDIR_PREFIX = "gmseg-"
+TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
 ISLAND = False
@@ -98,9 +98,9 @@ TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
 # XXX: this could be specified as a dict instead
-WIG_HEADER = 'track type=wiggle_0 name=gmseg ' \
-    'description="Segmentation by gmseg" visibility=dense viewLimits=0:1 ' \
-    'autoScale=off'
+WIG_HEADER = 'track type=wiggle_0 name=%s ' \
+    'description="Segmentation by %s" visibility=dense viewLimits=0:1 ' \
+    'autoScale=off' % (PKG, PKG)
 
 TRAIN_ATTRNAMES = ["input_master_filename", "trainable_params_filename"]
 
@@ -576,7 +576,7 @@ class Runner(object):
 
     def gmtk_out2wig(self):
         prefix_fmt = make_prefix_fmt(self.num_chunks)
-        wig_filebasename_fmt = "gmseg%s%s" % (prefix_fmt, EXT_WIG)
+        wig_filebasename_fmt = "".join([PKG, prefix_fmt, EXT_WIG])
 
         wig_dirpath = path(self.wig_dirname)
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt

@@ -1,5 +1,5 @@
 ======
- gmseg
+ segway
 ======
 by Michael Hoffman <mmh1@washington.edu>
 
@@ -11,7 +11,7 @@ DESCRIPTION
 
 Prerequisites
 =============
-You must have the following installed before installing gmseg:
+You must have the following installed before installing segway:
 
 - Python_ 2.5.1
 - HDF5_ 1.6.5
@@ -127,13 +127,13 @@ python setup.py install
 
 License
 =======
-gmseg is distributed in the hope that it will be useful, but WITHOUT
+Segway is distributed in the hope that it will be useful, but WITHOUT
 ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE.
 
 Contact
 =======
 Please let me <mmh1@washington.edu> know if you have any
-comments on the installation or use of gmseg. I would love to know
+comments on the installation or use of Segway. I would love to know
 if you get it working on a system not listed above.
 

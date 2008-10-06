@@ -14,12 +14,17 @@ from numpy import array, empty
 from pkg_resources import resource_filename, resource_string
 from tables import NoSuchNodeError
 
-DATA_PKG = "gmseg.data"
+try:
+    PKG = __package__
+except NameError:
+    PKG = "segway"
 
-data_filename = partial(resource_filename, DATA_PKG)
-data_string = partial(resource_string, DATA_PKG)
+PKG_DATA = ".".join([PKG, "data"])
 
-# NamedTemporaryFile is based somewhat on Python 2.5.2
+data_filename = partial(resource_filename, PKG_DATA)
+data_string = partial(resource_string, PKG_DATA)
+
+# NamedTemporaryDir is based somewhat on Python 2.5.2
 # tempfile._TemporaryFileWrapper
 #
 # Original Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python

@@ -1,4 +1,4 @@
-#include "/net/noble/vol2/home/mmh1/src/projects/gmseg/gmseg/data/seg.inc"
+#include "/net/noble/vol2/home/mmh1/src/projects/segway/segway/data/seg.inc"
 
 DT_IN_FILE inline
 1
