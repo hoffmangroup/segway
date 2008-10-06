@@ -41,9 +41,9 @@ segway-load-data = segway.importdata:main
 
 # XXX: warn: make sure you have LDFLAGS unset if you are building numpy
 
-# need optbuild>0.1.2 for OptionBuilder_ShortOptWithSpace_TF
+# need optbuild>=0.1.2.dev for OptionBuilder_ShortOptWithSpace_TF
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
-install_requires = ["textinput", "optbuild>0.1.2", "tables>2.0.4", "numpy", "path"]
+install_requires = ["textinput", "optbuild>=0.1.2.dev", "tables>2.0.4", "numpy", "path"]
 
 setup(name=name,
       version=__version__,
