@@ -22,9 +22,10 @@ XXX: NumPy should install automatically, but it doesn't.
 Additionally, the Sunflower setup script will automatically install
 the following packages or newer versions:
 
+- PyTables_ 2.1b3
 - path.py 2.2
-- PyTables_ 2.0
-- setuptools
+- setuptools 0.6c8
+- optbuild 0.1.3
 - textinput 0.1.1
 
 In order for automatic prerequisite installation to work, you either
@@ -66,7 +67,7 @@ platform and set up appropriate paths::
   PYTHON_VERSION=2.5
   export PYTHONPATH=${HOME}/arch/${ARCH}/lib/python${PYTHON_VERSION}:${HOME}/lib/python${PYTHON_VERSION}
 
-  export HDF5_DIR=${HOME}/arch/${ARCH}/opt/hdf5-1.6.6
+  export HDF5_DIR=${HOME}/arch/${ARCH}/opt/hdf5-1.8.1
 
 You'll also need to load this configuration for the rest of these
 hints, and create the appropriate directories. Run this from the bash
@@ -81,9 +82,9 @@ HDF5
 ~~~~
 Download the HDF5 source tarball, build, test, and install it::
 
-  wget ftp://ftp.hdfgroup.org/HDF5/current/src/hdf5-1.6.6.tar.gz
-  tar zxvf hdf5-1.6.6.tar.gz
-  cd hdf5-1.6.6
+  wget ftp://ftp.hdfgroup.org/HDF5/current/src/hdf5-1.8.1.tar.gz
+  tar zxvf hdf5-1.8.1.tar.gz
+  cd hdf5-1.8.1
   ./configure --prefix=${HDF5_DIR}
   make
   make install
@@ -120,10 +121,17 @@ directory, put this in ``~/.pydistutils.cfg``::
 You must set ``$ARCH`` as above in your .bashrc. The other variables
 will be determined by Python.
 
-
 Installation
 ============
 python setup.py install
+
+Using
+=====
+All commands have help with --help.
+
+1. Set up your HDF5 skeletons with ``segway-load-seq``.
+2. Populate the skeletons with data using ``segway-load-data``.
+3. Run ``segway`` on the HDF5 files.
 
 License
 =======

@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2008 Michael M. Hoffman <mmh1@u.washington.edu>
+# Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from functools import partial
 import shutil
@@ -15,6 +15,7 @@ from pkg_resources import resource_filename, resource_string
 from tables import NoSuchNodeError
 
 try:
+    # Python 2.6
     PKG = __package__
 except NameError:
     PKG = "segway"

@@ -743,7 +743,8 @@ def parse_options(args):
                       help="use or create observations in DIR")
 
     parser.add_option("--wiggle", "-w", metavar="DIR",
-                      help="use or create wiggle tracks in DIR")
+                      help="use or create wiggle tracks in DIR",
+                      default="out")
 
     parser.add_option("--input-master", "-i", metavar="FILE",
                       help="use or create input master in FILE")

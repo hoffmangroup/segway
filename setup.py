@@ -11,7 +11,8 @@ __version__ = "0.1.0a1"
 
 import sys
 
-assert sys.version_info >= (2, 5)
+# required for from __future__ import division, with_statement
+assert sys.version_info >= (2, 5, 1)
 
 from ez_setup import use_setuptools
 use_setuptools()
@@ -26,7 +27,8 @@ url = "http://noble.gs.washington.edu/~mmh1/software/%s/" % name.lower()
 download_url = "%s%s-%s.tar.gz" % (url, name, __version__)
 
 # XXX: remove these when the upstream packages are updated to fix these issues
-dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip"]
+dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip",
+                    "http://www.pytables.org/download/preliminary/tables-2.1b3.tar.gz"]
 # http://pytables.org/svn/pytables/branches/std-2.0#egg=tables-2.0.5.dev
 
 classifiers = ["Natural Language :: English",
@@ -41,9 +43,9 @@ segway-load-data = segway.importdata:main
 
 # XXX: warn: make sure you have LDFLAGS unset if you are building numpy
 
-# need optbuild>=0.1.2.dev for OptionBuilder_ShortOptWithSpace_TF
+# need optbuild>0.1.2 for OptionBuilder_ShortOptWithSpace_TF
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
-install_requires = ["textinput", "optbuild>=0.1.2.dev", "tables>2.0.4", "numpy", "path"]
+install_requires = ["textinput", "optbuild>0.1.2", "tables>2.0.4", "numpy", "path"]
 
 setup(name=name,
       version=__version__,
