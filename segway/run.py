@@ -14,9 +14,9 @@ from contextlib import closing
 from errno import EEXIST, ENOENT
 from itertools import count, izip
 from math import floor, log10
-from os import extsep, makedirs
+from os import extsep
 from random import random
-from shutil import move, rmtree
+from shutil import move
 from string import Template
 from struct import calcsize, unpack
 import sys
@@ -27,7 +27,7 @@ from optbuild import OptionBuilder_ShortOptWithSpace_TF
 from path import path
 from tables import openFile
 
-from ._util import (data_filename, data_string, init_num_obs,
+from ._util import (data_filename, data_string, gzip_open, init_num_obs,
                     NamedTemporaryDir, PKG, walk_continuous_supercontigs)
 
 # XXX: should be options
@@ -60,17 +60,19 @@ EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkEMtrainNew")
 VITERBI_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkViterbiNew")
 
 # extensions and suffixes
-EXT_WIG = "wig"
+EXT_GZ = "gz"
 EXT_LIST = "list"
 EXT_OBS = "obs"
 EXT_OUT = "out"
+EXT_WIG = "wig"
 
 PREFIX_LIST = "features"
 PREFIX_CHUNK = "chunk"
 
+SUFFIX_GZ = extsep + EXT_WIG
 SUFFIX_LIST = extsep + EXT_LIST
-SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_OBS = extsep + EXT_OBS
+SUFFIX_OUT = extsep + EXT_OUT
 
 FEATURE_FILELISTBASENAME = extsep.join([PREFIX_LIST, EXT_LIST])
 
@@ -252,13 +254,18 @@ def make_prefix_fmt(num_filenames):
 def read_gmtk_out(infile):
     data = infile.read()
 
-    fmt = "%dL" % (len(data) / calcsize("L"))
+    # @L: uint32/uint64 (@ is the default modifier: native size/alignment)
+    # =L: uint32 (standard size/alignment)
+    fmt = "=%dL" % (len(data) / calcsize("=L"))
     return unpack(fmt, data)
 
 def write_wig(outfile, output, (chrom, start, end)):
-    print >>outfile, TRACK_FMT % (chrom, start, end)
+    # convert from zero- to one-based
+    start_1based = start + 1
+
+    print >>outfile, TRACK_FMT % (chrom, start_1based, end)
     print >>outfile, WIG_HEADER
-    print >>outfile, FIXEDSTEP_FMT % (chrom, start)
+    print >>outfile, FIXEDSTEP_FMT % (chrom, start_1based)
 
     print >>outfile, "\n".join(map(str, output))
 
@@ -266,7 +273,7 @@ def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename):
     with open(gmtk_outfilename) as gmtk_outfile:
         data = read_gmtk_out(gmtk_outfile)
 
-        with open(wig_filename, "w") as wig_file:
+        with gzip_open(wig_filename, "w") as wig_file:
             return write_wig(wig_file, data, chunk_coord)
 
 class Runner(object):
@@ -334,15 +341,23 @@ class Runner(object):
         self.log_likelihood_filename = self.dirpath / filenamebase
 
     def make_dir(self, dirname):
+        dirpath = path(dirname)
+
         if self.delete_existing:
             # just always try to delete it
             try:
-                rmtree(dirname)
+                dirpath.rmtree()
             except OSError, err:
                 if err.errno != ENOENT:
                     raise
-
-        return makedirs(dirname)
+        try:
+            dirpath.makedirs()
+        except OSError, err:
+            # if the error is because directory exists, but it's
+            # empty, then do nothing
+            if (err.errno != EEXIST or not dirpath.isdir() or
+                dirpath.listdir()):
+                raise
 
     def make_wig_dir(self):
         self.make_dir(self.wig_dirname)
@@ -576,7 +591,7 @@ class Runner(object):
 
     def gmtk_out2wig(self):
         prefix_fmt = make_prefix_fmt(self.num_chunks)
-        wig_filebasename_fmt = "".join([PKG, prefix_fmt, EXT_WIG])
+        wig_filebasename_fmt = "".join([PKG, prefix_fmt, EXT_WIG, SUFFIX_GZ])
 
         wig_dirpath = path(self.wig_dirname)
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt

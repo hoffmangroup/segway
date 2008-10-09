@@ -19,9 +19,7 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
-from contextlib import closing
 from functools import partial
-from gzip import open as _gzip_open
 from os import extsep
 import sys
 
@@ -32,7 +30,7 @@ from tables import Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
 from .importseq import MIN_GAP_LEN
-from ._util import (fill_array, init_num_obs, new_extrema,
+from ._util import (fill_array, gzip_open, init_num_obs, new_extrema,
                     walk_continuous_supercontigs, walk_supercontigs)
 
 ATOM = Float64Atom(dflt=NAN)
@@ -61,10 +59,6 @@ class KeyPassingDefaultdict(defaultdict):
         self[key] = res = default_factory(key)
 
         return res
-
-# XXX: suggest as default
-def gzip_open(*args, **kwargs):
-    return closing(_gzip_open(*args, **kwargs))
 
 def pairs2dict(texts):
     res = {}
@@ -96,7 +90,7 @@ def write_score(chromosome, start, end, score, col_index, num_cols):
             break
     else:
         raise DataForGapError("%r does not fit into a single supercontig"
-                              % datum)
+                              % (start, end))
 
     try:
         continuous = supercontig.continuous

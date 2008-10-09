@@ -5,7 +5,9 @@ __version__ = "$Revision$"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
+from contextlib import closing
 from functools import partial
+from gzip import open as _gzip_open
 import shutil
 import sys
 from tempfile import mkdtemp
@@ -121,6 +123,10 @@ def init_num_obs(num_obs, continuous):
     assert num_obs is None or num_obs == curr_num_obs
 
     return curr_num_obs
+
+# XXX: suggest as default
+def gzip_open(*args, **kwargs):
+    return closing(_gzip_open(*args, **kwargs))
 
 def main(args=sys.argv[1:]):
     pass
