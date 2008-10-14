@@ -10,7 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
-from contextlib import closing
+from contextlib import closing, contextmanager
 from errno import EEXIST, ENOENT
 from itertools import count, izip
 from math import floor, log10
@@ -21,6 +21,7 @@ from string import Template
 from struct import calcsize, unpack
 import sys
 
+from DRMAA import Session as _Session
 from numpy import amin, amax, array, finfo, float32, isnan
 from numpy.random import uniform
 from optbuild import OptionBuilder_ShortOptWithSpace_TF
@@ -46,6 +47,8 @@ COMPONENT_CACHE = True
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 MAX_FRAMES = 10000000 # 10 million
+MEM_REQ = "11G"
+RES_REQ = "-l virtual_free=%s" % MEM_REQ
 
 # defaults
 RANDOM_STARTS = 1
@@ -55,8 +58,15 @@ MIN_FLOAT = finfo(float32).min
 SENTINEL = MIN_FLOAT
 
 # programs
+ENV_CMD = "/usr/bin/env"
+BASH_CMD = "bash"
+EM_TRAIN_CMD = "gmtkEMtrainNew"
+
+BASH_CMD_STR = '%s -trrng $((SGE_TASK_ID-1)) "$@"' % EM_TRAIN_CMD
+BASH_CMDLINE = [BASH_CMD, "-c", BASH_CMD_STR]
+
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkTriangulate")
-EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkEMtrainNew")
+EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF(EM_TRAIN_CMD)
 VITERBI_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkViterbiNew")
 
 # extensions and suffixes
@@ -108,6 +118,17 @@ TRAIN_ATTRNAMES = ["input_master_filename", "trainable_params_filename"]
 
 def extjoin(*args):
     return extsep.join(args)
+
+# XXX: suggest upstream as addition to DRMAA-python
+@contextmanager
+def Session(*args, **kwargs):
+    res = _Session()
+    res.init(*args, **kwargs)
+
+    try:
+        yield res
+    finally:
+        res.exit()
 
 def save_template(filename, resource, mapping, dirname=None,
                   delete_existing=False):
@@ -300,6 +321,7 @@ class Runner(object):
         self.wig_dirname = None
 
         # data
+        # a "chunk" is what GMTK calls a segment
         self.num_chunks = None
         self.chunk_coords = None
         self.mins = None
@@ -621,7 +643,7 @@ class Runner(object):
         prog = self.prog_factory(TRIANGULATE_PROG)
 
         prog(strFile=self.structure_filename,
-                         verbosity=VERBOSITY)
+             verbosity=VERBOSITY)
 
     def run_train(self):
         prog = self.prog_factory(EM_TRAIN_PROG)
@@ -648,24 +670,40 @@ class Runner(object):
         #                trainable_params_filename)
         start_params = []
 
-        for start_index in xrange(self.random_starts):
-            # XXX: re-add the ability to set your own starting parameters,
-            # with new=start_index
-            # (copy from existing rather than using it on command-line)
-            self.save_input_master(new=True)
-            self.set_trainable_params_filename(new=True)
+        with Session() as session:
+            for start_index in xrange(self.random_starts):
+                # XXX: re-add the ability to set your own starting parameters,
+                # with new=start_index
+                # (copy from existing rather than using it on command-line)
+                self.save_input_master(new=True)
+                self.set_trainable_params_filename(new=True)
 
-            input_master_filename = self.input_master_filename
-            trainable_params_filename = self.trainable_params_filename
+                input_master_filename = self.input_master_filename
+                trainable_params_filename = self.trainable_params_filename
 
-            prog(inputMasterFile=input_master_filename,
-                 outputTrainableParameters=trainable_params_filename,
-                 **kwargs)
+                kwargs_start = \
+                    dict(inputMasterFile=input_master_filename,
+                         outputTrainableParameters=trainable_params_filename,
+                         **kwargs)
 
-            if not self.dry_run:
-                start_params.append((self.load_log_likelihood(),
-                                     input_master_filename,
-                                     trainable_params_filename))
+                # $0 = "gmtkEMtrainNew" ignored by "$@" which starts with $1
+                em_train_cmdline = prog.build_cmdline(kwargs_start)
+
+                job_tmpl = session.createJobTemplate()
+                job_tmpl.remoteCommand = ENV_CMD
+                job_tmpl.args = BASH_CMDLINE + em_train_cmdline
+                job_tmpl.workingDirectory = job_tmpl.WORKING_DIRECTORY # cwd
+                job_tmpl.nativeSpecification = RES_REQ
+
+                session.runBulkJobs(job_tmpl, 1, self.num_chunks+1, 1)
+                import pdb; pdb.set_trace()
+
+                # XXX: hold_jid job for loadAccFile XXX goes here
+
+                if not self.dry_run:
+                    start_params.append((self.load_log_likelihood(),
+                                         input_master_filename,
+                                         trainable_params_filename))
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]

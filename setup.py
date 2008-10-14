@@ -5,7 +5,7 @@
 LONG_DESCRIPTION
 """
 
-__version__ = "0.1.0a1"
+__version__ = "0.1.0a2"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
@@ -28,8 +28,8 @@ download_url = "%s%s-%s.tar.gz" % (url, name, __version__)
 
 # XXX: remove these when the upstream packages are updated to fix these issues
 dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip",
-                    "http://www.pytables.org/download/preliminary/tables-2.1b3.tar.gz"]
-# http://pytables.org/svn/pytables/branches/std-2.0#egg=tables-2.0.5.dev
+                    "http://www.pytables.org/download/preliminary/tables-2.1b3.tar.gz",
+                    "http://gridengine.sunsource.net/files/documents/7/36/DRMAA-python-0.2.tar.gz"]
 
 classifiers = ["Natural Language :: English",
                "Programming Language :: Python"]
@@ -45,8 +45,11 @@ segway-load-data = segway.importdata:main
 
 # need optbuild>0.1.2 for OptionBuilder_ShortOptWithSpace_TF
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
+
+# XXX: DRMAA-python should be an option, after the code is written
+# correctly to fallback when it's not there
 install_requires = ["textinput", "optbuild>0.1.2", "tables>2.0.4", "numpy",
-                    "path"]
+                    "path", "DRMAA-python"]
 
 setup(name=name,
       version=__version__,
