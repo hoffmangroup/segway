@@ -128,7 +128,7 @@ WIG_HEADER = 'track type=wiggle_0 name=%s ' \
     'description="Segmentation by %s" visibility=dense viewLimits=0:1 ' \
     'autoScale=off' % (PKG, PKG)
 
-TRAIN_ATTRNAMES = ["input_master_filename", "trainable_params_filename"]
+TRAIN_ATTRNAMES = ["input_master_filename", "params_filename"]
 
 def extjoin(*args):
     return extsep.join(args)
@@ -336,7 +336,7 @@ class Runner(object):
         self.input_master_filename = None
         self.structure_filename = None
 
-        self.trainable_params_filename = None
+        self.params_filename = None
         self.dirname = None
         self.is_dirname_temp = False
         self.log_likelihood_filename = None
@@ -376,19 +376,19 @@ class Runner(object):
         with open(self.log_likelihood_filename) as infile:
             return float(infile.read().strip())
 
-    def set_trainable_params_filename(self, new=False):
-        # if this is not run and trainable_params_filename is
+    def set_params_filename(self, new=False):
+        # if this is not run and params_filename is
         # unspecified, then it won't be passed to gmtkViterbiNew
 
-        trainable_params_filename = self.trainable_params_filename
-        if not new and trainable_params_filename:
+        params_filename = self.params_filename
+        if not new and params_filename:
             if (not self.delete_existing
-                and path(trainable_params_filename).exists()):
+                and path(params_filename).exists()):
                 # it already exists and you don't want to force regen
                 self.train = False
         else:
             filenamebase = extjoin("params", "params")
-            self.trainable_params_filename = self.dirpath / filenamebase
+            self.params_filename = self.dirpath / filenamebase
 
     def set_log_likelihood_filename(self):
         filenamebase = extjoin("likelihood", "ll")
@@ -627,7 +627,7 @@ class Runner(object):
 
         if self.train:
             self.save_dont_train()
-            self.set_trainable_params_filename() # might turn off self.train
+            self.set_params_filename() # might turn off self.train
             self.set_log_likelihood_filename()
 
         if self.identify:
@@ -671,9 +671,9 @@ class Runner(object):
             return prog
 
     # XXX: there is some duplication between these two which should be removed
-    def queue_parallel(self, session, trainable_params_filename, **kwargs):
+    def queue_parallel(self, session, params_filename, **kwargs):
         kwargs = dict(inputMasterFile=self.input_master_filename,
-                      inputTrainableParameters=trainable_params_filename,
+                      inputTrainableParameters=params_filename,
                       **kwargs)
         acc_filename = self.dirpath / ACC_FILENAME_PARALLEL
         bash_cmd_str = CMD_STR_PARALLEL_FMT % (EM_TRAIN_CMD, acc_filename)
@@ -692,19 +692,19 @@ class Runner(object):
         job_tmpl.nativeSpecification = make_native_spec(l=res_req)
 
         # a task is the atomic unit within an array job
-        task_ids = session.runBulkJobs(job_tmpl, 1, self.num_chunks+1, 1)
+        task_ids = session.runBulkJobs(job_tmpl, 1, self.num_chunks, 1)
 
         return task_ids[0].partition(".")[0]
 
     def queue_bundle(self, session, parallel_jobid,
-                     input_trainable_params_filename,
-                     output_trainable_params_filename, **kwargs):
+                     input_params_filename,
+                     output_params_filename, **kwargs):
         ## bundle step: take parallel accumulators and combine them
         acc_filename = self.dirpath / ACC_FILENAME_BUNDLE
         kwargs = \
             dict(inputMasterFilename=self.input_master_filename,
-                 inputTrainableParameters=input_trainable_params_filename,
-                 outputTrainableParameters=output_trainable_params_filename,
+                 inputTrainableParameters=input_params_filename,
+                 outputTrainableParameters=output_params_filename,
                  trrng="nil",
                  loadAccRange="0:%s" % (self.num_chunks-1),
                  loadAccFile=ACC_FILENAME_BUNDLE,
@@ -753,10 +753,10 @@ class Runner(object):
                       lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0)
 
         dst_filenames = [self.input_master_filename,
-                         self.trainable_params_filename]
+                         self.params_filename]
 
         # list of tuples(log_likelihood, input_master_filename,
-        #                trainable_params_filename)
+        #                params_filename)
         start_params = []
 
         with Session() as session:
@@ -766,44 +766,48 @@ class Runner(object):
                 # with new=start_index
                 # (copy from existing rather than using it on command-line)
                 self.save_input_master(new=True)
-                self.set_trainable_params_filename(new=True)
+                self.set_params_filename(new=True)
 
                 last_log_likelihood = NINF
                 log_likelihood = NINF
                 round_index = 0
 
-                stem_trainable_params_filename = self.trainable_params_filename
-                last_trainable_params_filename = None
-                curr_trainable_params_filename = None
+                stem_params_filename = self.params_filename
+                last_params_filename = None
+                curr_params_filename = None
                 while is_training_progressing(last_log_likelihood,
                                               log_likelihood):
                     parallel_jobid = \
                         self.queue_parallel(session,
-                                            last_trainable_params_filename,
+                                            last_params_filename,
                                             **kwargs)
 
-                    curr_trainable_params_filename = \
-                        extjoin(stem_trainable_params_filename,
+                    curr_params_filename = \
+                        extjoin(stem_params_filename,
                                 str(round_index))
 
-                    self.queue_bundle(session,
-                                      parallel_jobid,
-                                      last_trainable_params_filename,
-                                      curr_trainable_params_filename, **kwargs)
+                    bundle_jobid = \
+                        self.queue_bundle(session,
+                                          parallel_jobid,
+                                          last_params_filename,
+                                          curr_params_filename,
+                                          **kwargs)
+
+                    session.wait(bundle_jobid)
 
                     import pdb; pdb.set_trace() # XXX: have to add wait here before continuing
 
                     last_log_likelihood = log_likelihood
                     log_likelihood = self.load_log_likelihood()
 
-                    last_trainable_params_filename = \
-                        curr_trainable_params_filename
+                    last_params_filename = \
+                        curr_params_filename
 
                     round_index += 1
 
                 start_params.append((log_likelihood,
                                      self.input_master_filename,
-                                     self.trainable_params_filename))
+                                     self.params_filename))
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]
@@ -816,8 +820,8 @@ class Runner(object):
         if not self.input_master_filename:
             self.save_input_master()
 
-        trainable_params_filename = self.trainable_params_filename
-        if trainable_params_filename:
+        params_filename = self.params_filename
+        if params_filename:
             cpp_options = "-DUSE_TRAINABLE_PARAMS"
         else:
             cpp_options = None
@@ -827,7 +831,7 @@ class Runner(object):
         prog(strFile=self.structure_filename,
 
              inputMasterFile=self.input_master_filename,
-             inputTrainableParameters=trainable_params_filename,
+             inputTrainableParameters=params_filename,
 
              ofilelist=self.output_filelistname,
              dumpNames=self.dumpnames_filename,
@@ -950,7 +954,7 @@ def main(args=sys.argv[1:]):
     runner.wig_dirname = wig_dirname
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
-    runner.trainable_params_filename = options.trainable_params
+    runner.params_filename = options.params
 
     runner.random_starts = options.random_starts
 
