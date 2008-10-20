@@ -1,6 +1,6 @@
-======
+========
  segway
-======
+========
 by Michael Hoffman <mmh1@washington.edu>
 
 .. contents::
@@ -45,11 +45,14 @@ home directory automatically (see hint below).
 .. _PyTables: http://www.pytables.org/
 
 If you want to use DRMAA to manage a cluster, you will need to ensure
-that your DRMAA headers are in C_INCLUDE_PATH, and that your libraries
-are in the default library path. For example, for Sun Grid Engine:
+that DRMAA headers are in C_INCLUDE_PATH, and DRMAA libraries are in
+the default library path. For example, these two bash commands will
+set up the appropriate environment variables to use Sun Grid Engine:
 
 export C_INCLUDE_PATH="${SGE_ROOT}/include:${C_INCLUDE_PATH}"
-export LDFLAGS="${LDFLAGS} -L${SGE_ROOT}/lib/lx24-amd64"
+export LDFLAGS="${LDFLAGS} -L${SGE_ROOT}/lib/$($SGE_ROOT/util/arch)"
+
+Then install Segway.
 
 Hints on installing the prerequisites in your home directory
 ------------------------------------------------------------

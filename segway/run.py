@@ -22,9 +22,11 @@ from struct import calcsize, unpack
 import sys
 
 from DRMAA import Session as _Session
-from numpy import amin, amax, array, finfo, float32, isnan
+from numpy import amin, amax, array, finfo, float32, isnan, NINF
 from numpy.random import uniform
-from optbuild import OptionBuilder_ShortOptWithSpace_TF
+from optbuild import (Mixin_NoConvertUnderscore,
+                      OptionBuilder_ShortOptWithSpace,
+                      OptionBuilder_ShortOptWithSpace_TF)
 from path import path
 from tables import openFile
 
@@ -34,12 +36,14 @@ from ._util import (data_filename, data_string, gzip_open, init_num_obs,
 # XXX: should be options
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
-VERBOSITY = 30
+VERBOSITY = 0 # XXX: should vary based on DRMAA submission or not
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
-ISLAND = False
+ISLAND = True
 WIG_DIRNAME = "out"
+
+LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
 # for extra memory savings, set to (False) or (not ISLAND)
 COMPONENT_CACHE = True
@@ -47,8 +51,9 @@ COMPONENT_CACHE = True
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 MAX_FRAMES = 10000000 # 10 million
-MEM_REQ = "11G"
-RES_REQ = "-l virtual_free=%s" % MEM_REQ
+MEM_REQ_PARALLEL = "8.5G"
+MEM_REQ_BUNDLE = "500M"
+RES_REQ_FMT = "virtual_free=%s"
 
 # defaults
 RANDOM_STARTS = 1
@@ -57,17 +62,26 @@ RANDOM_STARTS = 1
 MIN_FLOAT = finfo(float32).min
 SENTINEL = MIN_FLOAT
 
+ACC_FILENAME_FMT = "acc%s.bin"
+ACC_FILENAME_PARALLEL = ACC_FILENAME_FMT % "$((SGE_TASK_ID-1))"
+ACC_FILENAME_BUNDLE = ACC_FILENAME_FMT % "@D"
+
 # programs
 ENV_CMD = "/usr/bin/env"
 BASH_CMD = "bash"
 EM_TRAIN_CMD = "gmtkEMtrainNew"
 
-BASH_CMD_STR = '%s -trrng $((SGE_TASK_ID-1)) "$@"' % EM_TRAIN_CMD
-BASH_CMDLINE = [BASH_CMD, "-c", BASH_CMD_STR]
+CMD_STR_PARALLEL_FMT = '%s -trrng $((SGE_TASK_ID-1)) -storeAccFile %s "$@"'
+CMD_STR_BUNDLE = '%s "$@"' % EM_TRAIN_CMD
+BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
 
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF(EM_TRAIN_CMD)
 VITERBI_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkViterbiNew")
+NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
+                    + OptionBuilder_ShortOptWithSpace)() # do not run
+
+NATIVE_SPEC_DEFAULT = dict(q="all.q")
 
 # extensions and suffixes
 EXT_GZ = "gz"
@@ -130,6 +144,12 @@ def Session(*args, **kwargs):
     finally:
         res.exit()
 
+def is_training_progressing(last_ll, curr_ll,
+                            min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
+    # using x !< y instead of x >= y to give the right default answer
+    # in the case of NaNs
+    return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
+
 def save_template(filename, resource, mapping, dirname=None,
                   delete_existing=False):
     """
@@ -154,6 +174,12 @@ def save_template(filename, resource, mapping, dirname=None,
         outfile.write(text)
 
     return filename
+
+def make_native_spec(**kwargs):
+    options = NATIVE_SPEC_DEFAULT.copy()
+    options.update(kwargs)
+
+    return " ".join(NATIVE_SPEC_PROG.build_args(options=options))
 
 def make_spec(name, items):
     items[:0] = ["%s_IN_FILE inline" % name, str(len(items)), ""]
@@ -297,6 +323,9 @@ def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename):
         with gzip_open(wig_filename, "w") as wig_file:
             return write_wig(wig_file, data, chunk_coord)
 
+def set_cwd_job_tmpl(job_tmpl):
+    job_tmpl.workingDirectory = path.getcwd()
+
 class Runner(object):
     def __init__(self, **kwargs):
         # filenames
@@ -337,6 +366,9 @@ class Runner(object):
         self.train = True # EM train # this should become an int for num_starts
         self.identify = True # viterbi
         self.dry_run = False
+
+        # functions
+        self.train_prog = None
 
         self.__dict__.update(kwargs)
 
@@ -413,7 +445,7 @@ class Runner(object):
             return orig_filename
         else:
             orig_filepath = path(orig_filename)
-            dirpath = path(self.dirname)
+            dirpath = self.dirpath
 
             orig_filepath.copy(dirpath)
             return dirpath / orig_filepath.name
@@ -638,6 +670,60 @@ class Runner(object):
         else:
             return prog
 
+    # XXX: there is some duplication between these two which should be removed
+    def queue_parallel(self, session, trainable_params_filename, **kwargs):
+        kwargs = dict(inputMasterFile=self.input_master_filename,
+                      inputTrainableParameters=trainable_params_filename,
+                      **kwargs)
+        acc_filename = self.dirpath / ACC_FILENAME_PARALLEL
+        bash_cmd_str = CMD_STR_PARALLEL_FMT % (EM_TRAIN_CMD, acc_filename)
+        bash_cmdline = BASH_CMDLINE + [bash_cmd_str]
+
+        # $0 = "gmtkEMtrainNew" ignored by "$@" which starts with $1
+        gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
+
+        job_tmpl = session.createJobTemplate()
+        job_tmpl.remoteCommand = ENV_CMD
+        job_tmpl.args = bash_cmdline + gmtk_cmdline
+
+        set_cwd_job_tmpl(job_tmpl)
+
+        res_req = RES_REQ_FMT % MEM_REQ_PARALLEL
+        job_tmpl.nativeSpecification = make_native_spec(l=res_req)
+
+        # a task is the atomic unit within an array job
+        task_ids = session.runBulkJobs(job_tmpl, 1, self.num_chunks+1, 1)
+
+        return task_ids[0].partition(".")[0]
+
+    def queue_bundle(self, session, parallel_jobid,
+                     input_trainable_params_filename,
+                     output_trainable_params_filename, **kwargs):
+        ## bundle step: take parallel accumulators and combine them
+        acc_filename = self.dirpath / ACC_FILENAME_BUNDLE
+        kwargs = \
+            dict(inputMasterFilename=self.input_master_filename,
+                 inputTrainableParameters=input_trainable_params_filename,
+                 outputTrainableParameters=output_trainable_params_filename,
+                 trrng="nil",
+                 loadAccRange="0:%s" % (self.num_chunks-1),
+                 loadAccFile=ACC_FILENAME_BUNDLE,
+                 **kwargs)
+
+        bash_cmdline = BASH_CMDLINE + [CMD_STR_BUNDLE]
+        gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
+        job_tmpl = session.createJobTemplate()
+
+        job_tmpl.remoteCommand = ENV_CMD
+        job_tmpl.args = bash_cmdline + gmtk_cmdline
+        set_cwd_job_tmpl(job_tmpl)
+
+        res_req = RES_REQ_FMT % MEM_REQ_BUNDLE
+        job_tmpl.nativeSpecification = \
+            make_native_spec(hold_jid=parallel_jobid, l=res_req)
+
+        return session.runJob(job_tmpl)
+
     def run_triangulate(self):
         # XXX: should specify the triangulation file
         prog = self.prog_factory(TRIANGULATE_PROG)
@@ -646,7 +732,9 @@ class Runner(object):
              verbosity=VERBOSITY)
 
     def run_train(self):
-        prog = self.prog_factory(EM_TRAIN_PROG)
+        assert not self.dry_run
+
+        self.train_prog = self.prog_factory(EM_TRAIN_PROG)
 
         # XXX: this can be a parallelization point
         kwargs = dict(strFile=self.structure_filename,
@@ -661,7 +749,8 @@ class Runner(object):
                       maxEmIters=MAX_EM_ITERS,
                       verbosity=VERBOSITY,
                       island=ISLAND,
-                      componentCache=COMPONENT_CACHE)
+                      componentCache=COMPONENT_CACHE,
+                      lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0)
 
         dst_filenames = [self.input_master_filename,
                          self.trainable_params_filename]
@@ -671,6 +760,7 @@ class Runner(object):
         start_params = []
 
         with Session() as session:
+            # XXX: not implemented: multiple random starts (threads)
             for start_index in xrange(self.random_starts):
                 # XXX: re-add the ability to set your own starting parameters,
                 # with new=start_index
@@ -678,32 +768,42 @@ class Runner(object):
                 self.save_input_master(new=True)
                 self.set_trainable_params_filename(new=True)
 
-                input_master_filename = self.input_master_filename
-                trainable_params_filename = self.trainable_params_filename
+                last_log_likelihood = NINF
+                log_likelihood = NINF
+                round_index = 0
 
-                kwargs_start = \
-                    dict(inputMasterFile=input_master_filename,
-                         outputTrainableParameters=trainable_params_filename,
-                         **kwargs)
+                stem_trainable_params_filename = self.trainable_params_filename
+                last_trainable_params_filename = None
+                curr_trainable_params_filename = None
+                while is_training_progressing(last_log_likelihood,
+                                              log_likelihood):
+                    parallel_jobid = \
+                        self.queue_parallel(session,
+                                            last_trainable_params_filename,
+                                            **kwargs)
 
-                # $0 = "gmtkEMtrainNew" ignored by "$@" which starts with $1
-                em_train_cmdline = prog.build_cmdline(kwargs_start)
+                    curr_trainable_params_filename = \
+                        extjoin(stem_trainable_params_filename,
+                                str(round_index))
 
-                job_tmpl = session.createJobTemplate()
-                job_tmpl.remoteCommand = ENV_CMD
-                job_tmpl.args = BASH_CMDLINE + em_train_cmdline
-                job_tmpl.workingDirectory = job_tmpl.WORKING_DIRECTORY # cwd
-                job_tmpl.nativeSpecification = RES_REQ
+                    self.queue_bundle(session,
+                                      parallel_jobid,
+                                      last_trainable_params_filename,
+                                      curr_trainable_params_filename, **kwargs)
 
-                session.runBulkJobs(job_tmpl, 1, self.num_chunks+1, 1)
-                import pdb; pdb.set_trace()
+                    import pdb; pdb.set_trace() # XXX: have to add wait here before continuing
 
-                # XXX: hold_jid job for loadAccFile XXX goes here
+                    last_log_likelihood = log_likelihood
+                    log_likelihood = self.load_log_likelihood()
 
-                if not self.dry_run:
-                    start_params.append((self.load_log_likelihood(),
-                                         input_master_filename,
-                                         trainable_params_filename))
+                    last_trainable_params_filename = \
+                        curr_trainable_params_filename
+
+                    round_index += 1
+
+                start_params.append((log_likelihood,
+                                     self.input_master_filename,
+                                     self.trainable_params_filename))
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]

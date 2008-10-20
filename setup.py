@@ -39,6 +39,7 @@ entry_points = """
 segway = segway.run:main
 segway-load-seq = segway.importseq:main
 segway-load-data = segway.importdata:main
+h5values = segway.h5values:main
 """
 
 # XXX: warn: make sure you have LDFLAGS unset if you are building numpy
