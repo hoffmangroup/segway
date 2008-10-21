@@ -7,7 +7,7 @@ load_data: DESCRIPTION
 each SRC is either
 - *.list: a newline-delimited list of files
   - each file is a BED file which has a single observation
-- *.wigVar.gz: a variableStep wiggle file
+- *.wigVar.gz, *.wig.gz, *.pp.gz: a wiggle file
 - *.txt.gz: tabular representation of wiggle track (described in
    unused .sql file)
 
@@ -41,6 +41,7 @@ KEYEQ_CHROM = "chrom="
 LEN_KEYEQ_CHROM = len(KEYEQ_CHROM)
 
 DEFAULT_WIG_PARAMS = dict(span=1)
+WIG_FMT_SET = set(["variableStep", "fixedStep"])
 
 # XXX: hacky: should really load into a real MySQL database instead
 FIELDNAMES_MYSQL_TAB = ["bin", "chrom", "chromStart", "chromEnd", "dataValue"]
@@ -131,14 +132,13 @@ def read_wig(col_index, infile, num_cols, chromosomes):
         words = line.rstrip().split()
         num_words = len(words)
 
-        if words[0] == "variableStep" or "fixedStep":
+        if words[0] in WIG_FMT_SET:
             fmt = words[0]
 
             params = DEFAULT_WIG_PARAMS.copy()
             params.update(pairs2dict(words[1:]))
 
             chrom = params["chrom"]
-            print >>sys.stderr, " %s" % chrom
             chromosome = chromosomes[chrom]
 
             span = int(params["span"])
@@ -146,12 +146,16 @@ def read_wig(col_index, infile, num_cols, chromosomes):
             if fmt == "fixedStep":
                 start = int(params["start"]) - 1 # one-based
                 step = int(params["step"])
+
+                print >>sys.stderr, " %s (%d)" % (chrom, start)
             else:
                 assert "start" not in params
                 assert "step" not in params
 
                 start = None
                 step = None
+
+                print >>sys.stderr, " %s" % chrom
         elif fmt == "variableStep":
             assert num_words == 2
 
