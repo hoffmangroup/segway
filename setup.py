@@ -34,9 +34,11 @@ dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.z
 classifiers = ["Natural Language :: English",
                "Programming Language :: Python"]
 
+# XXX: parallel should be an option, after the code is written
+# correctly to fallback when it's not there
 entry_points = """
 [console_scripts]
-segway = segway.run:main
+segway = segway.run:main [parallel]
 segway-load-seq = segway.importseq:main
 segway-load-data = segway.importdata:main
 h5values = segway.h5values:main
@@ -47,10 +49,11 @@ h5values = segway.h5values:main
 # need optbuild>0.1.2 for OptionBuilder_ShortOptWithSpace_TF
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
-# XXX: DRMAA-python should be an option, after the code is written
-# correctly to fallback when it's not there
 install_requires = ["textinput", "optbuild>0.1.2", "tables>2.0.4", "numpy",
-                    "path", "DRMAA-python"]
+                    "path"]
+
+# XXX: ask if there is a way to specify this at the command-line
+extras_require = dict(parallel=["DRMAA-python"])
 
 setup(name=name,
       version=__version__,
@@ -63,6 +66,7 @@ setup(name=name,
       long_description=long_description,
       dependency_links=dependency_links,
       install_requires=install_requires,
+      extras_require=extras_require,
       zip_safe=True,
 
       # XXX: this should be based off of __file__ instead

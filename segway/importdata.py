@@ -2,7 +2,7 @@
 from __future__ import division, with_statement
 
 """
-importdata: DESCRIPTION
+load_data: DESCRIPTION
 
 each SRC is either
 - *.list: a newline-delimited list of files
@@ -40,7 +40,7 @@ EXT_H5 = "h5"
 KEYEQ_CHROM = "chrom="
 LEN_KEYEQ_CHROM = len(KEYEQ_CHROM)
 
-DEFAULT_WIGVAR_PARAMS = dict(span=1)
+DEFAULT_WIG_PARAMS = dict(span=1)
 
 # XXX: hacky: should really load into a real MySQL database instead
 FIELDNAMES_MYSQL_TAB = ["bin", "chrom", "chromStart", "chromEnd", "dataValue"]
@@ -120,25 +120,39 @@ def read_filelist(col_index, infile, num_cols, chromosomes):
         # recursion, whee!
         load_any(col_index, filename, num_cols, chromosomes)
 
-def read_wigvar(col_index, infile, num_cols, chromosomes):
+def read_wig(col_index, infile, num_cols, chromosomes):
     chromosome = None
+    start = None
+    step = None
     span = None
+    fmt = None
 
     for line in infile:
         words = line.rstrip().split()
         num_words = len(words)
 
-        # fixedStep not supported
-        if words[0] == "variableStep":
-            params = DEFAULT_WIGVAR_PARAMS.copy()
+        if words[0] == "variableStep" or "fixedStep":
+            fmt = words[0]
+
+            params = DEFAULT_WIG_PARAMS.copy()
             params.update(pairs2dict(words[1:]))
 
             chrom = params["chrom"]
-
             print >>sys.stderr, " %s" % chrom
             chromosome = chromosomes[chrom]
+
             span = int(params["span"])
-        else:
+
+            if fmt == "fixedStep":
+                start = int(params["start"]) - 1 # one-based
+                step = int(params["step"])
+            else:
+                assert "start" not in params
+                assert "step" not in params
+
+                start = None
+                step = None
+        elif fmt == "variableStep":
             assert num_words == 2
 
             start = int(words[0]) - 1 # one-based
@@ -146,6 +160,18 @@ def read_wigvar(col_index, infile, num_cols, chromosomes):
             score = float(words[1])
 
             write_score(chromosome, start, end, score, col_index, num_cols)
+        elif fmt == "fixedStep":
+            assert num_words == 1
+
+            end = start + span
+            score = float(words[0])
+
+            write_score(chromosome, start, end, score, col_index, num_cols)
+
+            start += step
+        else:
+            raise ValueError, "only fixedStep and variableStep formats are" \
+                " supported"
 
 def read_mysql_tab(col_index, infile, num_cols, chromosomes):
     for row in DictReader(infile, FIELDNAMES_MYSQL_TAB):
@@ -156,16 +182,19 @@ def read_mysql_tab(col_index, infile, num_cols, chromosomes):
 
         write_score(chromosome, start, end, score, col_index, num_cols)
 
+READERS = dict(list=read_filelist,
+               bed=read_bed,
+               pp=read_wig,
+               wigVar=read_wig,
+               wig=read_wig,
+               txt=read_mysql_tab)
+
 def read_any(col_index, filename, infile, num_cols, chromosomes):
-    if filename.endswith(".list"):
-        reader = read_filelist
-    elif filename.endswith(".bed"):
-        reader = read_bed
-    elif filename.endswith(".wigVar"):
-        reader = read_wigvar
-    elif filename.endswith(".txt"):
-        reader = read_mysql_tab
-    else:
+    ext = filename.rpartition(".")[2]
+
+    try:
+        reader = READERS[ext]
+    except KeyError:
         raise ValueError, "file extension not recognized"
 
     return reader(col_index, infile, num_cols, chromosomes)
@@ -252,7 +281,7 @@ def write_metadata(chromosome):
     chromosome_attrs.mins = mins
     chromosome_attrs.maxs = maxs
 
-def importdata(filenames, outdirname):
+def load_data(filenames, outdirname):
     outdirpath = path(outdirname)
     num_cols = len(filenames)
 
@@ -288,7 +317,7 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    return importdata(args[:-1], args[-1])
+    return load_data(args[:-1], args[-1])
 
 if __name__ == "__main__":
     sys.exit(main())

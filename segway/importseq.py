@@ -2,7 +2,7 @@
 from __future__ import division, with_statement
 
 """
-importseq: DESCRIPTION
+load_seq: DESCRIPTION
 """
 
 __version__ = "$Revision$"
@@ -57,7 +57,7 @@ re_gap_segment = compile(r"""
        DNA_LETTERS_UNAMBIG, REGEX_SEGMENT_LEN-1,
        DNA_LETTERS_UNAMBIG), VERBOSE)
 
-def importseq_single(h5file, seq):
+def read_seq(h5file, seq):
     supercontig_index = 0
 
     for m_segment in re_gap_segment.finditer(seq):
@@ -67,7 +67,7 @@ def importseq_single(h5file, seq):
         else:
             assert m_segment.group(1)
 
-def importseq(filenames, outdirname):
+def load_seq(filenames, outdirname):
     outdirpath = path(outdirname)
     try:
         outdirpath.makedirs()
@@ -83,7 +83,7 @@ def importseq(filenames, outdirname):
                 h5filename = outdirpath / extsep.join([defline, EXT_H5])
                 h5file = openFile(h5filename, "w", defline, filters=FILTERS)
                 with h5file as h5file:
-                    importseq_single(h5file, seq)
+                    read_seq(h5file, seq)
 
 def parse_options(args):
     from optparse import OptionParser
@@ -103,7 +103,7 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    return importseq(args[:-1], args[-1])
+    return load_seq(args[:-1], args[-1])
 
 if __name__ == "__main__":
     sys.exit(main())

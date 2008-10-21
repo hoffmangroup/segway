@@ -13,7 +13,7 @@ from cStringIO import StringIO
 from contextlib import closing, contextmanager
 from errno import EEXIST, ENOENT
 from itertools import count, izip
-from math import floor, log10
+from math import ceil, floor, log10
 from os import extsep
 from random import random
 from shutil import move
@@ -40,7 +40,7 @@ VERBOSITY = 0 # XXX: should vary based on DRMAA submission or not
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
-ISLAND = True
+ISLAND = False
 WIG_DIRNAME = "out"
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
@@ -51,9 +51,13 @@ COMPONENT_CACHE = True
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 MAX_FRAMES = 10000000 # 10 million
-MEM_REQ_PARALLEL = "8.5G"
+MEM_REQ_PARALLEL = "10.5G"
 MEM_REQ_BUNDLE = "500M"
 RES_REQ_FMT = "virtual_free=%s"
+
+# for a four-way model
+MEM_REQ_INTERCEPT = 13746364
+MEM_REQ_SLOPE = 5372
 
 # defaults
 RANDOM_STARTS = 1
@@ -82,6 +86,8 @@ NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
 NATIVE_SPEC_DEFAULT = dict(q="all.q")
+
+OPT_USE_TRAINABLE_PARAMS = "-DUSE_TRAINABLE_PARAMS"
 
 # extensions and suffixes
 EXT_GZ = "gz"
@@ -174,6 +180,17 @@ def save_template(filename, resource, mapping, dirname=None,
         outfile.write(text)
 
     return filename
+
+def make_mem_req(len):
+    res = MEM_REQ_SLOPE * len + MEM_REQ_INTERCEPT
+
+    return "%dM" % ceil(res / 2**20)
+
+def make_cpp_options(params_filename):
+    if params_filename:
+        return OPT_USE_TRAINABLE_PARAMS
+    else:
+        return None
 
 def make_native_spec(**kwargs):
     options = NATIVE_SPEC_DEFAULT.copy()
@@ -355,6 +372,7 @@ class Runner(object):
         self.chunk_coords = None
         self.mins = None
         self.maxs = None
+        self.chunk_mem_reqs = None
 
         # variables
         self.num_segs = NUM_SEGS
@@ -671,9 +689,11 @@ class Runner(object):
             return prog
 
     # XXX: there is some duplication between these two which should be removed
-    def queue_parallel(self, session, params_filename, **kwargs):
+    def queue_parallel(self, session, params_filename, start_index,
+                       round_index, **kwargs):
         kwargs = dict(inputMasterFile=self.input_master_filename,
                       inputTrainableParameters=params_filename,
+                      cppCommandOptions=make_cpp_options(params_filename),
                       **kwargs)
         acc_filename = self.dirpath / ACC_FILENAME_PARALLEL
         bash_cmd_str = CMD_STR_PARALLEL_FMT % (EM_TRAIN_CMD, acc_filename)
@@ -683,11 +703,15 @@ class Runner(object):
         gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
 
         job_tmpl = session.createJobTemplate()
+
+        # shouldn't this be jobName? not in SGE's DRMAA implementation
+        job_tmpl.name = "emtp%d.%d" % (start_index, round_index)
         job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = bash_cmdline + gmtk_cmdline
 
         set_cwd_job_tmpl(job_tmpl)
 
+        # XXX: after SGE mailing list response: use self.chunk_mem_reqs
         res_req = RES_REQ_FMT % MEM_REQ_PARALLEL
         job_tmpl.nativeSpecification = make_native_spec(l=res_req)
 
@@ -696,24 +720,26 @@ class Runner(object):
 
         return task_ids[0].partition(".")[0]
 
-    def queue_bundle(self, session, parallel_jobid,
-                     input_params_filename,
-                     output_params_filename, **kwargs):
+    def queue_bundle(self, session, parallel_jobid, input_params_filename,
+                     output_params_filename, start_index, round_index,
+                     **kwargs):
         ## bundle step: take parallel accumulators and combine them
         acc_filename = self.dirpath / ACC_FILENAME_BUNDLE
         kwargs = \
-            dict(inputMasterFilename=self.input_master_filename,
+            dict(inputMasterFile=self.input_master_filename,
                  inputTrainableParameters=input_params_filename,
                  outputTrainableParameters=output_params_filename,
+                 cppCommandOptions=make_cpp_options(input_params_filename),
                  trrng="nil",
                  loadAccRange="0:%s" % (self.num_chunks-1),
-                 loadAccFile=ACC_FILENAME_BUNDLE,
+                 loadAccFile=acc_filename,
                  **kwargs)
 
         bash_cmdline = BASH_CMDLINE + [CMD_STR_BUNDLE]
         gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
         job_tmpl = session.createJobTemplate()
 
+        job_tmpl.name = "emtb%d.%d" % (start_index, round_index)
         job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = bash_cmdline + gmtk_cmdline
         set_cwd_job_tmpl(job_tmpl)
@@ -746,7 +772,7 @@ class Runner(object):
                       nf1=self.num_obs,
                       ni1=self.num_obs,
 
-                      maxEmIters=MAX_EM_ITERS,
+                      maxEmIters=1,
                       verbosity=VERBOSITY,
                       island=ISLAND,
                       componentCache=COMPONENT_CACHE,
@@ -758,6 +784,9 @@ class Runner(object):
         # list of tuples(log_likelihood, input_master_filename,
         #                params_filename)
         start_params = []
+
+        chunk_lens = [end - start for chr, start, end in self.chunk_coords]
+        self.chunk_mem_reqs = [make_mem_req(len) for len in chunk_lens]
 
         with Session() as session:
             # XXX: not implemented: multiple random starts (threads)
@@ -775,39 +804,39 @@ class Runner(object):
                 stem_params_filename = self.params_filename
                 last_params_filename = None
                 curr_params_filename = None
-                while is_training_progressing(last_log_likelihood,
-                                              log_likelihood):
-                    parallel_jobid = \
-                        self.queue_parallel(session,
-                                            last_params_filename,
-                                            **kwargs)
+                while (round_index < MAX_EM_ITERS
+                       and is_training_progressing(last_log_likelihood,
+                                                   log_likelihood)):
+                    parallel_jobid = self.queue_parallel(session,
+                                                         last_params_filename,
+                                                         start_index,
+                                                         round_index,
+                                                         **kwargs)
 
-                    curr_params_filename = \
-                        extjoin(stem_params_filename,
-                                str(round_index))
+                    curr_params_filename = extjoin(stem_params_filename,
+                                                   str(round_index))
 
-                    bundle_jobid = \
-                        self.queue_bundle(session,
-                                          parallel_jobid,
-                                          last_params_filename,
-                                          curr_params_filename,
-                                          **kwargs)
+                    bundle_jobid = self.queue_bundle(session, parallel_jobid,
+                                                     last_params_filename,
+                                                     curr_params_filename,
+                                                     start_index, round_index,
+                                                     **kwargs)
 
-                    session.wait(bundle_jobid)
-
-                    import pdb; pdb.set_trace() # XXX: have to add wait here before continuing
+                    # wait for bundle to finish
+                    session.wait(bundle_jobid, session.TIMEOUT_WAIT_FOREVER)
 
                     last_log_likelihood = log_likelihood
                     log_likelihood = self.load_log_likelihood()
 
-                    last_params_filename = \
-                        curr_params_filename
+                    print >>sys.stderr, "log likelihood = %s" % log_likelihood
+
+                    last_params_filename = curr_params_filename
 
                     round_index += 1
 
                 start_params.append((log_likelihood,
                                      self.input_master_filename,
-                                     self.params_filename))
+                                     last_params_filename))
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]
@@ -821,10 +850,6 @@ class Runner(object):
             self.save_input_master()
 
         params_filename = self.params_filename
-        if params_filename:
-            cpp_options = "-DUSE_TRAINABLE_PARAMS"
-        else:
-            cpp_options = None
 
         prog = self.prog_factory(VITERBI_PROG)
 
@@ -841,7 +866,7 @@ class Runner(object):
              nf1=self.num_obs,
              ni1=self.num_obs,
 
-             cppCommandOptions=cpp_options,
+             cppCommandOptions=make_cpp_options(params_filename),
              verbosity=VERBOSITY)
 
         if not self.dry_run:
@@ -954,7 +979,7 @@ def main(args=sys.argv[1:]):
     runner.wig_dirname = wig_dirname
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
-    runner.params_filename = options.params
+    runner.params_filename = options.trainable_params
 
     runner.random_starts = options.random_starts
 
