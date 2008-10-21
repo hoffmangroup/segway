@@ -39,8 +39,8 @@ classifiers = ["Natural Language :: English",
 entry_points = """
 [console_scripts]
 segway = segway.run:main [parallel]
-segway-load-seq = segway.importseq:main
-segway-load-data = segway.importdata:main
+segway-load-seq = segway.load_seq:main
+segway-load-data = segway.load_data:main
 h5values = segway.h5values:main
 """
 
