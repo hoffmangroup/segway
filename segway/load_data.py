@@ -189,6 +189,7 @@ def read_mysql_tab(col_index, infile, num_cols, chromosomes):
 READERS = dict(list=read_filelist,
                bed=read_bed,
                pp=read_wig,
+               wigFix=read_wig,
                wigVar=read_wig,
                wig=read_wig,
                txt=read_mysql_tab)

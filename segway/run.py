@@ -10,6 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
+from collections import defaultdict
 from contextlib import closing, contextmanager
 from errno import EEXIST, ENOENT
 from itertools import count, izip
@@ -229,7 +230,7 @@ def make_items_multiseg(tmpl, num_segs, num_obs, data=None):
 def make_spec_multiseg(name, *args, **kwargs):
     return make_spec(name, make_items_multiseg(*args, **kwargs))
 
-# XXX: numpy
+# XXX: reimplement in numpy
 def make_normalized_random_rows(num_rows, num_cols):
     res = []
 
@@ -366,6 +367,8 @@ class Runner(object):
         self.obs_dirname = None
         self.wig_dirname = None
 
+        self.include_coords_filename = None
+
         # data
         # a "chunk" is what GMTK calls a segment
         self.num_chunks = None
@@ -393,6 +396,27 @@ class Runner(object):
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
             return float(infile.read().strip())
+
+    def load_include_coords(self):
+        filename = self.include_coords_filename
+
+        if not filename:
+            self.include_coords = None
+            return
+
+        coords = defaultdict(list)
+
+        with open(filename) as infile:
+            for line in infile:
+                words = line.rstrip().split()
+                chrom = words[0]
+                start = int(words[1])
+                end = int(words[2])
+
+                coords[chrom].append((start, end))
+
+        self.include_coords = dict((chrom, array(coords_list))
+                                   for chrom, coords_list in zz.iteritems())
 
     def set_params_filename(self, new=False):
         # if this is not run and params_filename is
@@ -513,9 +537,17 @@ class Runner(object):
         chunk_index = 0
         chunk_coords = []
 
+        include_coords = self.include_coords
+
         for h5filename in self.h5filenames:
             print >>sys.stderr, h5filename
             chrom = path(h5filename).namebase
+
+            if include_coords:
+                try:
+                    chr_include_coords = include_coords[chrom]
+                except KeyError:
+                    continue
 
             with openFile(h5filename) as chromosome:
                 chromosome_attrs = chromosome.root._v_attrs
@@ -545,7 +577,14 @@ class Runner(object):
                     ends = supercontig_attrs.chunk_ends
 
                     ## iterate through chunks and write
-                    for start, end in zip(starts, ends):
+                    ## izip so it can be modified in place
+                    for start, end in izip(starts, ends):
+                        if include_coords:
+                            XXX how many chr_include_coords overlap?
+                            XXX if 0, then continue
+                            XXX if 1, then adjust start and end
+                            XXX if >= 2, then add new starts and ends to list, then continue
+
                         num_frames = end - start
                         if not MIN_FRAMES <= num_frames <= MAX_FRAMES:
                             text = " skipping segment of length %d" \
@@ -637,6 +676,8 @@ class Runner(object):
             print >>dumpnames_file, "seg"
 
     def save_params(self):
+        self.load_include_coords()
+
         self.make_obs_dir()
         self.save_observations() # do first, because it sets self.num_obs
 
@@ -940,6 +981,9 @@ def parse_options(args):
     parser.add_option("--directory", "-d", metavar="DIR",
                       help="create all other files in DIR")
 
+    parser.add_option("--include-coords", metavar="FILE",
+                      help="limit to genomic coordinates in FILE")
+
     # XXX: group here: variables
     parser.add_option("--random-starts", "-r", type=int, default=RANDOM_STARTS,
                       metavar="NUM",
@@ -980,6 +1024,7 @@ def main(args=sys.argv[1:]):
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
     runner.params_filename = options.trainable_params
+    runner.include_coords_filename = options.include_coords
 
     runner.random_starts = options.random_starts
 
