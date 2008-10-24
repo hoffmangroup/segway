@@ -182,6 +182,44 @@ def save_template(filename, resource, mapping, dirname=None,
 
     return filename
 
+def accum_extrema(chromosome, mins, maxs):
+    chromosome_attrs = chromosome.root._v_attrs
+    chromosome_mins = chromosome_attrs.mins
+    chromosome_maxs = chromosome_attrs.maxs
+
+    if mins is None:
+        mins = chromosome_mins
+        maxs = chromosome_maxs
+    else:
+        mins = amin([chromosome_mins, mins], 0)
+        maxs = amax([chromosome_maxs, maxs], 0)
+
+    return mins, maxs
+
+def find_overlaps(start, end, coords):
+    """
+    find items in coords that overlap (start, end)
+    """
+    res = []
+
+    for coord_start, coord_end in coords:
+        if start > coord_end:
+            pass
+        elif end <= coord_start:
+            pass
+        elif start <= coord_start:
+            if end >= coord_end:
+                res.append([coord_start, coord_end])
+            else:
+                res.append([coord_start, end])
+        elif start > coord_start:
+            if end >= coord_end:
+                res.append([start, coord_end])
+            else:
+                res.append([start, end])
+
+    return res
+
 def make_mem_req(len):
     res = MEM_REQ_SLOPE * len + MEM_REQ_INTERCEPT
 
@@ -416,7 +454,8 @@ class Runner(object):
                 coords[chrom].append((start, end))
 
         self.include_coords = dict((chrom, array(coords_list))
-                                   for chrom, coords_list in zz.iteritems())
+                                   for chrom, coords_list
+                                   in coords.iteritems())
 
     def set_params_filename(self, new=False):
         # if this is not run and params_filename is
@@ -547,32 +586,23 @@ class Runner(object):
                 try:
                     chr_include_coords = include_coords[chrom]
                 except KeyError:
+                    # nothing is included on that chromosome
                     continue
 
             with openFile(h5filename) as chromosome:
-                chromosome_attrs = chromosome.root._v_attrs
-
                 try:
-                    chromosome_mins = chromosome_attrs.mins
-                    chromosome_maxs = chromosome_attrs.maxs
+                    mins, maxs = accum_extrema(chromosome, mins, maxs)
                 except AttributeError:
                     # this means there is no data for that chromosome
                     continue
-
-                if mins is None:
-                    mins = chromosome_mins
-                    maxs = chromosome_maxs
-                else:
-                    mins = amin([chromosome_mins, mins], 0)
-                    maxs = amax([chromosome_maxs, maxs], 0)
 
                 for supercontig, continuous in \
                         walk_continuous_supercontigs(chromosome):
                     num_obs = init_num_obs(num_obs, continuous)
 
                     supercontig_attrs = supercontig._v_attrs
-                    supercontig_start = supercontig_attrs.start
 
+                    supercontig_start = supercontig_attrs.start
                     starts = supercontig_attrs.chunk_starts
                     ends = supercontig_attrs.chunk_ends
 
@@ -580,10 +610,19 @@ class Runner(object):
                     ## izip so it can be modified in place
                     for start, end in izip(starts, ends):
                         if include_coords:
-                            XXX how many chr_include_coords overlap?
-                            XXX if 0, then continue
-                            XXX if 1, then adjust start and end
-                            XXX if >= 2, then add new starts and ends to list, then continue
+                            overlaps = find_overlaps(start, end,
+                                                     chr_include_coords)
+                            len_overlaps = len(overlaps)
+
+                            if len_overlaps == 0:
+                                continue
+                            elif len_overlaps == 1:
+                                start, end = overlaps[0]
+                            else:
+                                for overlap in overlaps:
+                                    starts.append(overlap[0])
+                                    ends.append(overlap[1])
+                                continue
 
                         num_frames = end - start
                         if not MIN_FRAMES <= num_frames <= MAX_FRAMES:

@@ -40,6 +40,7 @@ entry_points = """
 [console_scripts]
 segway = segway.run:main [parallel]
 segway-load-seq = segway.load_seq:main
+segway-name-tracks = segway.name_tracks:main
 segway-load-data = segway.load_data:main
 h5values = segway.h5values:main
 """

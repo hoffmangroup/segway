@@ -7,12 +7,17 @@ load_data: DESCRIPTION
 each SRC is either
 - *.list: a newline-delimited list of files
   - each file is a BED file which has a single observation
-- *.wigVar.gz, *.wig.gz, *.pp.gz: a wiggle file
+- *.wigVar.gz, *.wigFix.gz, *.wig.gz, *.pp.gz: a wiggle file
 - *.txt.gz: tabular representation of wiggle track (described in
    unused .sql file)
 
 DST is a directory, which will contain one HDF5 file for each chrom in the data
 """
+
+# XXXopt: the biggest bottlenecks are gzip reading and duplicating the
+# values for the numpy array. There is a Python patch to take care of
+# the first, I don't know if there is anything useful to be done for
+# the second
 
 __version__ = "$Revision$"
 
@@ -29,7 +34,7 @@ from tabdelim import DictReader
 from tables import Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
-from .importseq import MIN_GAP_LEN
+from .load_seq import MIN_GAP_LEN
 from ._util import (fill_array, gzip_open, init_num_obs, new_extrema,
                     walk_continuous_supercontigs, walk_supercontigs)
 
@@ -61,6 +66,103 @@ class KeyPassingDefaultdict(defaultdict):
 
         return res
 
+class ScoreWriter(object):
+    """
+    caches current supercontig before writing
+    """
+    def __init__(self, col_index, num_cols):
+        self.col_index = col_index
+        self.num_cols = num_cols
+        self.chromosome = None
+        self._clear()
+        self.write = self._write
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        self.flush()
+
+    def _seek(self, start, end):
+        self.flush()
+
+        chromosome = self.chromosome
+        for supercontig in walk_supercontigs(chromosome):
+            attrs = supercontig._v_attrs
+            supercontig_start = attrs.start
+            supercontig_end = attrs.end
+
+            if supercontig_start <= start and supercontig_end >= end:
+                break
+        else:
+            raise DataForGapError("%r does not fit into a single supercontig"
+                                  % (start, end))
+
+        try:
+            continuous = supercontig.continuous
+        except NoSuchNodeError:
+            shape = (supercontig_end - supercontig_start, self.num_cols)
+            continuous = chromosome.createCArray(supercontig, "continuous",
+                                                 ATOM, shape)
+
+        self.continuous = continuous
+        self.continuous_array = continuous[..., self.col_index]
+        self.start = supercontig_start
+        self.end = supercontig_end
+
+        return supercontig_start
+
+    def _clear(self):
+        self.continuous = None
+        self.continuous_array = None
+        self.start = PINF
+        self.end = NINF
+
+    def _write(self, start, score):
+        supercontig_start = self.start
+        end = start + self.span
+
+        if self.end < end or supercontig_start > start:
+            supercontig_start = self._seek(start, end)
+
+        row_start = start - supercontig_start
+        row_end = end - supercontig_start
+
+        self.continuous_array[row_start:row_end] = score
+
+    def _write_span1(self, start, score):
+        # this special-case optimization results in a speed increase of 27%
+        # but switching to a different function only gets you 3% of that
+        supercontig_start = self.start
+        row_start = start - supercontig_start
+
+        if self.end < start + 1 or row_start < 0:
+            row_start = start - self._seek(start, start+1)
+
+        # most of the optimization is in not using a slice here:
+        self.continuous_array[row_start] = score
+
+    def set_chromosome(self, chromosome):
+        if chromosome != self.chromosome:
+            self.flush()
+            self._clear()
+            self.chromosome = chromosome
+
+    def set_span(self, span):
+        self.span = span
+        if span == 1:
+            self.write = self._write_span1
+        else:
+            self.write = self._write
+
+    def flush(self):
+        """
+        do actual writing; stop being lazy
+        """
+        continuous = self.continuous
+        if continuous:
+            continuous[..., self.col_index] = self.continuous_array
+
 def pairs2dict(texts):
     res = {}
 
@@ -77,32 +179,11 @@ def chromosome_factory(outdirpath, key):
     return openFile(filename, "r+")
 
 def write_score(chromosome, start, end, score, col_index, num_cols):
-    # XXXopt: do profiling first:
-    # XXXopt: some caching and lazy-writing of all this would be
-    # good; in most cases, the chromosome will be the same
-    # throughout
+    # XXX: remove calls to this; call ScoreWriter directly in parent
 
-    for supercontig in walk_supercontigs(chromosome):
-        attrs = supercontig._v_attrs
-        supercontig_start = attrs.start
-        supercontig_end = attrs.end
-
-        if supercontig_start <= start and supercontig_end >= end:
-            break
-    else:
-        raise DataForGapError("%r does not fit into a single supercontig"
-                              % (start, end))
-
-    try:
-        continuous = supercontig.continuous
-    except NoSuchNodeError:
-        shape = (supercontig_end - supercontig_start, num_cols)
-        continuous = chromosome.createCArray(supercontig, "continuous", ATOM,
-                                             shape)
-
-    row_start = start - supercontig_start
-    row_end = end - supercontig_start
-    continuous[row_start:row_end, col_index] = score
+    with ScoreWriter(col_index, num_cols) as writer:
+        writer.set_chromosome(chromosome)
+        writer.write(start, end, score)
 
 def read_bed(col_index, bedfile, num_cols, chromosomes):
     for datum in read_native(bedfile):
@@ -128,54 +209,53 @@ def read_wig(col_index, infile, num_cols, chromosomes):
     span = None
     fmt = None
 
-    for line in infile:
-        words = line.rstrip().split()
-        num_words = len(words)
+    with ScoreWriter(col_index, num_cols) as writer:
+        for line in infile:
+            words = line.rstrip().split()
+            num_words = len(words)
 
-        if words[0] in WIG_FMT_SET:
-            fmt = words[0]
+            if words[0] in WIG_FMT_SET:
+                fmt = words[0]
 
-            params = DEFAULT_WIG_PARAMS.copy()
-            params.update(pairs2dict(words[1:]))
+                params = DEFAULT_WIG_PARAMS.copy()
+                params.update(pairs2dict(words[1:]))
 
-            chrom = params["chrom"]
-            chromosome = chromosomes[chrom]
+                chrom = params["chrom"]
+                chromosome = chromosomes[chrom]
+                writer.set_chromosome(chromosome)
 
-            span = int(params["span"])
+                span = int(params["span"])
+                writer.set_span(span)
 
-            if fmt == "fixedStep":
-                start = int(params["start"]) - 1 # one-based
-                step = int(params["step"])
+                if fmt == "fixedStep":
+                    start = int(params["start"]) - 1 # one-based
+                    step = int(params["step"])
 
-                print >>sys.stderr, " %s (%d)" % (chrom, start)
+                    print >>sys.stderr, " %s (%d)" % (chrom, start)
+                else:
+                    assert "start" not in params
+                    assert "step" not in params
+
+                    start = None
+                    step = None
+
+                    print >>sys.stderr, " %s" % chrom
+            elif fmt == "variableStep":
+                assert num_words == 2
+
+                start = int(words[0]) - 1 # one-based
+                score = float(words[1])
+                writer.write(start, score)
+            elif fmt == "fixedStep":
+                assert num_words == 1
+
+                score = float(words[0])
+                writer.write(start, score)
+
+                start += step
             else:
-                assert "start" not in params
-                assert "step" not in params
-
-                start = None
-                step = None
-
-                print >>sys.stderr, " %s" % chrom
-        elif fmt == "variableStep":
-            assert num_words == 2
-
-            start = int(words[0]) - 1 # one-based
-            end = start + span
-            score = float(words[1])
-
-            write_score(chromosome, start, end, score, col_index, num_cols)
-        elif fmt == "fixedStep":
-            assert num_words == 1
-
-            end = start + span
-            score = float(words[0])
-
-            write_score(chromosome, start, end, score, col_index, num_cols)
-
-            start += step
-        else:
-            raise ValueError, "only fixedStep and variableStep formats are" \
-                " supported"
+                raise ValueError, "only fixedStep and variableStep formats " \
+                    " are supported"
 
 def read_mysql_tab(col_index, infile, num_cols, chromosomes):
     for row in DictReader(infile, FIELDNAMES_MYSQL_TAB):
@@ -306,7 +386,7 @@ def load_data(filenames, outdirname):
 def parse_options(args):
     from optparse import OptionParser
 
-    usage = "%prog [OPTION]... SRC... DST"
+    usage = "%prog [OPTION]... DST TRACKNAME SRC..."
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
 
