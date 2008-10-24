@@ -70,10 +70,8 @@ class ScoreWriter(object):
     """
     caches current supercontig before writing
     """
-    def __init__(self, col_index, num_cols):
-        self.col_index = col_index
-        self.num_cols = num_cols
-        self.chromosome = None
+    def __init__(self, trackname):
+        self.trackname = trackname
         self._clear()
         self.write = self._write
 
@@ -113,6 +111,12 @@ class ScoreWriter(object):
         return supercontig_start
 
     def _clear(self):
+        """
+        clears attributes that are chromosome-specific
+        """
+        self.chromosome = None
+        self.col_index = None
+        self.num_cols = None
         self.continuous = None
         self.continuous_array = None
         self.start = PINF
@@ -148,6 +152,10 @@ class ScoreWriter(object):
             self._clear()
             self.chromosome = chromosome
 
+            tracknames = chromosome.root._v_attrs.tracknames
+            self.num_cols = len(tracknames)
+            self.col_index = tracknames.tolist().index(self.trackname)
+
     def set_span(self, span):
         self.span = span
         if span == 1:
@@ -179,37 +187,42 @@ def chromosome_factory(outdirpath, key):
     return openFile(filename, "r+")
 
 def write_score(chromosome, start, end, score, col_index, num_cols):
-    # XXX: remove calls to this; call ScoreWriter directly in parent
+    raise NotImplementedError, "should eliminate all callers"
 
-    with ScoreWriter(col_index, num_cols) as writer:
-        writer.set_chromosome(chromosome)
-        writer.write(start, end, score)
+##    # XXX: remove calls to this; call ScoreWriter directly in parent
+##
+##    with ScoreWriter(col_index, num_cols) as writer XXX:
+##        writer.set_chromosome(chromosome)
+##        writer.write(start, end, score)
 
-def read_bed(col_index, bedfile, num_cols, chromosomes):
-    for datum in read_native(bedfile):
-        chromosome = chromosomes[datum.chrom]
+def read_bed(chromosomes, trackname, filename, infile):
+    raise NotImplementedError, "need to update code for trackname regime; " \
+        "replace write_score with direct call to ScoreWriter"
 
-        start = datum.chromStart
-        end = datum.chromEnd
-        score = datum.score
+##    for datum in read_native(infile):
+##        chromosome = chromosomes[datum.chrom]
+##
+##        start = datum.chromStart
+##        end = datum.chromEnd
+##        score = datum.score
+##
+##        write_score(chromosome, start, end, score, col_index, num_cols)
 
-        write_score(chromosome, start, end, score, col_index, num_cols)
-
-def read_filelist(col_index, infile, num_cols, chromosomes):
+def read_filelist(chromosomes, trackname, filename, infile):
     for line in infile:
         filename = line.rstrip()
 
-        # recursion, whee!
-        load_any(col_index, filename, num_cols, chromosomes)
+        # recursion
+        load_any(chromosomes, trackname, filename, infile)
 
-def read_wig(col_index, infile, num_cols, chromosomes):
+def read_wig(chromosomes, trackname, filename, infile):
     chromosome = None
     start = None
     step = None
     span = None
     fmt = None
 
-    with ScoreWriter(col_index, num_cols) as writer:
+    with ScoreWriter(trackname) as writer:
         for line in infile:
             words = line.rstrip().split()
             num_words = len(words)
@@ -257,14 +270,17 @@ def read_wig(col_index, infile, num_cols, chromosomes):
                 raise ValueError, "only fixedStep and variableStep formats " \
                     " are supported"
 
-def read_mysql_tab(col_index, infile, num_cols, chromosomes):
-    for row in DictReader(infile, FIELDNAMES_MYSQL_TAB):
-        chromosome = chromosomes[row["chrom"]]
-        start = int(row["chromStart"])
-        end = int(row["chromEnd"])
-        score = float(row["dataValue"])
+def read_mysql_tab(chromosomes, trackname, filename, infile):
+    raise NotImplementedError, "needs updating for trackname regime, and " \
+        "replace write_score with direct call to ScoreWriter"
 
-        write_score(chromosome, start, end, score, col_index, num_cols)
+##    for row in DictReader(infile, FIELDNAMES_MYSQL_TAB):
+##        chromosome = chromosomes[row["chrom"]]
+##        start = int(row["chromStart"])
+##        end = int(row["chromEnd"])
+##        score = float(row["dataValue"])
+##
+##        write_score(chromosome, start, end, score, col_index, num_cols)
 
 READERS = dict(list=read_filelist,
                bed=read_bed,
@@ -274,7 +290,7 @@ READERS = dict(list=read_filelist,
                wig=read_wig,
                txt=read_mysql_tab)
 
-def read_any(col_index, filename, infile, num_cols, chromosomes):
+def read_any(chromosomes, trackname, filename, infile):
     ext = filename.rpartition(".")[2]
 
     try:
@@ -282,27 +298,26 @@ def read_any(col_index, filename, infile, num_cols, chromosomes):
     except KeyError:
         raise ValueError, "file extension not recognized"
 
-    return reader(col_index, infile, num_cols, chromosomes)
+    return reader(chromosomes, trackname, filename, infile)
 
-def load_uncompressed(col_index, filename, num_cols, chromosomes):
+def load_uncompressed(chromosomes, trackname, filename):
     with open(filename) as infile:
-        read_any(col_index, filename, infile, num_cols, chromosomes)
+        return read_any(chromosomes, trackname, filename, infile)
 
-def load_gzip(col_index, filename, num_cols, chromosomes):
+def load_gzip(chromosomes, trackname, filename):
     # remove .gz for further type sniffing
     filename_stem = filename.rpartition(extsep)[0]
 
     with gzip_open(filename) as infile:
-        return read_any(col_index, filename_stem, infile, num_cols,
-                        chromosomes)
+        return read_any(chromosomes, trackname, filename_stem, infile)
 
-def load_any(col_index, filename, num_cols, chromosomes):
+def load_any(chromosomes, trackname, filename):
     print >>sys.stderr, filename
 
     if filename.endswith(".gz"):
-        return load_gzip(col_index, filename, num_cols, chromosomes)
+        return load_gzip(chromosomes, trackname, filename)
     else:
-        return load_uncompressed(col_index, filename, num_cols, chromosomes)
+        return load_uncompressed(chromosomes, trackname, filename)
 
 def write_metadata(chromosome):
     print >>sys.stderr, "writing metadata for %s" % chromosome.title
@@ -366,16 +381,15 @@ def write_metadata(chromosome):
     chromosome_attrs.mins = mins
     chromosome_attrs.maxs = maxs
 
-def load_data(filenames, outdirname):
+def load_data(outdirname, trackname, filenames):
     outdirpath = path(outdirname)
-    num_cols = len(filenames)
 
     configured_chromosome_factory = partial(chromosome_factory, outdirpath)
     chromosomes = KeyPassingDefaultdict(configured_chromosome_factory)
 
     try:
         for col_index, filename in enumerate(filenames):
-            load_any(col_index, filename, num_cols, chromosomes)
+            load_any(chromosomes, trackname, filename)
 
         for chromosome in chromosomes.itervalues():
             write_metadata(chromosome)
@@ -393,7 +407,7 @@ def parse_options(args):
     options, args = parser.parse_args(args)
     # XXX: add options to refresh metadata only (do not destroy on openFile!)
 
-    if not len(args) >= 2:
+    if not len(args) >= 3:
         parser.print_usage()
         sys.exit(1)
 
@@ -402,7 +416,7 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    return load_data(args[:-1], args[-1])
+    return load_data(*args)
 
 if __name__ == "__main__":
     sys.exit(main())
