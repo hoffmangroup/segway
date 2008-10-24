@@ -144,7 +144,7 @@ Using
 =====
 All commands have help with --help.
 
-1. Set up your HDF5 skeletons with ``segway-load-seq``.
+1. Set up your HDF5 skeletons with ``segway-load-seq`` and ``segway-name-tracks``.
 2. Populate the skeletons with data using ``segway-load-data``.
 3. Run ``segway`` on the HDF5 files.
 

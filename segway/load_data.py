@@ -381,7 +381,7 @@ def write_metadata(chromosome):
     chromosome_attrs.mins = mins
     chromosome_attrs.maxs = maxs
 
-def load_data(outdirname, trackname, filenames):
+def load_data(outdirname, trackname, *filenames):
     outdirpath = path(outdirname)
 
     configured_chromosome_factory = partial(chromosome_factory, outdirpath)

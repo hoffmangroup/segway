@@ -23,7 +23,7 @@ from struct import calcsize, unpack
 import sys
 
 from DRMAA import Session as _Session
-from numpy import amin, amax, array, finfo, float32, isnan, NINF
+from numpy import amin, amax, array, isnan, NINF
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -64,21 +64,20 @@ MEM_REQ_SLOPE = 5372
 RANDOM_STARTS = 1
 
 # replace NAN with SENTINEL to avoid warnings
-MIN_FLOAT = finfo(float32).min
-SENTINEL = MIN_FLOAT
+# I chose this value because it is small, and len(str(SENTINEL)) is short
+SENTINEL = -5.42e34
 
 ACC_FILENAME_FMT = "acc%s.bin"
-ACC_FILENAME_PARALLEL = ACC_FILENAME_FMT % "$((SGE_TASK_ID-1))"
 ACC_FILENAME_BUNDLE = ACC_FILENAME_FMT % "@D"
 
 # programs
 ENV_CMD = "/usr/bin/env"
 BASH_CMD = "bash"
 EM_TRAIN_CMD = "gmtkEMtrainNew"
+EM_TRAIN_CMD_STR = '%s "$@"' % EM_TRAIN_CMD
 
-CMD_STR_PARALLEL_FMT = '%s -trrng $((SGE_TASK_ID-1)) -storeAccFile %s "$@"'
-CMD_STR_BUNDLE = '%s "$@"' % EM_TRAIN_CMD
 BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
+EM_TRAIN_CMDLINE = BASH_CMDLINE + [EM_TRAIN_CMD_STR]
 
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF(EM_TRAIN_CMD)
@@ -199,6 +198,9 @@ def accum_extrema(chromosome, mins, maxs):
 def find_overlaps(start, end, coords):
     """
     find items in coords that overlap (start, end)
+
+    NOTE: multiple overlapping regions in coords will result in data
+    being considered more than once
     """
     res = []
 
@@ -219,6 +221,11 @@ def find_overlaps(start, end, coords):
                 res.append([start, end])
 
     return res
+
+def name_job(job_tmpl, start_index, round_index, chunk_index):
+    # shouldn't this be jobName? not in SGE's DRMAA implementation
+    # XXX: report upstream
+    job_tmpl.name = "emt%d.%d.%s" % (start_index, round_index, chunk_index)
 
 def make_mem_req(len):
     res = MEM_REQ_SLOPE * len + MEM_REQ_INTERCEPT
@@ -768,39 +775,41 @@ class Runner(object):
         else:
             return prog
 
-    # XXX: there is some duplication between these two which should be removed
     def queue_parallel(self, session, params_filename, start_index,
                        round_index, **kwargs):
         kwargs = dict(inputMasterFile=self.input_master_filename,
                       inputTrainableParameters=params_filename,
                       cppCommandOptions=make_cpp_options(params_filename),
                       **kwargs)
-        acc_filename = self.dirpath / ACC_FILENAME_PARALLEL
-        bash_cmd_str = CMD_STR_PARALLEL_FMT % (EM_TRAIN_CMD, acc_filename)
-        bash_cmdline = BASH_CMDLINE + [bash_cmd_str]
 
-        # $0 = "gmtkEMtrainNew" ignored by "$@" which starts with $1
-        gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
+        res = [] # task ids
+        for chunk_index, chunk_mem_req in enumerate(self.chunk_mem_reqs):
+            acc_filename = self.dirpath / (ACC_FILENAME_FMT % chunk_index)
+            kwargs_chunk = dict(trrng=chunk_index,
+                                storeAccFile=acc_filename,
+                                **kwargs)
 
-        job_tmpl = session.createJobTemplate()
+            # XXX: there is some duplication between this and queue_bundle,
+            # which should be removed
+            gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs_chunk)
 
-        # shouldn't this be jobName? not in SGE's DRMAA implementation
-        job_tmpl.name = "emtp%d.%d" % (start_index, round_index)
-        job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = bash_cmdline + gmtk_cmdline
+            job_tmpl = session.createJobTemplate()
 
-        set_cwd_job_tmpl(job_tmpl)
+            name_job(job_tmpl, start_index, round_index, chunk_index)
+            job_tmpl.remoteCommand = ENV_CMD
+            job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
 
-        # XXX: after SGE mailing list response: use self.chunk_mem_reqs
-        res_req = RES_REQ_FMT % MEM_REQ_PARALLEL
-        job_tmpl.nativeSpecification = make_native_spec(l=res_req)
+            set_cwd_job_tmpl(job_tmpl)
 
-        # a task is the atomic unit within an array job
-        task_ids = session.runBulkJobs(job_tmpl, 1, self.num_chunks, 1)
+            res_req = RES_REQ_FMT % chunk_mem_req
+            job_tmpl.nativeSpecification = make_native_spec(l=res_req)
 
-        return task_ids[0].partition(".")[0]
+            # a task is the atomic unit within an array job
+            res.append(session.runJob(job_tmpl))
 
-    def queue_bundle(self, session, parallel_jobid, input_params_filename,
+        return res
+
+    def queue_bundle(self, session, parallel_jobids, input_params_filename,
                      output_params_filename, start_index, round_index,
                      **kwargs):
         ## bundle step: take parallel accumulators and combine them
@@ -815,18 +824,17 @@ class Runner(object):
                  loadAccFile=acc_filename,
                  **kwargs)
 
-        bash_cmdline = BASH_CMDLINE + [CMD_STR_BUNDLE]
         gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
         job_tmpl = session.createJobTemplate()
 
-        job_tmpl.name = "emtb%d.%d" % (start_index, round_index)
+        name_job(job_tmpl, start_index, round_index, "bundle")
         job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = bash_cmdline + gmtk_cmdline
+        job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
         set_cwd_job_tmpl(job_tmpl)
 
         res_req = RES_REQ_FMT % MEM_REQ_BUNDLE
         job_tmpl.nativeSpecification = \
-            make_native_spec(hold_jid=parallel_jobid, l=res_req)
+            make_native_spec(hold_jid=",".join(parallel_jobids), l=res_req)
 
         return session.runJob(job_tmpl)
 
@@ -887,7 +895,7 @@ class Runner(object):
                 while (round_index < MAX_EM_ITERS
                        and is_training_progressing(last_log_likelihood,
                                                    log_likelihood)):
-                    parallel_jobid = self.queue_parallel(session,
+                    parallel_jobids = self.queue_parallel(session,
                                                          last_params_filename,
                                                          start_index,
                                                          round_index,
@@ -896,7 +904,7 @@ class Runner(object):
                     curr_params_filename = extjoin(stem_params_filename,
                                                    str(round_index))
 
-                    bundle_jobid = self.queue_bundle(session, parallel_jobid,
+                    bundle_jobid = self.queue_bundle(session, parallel_jobids,
                                                      last_params_filename,
                                                      curr_params_filename,
                                                      start_index, round_index,
