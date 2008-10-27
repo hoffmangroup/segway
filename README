@@ -28,6 +28,9 @@ the following packages or newer versions:
 - optbuild 0.1.3
 - textinput 0.1.1
 
+XXX DRMAA is not automatically installed at the moment, you have to
+install it yourself. The URL is in the source to setup.py
+
 If you want DRMAA distributed job control (and you can't turn this off
 right now), it will also install:
 
