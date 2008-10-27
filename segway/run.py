@@ -133,9 +133,9 @@ TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
 # XXX: this could be specified as a dict instead
-WIG_HEADER = 'track type=wiggle_0 name=%s_%%s ' \
-    'description="Segmentation of %%s by %s" visibility=dense ' \
-    'viewLimits=0:1 autoScale=off' % (PKG, PKG)
+WIG_HEADER = 'track type=wiggle_0 name=%s ' \
+    'description="Segmentation by %s" visibility=dense viewLimits=0:1 ' \
+    'autoScale=off' % (PKG, PKG)
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename"]
 
@@ -372,23 +372,22 @@ def read_gmtk_out(infile):
     fmt = "=%dL" % (len(data) / calcsize("=L"))
     return unpack(fmt, data)
 
-def write_wig(outfile, trackname, output, (chrom, start, end)):
+def write_wig(outfile, output, (chrom, start, end)):
     # convert from zero- to one-based
     start_1based = start + 1
 
     print >>outfile, TRACK_FMT % (chrom, start_1based, end)
-    print >>outfile, WIG_HEADER % (trackname, trackname)
+    print >>outfile, WIG_HEADER
     print >>outfile, FIXEDSTEP_FMT % (chrom, start_1based)
 
     print >>outfile, "\n".join(map(str, output))
 
-def load_gmtk_out_save_wig(trackname, chunk_coord, gmtk_outfilename,
-                           wig_filename):
+def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename):
     with open(gmtk_outfilename) as gmtk_outfile:
         data = read_gmtk_out(gmtk_outfile)
 
         with gzip_open(wig_filename, "w") as wig_file:
-            return write_wig(wig_file, trackname, data, chunk_coord)
+            return write_wig(wig_file, data, chunk_coord)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -768,12 +767,11 @@ class Runner(object):
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
 
         # chunk_coord = (chrom, chromStart, chromEnd)
-        zipper = izip(count(), self.tracknames, self.output_filenames,
-                      self.chunk_coords)
-        for index, trackname, gmtk_outfilename, chunk_coord in zipper:
+        zipper = izip(count(), self.output_filenames, self.chunk_coords)
+        for index, gmtk_outfilename, chunk_coord in zipper:
             wig_filename = wig_filepath_fmt % index
 
-            load_gmtk_out_save_wig(trackname, chunk_coord, gmtk_outfilename,
+            load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
                                    wig_filename)
 
     def prog_factory(self, prog):
