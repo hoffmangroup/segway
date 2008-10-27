@@ -57,8 +57,11 @@ MEM_REQ_BUNDLE = "500M"
 RES_REQ_FMT = "virtual_free=%s"
 
 # for a four-way model
-MEM_REQ_INTERCEPT = 13746364
-MEM_REQ_SLOPE = 5372
+MEM_REQ_INTERCEPT_ISLAND = 17255542
+MEM_REQ_SLOPE_ISLAND = 4782
+
+MEM_REQ_INTERCEPT = 14442884
+MEM_REQ_SLOPE = 5768
 
 # defaults
 RANDOM_STARTS = 1
@@ -130,9 +133,9 @@ TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
 # XXX: this could be specified as a dict instead
-WIG_HEADER = 'track type=wiggle_0 name=%s ' \
-    'description="Segmentation by %s" visibility=dense viewLimits=0:1 ' \
-    'autoScale=off' % (PKG, PKG)
+WIG_HEADER = 'track type=wiggle_0 name=%s_%%s ' \
+    'description="Segmentation of %%s by %s" visibility=dense ' \
+    'viewLimits=0:1 autoScale=off' % (PKG, PKG)
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename"]
 
@@ -369,22 +372,23 @@ def read_gmtk_out(infile):
     fmt = "=%dL" % (len(data) / calcsize("=L"))
     return unpack(fmt, data)
 
-def write_wig(outfile, output, (chrom, start, end)):
+def write_wig(outfile, trackname, output, (chrom, start, end)):
     # convert from zero- to one-based
     start_1based = start + 1
 
     print >>outfile, TRACK_FMT % (chrom, start_1based, end)
-    print >>outfile, WIG_HEADER
+    print >>outfile, WIG_HEADER % (trackname, trackname)
     print >>outfile, FIXEDSTEP_FMT % (chrom, start_1based)
 
     print >>outfile, "\n".join(map(str, output))
 
-def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename):
+def load_gmtk_out_save_wig(trackname, chunk_coord, gmtk_outfilename,
+                           wig_filename):
     with open(gmtk_outfilename) as gmtk_outfile:
         data = read_gmtk_out(gmtk_outfile)
 
         with gzip_open(wig_filename, "w") as wig_file:
-            return write_wig(wig_file, data, chunk_coord)
+            return write_wig(wig_file, trackname, data, chunk_coord)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -421,6 +425,7 @@ class Runner(object):
         self.mins = None
         self.maxs = None
         self.chunk_mem_reqs = None
+        self.tracknames = None
 
         # variables
         self.num_segs = NUM_SEGS
@@ -603,6 +608,13 @@ class Runner(object):
                     # this means there is no data for that chromosome
                     continue
 
+                tracknames = chromosome._v_attr.tracknames.tolist()
+                if self.tracknames is None:
+                    self.tracknames = tracknames
+                elif self.tracknames != tracknames:
+                    raise ValueError("all tracknames attributes must be"
+                                     " identical")
+
                 for supercontig, continuous in \
                         walk_continuous_supercontigs(chromosome):
                     num_obs = init_num_obs(num_obs, continuous)
@@ -756,11 +768,12 @@ class Runner(object):
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
 
         # chunk_coord = (chrom, chromStart, chromEnd)
-        zipper = izip(count(), self.output_filenames, self.chunk_coords)
-        for index, gmtk_outfilename, chunk_coord in zipper:
+        zipper = izip(count(), self.tracknames, self.output_filenames,
+                      self.chunk_coords)
+        for index, trackname, gmtk_outfilename, chunk_coord in zipper:
             wig_filename = wig_filepath_fmt % index
 
-            load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
+            load_gmtk_out_save_wig(trackname, chunk_coord, gmtk_outfilename,
                                    wig_filename)
 
     def prog_factory(self, prog):

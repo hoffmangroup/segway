@@ -122,9 +122,11 @@ class ScoreWriter(object):
         self.start = PINF
         self.end = NINF
 
-    def _write(self, start, score):
+    def _write(self, score, start, end=None):
         supercontig_start = self.start
-        end = start + self.span
+
+        if end is None:
+            end = start + self.span
 
         if self.end < end or supercontig_start > start:
             supercontig_start = self._seek(start, end)
@@ -134,7 +136,7 @@ class ScoreWriter(object):
 
         self.continuous_array[row_start:row_end] = score
 
-    def _write_span1(self, start, score):
+    def _write_span1(self, score, start):
         # this special-case optimization results in a speed increase of 27%
         # but switching to a different function only gets you 3% of that
         supercontig_start = self.start
@@ -258,12 +260,12 @@ def read_wig(chromosomes, trackname, filename, infile):
 
                 start = int(words[0]) - 1 # one-based
                 score = float(words[1])
-                writer.write(start, score)
+                writer.write(score, start)
             elif fmt == "fixedStep":
                 assert num_words == 1
 
                 score = float(words[0])
-                writer.write(start, score)
+                writer.write(score, start)
 
                 start += step
             else:
@@ -271,16 +273,16 @@ def read_wig(chromosomes, trackname, filename, infile):
                     " are supported"
 
 def read_mysql_tab(chromosomes, trackname, filename, infile):
-    raise NotImplementedError, "needs updating for trackname regime, and " \
-        "replace write_score with direct call to ScoreWriter"
+    with ScoreWriter(trackname) as writer:
+        for row in DictReader(infile, FIELDNAMES_MYSQL_TAB):
+            chromosome = chromosomes[row["chrom"]]
+            writer.set_chromosome(chromosome)
 
-##    for row in DictReader(infile, FIELDNAMES_MYSQL_TAB):
-##        chromosome = chromosomes[row["chrom"]]
-##        start = int(row["chromStart"])
-##        end = int(row["chromEnd"])
-##        score = float(row["dataValue"])
-##
-##        write_score(chromosome, start, end, score, col_index, num_cols)
+            start = int(row["chromStart"])
+            end = int(row["chromEnd"])
+            score = float(row["dataValue"])
+
+            writer.write(score, start, end)
 
 READERS = dict(list=read_filelist,
                bed=read_bed,
