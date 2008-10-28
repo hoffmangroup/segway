@@ -12,6 +12,7 @@ __version__ = "$Revision$"
 from cStringIO import StringIO
 from collections import defaultdict
 from contextlib import closing, contextmanager
+from copy import copy
 from errno import EEXIST, ENOENT
 from itertools import count, izip
 from math import ceil, floor, log10
@@ -21,6 +22,7 @@ from shutil import move
 from string import Template
 from struct import calcsize, unpack
 import sys
+from threading import Thread
 
 from DRMAA import Session as _Session
 from numpy import amin, amax, array, isnan, NINF
@@ -31,8 +33,9 @@ from optbuild import (Mixin_NoConvertUnderscore,
 from path import path
 from tables import openFile
 
-from ._util import (data_filename, data_string, gzip_open, init_num_obs,
-                    NamedTemporaryDir, PKG, walk_continuous_supercontigs)
+from ._util import (data_filename, data_string, get_tracknames, gzip_open,
+                    init_num_obs, NamedTemporaryDir, PKG,
+                    walk_continuous_supercontigs)
 
 # XXX: should be options
 NUM_SEGS = 2
@@ -54,7 +57,7 @@ MIN_FRAMES = 2
 MAX_FRAMES = 10000000 # 10 million
 MEM_REQ_PARALLEL = "10.5G"
 MEM_REQ_BUNDLE = "500M"
-RES_REQ_FMT = "virtual_free=%s"
+RES_REQ_FMT = "mem_requested=%s"
 
 # for a four-way model
 MEM_REQ_INTERCEPT_ISLAND = 17255542
@@ -123,7 +126,8 @@ MEAN_TMPL = "$index mean_${seg}_${obs} 1 ${rand}"
 COVAR_TMPL_TIED = "$index covar_${obs} 1 ${rand}"
 COVAR_TMPL_UNTIED = "$index covar_${seg}_${obs} 1 ${rand}" # unused as of yet
 
-MC_TMPL = "$index 1 0 mc_${seg}_${obs} mean_${seg}_${obs} covar_${obs}"
+MC_TMPL = "$index 1 CTYPE_DIAG_GAUSSIAN" \
+    " mc_${seg}_${obs} mean_${seg}_${obs} covar_${obs}"
 MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmf_always mc_${seg}_${obs}"
 
 NAME_COLLECTION_TMPL = "$obs_index collection_seg_${obs} 2"
@@ -392,6 +396,17 @@ def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename):
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
 
+class RandomStartThread(Thread):
+    def __init__(self, runner, start_index):
+        raise NotImplementedError
+
+        self.runner = copy(runner)
+        self.start_index = start_index
+
+    def run(self):
+        self.runner.run_train_start()
+        # XXX return likelihood somehow
+
 class Runner(object):
     def __init__(self, **kwargs):
         # filenames
@@ -607,7 +622,7 @@ class Runner(object):
                     # this means there is no data for that chromosome
                     continue
 
-                tracknames = chromosome._v_attr.tracknames.tolist()
+                tracknames = get_tracknames(chromosome)
                 if self.tracknames is None:
                     self.tracknames = tracknames
                 elif self.tracknames != tracknames:
@@ -856,86 +871,88 @@ class Runner(object):
         prog(strFile=self.structure_filename,
              verbosity=VERBOSITY)
 
+    def run_train_start(self, start_index):
+        # XXX: re-add the ability to set your own starting parameters,
+        # with new=start_index (copy from existing rather than using
+        # it on command-line)
+        self.save_input_master(new=True)
+        self.set_params_filename(new=True)
+
+        last_log_likelihood = NINF
+        log_likelihood = NINF
+        round_index = 0
+
+        stem_params_filename = self.params_filename
+        last_params_filename = None
+        curr_params_filename = None
+
+        kwargs = self.train_kwargs
+
+        with Session() as session:
+            while (round_index < MAX_EM_ITERS
+                   and is_training_progressing(last_log_likelihood,
+                                               log_likelihood)):
+                parallel_jobids = self.queue_parallel(session,
+                                                     last_params_filename,
+                                                     start_index, round_index,
+                                                     **kwargs)
+
+                curr_params_filename = extjoin(stem_params_filename,
+                                               str(round_index))
+
+                bundle_jobid = self.queue_bundle(session, parallel_jobids,
+                                                 last_params_filename,
+                                                 curr_params_filename,
+                                                 start_index, round_index,
+                                                 **kwargs)
+
+                # wait for bundle to finish
+                session.wait(bundle_jobid, session.TIMEOUT_WAIT_FOREVER)
+
+                last_log_likelihood = log_likelihood
+                log_likelihood = self.load_log_likelihood()
+
+                print >>sys.stderr, "log likelihood = %s" % log_likelihood
+
+                last_params_filename = curr_params_filename
+
+                round_index += 1
+
+        return log_likelihood, self.input_master_filename, last_params_filename
+
     def run_train(self):
         assert not self.dry_run
 
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
 
-        # XXX: this can be a parallelization point
-        kwargs = dict(strFile=self.structure_filename,
-                      objsNotToTrain=self.dont_train_filename,
-                      llStoreFile=self.log_likelihood_filename,
+        self.train_kwargs = dict(strFile=self.structure_filename,
+                                 objsNotToTrain=self.dont_train_filename,
+                                 llStoreFile=self.log_likelihood_filename,
 
-                      of1=self.feature_filelistpath,
-                      fmt1="ascii",
-                      nf1=self.num_obs,
-                      ni1=self.num_obs,
+                                 of1=self.feature_filelistpath,
+                                 fmt1="ascii",
+                                 nf1=self.num_obs,
+                                 ni1=self.num_obs,
 
-                      maxEmIters=1,
-                      verbosity=VERBOSITY,
-                      island=ISLAND,
-                      componentCache=COMPONENT_CACHE,
-                      lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0)
+                                 maxEmIters=1,
+                                 verbosity=VERBOSITY,
+                                 island=ISLAND,
+                                 componentCache=COMPONENT_CACHE,
+                                 lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0)
 
+        # save the destination file for input_master as we will be
+        # generating new input masters for each start
         dst_filenames = [self.input_master_filename,
                          self.params_filename]
-
-        # list of tuples(log_likelihood, input_master_filename,
-        #                params_filename)
-        start_params = []
 
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
         self.chunk_mem_reqs = [make_mem_req(len) for len in chunk_lens]
 
-        with Session() as session:
-            # XXX: not implemented: multiple random starts (threads)
-            for start_index in xrange(self.random_starts):
-                # XXX: re-add the ability to set your own starting parameters,
-                # with new=start_index
-                # (copy from existing rather than using it on command-line)
-                self.save_input_master(new=True)
-                self.set_params_filename(new=True)
-
-                last_log_likelihood = NINF
-                log_likelihood = NINF
-                round_index = 0
-
-                stem_params_filename = self.params_filename
-                last_params_filename = None
-                curr_params_filename = None
-                while (round_index < MAX_EM_ITERS
-                       and is_training_progressing(last_log_likelihood,
-                                                   log_likelihood)):
-                    parallel_jobids = self.queue_parallel(session,
-                                                         last_params_filename,
-                                                         start_index,
-                                                         round_index,
-                                                         **kwargs)
-
-                    curr_params_filename = extjoin(stem_params_filename,
-                                                   str(round_index))
-
-                    bundle_jobid = self.queue_bundle(session, parallel_jobids,
-                                                     last_params_filename,
-                                                     curr_params_filename,
-                                                     start_index, round_index,
-                                                     **kwargs)
-
-                    # wait for bundle to finish
-                    session.wait(bundle_jobid, session.TIMEOUT_WAIT_FOREVER)
-
-                    last_log_likelihood = log_likelihood
-                    log_likelihood = self.load_log_likelihood()
-
-                    print >>sys.stderr, "log likelihood = %s" % log_likelihood
-
-                    last_params_filename = curr_params_filename
-
-                    round_index += 1
-
-                start_params.append((log_likelihood,
-                                     self.input_master_filename,
-                                     last_params_filename))
+        # list of tuples(log_likelihood, input_master_filename,
+        #                params_filename)
+        start_params = []
+        for start_index in xrange(self.random_starts):
+            start_params.append(self.run_train_start(start_index))
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]
@@ -1033,7 +1050,7 @@ def parse_options(args):
     parser.add_option("--structure", "-s", metavar="FILE",
                       help="use or create structure in FILE")
 
-    parser.add_option("--trainable-params", "-t", metavar="FILE",
+    parser.add_option("--trainable-params", "-p", metavar="FILE",
                       help="use or create trainable parameters in FILE")
 
     parser.add_option("--directory", "-d", metavar="DIR",

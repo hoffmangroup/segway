@@ -1,6 +1,10 @@
 #ifndef SEG_INC
 #define SEG_INC
 
+%% component types
+#define CTYPE_DIAG_GAUSSIAN 0
+#define CTYPE_GAMMA 3
+
 %% cardinalities
 
 % data exists or is missing?

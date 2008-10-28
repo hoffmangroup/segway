@@ -17,6 +17,7 @@ from tables import openFile
 
 from ._util import walk_continuous_supercontigs
 
+# XXX: duplicative of h5histogram.py
 def h5values(col_index, filenames):
     for filename in filenames:
         with openFile(filename) as h5file:

@@ -128,6 +128,12 @@ def init_num_obs(num_obs, continuous):
 def gzip_open(*args, **kwargs):
     return closing(_gzip_open(*args, **kwargs))
 
+def get_tracknames(chromosome):
+    return chromosome.root._v_attrs.tracknames.tolist()
+
+def get_col_index(chromosome, trackname):
+    return get_tracknames(chromosome).index(trackname)
+
 def main(args=sys.argv[1:]):
     pass
 

@@ -35,8 +35,9 @@ from tables import Float64Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
 from .load_seq import MIN_GAP_LEN
-from ._util import (fill_array, gzip_open, init_num_obs, new_extrema,
-                    walk_continuous_supercontigs, walk_supercontigs)
+from ._util import (fill_array, get_tracknames, gzip_open, init_num_obs,
+                    new_extrema, walk_continuous_supercontigs,
+                    walk_supercontigs)
 
 ATOM = Float64Atom(dflt=NAN)
 
@@ -154,9 +155,9 @@ class ScoreWriter(object):
             self._clear()
             self.chromosome = chromosome
 
-            tracknames = chromosome.root._v_attrs.tracknames
+            tracknames = get_tracknames(chromosome)
             self.num_cols = len(tracknames)
-            self.col_index = tracknames.tolist().index(self.trackname)
+            self.col_index = tracknames.index(self.trackname)
 
     def set_span(self, span):
         self.span = span
