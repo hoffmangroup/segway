@@ -15,10 +15,17 @@ from functools import partial
 from numpy import array, histogram, isfinite, NINF, PINF
 from tables import openFile
 
-from ._util import get_col_index, walk_continuous_supercontigs
+from ._util import (get_col_index as _get_col_index,
+                    walk_continuous_supercontigs)
 
 BINS = 100
 FIELDNAMES = ["lower_edge", "count"]
+
+def get_col_index(chromosome, trackname):
+    if trackname is None:
+        return 0
+    else:
+        return _get_col_index(chromosome, trackname)
 
 def calc_range(trackname, filenames):
     minimum = PINF
@@ -26,7 +33,7 @@ def calc_range(trackname, filenames):
 
     for filename in filenames:
         with openFile(filename) as chromosome:
-            col_index = get_col_index(trackname)
+            col_index = get_col_index(chromosome, trackname)
 
             attrs = chromosome.root._v_attrs
             minimum = min(minimum, attrs.mins[col_index])
@@ -44,7 +51,7 @@ def calc_histogram(trackname, filenames, data_range):
         with openFile(filename) as chromosome:
             print >>sys.stderr, filename
 
-            col_index = get_col_index(trackname)
+            col_index = get_col_index(chromosome, trackname)
 
             supercontig_walker = walk_continuous_supercontigs(chromosome)
             for supercontig, continuous in supercontig_walker:
@@ -53,12 +60,12 @@ def calc_histogram(trackname, filenames, data_range):
                 hist_supercontig, edges_supercontig = \
                     histogram_custom(col_finite)
 
-                assert edges_supercontig == edges
+                assert (edges_supercontig == edges).all()
                 hist += hist_supercontig
 
     return hist, edges
 
-def print_histogram(hist, edges, maximum):
+def print_histogram(hist, edges):
     for row in zip(edges, hist.tolist() + ["NA"]):
         print "\t".join(map(str, row))
 
@@ -67,7 +74,7 @@ def h5histogram(trackname, filenames):
 
     # two passes to avoid running out of memory
     data_range = calc_range(trackname, filenames)
-    hist, edges = calc_histogram(trackname, filenames)
+    hist, edges = calc_histogram(trackname, filenames, data_range)
 
     print_histogram(hist, edges)
 
@@ -77,8 +84,8 @@ def parse_options(args):
     usage = "%prog [OPTION]... FILE..."
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
-    parser.add_option("-c", "--col", type=int, metavar="COL",
-                      default=0, help="write values in column COL")
+    parser.add_option("-c", "--col", metavar="COL",
+                      help="write values in column COL (default first column)")
 
     options, args = parser.parse_args(args)
 

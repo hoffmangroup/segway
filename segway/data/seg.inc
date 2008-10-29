@@ -2,8 +2,8 @@
 #define SEG_INC
 
 %% component types
-#define CTYPE_DIAG_GAUSSIAN 0
-#define CTYPE_GAMMA 3
+#define COMPONENT_TYPE_DIAG_GAUSSIAN 0
+#define COMPONENT_TYPE_GAMMA 3
 
 %% cardinalities
 

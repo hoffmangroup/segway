@@ -14,6 +14,7 @@ from collections import defaultdict
 from contextlib import closing, contextmanager
 from copy import copy
 from errno import EEXIST, ENOENT
+from functools import partial
 from itertools import count, izip
 from math import ceil, floor, log10
 from os import extsep
@@ -54,7 +55,7 @@ COMPONENT_CACHE = True
 
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
-MAX_FRAMES = 10000000 # 10 million
+MAX_FRAMES = 1000000000 # 1 billion
 MEM_REQ_PARALLEL = "10.5G"
 MEM_REQ_BUNDLE = "500M"
 RES_REQ_FMT = "mem_requested=%s"
@@ -73,8 +74,8 @@ RANDOM_STARTS = 1
 # I chose this value because it is small, and len(str(SENTINEL)) is short
 SENTINEL = -5.42e34
 
-ACC_FILENAME_FMT = "acc%s.bin"
-ACC_FILENAME_BUNDLE = ACC_FILENAME_FMT % "@D"
+ACC_FILENAME_FMT = "acc.%s.%s.bin"
+GMTK_INDEX_PLACEHOLDER = "@D"
 
 # programs
 ENV_CMD = "/usr/bin/env"
@@ -97,15 +98,19 @@ OPT_USE_TRAINABLE_PARAMS = "-DUSE_TRAINABLE_PARAMS"
 
 # extensions and suffixes
 EXT_GZ = "gz"
+EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
 EXT_OBS = "obs"
 EXT_OUT = "out"
+EXT_PARAMS = "params"
 EXT_WIG = "wig"
 
+PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_LIST = "features"
 PREFIX_CHUNK = "chunk"
+PREFIX_PARAMS = "params"
 
-SUFFIX_GZ = extsep + EXT_WIG
+SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OBS = extsep + EXT_OBS
 SUFFIX_OUT = extsep + EXT_OUT
@@ -126,7 +131,7 @@ MEAN_TMPL = "$index mean_${seg}_${obs} 1 ${rand}"
 COVAR_TMPL_TIED = "$index covar_${obs} 1 ${rand}"
 COVAR_TMPL_UNTIED = "$index covar_${seg}_${obs} 1 ${rand}" # unused as of yet
 
-MC_TMPL = "$index 1 CTYPE_DIAG_GAUSSIAN" \
+MC_TMPL = "$index 1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
     " mc_${seg}_${obs} mean_${seg}_${obs} covar_${obs}"
 MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmf_always mc_${seg}_${obs}"
 
@@ -146,6 +151,17 @@ TRAIN_ATTRNAMES = ["input_master_filename", "params_filename"]
 def extjoin(*args):
     return extsep.join(args)
 
+def extjoin_not_none(*args):
+    return extjoin(*[str(arg) for arg in args
+                     if arg is not None])
+
+
+def maybe_gzip_open(filename, *args, **kwargs):
+    if filename.endswith(SUFFIX_GZ):
+        return gzip_open(filename, *args, **kwargs)
+    else:
+        return open(filename, *args, **kwargs)
+
 # XXX: suggest upstream as addition to DRMAA-python
 @contextmanager
 def Session(*args, **kwargs):
@@ -157,6 +173,11 @@ def Session(*args, **kwargs):
     finally:
         res.exit()
 
+def convert_chunks(attrs, name):
+    supercontig_start = attrs.start
+    edges_array = getattr(attrs, name) + supercontig_start
+    return edges_array.tolist()
+
 def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
     # using x !< y instead of x >= y to give the right default answer
@@ -164,7 +185,7 @@ def is_training_progressing(last_ll, curr_ll,
     return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
 
 def save_template(filename, resource, mapping, dirname=None,
-                  delete_existing=False):
+                  delete_existing=False, start_index=None):
     """
     creates a temporary file if filename is None or empty
     """
@@ -178,7 +199,9 @@ def save_template(filename, resource, mapping, dirname=None,
         prefix = stem_part[0]
         ext = stem_part[2]
 
-        filename = path(dirname) / extjoin(prefix, ext)
+        filebasename = extjoin_not_none(prefix, start_index, ext)
+
+        filename = path(dirname) / filebasename
 
     with open(filename, "w+") as outfile:
         tmpl = Template(data_string(resource))
@@ -315,7 +338,11 @@ def make_dense_cpt_spec(num_segs):
     return make_spec("DENSE_CPT", items)
 
 def make_rands(low, high, num_segs):
-    return array([uniform(low, high)
+    assert len(low) == len(high)
+
+    # size parameter is so that we always get an array, even if it
+    # has shape = (1,)
+    return array([uniform(low, high, len(low))
                   for seg_index in xrange(num_segs)])
 
 def make_mean_spec(num_segs, num_obs, mins, maxs):
@@ -323,8 +350,8 @@ def make_mean_spec(num_segs, num_obs, mins, maxs):
 
     return make_spec_multiseg("MEAN", MEAN_TMPL, num_segs, num_obs, rands)
 
-def make_covar_spec(num_segs, num_obs, mins, maxs):
-    if COVAR_TIED:
+def make_covar_spec(num_segs, num_obs, mins, maxs, tied):
+    if tied:
         num_segs = 1
         tmpl = COVAR_TMPL_TIED
     else:
@@ -413,7 +440,7 @@ class Runner(object):
         self.h5filenames = None
         self.feature_filelistpath = None
 
-        self.include_filename = None
+        self.gmtk_include_filename = None
         self.input_master_filename = None
         self.structure_filename = None
 
@@ -470,7 +497,7 @@ class Runner(object):
 
         coords = defaultdict(list)
 
-        with open(filename) as infile:
+        with maybe_gzip_open(filename) as infile:
             for line in infile:
                 words = line.rstrip().split()
                 chrom = words[0]
@@ -483,7 +510,7 @@ class Runner(object):
                                    for chrom, coords_list
                                    in coords.iteritems())
 
-    def set_params_filename(self, new=False):
+    def set_params_filename(self, new=False, start_index=None):
         # if this is not run and params_filename is
         # unspecified, then it won't be passed to gmtkViterbiNew
 
@@ -494,12 +521,17 @@ class Runner(object):
                 # it already exists and you don't want to force regen
                 self.train = False
         else:
-            filenamebase = extjoin("params", "params")
-            self.params_filename = self.dirpath / filenamebase
+            filebasename = extjoin_not_none(PREFIX_PARAMS, start_index,
+                                            EXT_PARAMS)
 
-    def set_log_likelihood_filename(self):
-        filenamebase = extjoin("likelihood", "ll")
-        self.log_likelihood_filename = self.dirpath / filenamebase
+            self.params_filename = self.dirpath / filebasename
+
+    def set_log_likelihood_filename(self, start_index=None):
+        # no need for new=False, since I don't care about keeping this file
+        # around generally
+        filebasename = extjoin_not_none(PREFIX_LIKELIHOOD, start_index,
+                                        EXT_LIKELIHOOD)
+        self.log_likelihood_filename = self.dirpath / filebasename
 
     def make_dir(self, dirname):
         dirpath = path(dirname)
@@ -558,7 +590,7 @@ class Runner(object):
             return dirpath / orig_filepath.name
 
     def save_include(self):
-        self.include_filename = self.save_resource(RES_INC)
+        self.gmtk_include_filename = self.save_resource(RES_INC)
 
     def save_structure(self):
         observation_tmpl = Template(data_string("observation.tmpl"))
@@ -570,7 +602,7 @@ class Runner(object):
                                       nonmissing_index=num_obs+obs_index)
                       for obs_index in xrange(num_obs))
 
-        mapping = dict(include_filename=self.include_filename,
+        mapping = dict(include_filename=self.gmtk_include_filename,
                        observations=observations)
 
         self.structure_filename = \
@@ -629,15 +661,19 @@ class Runner(object):
                     raise ValueError("all tracknames attributes must be"
                                      " identical")
 
-                for supercontig, continuous in \
-                        walk_continuous_supercontigs(chromosome):
+                supercontig_walker = walk_continuous_supercontigs(chromosome)
+                for supercontig, continuous in supercontig_walker:
+                    # also asserts same shape
                     num_obs = init_num_obs(num_obs, continuous)
 
                     supercontig_attrs = supercontig._v_attrs
-
                     supercontig_start = supercontig_attrs.start
-                    starts = supercontig_attrs.chunk_starts
-                    ends = supercontig_attrs.chunk_ends
+
+                    convert_chunks_custom = partial(convert_chunks,
+                                                    supercontig_attrs)
+
+                    starts = convert_chunks_custom("chunk_starts")
+                    ends = convert_chunks_custom("chunk_ends")
 
                     ## iterate through chunks and write
                     ## izip so it can be modified in place
@@ -664,17 +700,18 @@ class Runner(object):
                             print >>sys.stderr, text
                             continue
 
-                        chunk_start = supercontig_start + start
-                        chunk_end = supercontig_start + end
+                        chunk_start = start - supercontig_start
+                        chunk_end = end - supercontig_start
                         chunk_coords.append((chrom, chunk_start, chunk_end))
 
                         chunk_filepath = make_obs_filepath(chunk_index)
 
                         print >>feature_filelist, chunk_filepath
-                        print >>sys.stderr, " " + chunk_filepath
+                        print >>sys.stderr, " %s (%d, %d)" % (chunk_filepath,
+                                                              start, end)
 
                         if not chunk_filepath.exists():
-                            rows = continuous[start:end, ...]
+                            rows = continuous[chunk_start:chunk_end, ...]
                             save_observations_chunk(chunk_filepath, rows)
 
                         chunk_index += 1
@@ -696,13 +733,13 @@ class Runner(object):
         with feature_filelist as feature_filelist:
             self.write_observations(feature_filelist)
 
-    def save_input_master(self, new=False):
+    def save_input_master(self, new=False, start_index=None):
         num_segs = self.num_segs
         num_obs = self.num_obs
         mins = self.mins
         maxs = self.maxs
 
-        include_filename = self.include_filename
+        include_filename = self.gmtk_include_filename
 
         if new:
             input_master_filename = None
@@ -711,14 +748,15 @@ class Runner(object):
 
         dense_cpt_spec = make_dense_cpt_spec(num_segs)
         mean_spec = make_mean_spec(num_segs, num_obs, mins, maxs)
-        covar_spec = make_covar_spec(num_segs, num_obs, mins, maxs)
+        covar_spec = make_covar_spec(num_segs, num_obs, mins, maxs, COVAR_TIED)
         mc_spec = make_mc_spec(num_segs, num_obs)
         mx_spec = make_mx_spec(num_segs, num_obs)
         name_collection_spec = make_name_collection_spec(num_segs, num_obs)
 
         self.input_master_filename = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
-                          locals(), self.dirname, self.delete_existing)
+                          locals(), self.dirname, self.delete_existing,
+                          start_index)
     def save_dont_train(self):
         self.dont_train_filename = self.save_resource(RES_DONT_TRAIN)
 
@@ -809,14 +847,23 @@ class Runner(object):
                       **kwargs)
 
         res = [] # task ids
-        for chunk_index, chunk_mem_req in enumerate(self.chunk_mem_reqs):
-            acc_filename = self.dirpath / (ACC_FILENAME_FMT % chunk_index)
+
+        # sort chunks by decreasing size, so the most difficult chunks
+        # are dropped in the queue first
+        zipper = izip(self.chunk_lens, count(), self.chunk_mem_reqs)
+        sorted_zipper = sorted(zipper, reverse=True)
+
+        for chunk_len, chunk_index, chunk_mem_req in sorted_zipper:
+            # XXX: there is some duplication between this and
+            # queue_bundle, which should be removed. refactor the
+            # per-chunk stuff into a new function
+
+            acc_filebasename = ACC_FILENAME_FMT % (start_index, chunk_index)
+            acc_filename = self.dirpath / acc_filebasename
             kwargs_chunk = dict(trrng=chunk_index,
                                 storeAccFile=acc_filename,
                                 **kwargs)
 
-            # XXX: there is some duplication between this and queue_bundle,
-            # which should be removed
             gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs_chunk)
 
             job_tmpl = session.createJobTemplate()
@@ -830,7 +877,6 @@ class Runner(object):
             res_req = RES_REQ_FMT % chunk_mem_req
             job_tmpl.nativeSpecification = make_native_spec(l=res_req)
 
-            # a task is the atomic unit within an array job
             res.append(session.runJob(job_tmpl))
 
         return res
@@ -839,7 +885,10 @@ class Runner(object):
                      output_params_filename, start_index, round_index,
                      **kwargs):
         ## bundle step: take parallel accumulators and combine them
-        acc_filename = self.dirpath / ACC_FILENAME_BUNDLE
+        acc_filebasename = ACC_FILENAME_FMT % (start_index,
+                                               GMTK_INDEX_PLACEHOLDER)
+        acc_filename = self.dirpath / acc_filebasename
+
         kwargs = \
             dict(inputMasterFile=self.input_master_filename,
                  inputTrainableParameters=input_params_filename,
@@ -875,9 +924,11 @@ class Runner(object):
         # XXX: re-add the ability to set your own starting parameters,
         # with new=start_index (copy from existing rather than using
         # it on command-line)
-        self.save_input_master(new=True)
-        self.set_params_filename(new=True)
+        self.save_input_master(new=True, start_index=start_index)
+        self.set_params_filename(new=True, start_index=start_index)
+        self.set_log_likelihood_filename(start_index=start_index)
 
+        log_likelihood_filename = self.log_likelihood_filename
         last_log_likelihood = NINF
         log_likelihood = NINF
         round_index = 0
@@ -888,23 +939,27 @@ class Runner(object):
 
         kwargs = self.train_kwargs
 
+        queue_parallel = self.queue_parallel
+        queue_bundle = self.queue_bundle
+
         with Session() as session:
             while (round_index < MAX_EM_ITERS
                    and is_training_progressing(last_log_likelihood,
                                                log_likelihood)):
-                parallel_jobids = self.queue_parallel(session,
-                                                     last_params_filename,
-                                                     start_index, round_index,
-                                                     **kwargs)
+                parallel_jobids = queue_parallel(session, last_params_filename,
+                                                 start_index, round_index,
+                                                 **kwargs)
 
                 curr_params_filename = extjoin(stem_params_filename,
                                                str(round_index))
 
-                bundle_jobid = self.queue_bundle(session, parallel_jobids,
-                                                 last_params_filename,
-                                                 curr_params_filename,
-                                                 start_index, round_index,
-                                                 **kwargs)
+                bundle_jobid = queue_bundle(session, parallel_jobids,
+                                            last_params_filename,
+                                            curr_params_filename,
+                                            start_index, round_index,
+                                            llStoreFile=\
+                                                log_likelihood_filename,
+                                            **kwargs)
 
                 # wait for bundle to finish
                 session.wait(bundle_jobid, session.TIMEOUT_WAIT_FOREVER)
@@ -927,7 +982,6 @@ class Runner(object):
 
         self.train_kwargs = dict(strFile=self.structure_filename,
                                  objsNotToTrain=self.dont_train_filename,
-                                 llStoreFile=self.log_likelihood_filename,
 
                                  of1=self.feature_filelistpath,
                                  fmt1="ascii",
@@ -946,6 +1000,7 @@ class Runner(object):
                          self.params_filename]
 
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
+        self.chunk_lens = chunk_lens
         self.chunk_mem_reqs = [make_mem_req(len) for len in chunk_lens]
 
         # list of tuples(log_likelihood, input_master_filename,
@@ -1056,6 +1111,7 @@ def parse_options(args):
     parser.add_option("--directory", "-d", metavar="DIR",
                       help="create all other files in DIR")
 
+    # this is a 0-based file (I know because ENm008 starts at position 0)
     parser.add_option("--include-coords", metavar="FILE",
                       help="limit to genomic coordinates in FILE")
 
