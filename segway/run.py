@@ -143,7 +143,7 @@ FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
 # XXX: this could be specified as a dict instead
 WIG_HEADER = 'track type=wiggle_0 name=%s ' \
-    'description="Segmentation by %s" visibility=dense viewLimits=0:1 ' \
+    'description="%s segmentation of %%s" visibility=dense viewLimits=0:1 ' \
     'autoScale=off' % (PKG, PKG)
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename"]
@@ -403,22 +403,23 @@ def read_gmtk_out(infile):
     fmt = "=%dL" % (len(data) / calcsize("=L"))
     return unpack(fmt, data)
 
-def write_wig(outfile, output, (chrom, start, end)):
+def write_wig(outfile, output, (chrom, start, end), tracknames):
     # convert from zero- to one-based
     start_1based = start + 1
 
     print >>outfile, TRACK_FMT % (chrom, start_1based, end)
-    print >>outfile, WIG_HEADER
+    print >>outfile, WIG_HEADER % ", ".join(tracknames)
     print >>outfile, FIXEDSTEP_FMT % (chrom, start_1based)
 
     print >>outfile, "\n".join(map(str, output))
 
-def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename):
+def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename,
+                           tracknames):
     with open(gmtk_outfilename) as gmtk_outfile:
         data = read_gmtk_out(gmtk_outfile)
 
         with gzip_open(wig_filename, "w") as wig_file:
-            return write_wig(wig_file, data, chunk_coord)
+            return write_wig(wig_file, data, chunk_coord, tracknames)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -700,9 +701,12 @@ class Runner(object):
                             print >>sys.stderr, text
                             continue
 
+                        # start: reltaive to beginning of chromosome
+                        # chunk_start: relative to the beginning of
+                        # the supercontig
                         chunk_start = start - supercontig_start
                         chunk_end = end - supercontig_start
-                        chunk_coords.append((chrom, chunk_start, chunk_end))
+                        chunk_coords.append((chrom, start, end))
 
                         chunk_filepath = make_obs_filepath(chunk_index)
 
@@ -825,7 +829,7 @@ class Runner(object):
             wig_filename = wig_filepath_fmt % index
 
             load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
-                                   wig_filename)
+                                   wig_filename, self.tracknames)
 
     def prog_factory(self, prog):
         """
@@ -1007,7 +1011,10 @@ class Runner(object):
         #                params_filename)
         start_params = []
         for start_index in xrange(self.random_starts):
-            start_params.append(self.run_train_start(start_index))
+            # keeps it from rewriting variables that will be used
+            # later or in a different thread
+            runner_copy = copy(self)
+            start_params.append(runner_copy.run_train_start(start_index))
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]

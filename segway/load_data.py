@@ -94,8 +94,11 @@ class ScoreWriter(object):
             if supercontig_start <= start and supercontig_end >= end:
                 break
         else:
+            # the tuple must be placed inside another tuple before
+            # string formatting
+            coords = (start, end)
             raise DataForGapError("%r does not fit into a single supercontig"
-                                  % (start, end))
+                                  % (coords,))
 
         try:
             continuous = supercontig.continuous
@@ -269,6 +272,9 @@ def read_wig(chromosomes, trackname, filename, infile):
                 writer.write(score, start)
 
                 start += step
+            elif words[0] == "track":
+                # just ignore these lines
+                pass
             else:
                 raise ValueError, "only fixedStep and variableStep formats " \
                     " are supported"
