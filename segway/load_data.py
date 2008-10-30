@@ -82,7 +82,7 @@ class ScoreWriter(object):
     def __exit__(self, *args, **kwargs):
         self.flush()
 
-    def _seek(self, start, end):
+    def _seek(self, start):
         self.flush()
 
         chromosome = self.chromosome
@@ -91,14 +91,11 @@ class ScoreWriter(object):
             supercontig_start = attrs.start
             supercontig_end = attrs.end
 
-            if supercontig_start <= start and supercontig_end >= end:
+            if supercontig_start <= start < supercontig_end:
                 break
         else:
-            # the tuple must be placed inside another tuple before
-            # string formatting
-            coords = (start, end)
-            raise DataForGapError("%r does not fit into a single supercontig"
-                                  % (coords,))
+            raise DataForGapError("start=%d does not fit into a single"
+                                  " supercontig" % start)
 
         try:
             continuous = supercontig.continuous
@@ -127,13 +124,17 @@ class ScoreWriter(object):
         self.end = NINF
 
     def _write(self, score, start, end=None):
+        # if you try to write to (400, 405) and the supercontig only
+        # goes up to 401, then data will be written to 400 and 401
+        # without error. if you try to write to (402, 405), then you
+        # will get an exception
         supercontig_start = self.start
+
+        if self.end <= start or start < supercontig_start:
+            supercontig_start = self._seek(start)
 
         if end is None:
             end = start + self.span
-
-        if self.end < end or supercontig_start > start:
-            supercontig_start = self._seek(start, end)
 
         row_start = start - supercontig_start
         row_end = end - supercontig_start
@@ -146,8 +147,10 @@ class ScoreWriter(object):
         supercontig_start = self.start
         row_start = start - supercontig_start
 
-        if self.end < start + 1 or row_start < 0:
-            row_start = start - self._seek(start, start+1)
+        # < 0 means start < supercontig_start
+        # supposedly can't happen
+        if self.end <= start or row_start < 0:
+            row_start = start - self._seek(start)
 
         # most of the optimization is in not using a slice here:
         self.continuous_array[row_start] = score
