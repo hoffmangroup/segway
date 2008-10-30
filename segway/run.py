@@ -10,7 +10,6 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
-from collections import defaultdict
 from contextlib import closing, contextmanager
 from copy import copy
 from errno import EEXIST, ENOENT
@@ -35,7 +34,8 @@ from path import path
 from tables import openFile
 
 from ._util import (data_filename, data_string, get_tracknames, gzip_open,
-                    init_num_obs, NamedTemporaryDir, PKG,
+                    init_num_obs, iter_chroms_coords, load_coords,
+                    NamedTemporaryDir, PKG, SUFFIX_GZ,
                     walk_continuous_supercontigs)
 
 # XXX: should be options
@@ -97,7 +97,6 @@ NATIVE_SPEC_DEFAULT = dict(q="all.q")
 OPT_USE_TRAINABLE_PARAMS = "-DUSE_TRAINABLE_PARAMS"
 
 # extensions and suffixes
-EXT_GZ = "gz"
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
 EXT_OBS = "obs"
@@ -110,7 +109,6 @@ PREFIX_LIST = "features"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
 
-SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OBS = extsep + EXT_OBS
 SUFFIX_OUT = extsep + EXT_OUT
@@ -154,13 +152,6 @@ def extjoin(*args):
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
-
-
-def maybe_gzip_open(filename, *args, **kwargs):
-    if filename.endswith(SUFFIX_GZ):
-        return gzip_open(filename, *args, **kwargs)
-    else:
-        return open(filename, *args, **kwargs)
 
 # XXX: suggest upstream as addition to DRMAA-python
 @contextmanager
@@ -492,24 +483,7 @@ class Runner(object):
     def load_include_coords(self):
         filename = self.include_coords_filename
 
-        if not filename:
-            self.include_coords = None
-            return
-
-        coords = defaultdict(list)
-
-        with maybe_gzip_open(filename) as infile:
-            for line in infile:
-                words = line.rstrip().split()
-                chrom = words[0]
-                start = int(words[1])
-                end = int(words[2])
-
-                coords[chrom].append((start, end))
-
-        self.include_coords = dict((chrom, array(coords_list))
-                                   for chrom, coords_list
-                                   in coords.iteritems())
+        self.include_coords = load_coords(filename)
 
     def set_params_filename(self, new=False, start_index=None):
         # if this is not run and params_filename is
@@ -637,17 +611,8 @@ class Runner(object):
 
         include_coords = self.include_coords
 
-        for h5filename in self.h5filenames:
-            print >>sys.stderr, h5filename
-            chrom = path(h5filename).namebase
-
-            if include_coords:
-                try:
-                    chr_include_coords = include_coords[chrom]
-                except KeyError:
-                    # nothing is included on that chromosome
-                    continue
-
+        chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
+        for chrom, h5filename, chr_include_coords in chrom_iterator:
             with openFile(h5filename) as chromosome:
                 try:
                     mins, maxs = accum_extrema(chromosome, mins, maxs)

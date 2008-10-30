@@ -82,27 +82,47 @@ class ScoreWriter(object):
     def __exit__(self, *args, **kwargs):
         self.flush()
 
-    def _seek(self, start):
+    @staticmethod
+    def _get_supercontig_coords(supercontig):
+        attrs = supercontig._v_attrs
+        return attrs.start, attrs.end
+
+    def _seek_pos(self, pos):
+        chromosome = self.chromosome
+
+        for supercontig in walk_supercontigs(chromosome):
+            supercontig_start, supercontig_end = \
+                self._get_supercontig_coords(supercontig)
+            if supercontig_start <= pos < supercontig_end:
+                return supercontig
+
+        return None
+
+    def _seek(self, start, end=None):
         self.flush()
 
-        chromosome = self.chromosome
-        for supercontig in walk_supercontigs(chromosome):
-            attrs = supercontig._v_attrs
-            supercontig_start = attrs.start
-            supercontig_end = attrs.end
+        supercontig = self._seek_pos(start)
+        if supercontig is None:
+            if end is None:
+                end = start + 1
 
-            if supercontig_start <= start < supercontig_end:
-                break
-        else:
-            raise DataForGapError("start=%d does not fit into a single"
-                                  " supercontig" % start)
+            supercontig = self._seek_pos(end)
+
+            if supercontig is None:
+                # hopefully there won't be cases where *both* ends
+                # won't fit, but the middle does
+                raise DataForGapError("neither %d nor %d fit into a"
+                                      " supercontig" % (start, end))
+
+        supercontig_start, supercontig_end = \
+            self._get_supercontig_coords(supercontig)
 
         try:
             continuous = supercontig.continuous
         except NoSuchNodeError:
+            createCArray = self.chromosome.createCArray
             shape = (supercontig_end - supercontig_start, self.num_cols)
-            continuous = chromosome.createCArray(supercontig, "continuous",
-                                                 ATOM, shape)
+            continuous = createCArray(supercontig, "continuous", ATOM, shape)
 
         self.continuous = continuous
         self.continuous_array = continuous[..., self.col_index]
@@ -130,11 +150,14 @@ class ScoreWriter(object):
         # will get an exception
         supercontig_start = self.start
 
-        if self.end <= start or start < supercontig_start:
-            supercontig_start = self._seek(start)
-
         if end is None:
             end = start + self.span
+
+        if self.end <= start or start < supercontig_start:
+            supercontig_start = self._seek(start, end)
+
+            # if it is still off the left edge
+            start = max(start, supercontig_start)
 
         row_start = start - supercontig_start
         row_end = end - supercontig_start
@@ -150,7 +173,7 @@ class ScoreWriter(object):
         # < 0 means start < supercontig_start
         # supposedly can't happen
         if self.end <= start or row_start < 0:
-            row_start = start - self._seek(start)
+            row_start = max(start - self._seek(start), 0)
 
         # most of the optimization is in not using a slice here:
         self.continuous_array[row_start] = score
