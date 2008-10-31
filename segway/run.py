@@ -835,6 +835,7 @@ class Runner(object):
         kwargs["inputMasterFile"] = self.input_master_filename
         kwargs["inputTrainableParameters"] = params_filename
         kwargs["cppCommandOptions"] = make_cpp_options(params_filename)
+        
         gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
 
         job_tmpl = session.createJobTemplate()
