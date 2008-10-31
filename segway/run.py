@@ -16,7 +16,7 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip
 from math import ceil, floor, log10
-from os import extsep
+from os import extsep, getpid
 from random import random
 from shutil import move
 from string import Template
@@ -64,11 +64,8 @@ MEM_REQ_BUNDLE = "500M"
 RES_REQ_IDS = ["mem_requested", "mem_free"]
 
 # for a four-way model
-MEM_REQ_INTERCEPT_ISLAND = 17255542
-MEM_REQ_SLOPE_ISLAND = 4782
-
-MEM_REQ_INTERCEPT = 14442884
-MEM_REQ_SLOPE = 5768
+MEM_REQS = {2: [3619, 8098728],
+            4: [5768, 14442884]}
 
 # defaults
 RANDOM_STARTS = 1
@@ -254,13 +251,10 @@ def find_overlaps(start, end, coords):
 
     return res
 
-def name_job(job_tmpl, start_index, round_index, chunk_index):
-    # shouldn't this be jobName? not in SGE's DRMAA implementation
-    # XXX: report upstream
-    job_tmpl.name = "emt%d.%d.%s" % (start_index, round_index, chunk_index)
-
-def make_mem_req(len):
-    res = MEM_REQ_SLOPE * len + MEM_REQ_INTERCEPT
+def make_mem_req(len, num_obs):
+    # will fail if it's not pre-defined
+    slope, intercept = MEM_REQS[num_obs]
+    res = slope * len + intercept
 
     return "%dM" % ceil(res / 2**20)
 
@@ -525,6 +519,16 @@ class Runner(object):
         filebasename = extjoin_not_none(PREFIX_LIKELIHOOD, start_index,
                                         EXT_LIKELIHOOD)
         self.log_likelihood_filename = self.dirpath / filebasename
+
+    def make_output_dirpath(self, dirname, start_index):
+        res = self.dirpath / "output" / dirname / str(start_index)
+        self.make_dir(res)
+
+        return res
+
+    def set_output_dirpaths(self, start_index):
+        self.output_dirpath = self.make_output_dirpath("o", start_index)
+        self.error_dirpath = self.make_output_dirpath("e", start_index)
 
     def make_dir(self, dirname):
         dirpath = path(dirname)
@@ -830,6 +834,15 @@ class Runner(object):
         filebasename = ACC_FILENAME_FMT % (start_index, chunk_index)
         return self.dirpath / filebasename
 
+    def name_job(self, job_tmpl, start_index, round_index, chunk_index):
+        # shouldn't this be jobName? not in the Python DRMAA implementation
+        # XXX: report upstream
+        res = "emt%d.%d.%s.%s.%s" % (start_index, round_index, chunk_index,
+                                     self.dirpath.name, getpid())
+        job_tmpl.name = res
+
+        return res
+
     def queue_train(self, session, params_filename, start_index, round_index,
                     chunk_index, mem_req, hold_jid=None, **kwargs):
         kwargs["inputMasterFile"] = self.input_master_filename
@@ -839,10 +852,13 @@ class Runner(object):
         gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
 
         job_tmpl = session.createJobTemplate()
-        name_job(job_tmpl, start_index, round_index, chunk_index)
+        name = self.name_job(job_tmpl, start_index, round_index, chunk_index)
 
         job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
+
+        job_tmpl.outputPath = ":" + (self.output_dirpath / name)
+        job_tmpl.errorPath = ":" + (self.error_dirpath / name)
 
         set_cwd_job_tmpl(job_tmpl)
 
@@ -909,6 +925,7 @@ class Runner(object):
         self.save_input_master(new=True, start_index=start_index)
         self.set_params_filename(new=True, start_index=start_index)
         self.set_log_likelihood_filename(start_index=start_index)
+        self.set_output_dirpaths(start_index)
 
         log_likelihood_filename = self.log_likelihood_filename
         last_log_likelihood = NINF
@@ -972,6 +989,8 @@ class Runner(object):
     def run_train(self):
         assert not self.dry_run
 
+        num_obs = self.num_obs
+
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
 
         self.train_kwargs = dict(strFile=self.structure_filename,
@@ -979,8 +998,8 @@ class Runner(object):
 
                                  of1=self.feature_filelistpath,
                                  fmt1="ascii",
-                                 nf1=self.num_obs,
-                                 ni1=self.num_obs,
+                                 nf1=num_obs,
+                                 ni1=num_obs,
 
                                  maxEmIters=1,
                                  verbosity=VERBOSITY,
@@ -995,7 +1014,8 @@ class Runner(object):
 
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
         self.chunk_lens = chunk_lens
-        self.chunk_mem_reqs = [make_mem_req(len) for len in chunk_lens]
+        self.chunk_mem_reqs = [make_mem_req(chunk_len, num_obs)
+                               for chunk_len in chunk_lens]
 
         with Session() as session:
             assert session.DRMSInfo.startswith(DRMSINFO_PREFIX)
