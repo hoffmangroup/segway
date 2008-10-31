@@ -23,8 +23,9 @@ from string import Template
 from struct import calcsize, unpack
 import sys
 from threading import Thread
+from time import sleep
 
-from DRMAA import Session as _Session
+from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import amin, amax, array, isnan, NINF
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
@@ -47,6 +48,8 @@ COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
 ISLAND = False
 WIG_DIRNAME = "out"
+SLEEP_TIME = 60 # seconds
+DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
@@ -58,7 +61,7 @@ MIN_FRAMES = 2
 MAX_FRAMES = 1000000000 # 1 billion
 MEM_REQ_PARALLEL = "10.5G"
 MEM_REQ_BUNDLE = "500M"
-RES_REQ_FMT = "mem_requested=%s,mem_free=%s"
+RES_REQ_IDS = ["mem_requested", "mem_free"]
 
 # for a four-way model
 MEM_REQ_INTERCEPT_ISLAND = 17255542
@@ -92,7 +95,7 @@ VITERBI_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkViterbiNew")
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
-NATIVE_SPEC_DEFAULT = dict(q="all.q")
+NATIVE_SPEC_DEFAULT = dict(w="n")
 
 OPT_USE_TRAINABLE_PARAMS = "-DUSE_TRAINABLE_PARAMS"
 
@@ -105,7 +108,7 @@ EXT_PARAMS = "params"
 EXT_WIG = "wig"
 
 PREFIX_LIKELIHOOD = "likelihood"
-PREFIX_LIST = "features"
+PREFIX_LIST = "feature"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
 
@@ -164,8 +167,16 @@ def Session(*args, **kwargs):
     finally:
         res.exit()
 
+def run_job_em_train(session):
+    XXX
+    return session.runJob(job_tmpl)
+
 def make_res_req(size):
-    return RES_REQ_FMT % (size, size)
+    res = []
+    for res_req_id in RES_REQ_IDS:
+        res.append("%s=%s" % (res_req_id, size))
+
+    return res
 
 def convert_chunks(attrs, name):
     supercontig_start = attrs.start
@@ -266,7 +277,10 @@ def make_native_spec(**kwargs):
     options = NATIVE_SPEC_DEFAULT.copy()
     options.update(kwargs)
 
-    return " ".join(NATIVE_SPEC_PROG.build_args(options=options))
+    res = " ".join(NATIVE_SPEC_PROG.build_args(options=options))
+
+    print >>sys.stderr, res
+    return res
 
 def make_spec(name, items):
     items[:0] = ["%s_IN_FILE inline" % name, str(len(items)), ""]
@@ -419,17 +433,19 @@ def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
 
 class RandomStartThread(Thread):
-    def __init__(self, runner, start_index):
-        self.start_index = start_index
-
+    def __init__(self, runner, session, start_index):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
         self.runner = copy(runner)
 
+        self.session = session
+        self.start_index = start_index
+
         Thread.__init__(self)
 
     def run(self):
-        self.result = self.runner.run_train_start(self.start_index)
+        self.result = self.runner.run_train_start(self.session,
+                                                  self.start_index)
 
 class Runner(object):
     def __init__(self, **kwargs):
@@ -840,6 +856,7 @@ class Runner(object):
 
             gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs_chunk)
 
+            XXX
             job_tmpl = session.createJobTemplate()
 
             name_job(job_tmpl, start_index, round_index, chunk_index)
@@ -851,7 +868,8 @@ class Runner(object):
             res_req = make_res_req(chunk_mem_req)
             job_tmpl.nativeSpecification = make_native_spec(l=res_req)
 
-            res.append(session.runJob(job_tmpl))
+            XXX
+            res.append(run_job_em_train(session
 
         return res
 
@@ -916,36 +934,46 @@ class Runner(object):
         queue_parallel = self.queue_parallel
         queue_bundle = self.queue_bundle
 
-        with Session() as session:
-            while (round_index < MAX_EM_ITERS
-                   and is_training_progressing(last_log_likelihood,
-                                               log_likelihood)):
-                parallel_jobids = queue_parallel(session, last_params_filename,
-                                                 start_index, round_index,
-                                                 **kwargs)
+        timeout_no_wait = session.TIMEOUT_NO_WAIT
 
-                curr_params_filename = extjoin(stem_params_filename,
-                                               str(round_index))
+        while (round_index < MAX_EM_ITERS and
+               is_training_progressing(last_log_likelihood, log_likelihood)):
+            parallel_jobids = queue_parallel(session, last_params_filename,
+                                             start_index, round_index,
+                                             **kwargs)
 
-                bundle_jobid = queue_bundle(session, parallel_jobids,
-                                            last_params_filename,
-                                            curr_params_filename,
-                                            start_index, round_index,
-                                            llStoreFile=\
-                                                log_likelihood_filename,
-                                            **kwargs)
+            curr_params_filename = extjoin(stem_params_filename,
+                                           str(round_index))
 
-                # wait for bundle to finish
-                session.wait(bundle_jobid, session.TIMEOUT_WAIT_FOREVER)
+            bundle_jobid = queue_bundle(session, parallel_jobids,
+                                        last_params_filename,
+                                        curr_params_filename,
+                                        start_index, round_index,
+                                        llStoreFile=log_likelihood_filename,
+                                        **kwargs)
 
-                last_log_likelihood = log_likelihood
-                log_likelihood = self.load_log_likelihood()
+            # wait for bundle to finish
+            # XXXopt: polling in each thread is a bad way to do this
+            # it would be best to use session.synchronize() centrally
+            # and communicate to each thread when its job is done
 
-                print >>sys.stderr, "log likelihood = %s" % log_likelihood
+            # the very best thing would be to eliminate the GIL lock
+            # in the DRMAA wrapper
+            job_info = None
+            while not job_info:
+                try:
+                    job_info = session.wait(bundle_jobid, timeout_no_wait)
+                except ExitTimeoutError:
+                    sleep(SLEEP_TIME)
 
-                last_params_filename = curr_params_filename
+            last_log_likelihood = log_likelihood
+            log_likelihood = self.load_log_likelihood()
 
-                round_index += 1
+            print >>sys.stderr, "log likelihood = %s" % log_likelihood
+
+            last_params_filename = curr_params_filename
+
+            round_index += 1
 
         return log_likelihood, self.input_master_filename, last_params_filename
 
@@ -977,21 +1005,24 @@ class Runner(object):
         self.chunk_lens = chunk_lens
         self.chunk_mem_reqs = [make_mem_req(len) for len in chunk_lens]
 
-        threads = []
-        for start_index in xrange(self.random_starts):
-            thread = RandomStartThread(self, start_index)
-            thread.start()
-            threads.append(thread)
+        with Session() as session:
+            assert session.DRMSInfo.startswith(DRMSINFO_PREFIX)
 
-        # list of tuples(log_likelihood, input_master_filename,
-        #                params_filename)
-        start_params = []
-        for thread in threads:
-            thread.join()
+            threads = []
+            for start_index in xrange(self.random_starts):
+                thread = RandomStartThread(self, session, start_index)
+                thread.start()
+                threads.append(thread)
 
-            # this will get AttributeError if the thread failed and
-            # therefore did not set thread.result
-            start_params.append(thread.result)
+            # list of tuples(log_likelihood, input_master_filename,
+            #                params_filename)
+            start_params = []
+            for thread in threads:
+                thread.join()
+
+                # this will get AttributeError if the thread failed and
+                # therefore did not set thread.result
+                start_params.append(thread.result)
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]
