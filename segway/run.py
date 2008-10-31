@@ -58,7 +58,7 @@ MIN_FRAMES = 2
 MAX_FRAMES = 1000000000 # 1 billion
 MEM_REQ_PARALLEL = "10.5G"
 MEM_REQ_BUNDLE = "500M"
-RES_REQ_FMT = "mem_requested=%s"
+RES_REQ_FMT = "mem_requested=%s,mem_free=%s"
 
 # for a four-way model
 MEM_REQ_INTERCEPT_ISLAND = 17255542
@@ -163,6 +163,9 @@ def Session(*args, **kwargs):
         yield res
     finally:
         res.exit()
+
+def make_res_req(size):
+    return RES_REQ_FMT % (size, size)
 
 def convert_chunks(attrs, name):
     supercontig_start = attrs.start
@@ -417,14 +420,14 @@ def set_cwd_job_tmpl(job_tmpl):
 
 class RandomStartThread(Thread):
     def __init__(self, runner, start_index):
-        raise NotImplementedError
-
-        self.runner = copy(runner)
         self.start_index = start_index
 
+        # keeps it from rewriting variables that will be used
+        # later or in a different thread
+        self.runner = copy(runner)
+
     def run(self):
-        self.runner.run_train_start()
-        # XXX return likelihood somehow
+        self.result = self.runner.run_train_start(self.start_index)
 
 class Runner(object):
     def __init__(self, **kwargs):
@@ -843,7 +846,7 @@ class Runner(object):
 
             set_cwd_job_tmpl(job_tmpl)
 
-            res_req = RES_REQ_FMT % chunk_mem_req
+            res_req = make_res_req(chunk_mem_req)
             job_tmpl.nativeSpecification = make_native_spec(l=res_req)
 
             res.append(session.runJob(job_tmpl))
@@ -876,7 +879,7 @@ class Runner(object):
         job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
         set_cwd_job_tmpl(job_tmpl)
 
-        res_req = RES_REQ_FMT % MEM_REQ_BUNDLE
+        res_req = make_res_req(MEM_REQ_BUNDLE)
         job_tmpl.nativeSpecification = \
             make_native_spec(hold_jid=",".join(parallel_jobids), l=res_req)
 
@@ -972,14 +975,21 @@ class Runner(object):
         self.chunk_lens = chunk_lens
         self.chunk_mem_reqs = [make_mem_req(len) for len in chunk_lens]
 
+        threads = []
+        for start_index in xrange(self.random_starts):
+            thread = RandomStartThread(self, start_index)
+            thread.start()
+            threads.append(thread)
+
         # list of tuples(log_likelihood, input_master_filename,
         #                params_filename)
         start_params = []
-        for start_index in xrange(self.random_starts):
-            # keeps it from rewriting variables that will be used
-            # later or in a different thread
-            runner_copy = copy(self)
-            start_params.append(runner_copy.run_train_start(start_index))
+        for thread in threads:
+            thread.join()
+
+            # this will get AttributeError if the thread failed and
+            # therefore did not set thread.result
+            start_params.append(thread.result)
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]

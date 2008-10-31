@@ -54,17 +54,36 @@ def calc_histogram(trackname, filenames, data_range, include_coords):
 
             supercontig_walker = walk_continuous_supercontigs(chromosome)
             for supercontig, continuous in supercontig_walker:
+                supercontig_attrs = supercontig._v_attrs
+                supercontig_start = supercontig_attrs.start
+
                 if include_coords:
-                    # XXX
-                    import pdb; pdb.set_trace()
+                    # adjust coords
+                    chr_include_coords = chr_include_coords - supercontig_start
 
-                col = continuous[:, col_index]
-                col_finite = col[isfinite(col)]
-                hist_supercontig, edges_supercontig = \
-                    histogram_custom(col_finite)
+                    # set all negative coords to 0
+                    chr_include_coords[chr_include_coords < 0] = 0
+                else:
+                    # slice(None, None) means the whole sequence
+                    chr_include_coords = [[None, None]]
 
-                assert (edges_supercontig == edges).all()
-                hist += hist_supercontig
+                for coords in chr_include_coords:
+                    row_slice = slice(*coords)
+
+                    col = continuous[row_slice, col_index]
+                    col_finite = col[isfinite(col)]
+
+                    # if it has at least one row (it isn't truncated
+                    # away by the include_coords)
+                    if col_finite.shape[0]:
+                        if coords[0] is not None:
+                            coords_tuple = tuple(coords + supercontig_start)
+                            print >>sys.stderr, " (%s, %s)" % coords_tuple
+                        hist_supercontig, edges_supercontig = \
+                            histogram_custom(col_finite)
+
+                        assert (edges_supercontig == edges).all()
+                        hist += hist_supercontig
 
     return hist, edges
 
