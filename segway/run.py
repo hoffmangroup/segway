@@ -426,6 +426,8 @@ class RandomStartThread(Thread):
         # later or in a different thread
         self.runner = copy(runner)
 
+        Thread.__init__(self)
+
     def run(self):
         self.result = self.runner.run_train_start(self.start_index)
 
@@ -892,7 +894,7 @@ class Runner(object):
         prog(strFile=self.structure_filename,
              verbosity=VERBOSITY)
 
-    def run_train_start(self, start_index):
+    def run_train_start(self, session, start_index):
         # XXX: re-add the ability to set your own starting parameters,
         # with new=start_index (copy from existing rather than using
         # it on command-line)
