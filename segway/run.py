@@ -79,6 +79,7 @@ SENTINEL = -5.42e34
 
 ACC_FILENAME_FMT = "acc.%s.%s.bin"
 GMTK_INDEX_PLACEHOLDER = "@D"
+NAME_PLACEHOLDER = "bundle"
 
 # programs
 ENV_CMD = "/usr/bin/env"
@@ -166,10 +167,6 @@ def Session(*args, **kwargs):
         yield res
     finally:
         res.exit()
-
-def run_job_em_train(session):
-    XXX
-    return session.runJob(job_tmpl)
 
 def make_res_req(size):
     res = []
@@ -829,12 +826,35 @@ class Runner(object):
         else:
             return prog
 
-    def queue_parallel(self, session, params_filename, start_index,
-                       round_index, **kwargs):
-        kwargs = dict(inputMasterFile=self.input_master_filename,
-                      inputTrainableParameters=params_filename,
-                      cppCommandOptions=make_cpp_options(params_filename),
-                      **kwargs)
+    def make_acc_filename(self, start_index, chunk_index):
+        filebasename = ACC_FILENAME_FMT % (start_index, chunk_index)
+        return self.dirpath / filebasename
+
+    def queue_train(self, session, params_filename, start_index, round_index,
+                    chunk_index, mem_req, hold_jid=None, **kwargs):
+        kwargs["inputMasterFile"] = self.input_master_filename
+        kwargs["inputTrainableParameters"] = params_filename
+        kwargs["cppCommandOptions"] = make_cpp_options(params_filename)
+        gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
+
+        job_tmpl = session.createJobTemplate()
+        name_job(job_tmpl, start_index, round_index, chunk_index)
+
+        job_tmpl.remoteCommand = ENV_CMD
+        job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
+
+        set_cwd_job_tmpl(job_tmpl)
+
+        res_req = make_res_req(mem_req)
+        job_tmpl.nativeSpecification = make_native_spec(hold_jid=hold_jid,
+                                                        l=res_req)
+
+        return session.runJob(job_tmpl)
+
+    def queue_train_parallel(self, session, params_filename, start_index,
+                             round_index, **kwargs):
+        queue_train_custom = partial(self.queue_train, session,
+                                     params_filename, start_index, round_index)
 
         res = [] # task ids
 
@@ -842,68 +862,37 @@ class Runner(object):
         # are dropped in the queue first
         zipper = izip(self.chunk_lens, count(), self.chunk_mem_reqs)
         sorted_zipper = sorted(zipper, reverse=True)
-
         for chunk_len, chunk_index, chunk_mem_req in sorted_zipper:
-            # XXX: there is some duplication between this and
-            # queue_bundle, which should be removed. refactor the
-            # per-chunk stuff into a new function
-
-            acc_filebasename = ACC_FILENAME_FMT % (start_index, chunk_index)
-            acc_filename = self.dirpath / acc_filebasename
-            kwargs_chunk = dict(trrng=chunk_index,
-                                storeAccFile=acc_filename,
+            acc_filename = self.make_acc_filename(start_index, chunk_index)
+            kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
 
-            gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs_chunk)
-
-            XXX
-            job_tmpl = session.createJobTemplate()
-
-            name_job(job_tmpl, start_index, round_index, chunk_index)
-            job_tmpl.remoteCommand = ENV_CMD
-            job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
-
-            set_cwd_job_tmpl(job_tmpl)
-
-            res_req = make_res_req(chunk_mem_req)
-            job_tmpl.nativeSpecification = make_native_spec(l=res_req)
-
-            XXX
-            res.append(run_job_em_train(session
+            jobid = queue_train_custom(chunk_index, chunk_mem_req,
+                                       **kwargs_chunk)
+            res.append(jobid)
 
         return res
 
-    def queue_bundle(self, session, parallel_jobids, input_params_filename,
-                     output_params_filename, start_index, round_index,
-                     **kwargs):
-        ## bundle step: take parallel accumulators and combine them
-        acc_filebasename = ACC_FILENAME_FMT % (start_index,
-                                               GMTK_INDEX_PLACEHOLDER)
-        acc_filename = self.dirpath / acc_filebasename
+    def queue_train_bundle(self, session, parallel_jobids,
+                           input_params_filename, output_params_filename,
+                           start_index, round_index, **kwargs):
+        """bundle step: take parallel accumulators and combine them
+        """
+        acc_filename = self.make_acc_filename(start_index,
+                                              GMTK_INDEX_PLACEHOLDER)
 
         kwargs = \
-            dict(inputMasterFile=self.input_master_filename,
-                 inputTrainableParameters=input_params_filename,
-                 outputTrainableParameters=output_params_filename,
-                 cppCommandOptions=make_cpp_options(input_params_filename),
+            dict(outputTrainableParameters=output_params_filename,
                  trrng="nil",
                  loadAccRange="0:%s" % (self.num_chunks-1),
                  loadAccFile=acc_filename,
                  **kwargs)
 
-        gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
-        job_tmpl = session.createJobTemplate()
+        hold_jid = ",".join(parallel_jobids)
 
-        name_job(job_tmpl, start_index, round_index, "bundle")
-        job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
-        set_cwd_job_tmpl(job_tmpl)
-
-        res_req = make_res_req(MEM_REQ_BUNDLE)
-        job_tmpl.nativeSpecification = \
-            make_native_spec(hold_jid=",".join(parallel_jobids), l=res_req)
-
-        return session.runJob(job_tmpl)
+        return self.queue_train(session, input_params_filename, start_index,
+                                round_index, NAME_PLACEHOLDER, MEM_REQ_BUNDLE,
+                                hold_jid, **kwargs)
 
     def run_triangulate(self):
         # XXX: should specify the triangulation file
@@ -931,26 +920,28 @@ class Runner(object):
 
         kwargs = self.train_kwargs
 
-        queue_parallel = self.queue_parallel
-        queue_bundle = self.queue_bundle
+        queue_train_parallel = self.queue_train_parallel
+        queue_train_bundle = self.queue_train_bundle
 
         timeout_no_wait = session.TIMEOUT_NO_WAIT
 
         while (round_index < MAX_EM_ITERS and
                is_training_progressing(last_log_likelihood, log_likelihood)):
-            parallel_jobids = queue_parallel(session, last_params_filename,
-                                             start_index, round_index,
-                                             **kwargs)
+            parallel_jobids = queue_train_parallel(session,
+                                                   last_params_filename,
+                                                   start_index, round_index,
+                                                   **kwargs)
 
             curr_params_filename = extjoin(stem_params_filename,
                                            str(round_index))
 
-            bundle_jobid = queue_bundle(session, parallel_jobids,
-                                        last_params_filename,
-                                        curr_params_filename,
-                                        start_index, round_index,
-                                        llStoreFile=log_likelihood_filename,
-                                        **kwargs)
+            bundle_jobid = queue_train_bundle(session, parallel_jobids,
+                                              last_params_filename,
+                                              curr_params_filename,
+                                              start_index, round_index,
+                                              llStoreFile=\
+                                                  log_likelihood_filename,
+                                              **kwargs)
 
             # wait for bundle to finish
             # XXXopt: polling in each thread is a bad way to do this
