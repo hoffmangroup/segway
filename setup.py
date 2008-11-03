@@ -48,10 +48,10 @@ h5values = segway.h5values:main
 
 # XXX: warn: make sure you have LDFLAGS unset if you are building numpy
 
-# need optbuild>0.1.2 for OptionBuilder_ShortOptWithSpace_TF
+# need optbuild>0.1.3 for list option values
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
-install_requires = ["textinput", "optbuild>0.1.2", "tables>2.0.4", "numpy",
+install_requires = ["textinput", "optbuild>0.1.3", "tables>2.0.4", "numpy",
                     "path"]
 
 # XXX: ask if there is a way to specify this at the command-line
