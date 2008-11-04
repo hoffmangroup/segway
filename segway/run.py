@@ -26,7 +26,7 @@ from threading import Thread
 from time import sleep
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import amin, amax, array, isnan, NINF
+from numpy import amin, amax, array, empty, int32, invert, isnan, NINF
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -97,10 +97,14 @@ NATIVE_SPEC_DEFAULT = dict(w="n")
 
 OPT_USE_TRAINABLE_PARAMS = "-DUSE_TRAINABLE_PARAMS"
 
+def extjoin(*args):
+    return extsep.join(args)
+
 # extensions and suffixes
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
-EXT_OBS = "obs"
+EXT_FLOAT = "float32"
+EXT_INT = "int32"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
 EXT_WIG = "wig"
@@ -111,7 +115,6 @@ PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
 
 SUFFIX_LIST = extsep + EXT_LIST
-SUFFIX_OBS = extsep + EXT_OBS
 SUFFIX_OUT = extsep + EXT_OUT
 
 FEATURE_FILELISTBASENAME = extsep.join([PREFIX_LIST, EXT_LIST])
@@ -146,9 +149,6 @@ WIG_HEADER = 'track type=wiggle_0 name=%s ' \
     'autoScale=off' % (PKG, PKG)
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename"]
-
-def extjoin(*args):
-    return extsep.join(args)
 
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
@@ -395,6 +395,7 @@ def make_prefix_fmt(num_filenames):
     return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
 
 def read_gmtk_out(infile):
+    # XXXopt: use numpy.fromfile() instead
     data = infile.read()
 
     # @L: uint32/uint64 (@ is the default modifier: native size/alignment)
@@ -442,7 +443,8 @@ class Runner(object):
     def __init__(self, **kwargs):
         # filenames
         self.h5filenames = None
-        self.feature_filelistpath = None
+        self.float_filelistpath = None
+        self.int_filelistpath = None
 
         self.gmtk_include_filename = None
         self.input_master_filename = None
@@ -552,6 +554,9 @@ class Runner(object):
     def make_wig_dir(self):
         self.make_dir(self.wig_dirname)
 
+    def make_obs_filelistpath(self, ext):
+        return self.obs_dirpath / extjoin(PREFIX_LIST, ext, EXT_LIST)
+
     def make_obs_dir(self):
         obs_dirname = self.obs_dirname
         if not obs_dirname:
@@ -566,13 +571,21 @@ class Runner(object):
                 raise
 
         self.obs_dirpath = obs_dirpath
-        self.feature_filelistpath = obs_dirpath / FEATURE_FILELISTBASENAME
 
-    def make_obs_filepath(self, chunk_index):
+        self.float_filelistpath = self.make_obs_filelistpath(EXT_FLOAT)
+        self.int_filelistpath = self.make_obs_filelistpath(EXT_INT)
+
+    def make_obs_filepath(self, prefix, suffix):
+        return self.obs_dirpath / (prefix + suffix)
+
+    def make_obs_filepaths(self, chunk_index):
         prefix_feature_tmpl = PREFIX_CHUNK + make_prefix_fmt(MAX_CHUNKS)
         prefix = prefix_feature_tmpl % chunk_index
 
-        return path(self.obs_dirpath / (prefix + EXT_OBS))
+        make_obs_filepath_custom = partial(self.make_obs_filepath, prefix)
+
+        return (make_obs_filepath_custom(EXT_FLOAT),
+                make_obs_filepath_custom(EXT_INT))
 
     def save_resource(self, resname):
         orig_filename = data_filename(resname)
@@ -606,15 +619,8 @@ class Runner(object):
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.dirname, self.delete_existing)
 
-    # notes for switching to binary:
-    #
-    # input function in GMTK_ObservationMatrix.cc:
-    # ObservationMatrix::readBinSentence
-
-    # input per frame is a series of float32s, followed by a series of
-    # int32s it is better to optimize both sides here by sticking all
-    # the floats in one file, and the ints in another one
-    def save_observations_chunk(self, outfilename, data):
+    def save_observations_chunk_ascii(self, outfilename, data):
+        # XXX: unused; eliminate
         with open(outfilename, "w") as outfile:
             mask_missing = isnan(data)
             mask_nonmissing = (~ mask_missing).astype(int)
@@ -627,8 +633,24 @@ class Runner(object):
 
                 print >>outfile, " ".join(map(str, outrow))
 
-    def write_observations(self, feature_filelist):
-        make_obs_filepath = self.make_obs_filepath
+    def save_observations_chunk(self, float_filepath, int_filepath, data):
+        # input function in GMTK_ObservationMatrix.cc:
+        # ObservationMatrix::readBinSentence
+
+        # input per frame is a series of float32s, followed by a series of
+        # int32s it is better to optimize both sides here by sticking all
+        # the floats in one file, and the ints in another one
+        mask_missing = isnan(data)
+        mask_nonmissing = empty(mask_missing, int32)
+        invert(mask_missing, out=mask_nonmissing)
+
+        data[mask_missing] = SENTINEL
+
+        data.tofile(float_filepath)
+        mask_nonmissing.tofile(int_filepath)
+
+    def write_observations(self, float_filelist, int_filelist):
+        make_obs_filepaths = self.make_obs_filepaths
         save_observations_chunk = self.save_observations_chunk
         delete_existing = self.delete_existing
 
@@ -703,15 +725,20 @@ class Runner(object):
                         chunk_end = end - supercontig_start
                         chunk_coords.append((chrom, start, end))
 
-                        chunk_filepath = make_obs_filepath(chunk_index)
+                        float_filepath, int_filepath = \
+                            make_obs_filepaths(chunk_index)
 
-                        print >>feature_filelist, chunk_filepath
-                        print >>sys.stderr, " %s (%d, %d)" % (chunk_filepath,
+                        print >>float_filelist, float_filepath
+                        print >>int_filelist, int_filepath
+                        print >>sys.stderr, " %s (%d, %d)" % (float_filepath,
                                                               start, end)
 
-                        if not chunk_filepath.exists():
+                        # if they don't both exist
+                        if not (float_filepath.exists()
+                                and int_filepath.exists()):
                             rows = continuous[chunk_start:chunk_end, ...]
-                            save_observations_chunk(chunk_filepath, rows)
+                            save_observations_chunk(float_filepath,
+                                                    int_filepath, rows)
 
                         chunk_index += 1
 
@@ -721,16 +748,18 @@ class Runner(object):
         self.mins = mins
         self.maxs = maxs
 
-    def save_observations(self):
-        feature_filelistpath = self.feature_filelistpath
-
-        if self.delete_existing or feature_filelistpath.exists():
-            feature_filelist = closing(StringIO()) # dummy output
+    def open_writable_or_dummy(self, filepath):
+        if self.delete_existing or filepath.exists():
+            return closing(StringIO()) # dummy output
         else:
-            feature_filelist = open(self.feature_filelistpath, "w")
+            return open(filepath, "w")
 
-        with feature_filelist as feature_filelist:
-            self.write_observations(feature_filelist)
+    def save_observations(self):
+        open_writable_or_dummy = self.open_writable_or_dummy
+
+        with open_writable_or_dummy(self.float_filelistpath) as float_filelist:
+            with open_writable_or_dummy(self.int_filelistpath) as int_filelist:
+                self.write_observations(float_filelist, int_filelist)
 
     def save_input_master(self, new=False, start_index=None):
         num_segs = self.num_segs
@@ -1004,10 +1033,15 @@ class Runner(object):
         self.train_kwargs = dict(strFile=self.structure_filename,
                                  objsNotToTrain=self.dont_train_filename,
 
-                                 of1=self.feature_filelistpath,
-                                 fmt1="ascii",
+                                 of1=self.float_filelistpath,
+                                 fmt1="binary",
                                  nf1=num_obs,
-                                 ni1=num_obs,
+                                 ni1=0,
+
+                                 of2=self.int_filelistpath,
+                                 fmt2="binary",
+                                 nf2=0,
+                                 ni2=num_obs,
 
                                  maxEmIters=1,
                                  verbosity=VERBOSITY,
@@ -1067,10 +1101,15 @@ class Runner(object):
              ofilelist=self.output_filelistname,
              dumpNames=self.dumpnames_filename,
 
-             of1=self.feature_filelistpath,
-             fmt1="ascii",
+             of1=self.float_filelistpath,
+             fmt1="binary",
              nf1=self.num_obs,
-             ni1=self.num_obs,
+             ni1=0,
+
+             of2=self.int_filelistpath,
+             fmt2="binary",
+             nf2=0,
+             ni2=self.num_obs,
 
              cppCommandOptions=make_cpp_options(params_filename),
              verbosity=VERBOSITY)
