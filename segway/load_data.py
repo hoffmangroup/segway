@@ -28,10 +28,10 @@ from functools import partial
 from os import extsep
 import sys
 
-from numpy import amin, amax, array, isnan, NAN, NINF, PINF, where
+from numpy import amin, amax, array, float32, isnan, NAN, NINF, PINF, where
 from path import path
 from tabdelim import DictReader
-from tables import Float64Atom, NoSuchNodeError, openFile
+from tables import Float32Atom, NoSuchNodeError, openFile
 
 from .bed import read_native
 from .load_seq import MIN_GAP_LEN
@@ -39,7 +39,7 @@ from ._util import (fill_array, get_tracknames, gzip_open, init_num_obs,
                     new_extrema, walk_continuous_supercontigs,
                     walk_supercontigs)
 
-ATOM = Float64Atom(dflt=NAN)
+ATOM = Float32Atom(dflt=NAN)
 
 EXT_H5 = "h5"
 
@@ -289,12 +289,12 @@ def read_wig(chromosomes, trackname, filename, infile):
                 assert num_words == 2
 
                 start = int(words[0]) - 1 # one-based
-                score = float(words[1])
+                score = float32(words[1])
                 writer.write(score, start)
             elif fmt == "fixedStep":
                 assert num_words == 1
 
-                score = float(words[0])
+                score = float32(words[0])
                 writer.write(score, start)
 
                 start += step
@@ -313,7 +313,7 @@ def read_mysql_tab(chromosomes, trackname, filename, infile):
 
             start = int(row["chromStart"])
             end = int(row["chromEnd"])
-            score = float(row["dataValue"])
+            score = float32(row["dataValue"])
 
             writer.write(score, start, end)
 
