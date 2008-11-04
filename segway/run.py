@@ -606,6 +606,14 @@ class Runner(object):
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.dirname, self.delete_existing)
 
+    # notes for switching to binary:
+    #
+    # input function in GMTK_ObservationMatrix.cc:
+    # ObservationMatrix::readBinSentence
+
+    # input per frame is a series of float32s, followed by a series of
+    # int32s it is better to optimize both sides here by sticking all
+    # the floats in one file, and the ints in another one
     def save_observations_chunk(self, outfilename, data):
         with open(outfilename, "w") as outfile:
             mask_missing = isnan(data)
