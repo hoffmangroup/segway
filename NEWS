@@ -1,3 +1,7 @@
+0.1.0a4:
+
+understandable structure files (e.g. "obs0" becomes "h3k27me3")
+
 0.1.0a3:
 
 Files from previous versions are no longer compatible.
@@ -8,6 +12,7 @@ Files from previous versions are no longer compatible.
 * Output of segment lengths for diagnostic purposes.
 * Changed observation storage from float32 to float64.
 * Faster conversion of Viterbi output files to wiggle tracks.
+* Observation files now have more descriptive names.
 
 0.1.0a2:
 

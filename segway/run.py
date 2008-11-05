@@ -138,7 +138,7 @@ MC_TMPL = "$index 1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
     " mc_${seg}_${track} mean_${seg}_${track} covar_${track}"
 MX_TMPL = "$index 1 mx_${seg}_${track} 1 dpmf_always mc_${seg}_${track}"
 
-NAME_COLLECTION_TMPL = "$obs_index collection_seg_${track} 2"
+NAME_COLLECTION_TMPL = "$track_index collection_seg_${track} 2"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${track}"
 
 TRACK_FMT = "browser position %s:%s-%s"
