@@ -25,7 +25,8 @@ from threading import Thread
 from time import sleep
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import amin, amax, array, empty, fromfile, intc, invert, isnan, NINF
+from numpy import (amin, amax, append, array, diff, empty, fromfile, intc,
+                   insert, invert, isnan, median, NINF, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -385,6 +386,32 @@ def make_name_collection_spec(num_segs, num_obs):
 
     return make_spec("NAME_COLLECTION", items)
 
+def print_segment_summary_stats(data):
+    # unpack tuple, ignore rest
+    # end_pos is missing the end of the last segment
+    len_data = len(data)
+    change_pos, = diff(data).nonzero()
+
+    start_pos = insert(change_pos + 1, 0, 0)
+    data_start = data[start_pos]
+
+    # add an extraneous start position so where_seg+1 doesn't go out of bounds
+    start_pos = append(start_pos, len_data)
+
+    for seg in xrange(NUM_SEGS):
+        where_seg, = where(data_start == 0)
+        coords_seg = start_pos.take([where_seg, where_seg+1])
+        lens_seg = diff(coords_seg, axis=0).ravel()
+
+        # XXX: print out lens_seg in addition to the statistics
+
+        num_bases = lens_seg.sum()
+        frac_bases = num_bases / len_data
+
+        row = [seg, len(lens_seg), num_bases, frac_bases, lens_seg.mean(),
+               median(lens_seg)]
+        print "\t".join(row)
+
 def make_prefix_fmt(num_filenames):
     # make sure there aresufficient leading zeros
     return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
@@ -412,6 +439,9 @@ def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename,
 
     with gzip_open(wig_filename, "w") as wig_file:
         return write_wig(wig_file, data, chunk_coord, tracknames)
+
+    print "-- %s" % gmtk_outfilename
+    print_segment_summary_stats(data)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
