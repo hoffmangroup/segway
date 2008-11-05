@@ -129,17 +129,17 @@ RES_INC = "seg.inc"
 DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
 DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
 
-MEAN_TMPL = "$index mean_${seg}_${obs} 1 ${rand}"
+MEAN_TMPL = "$index mean_${seg}_${track} 1 ${rand}"
 
-COVAR_TMPL_TIED = "$index covar_${obs} 1 ${rand}"
-COVAR_TMPL_UNTIED = "$index covar_${seg}_${obs} 1 ${rand}" # unused as of yet
+COVAR_TMPL_TIED = "$index covar_${track} 1 ${rand}"
+COVAR_TMPL_UNTIED = "$index covar_${seg}_${track} 1 ${rand}" # unused as of yet
 
 MC_TMPL = "$index 1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-    " mc_${seg}_${obs} mean_${seg}_${obs} covar_${obs}"
-MX_TMPL = "$index 1 mx_${seg}_${obs} 1 dpmf_always mc_${seg}_${obs}"
+    " mc_${seg}_${track} mean_${seg}_${track} covar_${track}"
+MX_TMPL = "$index 1 mx_${seg}_${track} 1 dpmf_always mc_${seg}_${track}"
 
-NAME_COLLECTION_TMPL = "$obs_index collection_seg_${obs} 2"
-NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${obs}"
+NAME_COLLECTION_TMPL = "$obs_index collection_seg_${track} 2"
+NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${track}"
 
 TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
@@ -283,20 +283,20 @@ def make_spec(name, items):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
 #                             for index in xrange(num_obs)])
 
-def make_items_multiseg(tmpl, num_segs, num_obs, data=None):
+def make_items_multiseg(tmpl, num_segs, tracknames, data=None):
     substitute = Template(tmpl).substitute
 
+    num_tracks = len(tracknames)
     res = []
 
     for seg_index in xrange(num_segs):
         seg = "seg%d" % seg_index
-        for obs_index in xrange(num_obs):
-            obs = "obs%d" % obs_index
-            mapping = dict(seg=seg, obs=obs,
-                           seg_index=seg_index, obs_index=obs_index,
-                           index=num_obs*seg_index + obs_index)
+        for track_index, trackname in enumerate(tracknames):
+            mapping = dict(seg=seg, track=trackname,
+                           seg_index=seg_index, track_index=track_index,
+                           index=num_tracks*seg_index + track_index)
             if data is not None:
-                mapping["rand"] = data[seg_index, obs_index]
+                mapping["rand"] = data[seg_index, track_index]
 
             res.append(substitute(mapping))
 
@@ -345,12 +345,12 @@ def make_rands(low, high, num_segs):
     return array([uniform(low, high, len(low))
                   for seg_index in xrange(num_segs)])
 
-def make_mean_spec(num_segs, num_obs, mins, maxs):
+def make_mean_spec(num_segs, tracknames, mins, maxs):
     rands = make_rands(mins, maxs, num_segs)
 
-    return make_spec_multiseg("MEAN", MEAN_TMPL, num_segs, num_obs, rands)
+    return make_spec_multiseg("MEAN", MEAN_TMPL, num_segs, tracknames, rands)
 
-def make_covar_spec(num_segs, num_obs, mins, maxs, tied):
+def make_covar_spec(num_segs, tracknames, mins, maxs, tied):
     if tied:
         num_segs = 1
         tmpl = COVAR_TMPL_TIED
@@ -360,31 +360,28 @@ def make_covar_spec(num_segs, num_obs, mins, maxs, tied):
     # always start with maximum variance
     data = array([maxs - mins for seg_index in xrange(num_segs)])
 
-    return make_spec_multiseg("COVAR", tmpl, num_segs, num_obs, data)
+    return make_spec_multiseg("COVAR", tmpl, num_segs, tracknames, data)
 
-def make_mc_spec(num_segs, num_obs):
-    return make_spec_multiseg("MC", MC_TMPL, num_segs, num_obs)
+def make_mc_spec(num_segs, tracknames):
+    return make_spec_multiseg("MC", MC_TMPL, num_segs, tracknames)
 
-def make_mx_spec(num_segs, num_obs):
-    return make_spec_multiseg("MX", MX_TMPL, num_segs, num_obs)
+def make_mx_spec(num_segs, tracknames):
+    return make_spec_multiseg("MX", MX_TMPL, num_segs, tracknames)
 
-def make_name_collection_spec(num_segs, num_obs):
-    num_segs = NUM_SEGS
+def make_name_collection_spec(num_segs, tracknames):
     substitute = Template(NAME_COLLECTION_TMPL).substitute
     substitute_contents = Template(NAME_COLLECTION_CONTENTS_TMPL).substitute
 
     items = []
 
-    for obs_index in xrange(num_obs):
-        obs = "obs%d" % obs_index
-
-        mapping = dict(obs=obs, obs_index=obs_index)
+    for track_index, track in enumerate(tracknames):
+        mapping = dict(track=track, track_index=track_index)
 
         contents = [substitute(mapping)]
         for seg_index in xrange(num_segs):
             seg = "seg%d" % seg_index
-            mapping = dict(seg=seg, obs=obs,
-                           seg_index=seg_index, obs_index=obs_index)
+            mapping = dict(seg=seg, track=track,
+                           seg_index=seg_index, track_index=track_index)
 
             contents.append(substitute_contents(mapping))
         items.append("\n".join(contents))
@@ -624,11 +621,13 @@ class Runner(object):
         observation_tmpl = Template(data_string("observation.tmpl"))
         observation_sub = observation_tmpl.substitute
 
+        tracknames = self.tracknames
         num_obs = self.num_obs
         observations = \
-            "\n".join(observation_sub(obs_index=obs_index,
-                                      nonmissing_index=num_obs+obs_index)
-                      for obs_index in xrange(num_obs))
+            "\n".join(observation_sub(track=track,
+                                      track_index=track_index,
+                                      nonmissing_index=num_obs+track_index)
+                      for track_index, track in enumerate(tracknames))
 
         mapping = dict(include_filename=self.gmtk_include_filename,
                        observations=observations)
@@ -768,8 +767,8 @@ class Runner(object):
                 self.write_observations(float_filelist, int_filelist)
 
     def save_input_master(self, new=False, start_index=None):
+        tracknames = self.tracknames
         num_segs = self.num_segs
-        num_obs = self.num_obs
         mins = self.mins
         maxs = self.maxs
 
@@ -781,11 +780,12 @@ class Runner(object):
             input_master_filename = self.input_master_filename
 
         dense_cpt_spec = make_dense_cpt_spec(num_segs)
-        mean_spec = make_mean_spec(num_segs, num_obs, mins, maxs)
-        covar_spec = make_covar_spec(num_segs, num_obs, mins, maxs, COVAR_TIED)
-        mc_spec = make_mc_spec(num_segs, num_obs)
-        mx_spec = make_mx_spec(num_segs, num_obs)
-        name_collection_spec = make_name_collection_spec(num_segs, num_obs)
+        mean_spec = make_mean_spec(num_segs, tracknames, mins, maxs)
+        covar_spec = make_covar_spec(num_segs, tracknames, mins, maxs,
+                                     COVAR_TIED)
+        mc_spec = make_mc_spec(num_segs, tracknames)
+        mx_spec = make_mx_spec(num_segs, tracknames)
+        name_collection_spec = make_name_collection_spec(num_segs, tracknames)
 
         self.input_master_filename = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
@@ -823,7 +823,9 @@ class Runner(object):
         self.load_include_coords()
 
         self.make_obs_dir()
-        self.save_observations() # do first, because it sets self.num_obs
+
+        # do first, because it sets self.num_obs and self.tracknames
+        self.save_observations()
 
         self.save_include()
         self.save_structure()
