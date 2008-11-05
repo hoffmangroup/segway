@@ -1,0 +1,22 @@
+0.1.0a3:
+
+Files from previous versions are no longer compatible.
+
+* Binary output of observations for GMTK. This means it takes a few
+  minutes to write out observations for the whole genome before
+  training or Viterbi rather than many hours.
+* Output of segment lengths for diagnostic purposes.
+* Changed observation storage from float32 to float64.
+* Faster conversion of Viterbi output files to wiggle tracks.
+
+0.1.0a2:
+
+Files from previous versions are no longer compatible.
+
+* Efficient multiple random start EM training queue submission
+* Addition of h5histogram command
+* Limiting data analyzed to a particular region with --include-region
+* More efficient data loading
+* Some interface and file format changes
+* Performance improvements
+* Bugfixes

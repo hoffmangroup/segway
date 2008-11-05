@@ -10,7 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, nested
 from copy import copy
 from errno import EEXIST, ENOENT
 from functools import partial
@@ -26,7 +26,7 @@ from time import sleep
 
 from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import (amin, amax, append, array, diff, empty, fromfile, intc,
-                   insert, invert, isnan, median, NINF, where)
+                   insert, invert, isnan, NINF, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -34,10 +34,9 @@ from optbuild import (Mixin_NoConvertUnderscore,
 from path import path
 from tables import openFile
 
-from ._util import (data_filename, data_string, get_tracknames, gzip_open,
+from ._util import (data_filename, data_string, get_tracknames,
                     init_num_obs, iter_chroms_coords, load_coords,
-                    NamedTemporaryDir, PKG, SUFFIX_GZ,
-                    walk_continuous_supercontigs)
+                    NamedTemporaryDir, PKG, walk_continuous_supercontigs)
 
 # XXX: should be options
 NUM_SEGS = 2
@@ -106,11 +105,17 @@ EXT_FLOAT = "float32"
 EXT_INT = "int"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
+EXT_TAB = "tab"
 EXT_WIG = "wig"
+
+def make_prefix_fmt(num):
+    # make sure there are sufficient leading zeros
+    return "%%0%dd." % (int(floor(log10(num))) + 1)
 
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
+PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)
 
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
@@ -386,35 +391,26 @@ def make_name_collection_spec(num_segs, num_obs):
 
     return make_spec("NAME_COLLECTION", items)
 
-def print_segment_summary_stats(data):
-    # unpack tuple, ignore rest
-    # end_pos is missing the end of the last segment
+def print_segment_summary_stats(data, seg_len_files):
     len_data = len(data)
+
+    # unpack tuple, ignore rest
     change_pos, = diff(data).nonzero()
 
     start_pos = insert(change_pos + 1, 0, 0)
     data_start = data[start_pos]
 
-    # add an extraneous start position so where_seg+1 doesn't go out of bounds
+    # after generating data_start, add an extraneous start position so
+    # where_seg+1 doesn't go out of bounds
     start_pos = append(start_pos, len_data)
 
-    for seg in xrange(NUM_SEGS):
-        where_seg, = where(data_start == 0)
+    for seg_index, seg_len_file in enumerate(seg_len_files):
+        where_seg, = where(data_start == seg_index)
         coords_seg = start_pos.take([where_seg, where_seg+1])
+
         lens_seg = diff(coords_seg, axis=0).ravel()
 
-        # XXX: print out lens_seg in addition to the statistics
-
-        num_bases = lens_seg.sum()
-        frac_bases = num_bases / len_data
-
-        row = [seg, len(lens_seg), num_bases, frac_bases, lens_seg.mean(),
-               median(lens_seg)]
-        print "\t".join(row)
-
-def make_prefix_fmt(num_filenames):
-    # make sure there are sufficient leading zeros
-    return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
+        lens_seg.astype(intc).tofile(seg_len_file)
 
 def load_gmtk_out(filename):
     # gmtkViterbiNew.cc writes things with C sizeof(int) == numpy.intc
@@ -434,14 +430,14 @@ def write_wig(outfile, output, (chrom, start, end), tracknames):
     output.tofile(outfile, "\n", "%d")
 
 def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename,
-                           tracknames):
+                           seg_len_files, tracknames):
     data = load_gmtk_out(gmtk_outfilename)
 
-    with gzip_open(wig_filename, "w") as wig_file:
-        return write_wig(wig_file, data, chunk_coord, tracknames)
+    # XXX: gzip via a pipe
+    with open(wig_filename, "w") as wig_file:
+        write_wig(wig_file, data, chunk_coord, tracknames)
 
-    print "-- %s" % gmtk_outfilename
-    print_segment_summary_stats(data)
+    print_segment_summary_stats(data, seg_len_files)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -851,19 +847,31 @@ class Runner(object):
         setattr(self, name, dst_filename)
 
     def gmtk_out2wig(self):
-        prefix_fmt = make_prefix_fmt(self.num_chunks)
-        wig_filebasename_fmt = "".join([PKG, prefix_fmt, EXT_WIG, SUFFIX_GZ])
+        wig_prefix_fmt = make_prefix_fmt(self.num_chunks)
+        wig_filebasename_fmt_list = [PKG, wig_prefix_fmt, EXT_WIG]
+        wig_filebasename_fmt = "".join(wig_filebasename_fmt_list)
 
         wig_dirpath = path(self.wig_dirname)
         wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
 
+        seg_len_filebasename_fmt = "".join([PREFIX_SEG_LEN_FMT, EXT_INT])
+        seg_len_filepath_fmt = wig_dirpath / seg_len_filebasename_fmt
+
+        seg_len_filenames = [seg_len_filepath_fmt % seg_index
+                             for seg_index in xrange(NUM_SEGS)]
+
+        # XXX: this should be gzipped
+        open_wb = partial(open, mode="wb")
+
         # chunk_coord = (chrom, chromStart, chromEnd)
         zipper = izip(count(), self.output_filenames, self.chunk_coords)
-        for index, gmtk_outfilename, chunk_coord in zipper:
-            wig_filename = wig_filepath_fmt % index
+        with nested(*map(open_wb, seg_len_filenames)) as seg_len_files:
+            for index, gmtk_outfilename, chunk_coord in zipper:
+                wig_filename = wig_filepath_fmt % index
 
-            load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
-                                   wig_filename, self.tracknames)
+                load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
+                                       wig_filename, seg_len_files,
+                                       self.tracknames)
 
     def prog_factory(self, prog):
         """
