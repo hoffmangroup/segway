@@ -413,7 +413,7 @@ def print_segment_summary_stats(data):
         print "\t".join(row)
 
 def make_prefix_fmt(num_filenames):
-    # make sure there aresufficient leading zeros
+    # make sure there are sufficient leading zeros
     return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
 
 def load_gmtk_out(filename):
