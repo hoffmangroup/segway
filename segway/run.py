@@ -20,13 +20,12 @@ from os import extsep, getpid
 from random import random
 from shutil import move
 from string import Template
-from struct import calcsize, unpack
 import sys
 from threading import Thread
 from time import sleep
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import amin, amax, array, empty, int32, invert, isnan, NINF
+from numpy import amin, amax, array, empty, fromfile, intc, invert, isnan, NINF
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -71,8 +70,7 @@ MEM_REQS = {2: [3619, 8098728],
 RANDOM_STARTS = 1
 
 # replace NAN with SENTINEL to avoid warnings
-# I chose this value because it is small, and len(str(SENTINEL)) is short
-SENTINEL = -5.42e34
+SENTINEL = -9.87654321e34
 
 ACC_FILENAME_FMT = "acc.%s.%s.bin"
 GMTK_INDEX_PLACEHOLDER = "@D"
@@ -104,20 +102,17 @@ def extjoin(*args):
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
 EXT_FLOAT = "float32"
-EXT_INT = "int32"
+EXT_INT = "int"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
 EXT_WIG = "wig"
 
 PREFIX_LIKELIHOOD = "likelihood"
-PREFIX_LIST = "feature"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
 
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
-
-FEATURE_FILELISTBASENAME = extsep.join([PREFIX_LIST, EXT_LIST])
 
 # templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
@@ -394,16 +389,14 @@ def make_prefix_fmt(num_filenames):
     # make sure there aresufficient leading zeros
     return "%%0%dd." % (int(floor(log10(num_filenames))) + 1)
 
-def read_gmtk_out(infile):
-    # XXXopt: use numpy.fromfile() instead
-    data = infile.read()
-
-    # @L: uint32/uint64 (@ is the default modifier: native size/alignment)
-    # =L: uint32 (standard size/alignment)
-    fmt = "=%dL" % (len(data) / calcsize("=L"))
-    return unpack(fmt, data)
+def load_gmtk_out(filename):
+    # gmtkViterbiNew.cc writes things with C sizeof(int) == numpy.intc
+    return fromfile(filename, dtype=intc)
 
 def write_wig(outfile, output, (chrom, start, end), tracknames):
+    """
+    output is a 1D numpy.array
+    """
     # convert from zero- to one-based
     start_1based = start + 1
 
@@ -411,15 +404,14 @@ def write_wig(outfile, output, (chrom, start, end), tracknames):
     print >>outfile, WIG_HEADER % ", ".join(tracknames)
     print >>outfile, FIXEDSTEP_FMT % (chrom, start_1based)
 
-    print >>outfile, "\n".join(map(str, output))
+    output.tofile(outfile, "\n", "%d")
 
 def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename,
                            tracknames):
-    with open(gmtk_outfilename) as gmtk_outfile:
-        data = read_gmtk_out(gmtk_outfile)
+    data = load_gmtk_out(gmtk_outfilename)
 
-        with gzip_open(wig_filename, "w") as wig_file:
-            return write_wig(wig_file, data, chunk_coord, tracknames)
+    with gzip_open(wig_filename, "w") as wig_file:
+        return write_wig(wig_file, data, chunk_coord, tracknames)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -555,7 +547,7 @@ class Runner(object):
         self.make_dir(self.wig_dirname)
 
     def make_obs_filelistpath(self, ext):
-        return self.obs_dirpath / extjoin(PREFIX_LIST, ext, EXT_LIST)
+        return self.obs_dirpath / extjoin(ext, EXT_LIST)
 
     def make_obs_dir(self):
         obs_dirname = self.obs_dirname
@@ -578,8 +570,8 @@ class Runner(object):
     def make_obs_filepath(self, prefix, suffix):
         return self.obs_dirpath / (prefix + suffix)
 
-    def make_obs_filepaths(self, chunk_index):
-        prefix_feature_tmpl = PREFIX_CHUNK + make_prefix_fmt(MAX_CHUNKS)
+    def make_obs_filepaths(self, chrom, chunk_index):
+        prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_CHUNKS))
         prefix = prefix_feature_tmpl % chunk_index
 
         make_obs_filepath_custom = partial(self.make_obs_filepath, prefix)
@@ -619,20 +611,6 @@ class Runner(object):
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.dirname, self.delete_existing)
 
-    def save_observations_chunk_ascii(self, outfilename, data):
-        # XXX: unused; eliminate
-        with open(outfilename, "w") as outfile:
-            mask_missing = isnan(data)
-            mask_nonmissing = (~ mask_missing).astype(int)
-
-            data[mask_missing] = SENTINEL
-
-            for data_row, mask_nonmissing_row in zip(data, mask_nonmissing):
-                ## XXX: use textinput.ListWriter
-                outrow = data_row.tolist() + mask_nonmissing_row.tolist()
-
-                print >>outfile, " ".join(map(str, outrow))
-
     def save_observations_chunk(self, float_filepath, int_filepath, data):
         # input function in GMTK_ObservationMatrix.cc:
         # ObservationMatrix::readBinSentence
@@ -641,8 +619,10 @@ class Runner(object):
         # int32s it is better to optimize both sides here by sticking all
         # the floats in one file, and the ints in another one
         mask_missing = isnan(data)
-        mask_nonmissing = empty(mask_missing, int32)
-        invert(mask_missing, out=mask_nonmissing)
+        mask_nonmissing = empty(mask_missing.shape, intc)
+
+        # output -> mask_nonmissing
+        invert(mask_missing, mask_nonmissing)
 
         data[mask_missing] = SENTINEL
 
@@ -718,7 +698,7 @@ class Runner(object):
                             print >>sys.stderr, text
                             continue
 
-                        # start: reltaive to beginning of chromosome
+                        # start: relative to beginning of chromosome
                         # chunk_start: relative to the beginning of
                         # the supercontig
                         chunk_start = start - supercontig_start
@@ -726,7 +706,7 @@ class Runner(object):
                         chunk_coords.append((chrom, start, end))
 
                         float_filepath, int_filepath = \
-                            make_obs_filepaths(chunk_index)
+                            make_obs_filepaths(chrom, chunk_index)
 
                         print >>float_filelist, float_filepath
                         print >>int_filelist, int_filepath
@@ -1037,11 +1017,13 @@ class Runner(object):
                                  fmt1="binary",
                                  nf1=num_obs,
                                  ni1=0,
+                                 iswp1=False,
 
                                  of2=self.int_filelistpath,
                                  fmt2="binary",
                                  nf2=0,
                                  ni2=num_obs,
+                                 iswp2=False,
 
                                  maxEmIters=1,
                                  verbosity=VERBOSITY,
@@ -1093,6 +1075,7 @@ class Runner(object):
 
         prog = self.prog_factory(VITERBI_PROG)
 
+        # XXX: eliminate repetition with run_train()
         prog(strFile=self.structure_filename,
 
              inputMasterFile=self.input_master_filename,
@@ -1105,11 +1088,13 @@ class Runner(object):
              fmt1="binary",
              nf1=self.num_obs,
              ni1=0,
+             iswp1=False,
 
              of2=self.int_filelistpath,
              fmt2="binary",
              nf2=0,
              ni2=self.num_obs,
+             iswp2=False,
 
              cppCommandOptions=make_cpp_options(params_filename),
              verbosity=VERBOSITY)
