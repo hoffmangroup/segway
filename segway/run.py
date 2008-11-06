@@ -49,6 +49,7 @@ ISLAND = False
 WIG_DIRNAME = "out"
 SLEEP_TIME = 60 # seconds
 DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
+DISTRIBUTION = "gamma"
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
@@ -132,11 +133,21 @@ DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
 MEAN_TMPL = "$index mean_${seg}_${track} 1 ${rand}"
 
 COVAR_TMPL_TIED = "$index covar_${track} 1 ${rand}"
-COVAR_TMPL_UNTIED = "$index covar_${seg}_${track} 1 ${rand}" # unused as of yet
+# XXX: unused
+COVAR_TMPL_UNTIED = "$index covar_${seg}_${track} 1 ${rand}"
 
-MC_TMPL = "$index 1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-    " mc_${seg}_${track} mean_${seg}_${track} covar_${track}"
-MX_TMPL = "$index 1 mx_${seg}_${track} 1 dpmf_always mc_${seg}_${track}"
+GAMMASCALE_TMPL = "$index gammascale_${seg}_${track} 1 ${rand}"
+GAMMASHAPE_TMPL = "$index gammashape_${seg}_${track} 1 ${rand}"
+
+MC_NORM_TMPL = "$index 1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
+    " mc_norm_${seg}_${track} mean_${seg}_${track} covar_${track}"
+MC_GAMMA_TMPL = "$index 1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${track}" \
+    " gammascale_${seg}_${track} gammashape_${seg}_${track}"
+MC_TMPLS = dict(norm=MC_NORM_TMPL,
+                gamma=MC_GAMMA_TMPL)
+
+MX_TMPL = "$index 1 mx_${seg}_${track} 1 dpmf_always" \
+    " mc_${distribution}_${seg}_${track}"
 
 NAME_COLLECTION_TMPL = "$track_index collection_seg_${track} 2"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${track}"
@@ -252,9 +263,9 @@ def find_overlaps(start, end, coords):
 
     return res
 
-def make_mem_req(len, num_obs):
+def make_mem_req(len, num_tracks):
     # will fail if it's not pre-defined
-    slope, intercept = MEM_REQS[num_obs]
+    slope, intercept = MEM_REQS[num_tracks]
     res = slope * len + intercept
 
     return "%dM" % ceil(res / 2**20)
@@ -279,31 +290,9 @@ def make_spec(name, items):
 
     return "\n".join(items) + "\n"
 
-# def make_dt_spec(num_obs):
+# def make_dt_spec(num_tracks):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
-#                             for index in xrange(num_obs)])
-
-def make_items_multiseg(tmpl, num_segs, tracknames, data=None):
-    substitute = Template(tmpl).substitute
-
-    num_tracks = len(tracknames)
-    res = []
-
-    for seg_index in xrange(num_segs):
-        seg = "seg%d" % seg_index
-        for track_index, trackname in enumerate(tracknames):
-            mapping = dict(seg=seg, track=trackname,
-                           seg_index=seg_index, track_index=track_index,
-                           index=num_tracks*seg_index + track_index)
-            if data is not None:
-                mapping["rand"] = data[seg_index, track_index]
-
-            res.append(substitute(mapping))
-
-    return res
-
-def make_spec_multiseg(name, *args, **kwargs):
-    return make_spec(name, make_items_multiseg(*args, **kwargs))
+#                             for index in xrange(num_tracks)])
 
 # XXX: reimplement in numpy
 def make_normalized_random_rows(num_rows, num_cols):
@@ -330,43 +319,6 @@ def make_dense_cpt_start_seg_spec(num_segs):
 
 def make_dense_cpt_seg_seg_spec(num_segs):
     return make_random_spec(DENSE_CPT_SEG_SEG_FRAG, num_segs, num_segs)
-
-def make_dense_cpt_spec(num_segs):
-    items = [make_dense_cpt_start_seg_spec(num_segs),
-             make_dense_cpt_seg_seg_spec(num_segs)]
-
-    return make_spec("DENSE_CPT", items)
-
-def make_rands(low, high, num_segs):
-    assert len(low) == len(high)
-
-    # size parameter is so that we always get an array, even if it
-    # has shape = (1,)
-    return array([uniform(low, high, len(low))
-                  for seg_index in xrange(num_segs)])
-
-def make_mean_spec(num_segs, tracknames, mins, maxs):
-    rands = make_rands(mins, maxs, num_segs)
-
-    return make_spec_multiseg("MEAN", MEAN_TMPL, num_segs, tracknames, rands)
-
-def make_covar_spec(num_segs, tracknames, mins, maxs, tied):
-    if tied:
-        num_segs = 1
-        tmpl = COVAR_TMPL_TIED
-    else:
-        tmpl = COVAR_TMPL_UNTIED
-
-    # always start with maximum variance
-    data = array([maxs - mins for seg_index in xrange(num_segs)])
-
-    return make_spec_multiseg("COVAR", tmpl, num_segs, tracknames, data)
-
-def make_mc_spec(num_segs, tracknames):
-    return make_spec_multiseg("MC", MC_TMPL, num_segs, tracknames)
-
-def make_mx_spec(num_segs, tracknames):
-    return make_spec_multiseg("MX", MX_TMPL, num_segs, tracknames)
 
 def make_name_collection_spec(num_segs, tracknames):
     substitute = Template(NAME_COLLECTION_TMPL).substitute
@@ -439,6 +391,16 @@ def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename,
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
 
+def generate_tmpl_mappings(segnames, tracknames):
+    num_tracks = len(tracknames)
+
+    for seg_index, segname in enumerate(segnames):
+        for track_index, trackname in enumerate(tracknames):
+            yield dict(seg=segname, track=trackname,
+                       seg_index=seg_index, track_index=track_index,
+                       index=num_tracks*seg_index + track_index,
+                       distribution=DISTRIBUTION)
+
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index):
         # keeps it from rewriting variables that will be used
@@ -491,6 +453,7 @@ class Runner(object):
 
         # variables
         self.num_segs = NUM_SEGS
+        self.segnames = ["seg%d" % seg_index for seg_index in xrange(NUM_SEGS)]
         self.random_starts = RANDOM_STARTS
 
         # flags
@@ -622,11 +585,11 @@ class Runner(object):
         observation_sub = observation_tmpl.substitute
 
         tracknames = self.tracknames
-        num_obs = self.num_obs
+        num_tracks = self.num_tracks
         observations = \
             "\n".join(observation_sub(track=track,
                                       track_index=track_index,
-                                      nonmissing_index=num_obs+track_index)
+                                      nonmissing_index=num_tracks+track_index)
                       for track_index, track in enumerate(tracknames))
 
         mapping = dict(include_filename=self.gmtk_include_filename,
@@ -659,7 +622,7 @@ class Runner(object):
         save_observations_chunk = self.save_observations_chunk
         delete_existing = self.delete_existing
 
-        num_obs = None
+        num_tracks = None
         mins = None
         maxs = None
 
@@ -687,7 +650,7 @@ class Runner(object):
                 supercontig_walker = walk_continuous_supercontigs(chromosome)
                 for supercontig, continuous in supercontig_walker:
                     # also asserts same shape
-                    num_obs = init_num_obs(num_obs, continuous)
+                    num_tracks = init_num_obs(num_tracks, continuous)
 
                     supercontig_attrs = supercontig._v_attrs
                     supercontig_start = supercontig_attrs.start
@@ -747,7 +710,7 @@ class Runner(object):
 
                         chunk_index += 1
 
-        self.num_obs = num_obs
+        self.num_tracks = num_tracks
         self.num_chunks = chunk_index
         self.chunk_coords = chunk_coords
         self.mins = mins
@@ -766,6 +729,106 @@ class Runner(object):
             with open_writable_or_dummy(self.int_filelistpath) as int_filelist:
                 self.write_observations(float_filelist, int_filelist)
 
+    def rand_means(self):
+        low = self.mins
+        high = self.maxs
+        num_segs = self.num_segs
+
+        assert len(low) == len(high)
+
+        # size parameter is so that we always get an array, even if it
+        # has shape = (1,)
+        return array([uniform(low, high, len(low))
+                      for seg_index in xrange(num_segs)])
+
+    def make_items_multiseg(self, tmpl, data=None, segnames=None):
+        tracknames = self.tracknames
+
+        if segnames is None:
+            segnames = self.segnames
+
+        substitute = Template(tmpl).substitute
+
+        res = []
+        for mapping in generate_tmpl_mappings(segnames, tracknames):
+            if data is not None:
+                seg_index = mapping["seg_index"]
+                track_index = mapping["track_index"]
+                mapping["rand"] = data[seg_index, track_index]
+
+            res.append(substitute(mapping))
+
+        return res
+
+    def make_spec_multiseg(self, name, *args, **kwargs):
+        return make_spec(name, self.make_items_multiseg(*args, **kwargs))
+
+    def make_dense_cpt_spec(self):
+        num_segs = self.num_segs
+
+        items = [make_dense_cpt_start_seg_spec(num_segs),
+                 make_dense_cpt_seg_seg_spec(num_segs)]
+
+        return make_spec("DENSE_CPT", items)
+
+    def make_mean_spec(self, means):
+        return self.make_spec_multiseg("MEAN", MEAN_TMPL, means)
+
+    def make_covar_spec(self, tied, vars):
+        if tied:
+            segnames = ["any"]
+            tmpl = COVAR_TMPL_TIED
+        else:
+            segnames = None
+            tmpl = COVAR_TMPL_UNTIED
+
+        # always start with maximum variance
+
+        return self.make_spec_multiseg("COVAR", tmpl, vars, segnames)
+
+    def make_items_gamma(self, means, vars):
+        substitute_scale = Template(GAMMASCALE_TMPL).substitute
+        substitute_shape = Template(GAMMASHAPE_TMPL).substitute
+
+        # random start values are equivalent to the random start
+        # values of a Gaussian:
+        #
+        # means = scales * shapes
+        # vars = shapes * scales**2
+        #
+        # therefore:
+        scales = vars / means
+        shapes = means**2 / vars
+
+        res = []
+        for mapping in generate_tmpl_mappings(self.segnames, self.tracknames):
+            seg_index = mapping["seg_index"]
+            track_index = mapping["track_index"]
+            index = mapping["index"] * 2
+
+            mapping_plus = partial(dict, **mapping)
+
+            cell_indices = (seg_index, track_index)
+            scale = scales[cell_indices]
+            shape = shapes[cell_indices]
+
+            mapping_scale = mapping_plus(rand=scale, index=index)
+            res.append(substitute_scale(mapping_scale))
+
+            mapping_shape = mapping_plus(rand=shape, index=index+1)
+            res.append(substitute_shape(mapping_shape))
+
+        return res
+
+    def make_gamma_spec(self, *args, **kwargs):
+        return make_spec("REAL_MAT", self.make_items_gamma(*args, **kwargs))
+
+    def make_mc_spec(self):
+        return self.make_spec_multiseg("MC", MC_TMPLS[DISTRIBUTION])
+
+    def make_mx_spec(self):
+        return self.make_spec_multiseg("MX", MX_TMPL)
+
     def save_input_master(self, new=False, start_index=None):
         tracknames = self.tracknames
         num_segs = self.num_segs
@@ -779,12 +842,24 @@ class Runner(object):
         else:
             input_master_filename = self.input_master_filename
 
-        dense_cpt_spec = make_dense_cpt_spec(num_segs)
-        mean_spec = make_mean_spec(num_segs, tracknames, mins, maxs)
-        covar_spec = make_covar_spec(num_segs, tracknames, mins, maxs,
-                                     COVAR_TIED)
-        mc_spec = make_mc_spec(num_segs, tracknames)
-        mx_spec = make_mx_spec(num_segs, tracknames)
+        dense_cpt_spec = self.make_dense_cpt_spec()
+
+        means = self.rand_means()
+        vars = array([maxs - mins for seg_index in xrange(num_segs)])
+
+        if DISTRIBUTION == "norm":
+            mean_spec = self.make_mean_spec(means)
+            covar_spec = self.make_covar_spec(COVAR_TIED, vars)
+            gamma_spec = ""
+        elif DISTRIBUTION == "gamma":
+            mean_spec = ""
+            covar_spec = ""
+            gamma_spec = self.make_gamma_spec(means, vars)
+        else:
+            raise ValueError("distribution %s not supported" % DISTRIBUTION)
+
+        mc_spec = self.make_mc_spec()
+        mx_spec = self.make_mx_spec()
         name_collection_spec = make_name_collection_spec(num_segs, tracknames)
 
         self.input_master_filename = \
@@ -824,7 +899,7 @@ class Runner(object):
 
         self.make_obs_dir()
 
-        # do first, because it sets self.num_obs and self.tracknames
+        # do first, because it sets self.num_tracks and self.tracknames
         self.save_observations()
 
         self.save_include()
@@ -923,7 +998,10 @@ class Runner(object):
         job_tmpl.nativeSpecification = make_native_spec(hold_jid=hold_jid,
                                                         l=res_req)
 
-        return session.runJob(job_tmpl)
+        if self.dry_run:
+            return None
+        else:
+            return session.runJob(job_tmpl)
 
     def queue_train_parallel(self, session, params_filename, start_index,
                              round_index, **kwargs):
@@ -1018,6 +1096,12 @@ class Runner(object):
                                                   log_likelihood_filename,
                                               **kwargs)
 
+            last_params_filename = curr_params_filename
+
+            if self.dry_run:
+                log_likelihood = None
+                break
+
             # wait for bundle to finish
             # XXXopt: polling in each thread is a bad way to do this
             # it would be best to use session.synchronize() centrally
@@ -1037,16 +1121,12 @@ class Runner(object):
 
             print >>sys.stderr, "log likelihood = %s" % log_likelihood
 
-            last_params_filename = curr_params_filename
-
             round_index += 1
 
         return log_likelihood, self.input_master_filename, last_params_filename
 
     def run_train(self):
-        assert not self.dry_run
-
-        num_obs = self.num_obs
+        num_tracks = self.num_tracks
 
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
 
@@ -1055,14 +1135,14 @@ class Runner(object):
 
                                  of1=self.float_filelistpath,
                                  fmt1="binary",
-                                 nf1=num_obs,
+                                 nf1=num_tracks,
                                  ni1=0,
                                  iswp1=False,
 
                                  of2=self.int_filelistpath,
                                  fmt2="binary",
                                  nf2=0,
-                                 ni2=num_obs,
+                                 ni2=num_tracks,
                                  iswp2=False,
 
                                  maxEmIters=1,
@@ -1078,7 +1158,7 @@ class Runner(object):
 
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
         self.chunk_lens = chunk_lens
-        self.chunk_mem_reqs = [make_mem_req(chunk_len, num_obs)
+        self.chunk_mem_reqs = [make_mem_req(chunk_len, num_tracks)
                                for chunk_len in chunk_lens]
 
         with Session() as session:
@@ -1126,14 +1206,14 @@ class Runner(object):
 
              of1=self.float_filelistpath,
              fmt1="binary",
-             nf1=self.num_obs,
+             nf1=self.num_tracks,
              ni1=0,
              iswp1=False,
 
              of2=self.int_filelistpath,
              fmt2="binary",
              nf2=0,
-             ni2=self.num_obs,
+             ni2=self.num_tracks,
              iswp2=False,
 
              cppCommandOptions=make_cpp_options(params_filename),
