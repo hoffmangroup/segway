@@ -700,8 +700,7 @@ class Runner(object):
 
                     num_frames = end - start
                     if not MIN_FRAMES <= num_frames <= MAX_FRAMES:
-                        text = " skipping segment of length %d" \
-                            % num_frames
+                        text = " skipping segment of length %d" % num_frames
                         print >>sys.stderr, text
                         continue
 
@@ -721,8 +720,7 @@ class Runner(object):
                                                           start, end)
 
                     # if they don't both exist
-                    if not (float_filepath.exists()
-                            and int_filepath.exists()):
+                    if not (float_filepath.exists() and int_filepath.exists()):
                         rows = continuous[chunk_start:chunk_end, ...] XXX add min+infinitesimal
                         save_observations_chunk(float_filepath, int_filepath,
                                                 rows)
