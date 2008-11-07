@@ -38,6 +38,9 @@ from ._util import (data_filename, data_string, get_tracknames,
                     init_num_obs, iter_chroms_coords, load_coords,
                     NamedTemporaryDir, PKG, walk_continuous_supercontigs)
 
+DISTRIBUTION_NORM = "norm"
+DISTRIBUTION_GAMMA = "gamma"
+
 # XXX: should be options
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
@@ -49,7 +52,8 @@ ISLAND = False
 WIG_DIRNAME = "out"
 SLEEP_TIME = 60 # seconds
 DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
-DISTRIBUTION = "gamma"
+
+DISTRIBUTION = DISTRIBUTION_GAMMA
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
@@ -160,7 +164,7 @@ WIG_HEADER = 'track type=wiggle_0 name=%s ' \
     'description="%s segmentation of %%s" visibility=dense viewLimits=0:1 ' \
     'autoScale=off' % (PKG, PKG)
 
-TRAIN_ATTRNAMES = ["input_master_filename", "params_filename"]
+TRAIN_ATTRNAMES = ["input_master_filename", "params_filename", "log_likelihood_filename"]
 
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
@@ -477,6 +481,11 @@ class Runner(object):
 
         self.include_coords = load_coords(filename)
 
+    def make_filename(self, *exts):
+        filebasename = extjoin_not_none(*exts)
+
+        return self.dirpath / filebasename
+
     def set_params_filename(self, new=False, start_index=None):
         # if this is not run and params_filename is
         # unspecified, then it won't be passed to gmtkViterbiNew
@@ -488,17 +497,14 @@ class Runner(object):
                 # it already exists and you don't want to force regen
                 self.train = False
         else:
-            filebasename = extjoin_not_none(PREFIX_PARAMS, start_index,
-                                            EXT_PARAMS)
+            self.params_filename = \
+                self.make_filename(PREFIX_PARAMS, start_index, EXT_PARAMS)
 
-            self.params_filename = self.dirpath / filebasename
-
-    def set_log_likelihood_filename(self, start_index=None):
-        # no need for new=False, since I don't care about keeping this file
-        # around generally
-        filebasename = extjoin_not_none(PREFIX_LIKELIHOOD, start_index,
-                                        EXT_LIKELIHOOD)
-        self.log_likelihood_filename = self.dirpath / filebasename
+    def set_log_likelihood_filename(self, new=False, start_index=None):
+        if new or not self.log_likelihood_filename:
+            self.log_likelihood_filename = \
+                self.make_filename(PREFIX_LIKELIHOOD, start_index,
+                                   EXT_LIKELIHOOD)
 
     def make_output_dirpath(self, dirname, start_index):
         res = self.dirpath / "output" / dirname / str(start_index)
@@ -847,11 +853,11 @@ class Runner(object):
         means = self.rand_means()
         vars = array([maxs - mins for seg_index in xrange(num_segs)])
 
-        if DISTRIBUTION == "norm":
+        if DISTRIBUTION == DISTRIBUTION_NORM:
             mean_spec = self.make_mean_spec(means)
             covar_spec = self.make_covar_spec(COVAR_TIED, vars)
             gamma_spec = ""
-        elif DISTRIBUTION == "gamma":
+        elif DISTRIBUTION == DISTRIBUTION_GAMMA:
             mean_spec = ""
             covar_spec = ""
             gamma_spec = self.make_gamma_spec(means, vars)
@@ -1059,7 +1065,7 @@ class Runner(object):
         # it on command-line)
         self.save_input_master(new=True, start_index=start_index)
         self.set_params_filename(new=True, start_index=start_index)
-        self.set_log_likelihood_filename(start_index=start_index)
+        self.set_log_likelihood_filename(new=True, start_index=start_index)
         self.set_output_dirpaths(start_index)
 
         log_likelihood_filename = self.log_likelihood_filename
@@ -1123,7 +1129,9 @@ class Runner(object):
 
             round_index += 1
 
-        return log_likelihood, self.input_master_filename, last_params_filename
+        # log_likelihood and a list of src_filenames to save
+        return (log_likelihood, self.input_master_filename,
+                last_params_filename, log_likelihood_filename)
 
     def run_train(self):
         num_tracks = self.num_tracks
@@ -1153,8 +1161,12 @@ class Runner(object):
 
         # save the destination file for input_master as we will be
         # generating new input masters for each start
+        #
+        # len(dst_filenames) == len(TRAIN_ATTRNAMES) == len(return value
+        # of Runner.run_train_start())-1. This is asserted below.
         dst_filenames = [self.input_master_filename,
-                         self.params_filename]
+                         self.params_filename,
+                         self.log_likelihood_filename]
 
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
         self.chunk_lens = chunk_lens
@@ -1182,6 +1194,9 @@ class Runner(object):
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]
+
+            assert (len(TRAIN_ATTRNAMES) == len(src_filenames)
+                    == len(dst_filenames))
 
             zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
             for name, src_filename, dst_filename in zipper:

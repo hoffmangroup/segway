@@ -1,6 +1,7 @@
 0.1.0a4:
 
-understandable structure files (e.g. "obs0" becomes "h3k27me3")
+* understandable structure files (e.g. "obs0" becomes "h3k27me3")
+* save log likelihood files
 
 0.1.0a3:
 
