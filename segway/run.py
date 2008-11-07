@@ -624,103 +624,114 @@ class Runner(object):
         mask_nonmissing.tofile(int_filepath)
 
     def write_observations(self, float_filelist, int_filelist):
+        include_coords = self.include_coords
+
+        # XXX: refactor passes into separate functions
+
+        # pass 1
+        # XXXopt: it might be better to cache these and only make one
+        # pass, but it might also leak memory
+        # XXX: warning: mins and maxs ignore include_coords
+        data_filenames = []
+        mins = None
+        maxs = None
+
+        chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
+        for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
+            try:
+                mins, maxs = accum_extrema(chromosome, mins, maxs)
+            except AttributeError:
+                # this means there is no data for that chromosome
+                continue
+
+            data_filenames.append(filename)
+
+            tracknames = get_tracknames(chromosome)
+            if self.tracknames is None:
+                self.tracknames = tracknames
+            elif self.tracknames != tracknames:
+                raise ValueError("all tracknames attributes must be identical")
+
+        self.mins = mins
+        self.maxs = maxs
+
+        # pass 2
         make_obs_filepaths = self.make_obs_filepaths
         save_observations_chunk = self.save_observations_chunk
         delete_existing = self.delete_existing
 
         num_tracks = None
-        mins = None
-        maxs = None
-
         chunk_index = 0
         chunk_coords = []
 
-        include_coords = self.include_coords
+        chrom_iterator = iter_chroms_coords(data_filenames, include_coords)
+        for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
+            supercontig_walker = walk_continuous_supercontigs(chromosome)
+            for supercontig, continuous in supercontig_walker:
+                # also asserts same shape
+                num_tracks = init_num_obs(num_tracks, continuous)
 
-        chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
-        for chrom, h5filename, chr_include_coords in chrom_iterator:
-            with openFile(h5filename) as chromosome:
-                try:
-                    mins, maxs = accum_extrema(chromosome, mins, maxs)
-                except AttributeError:
-                    # this means there is no data for that chromosome
-                    continue
+                supercontig_attrs = supercontig._v_attrs
+                supercontig_start = supercontig_attrs.start
 
-                tracknames = get_tracknames(chromosome)
-                if self.tracknames is None:
-                    self.tracknames = tracknames
-                elif self.tracknames != tracknames:
-                    raise ValueError("all tracknames attributes must be"
-                                     " identical")
+                convert_chunks_custom = partial(convert_chunks,
+                                                supercontig_attrs)
 
-                supercontig_walker = walk_continuous_supercontigs(chromosome)
-                for supercontig, continuous in supercontig_walker:
-                    # also asserts same shape
-                    num_tracks = init_num_obs(num_tracks, continuous)
+                starts = convert_chunks_custom("chunk_starts")
+                ends = convert_chunks_custom("chunk_ends")
 
-                    supercontig_attrs = supercontig._v_attrs
-                    supercontig_start = supercontig_attrs.start
+                ## iterate through chunks and write
+                ## izip so it can be modified in place
+                for start, end in izip(starts, ends):
+                    if include_coords:
+                        overlaps = find_overlaps(start, end,
+                                                 chr_include_coords)
+                        len_overlaps = len(overlaps)
 
-                    convert_chunks_custom = partial(convert_chunks,
-                                                    supercontig_attrs)
-
-                    starts = convert_chunks_custom("chunk_starts")
-                    ends = convert_chunks_custom("chunk_ends")
-
-                    ## iterate through chunks and write
-                    ## izip so it can be modified in place
-                    for start, end in izip(starts, ends):
-                        if include_coords:
-                            overlaps = find_overlaps(start, end,
-                                                     chr_include_coords)
-                            len_overlaps = len(overlaps)
-
-                            if len_overlaps == 0:
-                                continue
-                            elif len_overlaps == 1:
-                                start, end = overlaps[0]
-                            else:
-                                for overlap in overlaps:
-                                    starts.append(overlap[0])
-                                    ends.append(overlap[1])
-                                continue
-
-                        num_frames = end - start
-                        if not MIN_FRAMES <= num_frames <= MAX_FRAMES:
-                            text = " skipping segment of length %d" \
-                                % num_frames
-                            print >>sys.stderr, text
+                        if len_overlaps == 0:
+                            continue
+                        elif len_overlaps == 1:
+                            start, end = overlaps[0]
+                        else:
+                            for overlap in overlaps:
+                                starts.append(overlap[0])
+                                ends.append(overlap[1])
                             continue
 
-                        # start: relative to beginning of chromosome
-                        # chunk_start: relative to the beginning of
-                        # the supercontig
-                        chunk_start = start - supercontig_start
-                        chunk_end = end - supercontig_start
-                        chunk_coords.append((chrom, start, end))
+                    num_frames = end - start
+                    if not MIN_FRAMES <= num_frames <= MAX_FRAMES:
+                        text = " skipping segment of length %d" \
+                            % num_frames
+                        print >>sys.stderr, text
+                        continue
 
-                        float_filepath, int_filepath = \
-                            make_obs_filepaths(chrom, chunk_index)
+                    # start: relative to beginning of chromosome
+                    # chunk_start: relative to the beginning of
+                    # the supercontig
+                    chunk_start = start - supercontig_start
+                    chunk_end = end - supercontig_start
+                    chunk_coords.append((chrom, start, end))
 
-                        print >>float_filelist, float_filepath
-                        print >>int_filelist, int_filepath
-                        print >>sys.stderr, " %s (%d, %d)" % (float_filepath,
-                                                              start, end)
+                    float_filepath, int_filepath = \
+                        make_obs_filepaths(chrom, chunk_index)
 
-                        # if they don't both exist
-                        if not (float_filepath.exists()
-                                and int_filepath.exists()):
-                            rows = continuous[chunk_start:chunk_end, ...]
-                            save_observations_chunk(float_filepath,
-                                                    int_filepath, rows)
+                    print >>float_filelist, float_filepath
+                    print >>int_filelist, int_filepath
+                    print >>sys.stderr, " %s (%d, %d)" % (float_filepath,
+                                                          start, end)
 
-                        chunk_index += 1
+                    # if they don't both exist
+                    if not (float_filepath.exists()
+                            and int_filepath.exists()):
+                        rows = continuous[chunk_start:chunk_end, ...] XXX add min+infinitesimal
+                        save_observations_chunk(float_filepath, int_filepath,
+                                                rows)
+
+                    chunk_index += 1
 
         self.num_tracks = num_tracks
         self.num_chunks = chunk_index
         self.chunk_coords = chunk_coords
-        self.mins = mins
-        self.maxs = maxs
 
     def open_writable_or_dummy(self, filepath):
         if self.delete_existing or filepath.exists():
