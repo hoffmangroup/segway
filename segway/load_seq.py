@@ -15,9 +15,9 @@ from re import compile, VERBOSE
 import sys
 
 from path import path
-from tables import Filters, openFile
+from tables import openFile
 
-from ._util import LightIterator
+from ._util import FILTERS_GZIP, LightIterator
 
 MIN_GAP_LEN = 100000
 assert not MIN_GAP_LEN % 2 # must be even for division
@@ -29,7 +29,6 @@ REGEX_SEGMENT_LEN = MIN_GAP_LEN // 2 # max == MAXREPEAT
 DNA_LETTERS_UNAMBIG = "ACGTacgt"
 
 EXT_H5 = "h5"
-FILTERS = Filters(complevel=1)
 SUPERCONTIG_NAME_FMT = "supercontig_%s"
 
 def create_supercontig(h5file, index, start, end):
@@ -81,7 +80,7 @@ def load_seq(filenames, outdirname):
         with file(filename) as infile:
             for defline, seq in LightIterator(infile):
                 h5filename = outdirpath / extsep.join([defline, EXT_H5])
-                h5file = openFile(h5filename, "w", defline, filters=FILTERS)
+                h5file = openFile(h5filename, "w", defline, filters=FILTERS_GZIP)
                 with h5file as h5file:
                     read_seq(h5file, seq)
 

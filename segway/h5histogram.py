@@ -46,44 +46,46 @@ def calc_histogram(trackname, filenames, data_range, include_coords):
     histogram_custom = partial(histogram, bins=BINS, range=data_range,
                                new=True)
 
+    # XXX: do two-pass min/max finding so that you can add
+    # infinitesimals in the case of gamma
+
     hist, edges = histogram_custom(array([]))
     chrom_iterator = iter_chroms_coords(filenames, include_coords)
-    for chrom, filename, chr_include_coords in chrom_iterator:
-        with openFile(filename) as chromosome:
-            col_index = get_col_index(chromosome, trackname)
+    for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
+        col_index = get_col_index(chromosome, trackname)
 
-            supercontig_walker = walk_continuous_supercontigs(chromosome)
-            for supercontig, continuous in supercontig_walker:
-                supercontig_attrs = supercontig._v_attrs
-                supercontig_start = supercontig_attrs.start
+        supercontig_walker = walk_continuous_supercontigs(chromosome)
+        for supercontig, continuous in supercontig_walker:
+            supercontig_attrs = supercontig._v_attrs
+            supercontig_start = supercontig_attrs.start
 
-                if include_coords:
-                    # adjust coords
-                    chr_include_coords = chr_include_coords - supercontig_start
+            if include_coords:
+                # adjust coords
+                chr_include_coords = chr_include_coords - supercontig_start
 
-                    # set all negative coords to 0
-                    chr_include_coords[chr_include_coords < 0] = 0
-                else:
-                    # slice(None, None) means the whole sequence
-                    chr_include_coords = [[None, None]]
+                # set all negative coords to 0
+                chr_include_coords[chr_include_coords < 0] = 0
+            else:
+                # slice(None, None) means the whole sequence
+                chr_include_coords = [[None, None]]
 
-                for coords in chr_include_coords:
-                    row_slice = slice(*coords)
+            for coords in chr_include_coords:
+                row_slice = slice(*coords)
 
-                    col = continuous[row_slice, col_index]
-                    col_finite = col[isfinite(col)]
+                col = continuous[row_slice, col_index]
+                col_finite = col[isfinite(col)]
 
-                    # if it has at least one row (it isn't truncated
-                    # away by the include_coords)
-                    if col_finite.shape[0]:
-                        if coords[0] is not None:
-                            coords_tuple = tuple(coords + supercontig_start)
-                            print >>sys.stderr, " (%s, %s)" % coords_tuple
-                        hist_supercontig, edges_supercontig = \
-                            histogram_custom(col_finite)
+                # if it has at least one row (it isn't truncated
+                # away by the include_coords)
+                if col_finite.shape[0]:
+                    if coords[0] is not None:
+                        coords_tuple = tuple(coords + supercontig_start)
+                        print >>sys.stderr, " (%s, %s)" % coords_tuple
+                    hist_supercontig, edges_supercontig = \
+                        histogram_custom(col_finite)
 
-                        assert (edges_supercontig == edges).all()
-                        hist += hist_supercontig
+                    assert (edges_supercontig == edges).all()
+                    hist += hist_supercontig
 
     return hist, edges
 

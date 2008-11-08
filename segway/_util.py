@@ -17,7 +17,7 @@ from tempfile import mkdtemp
 from numpy import array, empty
 from path import path
 from pkg_resources import resource_filename, resource_string
-from tables import NoSuchNodeError
+from tables import openFile, Filters, NoSuchNodeError
 
 try:
     # Python 2.6
@@ -26,6 +26,8 @@ except NameError:
     PKG = "segway"
 
 PKG_DATA = ".".join([PKG, "data"])
+
+FILTERS_GZIP = Filters(complevel=1)
 
 EXT_GZ = "gz"
 SUFFIX_GZ = extsep + EXT_GZ
@@ -195,7 +197,8 @@ def iter_chroms_coords(filenames, coords):
         if is_empty_array(chr_include_coords):
             continue
 
-        yield chrom, filename, chr_include_coords
+        with openFile(filename) as chromosome:
+            yield chrom, filename, chromosome, chr_include_coords
 
 def main(args=sys.argv[1:]):
     pass

@@ -25,16 +25,16 @@ from threading import Thread
 from time import sleep
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import (amin, amax, append, array, diff, empty, fromfile, intc,
-                   insert, invert, isnan, NINF, where)
+from numpy import (amin, amax, append, array, diff, empty, finfo, fromfile,
+                   intc, insert, invert, isnan, NINF, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
                       OptionBuilder_ShortOptWithSpace_TF)
+from tables import Atom, openFile
 from path import path
-from tables import openFile
 
-from ._util import (data_filename, data_string, get_tracknames,
+from ._util import (data_filename, data_string, FILTERS_GZIP, get_tracknames,
                     init_num_obs, iter_chroms_coords, load_coords,
                     NamedTemporaryDir, PKG, walk_continuous_supercontigs)
 
@@ -104,6 +104,7 @@ def extjoin(*args):
     return extsep.join(args)
 
 # extensions and suffixes
+EXT_IDENTIFY = "identify.h5"
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
 EXT_FLOAT = "float32"
@@ -164,7 +165,8 @@ WIG_HEADER = 'track type=wiggle_0 name=%s ' \
     'description="%s segmentation of %%s" visibility=dense viewLimits=0:1 ' \
     'autoScale=off' % (PKG, PKG)
 
-TRAIN_ATTRNAMES = ["input_master_filename", "params_filename", "log_likelihood_filename"]
+TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
+                   "log_likelihood_filename"]
 
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
@@ -345,6 +347,7 @@ def make_name_collection_spec(num_segs, tracknames):
     return make_spec("NAME_COLLECTION", items)
 
 def print_segment_summary_stats(data, seg_len_files):
+    # XXX: should use HDF5 instead
     len_data = len(data)
 
     # unpack tuple, ignore rest
@@ -369,6 +372,20 @@ def load_gmtk_out(filename):
     # gmtkViterbiNew.cc writes things with C sizeof(int) == numpy.intc
     return fromfile(filename, dtype=intc)
 
+def write_identify(h5file, data, start, end, tracknames):
+    root = h5file.root
+    attrs = root._v_attrs
+
+    attrs.start = start
+    attrs.end = end
+    attrs.tracknames = array(tracknames)
+
+    # this is slower than just using a tables.Array, but it allows compression
+    atom = Atom.from_dtype(data.dtype)
+    c_array = h5file.createCArray(root, "identify", atom, data.shape)
+
+    c_array[...] = data
+
 def write_wig(outfile, output, (chrom, start, end), tracknames):
     """
     output is a 1D numpy.array
@@ -382,13 +399,19 @@ def write_wig(outfile, output, (chrom, start, end), tracknames):
 
     output.tofile(outfile, "\n", "%d")
 
-def load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename, wig_filename,
-                           seg_len_files, tracknames):
+def load_gmtk_out_save_wig((chrom, start, end), gmtk_outfilename,
+                           identify_filename, wig_filename, seg_len_files,
+                           tracknames):
     data = load_gmtk_out(gmtk_outfilename)
+
+    identify_file = openFile(identify_filename, "w", chrom,
+                             filters=FILTERS_GZIP)
+    with identify_file:
+        write_identify(identify_file, data, start, end, tracknames)
 
     # XXX: gzip via a pipe
     with open(wig_filename, "w") as wig_file:
-        write_wig(wig_file, data, chunk_coord, tracknames)
+        write_wig(wig_file, data, (chrom, start, end), tracknames)
 
     print_segment_summary_stats(data, seg_len_files)
 
@@ -655,6 +678,16 @@ class Runner(object):
         self.mins = mins
         self.maxs = maxs
 
+        if DISTRIBUTION == DISTRIBUTION_GAMMA:
+            finfo_mins = finfo(mins.dtype)
+
+            # must always be >0
+            fudge = (mins <= 0) * (finfo_mins.tiny - mins)
+            if fudge.sum() == 0:
+                fudge = None
+        else:
+            fudge = None
+
         # pass 2
         make_obs_filepaths = self.make_obs_filepaths
         save_observations_chunk = self.save_observations_chunk
@@ -668,7 +701,7 @@ class Runner(object):
         for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
             supercontig_walker = walk_continuous_supercontigs(chromosome)
             for supercontig, continuous in supercontig_walker:
-                # also asserts same shape
+                # init_num_obs() also asserts same shape
                 num_tracks = init_num_obs(num_tracks, continuous)
 
                 supercontig_attrs = supercontig._v_attrs
@@ -721,7 +754,11 @@ class Runner(object):
 
                     # if they don't both exist
                     if not (float_filepath.exists() and int_filepath.exists()):
-                        rows = continuous[chunk_start:chunk_end, ...] XXX add min+infinitesimal
+                        rows = continuous[chunk_start:chunk_end, ...]
+
+                        if fudge is not None:
+                            rows += fudge
+
                         save_observations_chunk(float_filepath, int_filepath,
                                                 rows)
 
@@ -939,15 +976,18 @@ class Runner(object):
         setattr(self, name, dst_filename)
 
     def gmtk_out2wig(self):
-        wig_prefix_fmt = make_prefix_fmt(self.num_chunks)
-        wig_filebasename_fmt_list = [PKG, wig_prefix_fmt, EXT_WIG]
+        prefix_fmt = make_prefix_fmt(self.num_chunks)
+        wig_filebasename_fmt_list = [PKG, prefix_fmt, EXT_WIG]
         wig_filebasename_fmt = "".join(wig_filebasename_fmt_list)
 
-        wig_dirpath = path(self.wig_dirname)
-        wig_filepath_fmt = wig_dirpath / wig_filebasename_fmt
+        identify_filebase_fmt_list = [PKG, prefix_fmt, EXT_IDENTIFY]
+
+        out_dirpath = path(self.wig_dirname)
+        wig_filepath_fmt = out_dirpath / wig_filebasename_fmt
+        identify_filepath_fmt = out_dirpath / identify_filebasename_fmt
 
         seg_len_filebasename_fmt = "".join([PREFIX_SEG_LEN_FMT, EXT_INT])
-        seg_len_filepath_fmt = wig_dirpath / seg_len_filebasename_fmt
+        seg_len_filepath_fmt = out_dirpath / seg_len_filebasename_fmt
 
         seg_len_filenames = [seg_len_filepath_fmt % seg_index
                              for seg_index in xrange(NUM_SEGS)]
@@ -960,10 +1000,11 @@ class Runner(object):
         with nested(*map(open_wb, seg_len_filenames)) as seg_len_files:
             for index, gmtk_outfilename, chunk_coord in zipper:
                 wig_filename = wig_filepath_fmt % index
+                identify_filename = identify_filepath_fmt % index
 
                 load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
-                                       wig_filename, seg_len_files,
-                                       self.tracknames)
+                                       identify_filename, wig_filename,
+                                       seg_len_files, self.tracknames)
 
     def prog_factory(self, prog):
         """
