@@ -25,7 +25,7 @@ from threading import Thread
 from time import sleep
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import (amin, amax, append, array, diff, empty, finfo, fromfile,
+from numpy import (amin, amax, append, array, diff, empty, fromfile,
                    intc, insert, invert, isnan, NINF, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
@@ -146,7 +146,8 @@ GAMMASHAPE_TMPL = "$index gammashape_${seg}_${track} 1 ${rand}"
 
 MC_NORM_TMPL = "$index 1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
     " mc_norm_${seg}_${track} mean_${seg}_${track} covar_${track}"
-MC_GAMMA_TMPL = "$index 1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${track}" \
+MC_GAMMA_TMPL = "$index 1 COMPONENT_TYPE_GAMMA ${min_track}" \
+    " mc_gamma_${seg}_${track}" \
     " gammascale_${seg}_${track} gammashape_${seg}_${track}"
 MC_TMPLS = dict(norm=MC_NORM_TMPL,
                 gamma=MC_GAMMA_TMPL)
@@ -649,46 +650,16 @@ class Runner(object):
     def write_observations(self, float_filelist, int_filelist):
         include_coords = self.include_coords
 
-        # XXX: refactor passes into separate functions
+        # originally, the metadata and observations parts were two
+        # separate passes, but this is no longer needed. the comment
+        # is for convenience in case I need to go back to two separate
+        # passes
 
-        # pass 1
-        # XXXopt: it might be better to cache these and only make one
-        # pass, but it might also leak memory
-        # XXX: warning: mins and maxs ignore include_coords
-        data_filenames = []
+        # metadata
         mins = None
         maxs = None
 
-        chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
-        for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
-            try:
-                mins, maxs = accum_extrema(chromosome, mins, maxs)
-            except AttributeError:
-                # this means there is no data for that chromosome
-                continue
-
-            data_filenames.append(filename)
-
-            tracknames = get_tracknames(chromosome)
-            if self.tracknames is None:
-                self.tracknames = tracknames
-            elif self.tracknames != tracknames:
-                raise ValueError("all tracknames attributes must be identical")
-
-        self.mins = mins
-        self.maxs = maxs
-
-        if DISTRIBUTION == DISTRIBUTION_GAMMA:
-            finfo_mins = finfo(mins.dtype)
-
-            # must always be >0
-            fudge = (mins <= 0) * (finfo_mins.tiny - mins)
-            if fudge.sum() == 0:
-                fudge = None
-        else:
-            fudge = None
-
-        # pass 2
+        # observations
         make_obs_filepaths = self.make_obs_filepaths
         save_observations_chunk = self.save_observations_chunk
         delete_existing = self.delete_existing
@@ -697,8 +668,22 @@ class Runner(object):
         chunk_index = 0
         chunk_coords = []
 
-        chrom_iterator = iter_chroms_coords(data_filenames, include_coords)
+        chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
         for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
+            # metadata
+            try:
+                mins, maxs = accum_extrema(chromosome, mins, maxs)
+            except AttributeError:
+                # this means there is no data for that chromosome
+                continue
+
+            tracknames = get_tracknames(chromosome)
+            if self.tracknames is None:
+                self.tracknames = tracknames
+            elif self.tracknames != tracknames:
+                raise ValueError("all tracknames attributes must be identical")
+
+            # observations
             supercontig_walker = walk_continuous_supercontigs(chromosome)
             for supercontig, continuous in supercontig_walker:
                 # init_num_obs() also asserts same shape
@@ -756,13 +741,13 @@ class Runner(object):
                     if not (float_filepath.exists() and int_filepath.exists()):
                         rows = continuous[chunk_start:chunk_end, ...]
 
-                        if fudge is not None:
-                            rows += fudge
-
                         save_observations_chunk(float_filepath, int_filepath,
                                                 rows)
 
                     chunk_index += 1
+
+        self.mins = mins
+        self.maxs = maxs
 
         self.num_tracks = num_tracks
         self.num_chunks = chunk_index
@@ -795,6 +780,7 @@ class Runner(object):
 
     def make_items_multiseg(self, tmpl, data=None, segnames=None):
         tracknames = self.tracknames
+        mins = self.mins
 
         if segnames is None:
             segnames = self.segnames
@@ -807,6 +793,7 @@ class Runner(object):
                 seg_index = mapping["seg_index"]
                 track_index = mapping["track_index"]
                 mapping["rand"] = data[seg_index, track_index]
+                mapping["min_track"] = mins[track_index]
 
             res.append(substitute(mapping))
 
