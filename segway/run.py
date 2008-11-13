@@ -15,18 +15,17 @@ from copy import copy
 from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip
-from math import ceil, floor, log10
+from math import ceil, floor, ldexp, log10
 from os import extsep, getpid
 from random import random
 from shutil import move
 from string import Template
 import sys
-from threading import Thread
-from time import sleep
+from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import (amin, amax, append, array, diff, empty, fromfile,
-                   intc, insert, invert, isnan, NINF, where)
+from numpy import (amin, amax, append, array, diff, empty, finfo, float32,
+                   fromfile, intc, insert, invert, isnan, NINF, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -50,8 +49,18 @@ COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
 ISLAND = False
 WIG_DIRNAME = "out"
-SLEEP_TIME = 60 # seconds
+SESSION_WAIT_TIMEOUT = 60 # seconds
+JOIN_TIMEOUT = finfo(float).max
 DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
+
+FINFO_FLOAT32 = finfo(float32)
+MACHEP_FLOAT32 = FINFO_FLOAT32.machep
+TINY_FLOAT32 = FINFO_FLOAT32.tiny
+
+FUDGE_EP = -17 # ldexp(1, -17) = ~1e-6
+assert FUDGE_EP > MACHEP_FLOAT32
+
+FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 
 DISTRIBUTION = DISTRIBUTION_GAMMA
 
@@ -141,14 +150,13 @@ COVAR_TMPL_TIED = "$index covar_${track} 1 ${rand}"
 # XXX: unused
 COVAR_TMPL_UNTIED = "$index covar_${seg}_${track} 1 ${rand}"
 
-GAMMASCALE_TMPL = "$index gammascale_${seg}_${track} 1 ${rand}"
-GAMMASHAPE_TMPL = "$index gammashape_${seg}_${track} 1 ${rand}"
+GAMMASCALE_TMPL = "$index gammascale_${seg}_${track} 1 1 ${rand}"
+GAMMASHAPE_TMPL = "$index gammashape_${seg}_${track} 1 1 ${rand}"
 
 MC_NORM_TMPL = "$index 1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
     " mc_norm_${seg}_${track} mean_${seg}_${track} covar_${track}"
-MC_GAMMA_TMPL = "$index 1 COMPONENT_TYPE_GAMMA ${min_track}" \
-    " mc_gamma_${seg}_${track}" \
-    " gammascale_${seg}_${track} gammashape_${seg}_${track}"
+MC_GAMMA_TMPL = "$index 1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${track}" \
+    " ${min_track} gammascale_${seg}_${track} gammashape_${seg}_${track}"
 MC_TMPLS = dict(norm=MC_NORM_TMPL,
                 gamma=MC_GAMMA_TMPL)
 
@@ -289,7 +297,6 @@ def make_native_spec(**kwargs):
 
     res = " ".join(NATIVE_SPEC_PROG.build_args(options=options))
 
-    print >>sys.stderr, res
     return res
 
 def make_spec(name, items):
@@ -430,19 +437,21 @@ def generate_tmpl_mappings(segnames, tracknames):
                        distribution=DISTRIBUTION)
 
 class RandomStartThread(Thread):
-    def __init__(self, runner, session, start_index):
+    def __init__(self, runner, session, start_index, interrupt_event):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
         self.runner = copy(runner)
 
         self.session = session
         self.start_index = start_index
+        self.interrupt_event = interrupt_event
 
         Thread.__init__(self)
 
     def run(self):
         self.result = self.runner.run_train_start(self.session,
-                                                  self.start_index)
+                                                  self.start_index,
+                                                  self.interrupt_event)
 
 class Runner(object):
     def __init__(self, **kwargs):
@@ -789,11 +798,22 @@ class Runner(object):
 
         res = []
         for mapping in generate_tmpl_mappings(segnames, tracknames):
+            track_index = mapping["track_index"]
+            min_track = mins[track_index]
+
+            # fudge the minimum by a very small amount this is not
+            # continuous, but hopefully we won't get values where it
+            # matters
+            if min_track == 0.0:
+                min_track_fudged = FUDGE_TINY
+            else:
+                min_track_fudged = min_track - ldexp(abs(min_track), FUDGE_EP)
+
+            mapping["min_track"] = min_track_fudged
+
             if data is not None:
                 seg_index = mapping["seg_index"]
-                track_index = mapping["track_index"]
                 mapping["rand"] = data[seg_index, track_index]
-                mapping["min_track"] = mins[track_index]
 
             res.append(substitute(mapping))
 
@@ -968,6 +988,7 @@ class Runner(object):
         wig_filebasename_fmt = "".join(wig_filebasename_fmt_list)
 
         identify_filebase_fmt_list = [PKG, prefix_fmt, EXT_IDENTIFY]
+        identify_filebasename_fmt = "".join(identify_filebase_fmt_list)
 
         out_dirpath = path(self.wig_dirname)
         wig_filepath_fmt = out_dirpath / wig_filebasename_fmt
@@ -1026,6 +1047,10 @@ class Runner(object):
 
         gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
 
+        if self.dry_run:
+            print " ".join(gmtk_cmdline)
+            return None
+
         job_tmpl = session.createJobTemplate()
         name = self.name_job(job_tmpl, start_index, round_index, chunk_index)
 
@@ -1041,10 +1066,7 @@ class Runner(object):
         job_tmpl.nativeSpecification = make_native_spec(hold_jid=hold_jid,
                                                         l=res_req)
 
-        if self.dry_run:
-            return None
-        else:
-            return session.runJob(job_tmpl)
+        return session.runJob(job_tmpl)
 
     def queue_train_parallel(self, session, params_filename, start_index,
                              round_index, **kwargs):
@@ -1096,7 +1118,7 @@ class Runner(object):
         prog(strFile=self.structure_filename,
              verbosity=VERBOSITY)
 
-    def run_train_start(self, session, start_index):
+    def run_train_start(self, session, start_index, interrupt_event):
         # XXX: re-add the ability to set your own starting parameters,
         # with new=start_index (copy from existing rather than using
         # it on command-line)
@@ -1153,11 +1175,23 @@ class Runner(object):
             # the very best thing would be to eliminate the GIL lock
             # in the DRMAA wrapper
             job_info = None
+            control = session.control
+            terminate = session.TERMINATE
             while not job_info:
                 try:
                     job_info = session.wait(bundle_jobid, timeout_no_wait)
                 except ExitTimeoutError:
-                    sleep(SLEEP_TIME)
+                    interrupt_event.wait(SESSION_WAIT_TIMEOUT)
+                    # XXX: Py2.6+: use is_set() isntead of isSet()
+                    if interrupt_event.isSet():
+                        for jobid in parallel_jobids + [bundle_jobid]:
+                            try:
+                                print >>sys.stderr, "killing job %s" % jobid
+                                control(jobid, terminate)
+                            except BaseException, err:
+                                print >>sys.stderr, ("ignoring exception: %r"
+                                                     % err)
+                        raise KeyboardInterrupt
 
             last_log_likelihood = log_likelihood
             log_likelihood = self.load_log_likelihood()
@@ -1210,24 +1244,37 @@ class Runner(object):
         self.chunk_mem_reqs = [make_mem_req(chunk_len, num_tracks)
                                for chunk_len in chunk_lens]
 
+        interrupt_event = Event()
+
+        threads = []
         with Session() as session:
             assert session.DRMSInfo.startswith(DRMSINFO_PREFIX)
 
-            threads = []
-            for start_index in xrange(self.random_starts):
-                thread = RandomStartThread(self, session, start_index)
-                thread.start()
-                threads.append(thread)
+            try:
+                for start_index in xrange(self.random_starts):
+                    thread = RandomStartThread(self, session, start_index,
+                                               interrupt_event)
+                    thread.start()
+                    threads.append(thread)
 
-            # list of tuples(log_likelihood, input_master_filename,
-            #                params_filename)
-            start_params = []
-            for thread in threads:
-                thread.join()
+                # list of tuples(log_likelihood, input_master_filename,
+                #                params_filename)
+                start_params = []
+                for thread in threads:
+                    while thread.isAlive():
+                        # XXX: KeyboardInterrupts only occur if there is a
+                        # timeout specified here. Is this a Python bug?
+                        thread.join(JOIN_TIMEOUT)
 
-                # this will get AttributeError if the thread failed and
-                # therefore did not set thread.result
-                start_params.append(thread.result)
+                    # this will get AttributeError if the thread failed and
+                    # therefore did not set thread.result
+                    start_params.append(thread.result)
+            except KeyboardInterrupt:
+                interrupt_event.set()
+                for thread in threads:
+                    thread.join()
+
+                raise
 
         if not self.dry_run:
             src_filenames = max(start_params)[1:]
