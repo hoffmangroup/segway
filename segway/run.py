@@ -1018,13 +1018,10 @@ class Runner(object):
         """
         allows dry_run
         """
-        def dry_run_prog(*args, **kwargs):
-            print " ".join(prog.build_cmdline(args, kwargs))
+        # XXX: this poisons a global variable
+        prog.dry_run = self.dry_run
 
-        if self.dry_run:
-            return dry_run_prog
-        else:
-            return prog
+        return prog
 
     def make_acc_filename(self, start_index, chunk_index):
         filebasename = ACC_FILENAME_FMT % (start_index, chunk_index)
@@ -1105,7 +1102,10 @@ class Runner(object):
                  loadAccFile=acc_filename,
                  **kwargs)
 
-        hold_jid = ",".join(parallel_jobids)
+        if self.dry_run:
+            hold_jid = None
+        else:
+            hold_jid = ",".join(parallel_jobids)
 
         return self.queue_train(session, input_params_filename, start_index,
                                 round_index, NAME_PLACEHOLDER, MEM_REQ_BUNDLE,

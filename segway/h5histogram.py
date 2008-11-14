@@ -46,9 +46,6 @@ def calc_histogram(trackname, filenames, data_range, include_coords):
     histogram_custom = partial(histogram, bins=BINS, range=data_range,
                                new=True)
 
-    # XXX: do two-pass min/max finding so that you can add
-    # infinitesimals in the case of gamma
-
     hist, edges = histogram_custom(array([]))
     chrom_iterator = iter_chroms_coords(filenames, include_coords)
     for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
