@@ -84,7 +84,8 @@ MEM_REQS = {2: [3619, 8098728],
 RANDOM_STARTS = 1
 
 # replace NAN with SENTINEL to avoid warnings
-SENTINEL = -9.87654321e34
+# XXX: replace with something negative and outlandish again
+SENTINEL = float32(9.87654321)
 
 ACC_FILENAME_FMT = "acc.%s.%s.bin"
 GMTK_INDEX_PLACEHOLDER = "@D"
@@ -134,6 +135,8 @@ PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)
 
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
+
+IDENTIFY_FILELISTBASENAME = extjoin("identify", EXT_LIST)
 
 # templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
@@ -380,10 +383,11 @@ def load_gmtk_out(filename):
     # gmtkViterbiNew.cc writes things with C sizeof(int) == numpy.intc
     return fromfile(filename, dtype=intc)
 
-def write_identify(h5file, data, start, end, tracknames):
+def write_identify(h5file, data, chrom, start, end, tracknames):
     root = h5file.root
     attrs = root._v_attrs
 
+    attrs.chrom = chrom
     attrs.start = start
     attrs.end = end
     attrs.tracknames = array(tracknames)
@@ -415,7 +419,7 @@ def load_gmtk_out_save_wig((chrom, start, end), gmtk_outfilename,
     identify_file = openFile(identify_filename, "w", chrom,
                              filters=FILTERS_GZIP)
     with identify_file:
-        write_identify(identify_file, data, start, end, tracknames)
+        write_identify(identify_file, data, chrom, start, end, tracknames)
 
     # XXX: gzip via a pipe
     with open(wig_filename, "w") as wig_file:
@@ -519,12 +523,12 @@ class Runner(object):
 
         return self.dirpath / filebasename
 
-    def set_params_filename(self, new=False, start_index=None):
+    def set_params_filename(self, start_index=None):
         # if this is not run and params_filename is
         # unspecified, then it won't be passed to gmtkViterbiNew
 
         params_filename = self.params_filename
-        if not new and params_filename:
+        if not start_index and params_filename:
             if (not self.delete_existing
                 and path(params_filename).exists()):
                 # it already exists and you don't want to force regen
@@ -533,11 +537,9 @@ class Runner(object):
             self.params_filename = \
                 self.make_filename(PREFIX_PARAMS, start_index, EXT_PARAMS)
 
-    def set_log_likelihood_filename(self, new=False, start_index=None):
-        if new or not self.log_likelihood_filename:
-            self.log_likelihood_filename = \
-                self.make_filename(PREFIX_LIKELIHOOD, start_index,
-                                   EXT_LIKELIHOOD)
+    def set_log_likelihood_filename(self, start_index=None):
+        self.log_likelihood_filename = \
+            self.make_filename(PREFIX_LIKELIHOOD, start_index, EXT_LIKELIHOOD)
 
     def make_output_dirpath(self, dirname, start_index):
         res = self.dirpath / "output" / dirname / str(start_index)
@@ -804,12 +806,13 @@ class Runner(object):
             # fudge the minimum by a very small amount this is not
             # continuous, but hopefully we won't get values where it
             # matters
-            if min_track == 0.0:
-                min_track_fudged = FUDGE_TINY
-            else:
-                min_track_fudged = min_track - ldexp(abs(min_track), FUDGE_EP)
-
-            mapping["min_track"] = min_track_fudged
+            # XXX: restore this after GMTK issues fixed
+#            if min_track == 0.0:
+#                min_track_fudged = FUDGE_TINY
+#            else:
+#                min_track_fudged = min_track - ldexp(abs(min_track), FUDGE_EP)
+#
+            mapping["min_track"] = min_track - 1.0
 
             if data is not None:
                 seg_index = mapping["seg_index"]
@@ -888,7 +891,7 @@ class Runner(object):
     def make_mx_spec(self):
         return self.make_spec_multiseg("MX", MX_TMPL)
 
-    def save_input_master(self, new=False, start_index=None):
+    def save_input_master(self, start_index=None):
         tracknames = self.tracknames
         num_segs = self.num_segs
         mins = self.mins
@@ -896,7 +899,8 @@ class Runner(object):
 
         include_filename = self.gmtk_include_filename
 
-        if new:
+        # if start_index >= 1, then always make a new file
+        if start_index:
             input_master_filename = None
         else:
             input_master_filename = self.input_master_filename
@@ -925,6 +929,7 @@ class Runner(object):
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
                           locals(), self.dirname, self.delete_existing,
                           start_index)
+
     def save_dont_train(self):
         self.dont_train_filename = self.save_resource(RES_DONT_TRAIN)
 
@@ -1000,6 +1005,9 @@ class Runner(object):
         seg_len_filenames = [seg_len_filepath_fmt % seg_index
                              for seg_index in xrange(NUM_SEGS)]
 
+        identify_filelistname = out_dirpath / IDENTIFY_FILELISTBASENAME
+        identify_filelist = open(identify_filelistname, "w")
+
         # XXX: this should be gzipped
         open_wb = partial(open, mode="wb")
 
@@ -1010,6 +1018,7 @@ class Runner(object):
                 wig_filename = wig_filepath_fmt % index
                 identify_filename = identify_filepath_fmt % index
 
+                print >>identify_filelist, identify_filename
                 load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
                                        identify_filename, wig_filename,
                                        seg_len_files, self.tracknames)
@@ -1119,12 +1128,9 @@ class Runner(object):
              verbosity=VERBOSITY)
 
     def run_train_start(self, session, start_index, interrupt_event):
-        # XXX: re-add the ability to set your own starting parameters,
-        # with new=start_index (copy from existing rather than using
-        # it on command-line)
-        self.save_input_master(new=True, start_index=start_index)
-        self.set_params_filename(new=True, start_index=start_index)
-        self.set_log_likelihood_filename(new=True, start_index=start_index)
+        self.save_input_master(start_index)
+        self.set_params_filename(start_index)
+        self.set_log_likelihood_filename(start_index)
         self.set_output_dirpaths(start_index)
 
         log_likelihood_filename = self.log_likelihood_filename
@@ -1238,6 +1244,8 @@ class Runner(object):
         dst_filenames = [self.input_master_filename,
                          self.params_filename,
                          self.log_likelihood_filename]
+
+        dst_overwrite = [XXX]XXX
 
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
         self.chunk_lens = chunk_lens
