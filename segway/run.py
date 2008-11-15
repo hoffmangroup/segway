@@ -220,7 +220,7 @@ def save_template(filename, resource, mapping, dirname=None,
     """
     if filename:
         if not delete_existing and path(filename).exists():
-            return filename
+            return filename, False
     else:
         resource_part = resource.rpartition(".tmpl")
         stem = resource_part[0] or resource_part[2]
@@ -238,7 +238,7 @@ def save_template(filename, resource, mapping, dirname=None,
 
         outfile.write(text)
 
-    return filename
+    return filename, True
 
 def accum_extrema(chromosome, mins, maxs):
     chromosome_attrs = chromosome.root._v_attrs
@@ -636,7 +636,7 @@ class Runner(object):
         mapping = dict(include_filename=self.gmtk_include_filename,
                        observations=observations)
 
-        self.structure_filename = \
+        self.structure_filename, self.structure_filename_new = \
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.dirname, self.delete_existing)
 
@@ -925,7 +925,7 @@ class Runner(object):
         mx_spec = self.make_mx_spec()
         name_collection_spec = make_name_collection_spec(num_segs, tracknames)
 
-        self.input_master_filename = \
+        self.input_master_filename, self.input_master_filename_new = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
                           locals(), self.dirname, self.delete_existing,
                           start_index)
@@ -1241,11 +1241,16 @@ class Runner(object):
         #
         # len(dst_filenames) == len(TRAIN_ATTRNAMES) == len(return value
         # of Runner.run_train_start())-1. This is asserted below.
-        dst_filenames = [self.input_master_filename,
+
+        self.save_input_master()
+        if self.input_master_filename_new:
+            input_master_filename = self.input_master_filename
+        else:
+            input_master_filename = None
+
+        dst_filenames = [input_master_filename,
                          self.params_filename,
                          self.log_likelihood_filename]
-
-        dst_overwrite = [XXX]XXX
 
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
         self.chunk_lens = chunk_lens

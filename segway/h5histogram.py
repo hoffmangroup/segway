@@ -11,8 +11,9 @@ __version__ = "$Revision$"
 
 import sys
 
+from collections import defaultdict
 from functools import partial
-from numpy import array, histogram, isfinite, NINF, PINF
+from numpy import array, histogram, isfinite, NINF, PINF, zeros
 from tables import openFile
 
 from ._util import (get_col_index as _get_col_index, iter_chroms_coords,
@@ -28,7 +29,7 @@ def get_col_index(chromosome, trackname):
         return _get_col_index(chromosome, trackname)
 
 def calc_range(trackname, filenames):
-    # not limited to include_coords, so scale is same
+    # not limited to include_coords, so scale is always the same
     minimum = PINF
     maximum = NINF
 
@@ -42,7 +43,8 @@ def calc_range(trackname, filenames):
 
     return minimum, maximum
 
-def calc_histogram(trackname, filenames, data_range, include_coords):
+def calc_histogram(trackname, filenames, data_range, include_coords,
+                   include_identify_dict, identify_label):
     histogram_custom = partial(histogram, bins=BINS, range=data_range,
                                new=True)
 
@@ -55,6 +57,7 @@ def calc_histogram(trackname, filenames, data_range, include_coords):
         for supercontig, continuous in supercontig_walker:
             supercontig_attrs = supercontig._v_attrs
             supercontig_start = supercontig_attrs.start
+            supercontig_end  = supercontig_attrs.end
 
             if include_coords:
                 # adjust coords
@@ -70,6 +73,40 @@ def calc_histogram(trackname, filenames, data_range, include_coords):
                 row_slice = slice(*coords)
 
                 col = continuous[row_slice, col_index]
+
+                if include_identify_dict:
+                    include_identify_chunks = include_identify_dict[chrom]
+
+                    col_bitmap = zeros(col.shape, bool)
+
+                    coords_start, coords_end = coords
+                    if coords_start is None:
+                        coords_start = 0
+                    if coords_end is None:
+                        coords_end = supercontig_end
+
+                    for chunk in include_identify_chunks:
+                        chunk_attrs = chunk.root._v_attrs
+                        chunk_start = chunk_attrs.start - supercontig_start
+
+                        chunk_identify = chunk.root.identify
+
+                        XXX double check boundary conditions
+                        if chunk_start >= coords_end or chunk_end <= coords_start:
+                            continue
+                        if chunk_start < coords_start:
+                            XXX shorten chunk_identify at beginning
+                        if chunk_start > coords_start:
+                            XXX pad
+
+                        XXX double check what happens when you have too much padding at end 
+
+                        chunk_end = chunk_attrs.end - supercontig_start
+
+                        col_bitmap[chunk_identify == identify_label] = True
+
+                    col = col[col_bitmap]
+
                 col_finite = col[isfinite(col)]
 
                 # if it has at least one row (it isn't truncated
@@ -78,6 +115,7 @@ def calc_histogram(trackname, filenames, data_range, include_coords):
                     if coords[0] is not None:
                         coords_tuple = tuple(coords + supercontig_start)
                         print >>sys.stderr, " (%s, %s)" % coords_tuple
+
                     hist_supercontig, edges_supercontig = \
                         histogram_custom(col_finite)
 
@@ -90,15 +128,36 @@ def print_histogram(hist, edges):
     for row in zip(edges, hist.tolist() + ["NA"]):
         print "\t".join(map(str, row))
 
-def h5histogram(trackname, filenames, include_coords_filename=None):
+def load_include_identify(filelistname):
+    if filelistname is None:
+        return
+
+    res = defaultdict(list)
+
+    with open(filelistname) as filelist:
+        for line in filelist:
+            filename = line.rstrip()
+
+            # XXX: these never get closed
+            identify = openFile(filename)
+            chrom = identify.root._v_attrs.chrom
+            res[chrom].append(identify)
+
+    return res
+
+def h5histogram(trackname, filenames, include_coords_filename=None,
+                include_identify_filelistname=None, identify_label=1):
     print "\t".join(FIELDNAMES)
 
     include_coords = load_coords(include_coords_filename)
+    include_identify_dict = \
+        load_include_identify(include_identify_filelistname)
 
     # two passes to avoid running out of memory
     data_range = calc_range(trackname, filenames)
     hist, edges = calc_histogram(trackname, filenames, data_range,
-                                 include_coords)
+                                 include_coords, include_identify_dict,
+                                 identify_label)
 
     print_histogram(hist, edges)
 
@@ -111,6 +170,13 @@ def parse_options(args):
     # this is a 0-based file (I know because ENm008 starts at position 0)
     parser.add_option("--include-coords", metavar="FILE",
                       help="limit to genomic coordinates in FILE")
+
+    parser.add_option("--include-identify", metavar="FILELIST",
+                      help="limit to label identified in files in FILELIST")
+
+    parser.add_option("--identify-label", metavar="LABEL", default=1,
+                      help="limit to LABEL in a list of specified identify"
+                      " files")
 
     parser.add_option("-c", "--col", metavar="COL",
                       help="write values in column COL (default first column)")
@@ -126,7 +192,8 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    return h5histogram(options.col, args, options.include_coords)
+    return h5histogram(options.col, args, options.include_coords,
+                       options.include_identify, options.identify_label)
 
 if __name__ == "__main__":
     sys.exit(main())
