@@ -13,14 +13,18 @@ import sys
 
 from collections import defaultdict
 from functools import partial
-from numpy import array, histogram, isfinite, NINF, PINF, zeros
+from numpy import array, concatenate, histogram, isfinite, NINF, PINF, zeros
 from tables import openFile
 
-from ._util import (get_col_index as _get_col_index, iter_chroms_coords,
+from ._util import (DTYPE_IDENTIFY, fill_array,
+                    get_col_index as _get_col_index, iinfo, iter_chroms_coords,
                     load_coords, walk_continuous_supercontigs)
 
 BINS = 100
 FIELDNAMES = ["lower_edge", "count"]
+
+IINFO_IDENTIFY = iinfo(DTYPE_IDENTIFY)
+MAX_IDENTIFY = IINFO_IDENTIFY.max # sentinel for padding
 
 def get_col_index(chromosome, trackname):
     if trackname is None:
@@ -88,20 +92,35 @@ def calc_histogram(trackname, filenames, data_range, include_coords,
                     for chunk in include_identify_chunks:
                         chunk_attrs = chunk.root._v_attrs
                         chunk_start = chunk_attrs.start - supercontig_start
-
+                        chunk_end = chunk_attrs.end - supercontig_start
                         chunk_identify = chunk.root.identify
 
-                        XXX double check boundary conditions
-                        if chunk_start >= coords_end or chunk_end <= coords_start:
+                        assert chunk_identify.dtype == DTYPE_IDENTIFY
+
+                        if (chunk_start >= coords_end
+                            or chunk_end <= coords_start):
                             continue
-                        if chunk_start < coords_start:
-                            XXX shorten chunk_identify at beginning
-                        if chunk_start > coords_start:
-                            XXX pad
 
-                        XXX double check what happens when you have too much padding at end 
+                        chunk_start_offset = coords_start-chunk_start
+                        if chunk_start_offset > 0:
+                            chunk_identify = \
+                                chunk_identify[chunk_start_offset:]
+                        elif chunk_start_offset < 0:
+                            padding_shape = (-chunk_start_offset,)
+                            padding = fill_array(MAX_IDENTIFY, padding_shape,
+                                                 DTYPE_IDENTIFY)
+                            padded_list = [padding, chunk_identify]
+                            chunk_identify = concatenate(padded_list)
 
-                        chunk_end = chunk_attrs.end - supercontig_start
+                        # if there is not enough padding at end,
+                        # things will work. Need to correct if there
+                        # is too much
+                        if chunk_end > coords_end:
+                            # -1 if it is one longer, etc.
+                            chunk_end_offset = chunk_end-coords_end
+                            chunk_identify = chunk_identify[:chunk_end_offset]
+
+                        assert len(chunk_identify) <= coords_end - coords_start
 
                         col_bitmap[chunk_identify == identify_label] = True
 

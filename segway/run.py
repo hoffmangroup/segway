@@ -25,7 +25,7 @@ from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import (amin, amax, append, array, diff, empty, finfo, float32,
-                   fromfile, intc, insert, invert, isnan, NINF, where)
+                   fromfile, insert, invert, isnan, NINF, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -33,9 +33,10 @@ from optbuild import (Mixin_NoConvertUnderscore,
 from tables import Atom, openFile
 from path import path
 
-from ._util import (data_filename, data_string, FILTERS_GZIP, get_tracknames,
-                    init_num_obs, iter_chroms_coords, load_coords,
-                    NamedTemporaryDir, PKG, walk_continuous_supercontigs)
+from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
+                    DTYPE_SEG_LEN, FILTERS_GZIP, get_tracknames, init_num_obs,
+                    iter_chroms_coords, load_coords, NamedTemporaryDir, PKG,
+                    walk_continuous_supercontigs)
 
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
@@ -377,11 +378,11 @@ def print_segment_summary_stats(data, seg_len_files):
 
         lens_seg = diff(coords_seg, axis=0).ravel()
 
-        lens_seg.astype(intc).tofile(seg_len_file)
+        lens_seg.astype(DTYPE_SEG_LEN).tofile(seg_len_file)
 
 def load_gmtk_out(filename):
     # gmtkViterbiNew.cc writes things with C sizeof(int) == numpy.intc
-    return fromfile(filename, dtype=intc)
+    return fromfile(filename, dtype=DTYPE_IDENTIFY)
 
 def write_identify(h5file, data, chrom, start, end, tracknames):
     root = h5file.root
@@ -648,7 +649,7 @@ class Runner(object):
         # int32s it is better to optimize both sides here by sticking all
         # the floats in one file, and the ints in another one
         mask_missing = isnan(data)
-        mask_nonmissing = empty(mask_missing.shape, intc)
+        mask_nonmissing = empty(mask_missing.shape, DTYPE_OBS_INT)
 
         # output -> mask_nonmissing
         invert(mask_missing, mask_nonmissing)

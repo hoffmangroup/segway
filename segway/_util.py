@@ -14,7 +14,7 @@ import shutil
 import sys
 from tempfile import mkdtemp
 
-from numpy import array, empty
+from numpy import array, empty, intc
 from path import path
 from pkg_resources import resource_filename, resource_string
 from tables import openFile, Filters, NoSuchNodeError
@@ -31,6 +31,10 @@ FILTERS_GZIP = Filters(complevel=1)
 
 EXT_GZ = "gz"
 SUFFIX_GZ = extsep + EXT_GZ
+
+DTYPE_IDENTIFY = intc
+DTYPE_OBS_INT = intc
+DTYPE_SEG_LEN = intc
 
 data_filename = partial(resource_filename, PKG_DATA)
 data_string = partial(resource_string, PKG_DATA)
