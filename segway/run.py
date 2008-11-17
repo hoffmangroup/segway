@@ -191,6 +191,8 @@ def Session(*args, **kwargs):
     res = _Session()
     res.init(*args, **kwargs)
 
+    assert res.DRMSInfo.startswith(DRMSINFO_PREFIX)
+
     try:
         yield res
     finally:
@@ -970,12 +972,18 @@ class Runner(object):
         self.save_include()
         self.save_structure()
 
-        if self.train:
+        train = self.train
+        identify = self.identify
+
+        if train or identify:
+            self.make_chunk_mem_reqs()
+
+        if train:
             self.save_dont_train()
             self.set_params_filename() # might turn off self.train
             self.set_log_likelihood_filename()
 
-        if self.identify:
+        if identify:
             self.save_output_filelist()
             self.save_dumpnames()
             self.make_wig_dir()
@@ -1037,14 +1045,40 @@ class Runner(object):
         filebasename = ACC_FILENAME_FMT % (start_index, chunk_index)
         return self.dirpath / filebasename
 
-    def name_job(self, job_tmpl, start_index, round_index, chunk_index):
+    def make_job_name_train(self, start_index, round_index, chunk_index):
+        return "emt%d.%d.%s.%s.%s" % (start_index, round_index, chunk_index,
+                                      self.dirpath.name, getpid())
+
+    def make_job_name_identify(self, chunk_index):
+        return "vit%d.%s.%s" % (chunk_index, self.dirpath.name, getpid())
+
+    def queue_gmtk(self, session, prog, kwargs, job_name, mem_req,
+                   native_specs={}):
+        gmtk_cmdline = prog.build_cmdline(options=kwargs)
+
+        if self.dry_run:
+            print " ".join(gmtk_cmdline)
+            return None
+
+        job_tmpl = session.createJobTemplate()
+
         # shouldn't this be jobName? not in the Python DRMAA implementation
         # XXX: report upstream
-        res = "emt%d.%d.%s.%s.%s" % (start_index, round_index, chunk_index,
-                                     self.dirpath.name, getpid())
-        job_tmpl.name = res
+        job_tmpl.name = job_name
 
-        return res
+        job_tmpl.remoteCommand = ENV_CMD
+        job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
+
+        job_tmpl.outputPath = ":" + (self.output_dirpath / job_name)
+        job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
+
+        set_cwd_job_tmpl(job_tmpl)
+
+        res_req = make_res_req(mem_req)
+        job_tmpl.nativeSpecification = make_native_spec(l=res_req,
+                                                        **native_specs)
+
+        return session.runJob(job_tmpl)
 
     def queue_train(self, session, params_filename, start_index, round_index,
                     chunk_index, mem_req, hold_jid=None, **kwargs):
@@ -1052,28 +1086,21 @@ class Runner(object):
         kwargs["inputTrainableParameters"] = params_filename
         kwargs["cppCommandOptions"] = make_cpp_options(params_filename)
 
-        gmtk_cmdline = self.train_prog.build_cmdline(options=kwargs)
+        prog = self.train_prog
+        name = self.make_job_name_train(start_index, round_index, chunk_index)
+        native_specs = dict(hold_jid=hold_jid)
 
-        if self.dry_run:
-            print " ".join(gmtk_cmdline)
-            return None
+        return self.queue_gmtk(session, prog, kwargs, name, mem_req,
+                               native_specs)
 
-        job_tmpl = session.createJobTemplate()
-        name = self.name_job(job_tmpl, start_index, round_index, chunk_index)
+    def chunk_mem_reqs_decreasing(self):
+        # sort chunks by decreasing size, so the most difficult chunks
+        # are dropped in the queue first
+        zipper = izip(self.chunk_lens, count(), self.chunk_mem_reqs)
 
-        job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
-
-        job_tmpl.outputPath = ":" + (self.output_dirpath / name)
-        job_tmpl.errorPath = ":" + (self.error_dirpath / name)
-
-        set_cwd_job_tmpl(job_tmpl)
-
-        res_req = make_res_req(mem_req)
-        job_tmpl.nativeSpecification = make_native_spec(hold_jid=hold_jid,
-                                                        l=res_req)
-
-        return session.runJob(job_tmpl)
+        # XXX: use itertools instead of a generator here
+        for _, chunk_index, chunk_mem_req in sorted(zipper, reverse=True):
+            yield chunk_index, chunk_mem_req
 
     def queue_train_parallel(self, session, params_filename, start_index,
                              round_index, **kwargs):
@@ -1082,11 +1109,7 @@ class Runner(object):
 
         res = [] # task ids
 
-        # sort chunks by decreasing size, so the most difficult chunks
-        # are dropped in the queue first
-        zipper = izip(self.chunk_lens, count(), self.chunk_mem_reqs)
-        sorted_zipper = sorted(zipper, reverse=True)
-        for chunk_len, chunk_index, chunk_mem_req in sorted_zipper:
+        for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
             acc_filename = self.make_acc_filename(start_index, chunk_index)
             kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
@@ -1211,31 +1234,44 @@ class Runner(object):
         return (log_likelihood, self.input_master_filename,
                 last_params_filename, log_likelihood_filename)
 
-    def run_train(self):
+    def make_gmtk_kwargs(self):
         num_tracks = self.num_tracks
 
+        return dict(strFile=self.structure_filename,
+
+                    of1=self.float_filelistpath,
+                    fmt1="binary",
+                    nf1=num_tracks,
+                    ni1=0,
+                    iswp1=False,
+
+                    of2=self.int_filelistpath,
+                    fmt2="binary",
+                    nf2=0,
+                    ni2=num_tracks,
+                    iswp2=False,
+
+                    verbosity=VERBOSITY)
+
+    def make_chunk_mem_reqs(self):
+        # XXX: should probably have different mem reqs for train or viterbi
+        num_tracks = self.num_tracks
+
+        chunk_lens = [end - start for chr, start, end in self.chunk_coords]
+
+        self.chunk_lens = chunk_lens
+        self.chunk_mem_reqs = [make_mem_req(chunk_len, num_tracks)
+                               for chunk_len in chunk_lens]
+
+    def run_train(self):
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
 
-        self.train_kwargs = dict(strFile=self.structure_filename,
-                                 objsNotToTrain=self.dont_train_filename,
-
-                                 of1=self.float_filelistpath,
-                                 fmt1="binary",
-                                 nf1=num_tracks,
-                                 ni1=0,
-                                 iswp1=False,
-
-                                 of2=self.int_filelistpath,
-                                 fmt2="binary",
-                                 nf2=0,
-                                 ni2=num_tracks,
-                                 iswp2=False,
-
+        self.train_kwargs = dict(objsNotToTrain=self.dont_train_filename,
                                  maxEmIters=1,
-                                 verbosity=VERBOSITY,
                                  island=ISLAND,
                                  componentCache=COMPONENT_CACHE,
-                                 lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0)
+                                 lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
+                                 **self.make_gmtk_kwargs())
 
         # save the destination file for input_master as we will be
         # generating new input masters for each start
@@ -1253,17 +1289,10 @@ class Runner(object):
                          self.params_filename,
                          self.log_likelihood_filename]
 
-        chunk_lens = [end - start for chr, start, end in self.chunk_coords]
-        self.chunk_lens = chunk_lens
-        self.chunk_mem_reqs = [make_mem_req(chunk_len, num_tracks)
-                               for chunk_len in chunk_lens]
-
         interrupt_event = Event()
 
         threads = []
         with Session() as session:
-            assert session.DRMSInfo.startswith(DRMSINFO_PREFIX)
-
             try:
                 for start_index in xrange(self.random_starts):
                     thread = RandomStartThread(self, session, start_index,
@@ -1308,38 +1337,38 @@ class Runner(object):
 
         prog = self.prog_factory(VITERBI_PROG)
 
-        # XXX: eliminate repetition with run_train()
-        prog(strFile=self.structure_filename,
+        identify_kwargs = \
+            dict(inputMasterFile=self.input_master_filename,
+                 inputTrainableParameters=params_filename,
 
-             inputMasterFile=self.input_master_filename,
-             inputTrainableParameters=params_filename,
+                 ofilelist=self.output_filelistname,
+                 dumpNames=self.dumpnames_filename,
 
-             ofilelist=self.output_filelistname,
-             dumpNames=self.dumpnames_filename,
+                 cppCommandOptions=make_cpp_options(params_filename),
+                 **self.make_gmtk_kwargs())
 
-             of1=self.float_filelistpath,
-             fmt1="binary",
-             nf1=self.num_tracks,
-             ni1=0,
-             iswp1=False,
+        gmtk_cmdline = prog.build_cmdline(options=identify_kwargs)
 
-             of2=self.int_filelistpath,
-             fmt2="binary",
-             nf2=0,
-             ni2=self.num_tracks,
-             iswp2=False,
+        self.set_output_dirpaths("identify")
 
-             cppCommandOptions=make_cpp_options(params_filename),
-             verbosity=VERBOSITY)
+        # XXX: kill submitted jobs on exception
+        with Session() as session:
+            for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
+                identify_kwargs_chunk = dict(dcdrng=chunk_index,
+                                             **identify_kwargs)
+                job_name = self.make_job_name_identify(chunk_index)
+                self.queue_gmtk(session, prog, identify_kwargs_chunk, job_name,
+                                chunk_mem_req)
 
         if not self.dry_run:
+            # XXXopt: could be done in parallel as well
             self.gmtk_out2wig()
 
     def _run(self):
         """
         main run, after dirname is specified
         """
-        # XXX: use binary I/O to gmtk rather than ascii
+        # XXXopt: use binary I/O to gmtk rather than ascii
 
         self.dirpath = path(self.dirname)
         self.save_params()
