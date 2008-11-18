@@ -295,6 +295,8 @@ def read_wig(chromosomes, trackname, filename, infile):
                 score = float32(words[1])
                 writer.write(score, start)
             elif fmt == "fixedStep":
+                # XXXopt: probably could get a speedup by reading in
+                # multiple lines before writing
                 assert num_words == 1
 
                 score = float32(words[0])
