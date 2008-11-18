@@ -33,7 +33,7 @@ from path import path
 from tabdelim import DictReader
 from tables import Float32Atom, NoSuchNodeError, openFile
 
-from .bed import read_native
+#from .bed import read_native
 from .load_seq import MIN_GAP_LEN
 from ._util import (fill_array, get_tracknames, gzip_open, init_num_obs,
                     new_extrema, walk_continuous_supercontigs,
@@ -255,7 +255,10 @@ def read_wig(chromosomes, trackname, filename, infile):
     fmt = None
 
     with ScoreWriter(trackname) as writer:
-        for line in infile:
+        for index, line in enumerate(infile):
+            if not index % 100000:
+                print >>sys.stderr, ("[%d]" % index),
+
             words = line.rstrip().split()
             num_words = len(words)
 
@@ -276,7 +279,7 @@ def read_wig(chromosomes, trackname, filename, infile):
                     start = int(params["start"]) - 1 # one-based
                     step = int(params["step"])
 
-                    print >>sys.stderr, " %s (%d)" % (chrom, start)
+                    print >>sys.stderr, "\n%s (%d)" % (chrom, start)
                 else:
                     assert "start" not in params
                     assert "step" not in params
@@ -284,7 +287,7 @@ def read_wig(chromosomes, trackname, filename, infile):
                     start = None
                     step = None
 
-                    print >>sys.stderr, " %s" % chrom
+                    print >>sys.stderr, "\n%s" % chrom
             elif fmt == "variableStep":
                 assert num_words == 2
 
