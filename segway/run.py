@@ -17,15 +17,14 @@ from functools import partial
 from itertools import count, izip
 from math import ceil, floor, ldexp, log10
 from os import extsep, getpid
-from random import random
 from shutil import move
 from string import Template
 import sys
 from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import (amin, amax, append, array, diff, empty, finfo, float32,
-                   fromfile, insert, invert, isnan, NINF, where)
+from numpy import (amin, amax, append, array, diag, diff, empty, finfo, float32,
+                   fromfile, insert, invert, isnan, newaxis, NINF, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -34,9 +33,9 @@ from tables import Atom, openFile
 from path import path
 
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
-                    DTYPE_SEG_LEN, FILTERS_GZIP, get_tracknames, init_num_obs,
-                    iter_chroms_coords, load_coords, NamedTemporaryDir, PKG,
-                    walk_continuous_supercontigs)
+                    DTYPE_SEG_LEN, fill_array, FILTERS_GZIP, get_tracknames,
+                    init_num_obs, iter_chroms_coords, load_coords,
+                    NamedTemporaryDir, PKG, walk_continuous_supercontigs)
 
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
@@ -52,6 +51,12 @@ ISLAND = False
 WIG_DIRNAME = "out"
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
+LEN_SEG_EXPECTED = 10000
+
+# ratio of number of Dirichlet counts to add relative to amount of
+# training data
+LEN_SEG_STRENGTH = 1
+
 DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
 
 FINFO_FLOAT32 = finfo(float32)
@@ -144,6 +149,8 @@ RES_STR_TMPL = "seg.str.tmpl"
 RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC = "seg.inc"
+
+DIRICHLET_FRAG = "0 dirichlet_seg_seg 1 CARD_SEG CARD_SEG"
 
 DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
 DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
@@ -310,29 +317,40 @@ def make_spec(name, items):
 
     return "\n".join(items) + "\n"
 
+def make_table_spec(frag, table):
+    return " ".join([frag] + [str(row) for row in table])
+
 # def make_dt_spec(num_tracks):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
 #                             for index in xrange(num_tracks)])
 
-# XXX: reimplement in numpy
-def make_normalized_random_rows(num_rows, num_cols):
-    res = []
+def make_normalized_random_table(num_rows, num_cols):
+    random_vals = uniform(size=(num_rows, num_cols))
+    random_vals_sums = random_vals.sum(1)[..., newaxis]
 
-    for row_index in xrange(num_rows):
-        row_raw = []
-        for col_index in xrange(num_cols):
-            row_raw.append(random())
-
-        total = sum(row_raw)
-
-        res.extend([item_raw/total for item_raw in row_raw])
-
-    return res
+    return random_vals / random_vals_sums
 
 def make_random_spec(frag, *args, **kwargs):
-    random_rows = make_normalized_random_rows(*args, **kwargs)
+    table = make_normalized_random_table(*args, **kwargs)
 
-    return " ".join([frag] + [str(row) for row in random_rows])
+    return make_table_spec(frag, table)
+
+def prob_transition_from_expected_len(length):
+    # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
+    return length / (1 + length)
+
+def make_dirichlet_table(num_segs, num_bases):
+    prob_diag = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
+    prob_nondiag = (1.0 - prob_diag) / (num_segs - 1)
+
+    probs = diag(fill_array(prob_diag, num_segs))
+    probs[probs == 0.0] = prob_nondiag
+
+    # astype(int) means flooring the floats
+    pseudocounts_per_row = (LEN_SEG_STRENGTH * num_bases) / num_segs
+    pseudocounts = (probs * pseudocounts_per_row).astype(int)
+
+    return pseudocounts
 
 def make_dense_cpt_start_seg_spec(num_segs):
     return make_random_spec(DENSE_CPT_START_SEG_FRAG, 1, num_segs)
@@ -681,6 +699,7 @@ class Runner(object):
         num_tracks = None
         chunk_index = 0
         chunk_coords = []
+        num_bases = 0
 
         chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
         for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
@@ -751,6 +770,8 @@ class Runner(object):
                     print >>sys.stderr, " %s (%d, %d)" % (float_filepath,
                                                           start, end)
 
+                    num_bases += end - start
+
                     # if they don't both exist
                     if not (float_filepath.exists() and int_filepath.exists()):
                         rows = continuous[chunk_start:chunk_end, ...]
@@ -765,6 +786,7 @@ class Runner(object):
 
         self.num_tracks = num_tracks
         self.num_chunks = chunk_index
+        self.num_bases = num_bases
         self.chunk_coords = chunk_coords
 
     def open_writable_or_dummy(self, filepath):
@@ -827,6 +849,10 @@ class Runner(object):
 
     def make_spec_multiseg(self, name, *args, **kwargs):
         return make_spec(name, self.make_items_multiseg(*args, **kwargs))
+
+    def make_dirichlet_spec(self):
+        dirichlet_table = make_dirichlet_table(self.num_segs, self.num_bases)
+        return make_table_spec(DIRICHLET_FRAG, dirichlet_table)
 
     def make_dense_cpt_spec(self):
         num_segs = self.num_segs
@@ -908,6 +934,7 @@ class Runner(object):
         else:
             input_master_filename = self.input_master_filename
 
+        dirichlet_spec = self.make_dirichlet_spec()
         dense_cpt_spec = self.make_dense_cpt_spec()
 
         means = self.rand_means()
@@ -1098,7 +1125,7 @@ class Runner(object):
         # are dropped in the queue first
         zipper = izip(self.chunk_lens, count(), self.chunk_mem_reqs)
 
-        # XXX: use itertools instead of a generator here
+        # XXX: use itertools instead of a generator
         for _, chunk_index, chunk_mem_req in sorted(zipper, reverse=True):
             yield chunk_index, chunk_mem_req
 
@@ -1109,10 +1136,15 @@ class Runner(object):
 
         res = [] # task ids
 
-        for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
+        chunk_mem_reqs = list(self.chunk_mem_reqs_decreasing())
+        last_chunk_index = chunk_mem_reqs[-1][0]
+        for chunk_index, chunk_mem_req in chunk_mem_reqs:
             acc_filename = self.make_acc_filename(start_index, chunk_index)
             kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
+
+            if chunk_index == last_chunk_index:
+                kwargs_chunk["dirichletPriors"] = True
 
             jobid = queue_train_custom(chunk_index, chunk_mem_req,
                                        **kwargs_chunk)

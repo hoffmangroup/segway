@@ -27,6 +27,7 @@ from collections import defaultdict
 from functools import partial
 from os import extsep
 import sys
+from warnings import warn
 
 from numpy import amin, amax, array, float32, isnan, NAN, NINF, PINF, where
 from path import path
@@ -74,7 +75,7 @@ class ScoreWriter(object):
     def __init__(self, trackname):
         self.trackname = trackname
         self._clear()
-        self.write = self._write
+        self._write = self._write_flexible
 
     def __enter__(self):
         return self
@@ -99,8 +100,6 @@ class ScoreWriter(object):
         return None
 
     def _seek(self, start, end=None):
-        self.flush()
-
         supercontig = self._seek_pos(start)
         if supercontig is None:
             if end is None:
@@ -111,11 +110,16 @@ class ScoreWriter(object):
             if supercontig is None:
                 # hopefully there won't be cases where *both* ends
                 # won't fit, but the middle does
+
+                # an exception error leaves all of the instance
+                # attributes untouched
                 raise DataForGapError("neither %d nor %d fit into a"
                                       " supercontig" % (start, end))
 
         supercontig_start, supercontig_end = \
             self._get_supercontig_coords(supercontig)
+
+        self.flush()
 
         try:
             continuous = supercontig.continuous
@@ -143,7 +147,7 @@ class ScoreWriter(object):
         self.start = PINF
         self.end = NINF
 
-    def _write(self, score, start, end=None):
+    def _write_flexible(self, score, start, end=None):
         # if you try to write to (400, 405) and the supercontig only
         # goes up to 401, then data will be written to 400 and 401
         # without error. if you try to write to (402, 405), then you
@@ -191,9 +195,15 @@ class ScoreWriter(object):
     def set_span(self, span):
         self.span = span
         if span == 1:
-            self.write = self._write_span1
+            self._write = self._write_span1
         else:
-            self.write = self._write
+            self._write = self._write_flexible
+
+    def write(self, *args, **kwargs):
+        try:
+            return self._write(*args, **kwargs)
+        except DataForGapError:
+            warn("data supplied outside supercontig: %r %r" % (args, kwargs))
 
     def flush(self):
         """
@@ -296,7 +306,8 @@ def read_wig(chromosomes, trackname, filename, infile):
                 writer.write(score, start)
             elif fmt == "fixedStep":
                 # XXXopt: probably could get a speedup by reading in
-                # multiple lines before writing
+                # multiple lines before writing. read up until the end
+                # of the current supercontig
                 assert num_words == 1
 
                 score = float32(words[0])
