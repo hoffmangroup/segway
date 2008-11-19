@@ -87,9 +87,10 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
   supercontig = supercontigs->supercontig_curr++;
 
   /* leave open */
-  printf("%s\n", name);
   subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
   assert(subgroup >= 0);
+
+  printf("%s: %d\n", name, group);
 
   get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &supercontig->start);
   get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
@@ -265,7 +266,6 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
     } else {
       /* calc dimensions */
       num_cols = get_num_cols(h5file);
-      printf("num cols: %lld\n", num_cols);
 
       file_dataspace_dims[0] = supercontig->end - supercontig->start;
       file_dataspace_dims[1] = num_cols;
@@ -281,8 +281,9 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
              >= 0);
 
       /* create dataset */
-      printf("creating %lld x %lld dataset\n",
-             file_dataspace_dims[0], file_dataspace_dims[1]);
+      printf("creating %lld x %lld dataset in %d\n",
+             file_dataspace_dims[0], file_dataspace_dims[1],
+             supercontig->group);
       dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
                           file_dataspace, H5P_DEFAULT,
                           dataset_creation_plist, H5P_DEFAULT);
