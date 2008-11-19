@@ -143,7 +143,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
 
   while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
     loc_eq = strchr(token, '=');
-    key = strndup(token, loc_eq - token);
+    key = strndupa(token, loc_eq - token);
     val = loc_eq + 1;
 
     if (!strcmp(key, KEY_CHROM)) {
@@ -158,8 +158,6 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
       printf("can't understand key: %s", key);
       exit(1);
     }
-
-    free(key);
 
     newstring = NULL;
   }
@@ -256,6 +254,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   free(chrom);
 
   /* XXXopt: don't close if it's the same file */
+  free(buf);
   close_file(*h5file);
 
   /* open the chromosome file */
