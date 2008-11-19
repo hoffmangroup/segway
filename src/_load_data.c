@@ -283,21 +283,21 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
              >= 0);
 
       /* create dataset */
-      printf("creating %lld x %lld dataset in %d\n",
+      printf("creating %lld x %lld dataset in %d...",
              file_dataspace_dims[0], file_dataspace_dims[1],
              supercontig->group);
       dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
                           file_dataspace, H5P_DEFAULT,
                           dataset_creation_plist, H5P_DEFAULT);
       assert(dataset >= 0);
-      printf("done\n");
+      printf(" done\n");
 
       /* XXX: set PyTables attrs: new func */
     }
 
     /* select file hyperslab */
     select_start[0] = buf_offset_start - supercontig->start;
-    select_count[0] = buf_offset_end - supercontig->start;
+    select_count[0] = buf_offset_end - select_start[0];
     assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
                                NULL, select_count, NULL) >= 0);
 
