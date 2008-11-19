@@ -410,7 +410,6 @@ int main(void) {
         *buf_ptr++ = datum;
       } /* else: ignore data until we get to another header line */
     } else {
-      close_file(h5file); return 0; /* XXX: testing */
       write_buf(h5file, buf_start, buf_end, buf_filled_start, buf_ptr, &supercontigs);
       proc_wigfix_header(line, &h5file, &supercontigs,
                          &buf_start, &buf_end, &buf_ptr);
