@@ -249,11 +249,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   H5G_info_t root_info;
 
   /* do writing if buf_len > 0 */
-
-  char *line_copy;
-
-  line_copy = strdup(line); /* XXX: why? */
-  parse_wigfix_header(line_copy, &chrom, &start, &step);
+  parse_wigfix_header(line, &chrom, &start, &step);
 
   assert(chrom && start >= 0 && step == 1);
 
@@ -261,12 +257,12 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 
   /* set h5filename */
   printf("chrom: %s\n", chrom);
-  printf("line_copy: %s\n", line_copy);
+  printf("line: %s\n", line);
   h5filename = malloc(strlen(chrom)+strlen(SUFFIX_H5)+1);
   suffix = stpcpy(h5filename, chrom);
   strcpy(suffix, SUFFIX_H5);
   free(chrom);
-  printf("line_copy: %s\n", line_copy);
+  printf("line: %s\n", line);
 
   /* XXXopt: don't close if it's the same file */
   if (*buf) {
@@ -296,17 +292,12 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* XXX: need to ensure sorting */
   *buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
   *buf = malloc(*buf_len * sizeof(float));
-  printf("allocated\n");
 
-  printf("line_copy: %s\n", line_copy);
   free(h5filename);
-  printf("line_copy: %s\n", line_copy);
-  free(line_copy);
 }
 
 int main(void) {
   char *line = NULL;
-  char *line_copy;
   size_t size_line = 0;
   char *tailptr;
 
@@ -343,11 +334,8 @@ int main(void) {
      strtof rather than using getline */
 
   assert (getline(&line, &size_line, stdin) >= 0);
-  line_copy = strdup(line); /* XXX: why? */
-  free(line_copy);
-  line_copy = strdup(line); /* XXX: why? */
-  proc_wigfix_header(line_copy, &h5file, &supercontigs, &buf, &buf_len);
-  free(line_copy);
+
+  proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
   buf_ptr = buf;
   buf_end = buf_ptr + buf_len;
 
@@ -358,9 +346,7 @@ int main(void) {
         *buf_ptr++ = datum;
       } /* else: ignore the data */
     } else {
-      line_copy = strdup(line); /* XXX: why? */
       proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
-      free(line_copy);
 
       buf_ptr = buf;
       buf_end = buf_ptr + buf_len;
