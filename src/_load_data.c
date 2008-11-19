@@ -256,13 +256,10 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   printf("%s (%ld)\n", chrom, start);
 
   /* set h5filename */
-  printf("chrom: %s\n", chrom);
-  printf("line: %s\n", line);
   h5filename = malloc(strlen(chrom)+strlen(SUFFIX_H5)+1);
   suffix = stpcpy(h5filename, chrom);
   strcpy(suffix, SUFFIX_H5);
   free(chrom);
-  printf("line: %s\n", line);
 
   /* XXXopt: don't close if it's the same file */
   if (*buf) {
