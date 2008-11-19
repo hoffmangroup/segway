@@ -147,6 +147,7 @@ int main(void) {
   hsize_t dims[CARDINALITY];
   hsize_t select_start[CARDINALITY] = {-1, COL};
   hsize_t select_count[CARDINALITY] = {1, 1};
+  hsize_t chunk_dims[CARDINALITY] = {1000000, -1};
 
   /* for error suppression */
   H5E_auto2_t old_func;
@@ -254,6 +255,9 @@ int main(void) {
 
         assert(H5Sset_extent_simple(file_dataspace, CARDINALITY, dims, dims)
                >= 0);
+
+        chunk_dims[1] = num_cols;
+        assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims) >= 0);
 
         printf("creating %lld x %lld dataset\n", dims[0], dims[1]);
 
