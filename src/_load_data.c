@@ -304,7 +304,7 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
     /* write */
     printf("writing %lld floats...", select_count[0]);
     assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
-                    H5P_DEFAULT, &buf_filled_start) >= 0);
+                    H5P_DEFAULT, buf_filled_start) >= 0);
     printf(" done\n");
 
     /* close dataspaces */
