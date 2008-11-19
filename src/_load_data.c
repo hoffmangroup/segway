@@ -170,6 +170,15 @@ void init_supercontig_array(size_t len,
   supercontigs->supercontig_curr = supercontigs->supercontigs;
 }
 
+void free_supercontig_array(supercontig_array_t *supercontigs) {
+  for (supercontig_t *supercontig = supercontigs->supercontigs;
+       supercontig <= supercontigs->supercontigs + supercontigs-> len;
+       supercontig++) {
+    assert(H5Gclose(supercontig->group) >= 0);
+  }
+  free(supercontigs->supercontigs);
+}
+
 #if 0
 void write_XXX(XXX) {
   hid_t dataset = -1;
@@ -255,9 +264,10 @@ void write_XXX(XXX) {
 
 void proc_wigfix_header(char *line, hid_t *h5file,
                         supercontig_array_t *supercontigs,
-                        float **buf, size_t *buf_len) {
+                        float **buf_start, float **buf_end, float **buf_ptr) {
   long start = -1;
   long step = 1;
+  size_t buf_len;
 
   char *chrom = NULL;
   char *h5filename = NULL;
@@ -282,9 +292,9 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   free(chrom);
 
   /* XXXopt: don't close if it's the same file */
-  if (*buf) {
-    free(*buf);
-    free(supercontigs->supercontigs);
+  if (*buf_start) {
+    free(*buf_start);
+    free_supercontig_array(supercontigs);
   }
   close_file(*h5file);
 
@@ -308,8 +318,11 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* allocate buffer: enough to assign values from 0 to the end of the
      last supercontig */
   /* XXX: need to ensure sorting */
-  *buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
-  *buf = malloc(*buf_len * sizeof(float));
+  buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
+
+  *buf_start = malloc(*buf_len * sizeof(float));
+  *buf_ptr = *buf_start + start;
+  *buf_end = *buf_start + buf_len;
 }
 
 int main(void) {
@@ -317,9 +330,8 @@ int main(void) {
   size_t size_line = 0;
   char *tailptr;
 
-  size_t buf_len = 0;
-  float *buf = NULL;
-  float *buf_ptr, *buf_end;
+  float *buf_start = NULL;
+  float *buf_offset, *buf_ptr, *buf_end;
 
   supercontig_array_t supercontigs;
 
@@ -332,27 +344,27 @@ int main(void) {
 
   assert (getline(&line, &size_line, stdin) >= 0);
 
-  proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
-  buf_ptr = buf;
-  buf_end = buf_ptr + buf_len;
+  proc_wigfix_header(line, &h5file, &supercontigs,
+                     &buf_start, &buf_end, &buf_ptr);
+  buf_offset = buf_ptr;
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
     if (*tailptr == '\n') {
       if (buf_ptr < buf_end) {
         *buf_ptr++ = datum;
-      } /* else: ignore the data */
+      } /* else: ignore data until we get to another header line */
     } else {
-      proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
-
-      buf_ptr = buf;
-      buf_end = buf_ptr + buf_len;
+      write_buf(
+      proc_wigfix_header(line, &h5file, &supercontigs,
+                         &buf_start, &buf_end, &buf_ptr);
+      buf_offset = buf_ptr;
     }
   }
 
-  free(supercontigs.supercontigs);
+  free_supercontig_array(&supercontigs);
   free(line);
-  free(buf);
+  free(buf_start);
 
   close_file(h5file);
 
