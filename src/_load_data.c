@@ -134,7 +134,7 @@ int main(void) {
 
   char *chrom;
   char *h5filename = NULL;
-  long new_start, offset;
+  long new_start;
 
   supercontig_t supercontig;
 
@@ -168,21 +168,22 @@ int main(void) {
   assert(mem_dataspace >= 0);
 
   while (getline(&line, &size_line, stdin) >= 0) {
-    *strchr(line, '\n') = '\0';
-
     datum = strtof(line, &tailptr);
-    if (!*tailptr && h5file >= 0) {
-      select_start[0] = offset;
+    if (*tailptr == '\n' && h5file >= 0) {
+      if (!(select_start[0] % 100000)) {
+        printf(" [%lld]", select_start[0]);
+      }
       assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
                                  NULL, select_count, NULL) >= 0);
 
       /* XXXopt: write in memory instead of each time */
-      printf("writing %f...", datum);
       assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
                       H5P_DEFAULT, &datum) >= 0);
-      printf(" done\n");
-      offset++;
+      select_start[0]++;
     } else {
+      /* strip trailing newline */
+      *strchr(line, '\n') = '\0';
+
       /* XXX: most of this should go to another function:
          parse_wigfix_header() */
       assert(!strncmp(FMT_WIGFIX, line, LEN_FMT_WIGFIX));
@@ -273,7 +274,7 @@ int main(void) {
         assert(dataset >= 0);
         printf("done\n");
 
-        offset = new_start - supercontig.start;
+        select_start[0] = new_start - supercontig.start;
       }
     }
   }
