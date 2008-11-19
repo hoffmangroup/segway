@@ -113,6 +113,12 @@ void close_group(hid_t group) {
   }
 }
 
+void close_file(hid_t h5file) {
+  if (h5file >= 0) {
+    assert(H5Fclose(h5file) >= 0);
+  }
+}
+
 int main(void) {
   char *save_ptr;
   char *line;
@@ -218,7 +224,7 @@ int main(void) {
       close_dataspace(file_dataspace);
       close_dataset(dataset);
       close_group(supercontig.group);
-      close_group(h5file);
+      close_file(h5file);
 
       printf("%s (%ld)\n", chrom, new_start);
 
@@ -277,7 +283,7 @@ int main(void) {
   close_dataspace(file_dataspace);
   close_dataset(dataset);
   close_group(supercontig.group);
-  close_group(h5file);
+  close_file(h5file);
 
   assert(H5Pclose(dataset_creation_plist) >= 0);
 }
