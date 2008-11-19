@@ -25,7 +25,7 @@
 
 #define CARDINALITY 2
 #define COL 0 /* XXX: this really can't be hard-coded, just for debugging */
-#define CHUNK_NROWS 1000
+#define CHUNK_NROWS 1000 /* XXX: this needs to adjust, be smaller than max size */
 
 const float nan_float = NAN;
 
@@ -244,6 +244,7 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
     /* find the end that fits into this supercontig */
     buf_offset_end = buf_filled_end - buf_start;
     if (buf_offset_end > supercontig->end) {
+      /* XXX: I think this is unused */
       buf_filled_end_ptr = buf_start + supercontig->end;
       buf_offset_end = supercontig->end;
     }
@@ -252,11 +253,12 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
     }
     assert (buf_offset_end <= supercontig->end);
 
-    /* XXX: set mem dataspace */
+    /* set mem dataspace */
     mem_dataspace_dims[0] = buf_offset_end - buf_offset_start;
     mem_dataspace = H5Screate_simple(1, mem_dataspace_dims, NULL);
     assert(mem_dataspace >= 0);
 
+    /* set dataset if it exists */
     dataset = open_dataset(supercontig->group, DATASET_NAME, H5P_DEFAULT);
 
     if (dataset >= 0) {
@@ -293,17 +295,19 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
       /* XXX: set PyTables attrs: new func */
     }
 
-    /*
-      at end, write to supercontigs in segments
+    /* select file hyperslab */
+    select_start[0] = buf_offset_start - supercontig->start;
+    select_count[0] = buf_offset_end - supercontig->start;
+    assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
+                               NULL, select_count, NULL) >= 0);
 
-      XXX: select new slab and write
-      assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
-                                 NULL, select_count, NULL) >= 0);
+    /* write */
+    printf("writing %d floats...", select_count[0]);
+    assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
+                    H5P_DEFAULT, &buf_filled_start) >= 0);
+    printf(" done\n");
 
-      assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
-                      H5P_DEFAULT, &datum) >= 0);
-    */
-
+    /* close dataspaces */
     close_dataspace(file_dataspace);
     close_dataspace(mem_dataspace);
   }
