@@ -162,7 +162,9 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
     newstring = NULL;
   }
 
-  free(save_ptr);
+  if (save_ptr) {
+    free(save_ptr);
+  }
 }
 
 void init_supercontig_array(size_t len,
