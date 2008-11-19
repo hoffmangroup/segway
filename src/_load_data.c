@@ -136,6 +136,9 @@ int main(void) {
   char *h5filename = NULL;
   long new_start;
 
+  size_t buf_len;
+  float *buf;
+
   supercontig_t supercontig;
 
   float datum;
@@ -264,17 +267,23 @@ int main(void) {
                >= 0);
 
         chunk_dims[1] = num_cols;
-        assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims) >= 0);
+        assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims)
+               >= 0);
 
         printf("creating %lld x %lld dataset\n", dims[0], dims[1]);
-
         dataset = H5Dcreate(supercontig.group, DATASET_NAME, DTYPE,
                             file_dataspace, H5P_DEFAULT,
                             dataset_creation_plist, H5P_DEFAULT);
         assert(dataset >= 0);
         printf("done\n");
       }
+
       select_start[0] = new_start - supercontig.start;
+
+      buf_len = supercontig.end - select_start[0];
+      printf("allocating %zd floats... ", buf_len);
+      buf = malloc(buf_len * sizeof(float));
+      printf("done\n");
     }
   }
 
