@@ -25,6 +25,7 @@
 
 #define CARDINALITY 2
 #define COL 0 /* XXX: this really can't be hard-coded, just for debugging */
+#define CHUNK_NROWS 1000000
 
 const float nan_float = NAN;
 
@@ -179,73 +180,118 @@ void free_supercontig_array(supercontig_array_t *supercontigs) {
   free(supercontigs->supercontigs);
 }
 
-#if 0
-void write_XXX(XXX) {
+/* suppresses errors */
+hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
+  /* suppress errors */
+  H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data);
+  H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+
+  dataset = H5Dopen(loc, name, dapl);
+
+  /* re-enable errors */
+  H5Eset_auto(H5E_DEFAULT, old_func, old_client_data);
+
+  return dataset;
+}
+
+void write_buf(hid_t *h5file, float *buf_start, float *buf_end,
+               float *buf_filled_start, float *buf_filled_end,
+               supercontig_array_t *supercontigs) {
+  float *buf_filled_end_ptr; /* for one supercontig */
+  size_t buf_offset_start, buf_offset_end;
   hid_t dataset = -1;
 
+  hid_t mem_dataspace = -1;
   hid_t file_dataspace = -1;
 
   hsize_t num_cols;
 
-  hsize_t dims[CARDINALITY];
+  hsize_t mem_dataspace_dims[1];
+  hsize_t file_dataspace_dims[CARDINALITY];
   hsize_t select_start[CARDINALITY] = {-1, COL};
   hsize_t select_count[CARDINALITY] = {1, 1};
-  hsize_t chunk_dims[CARDINALITY] = {1000000, -1};
+  hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, -1};
 
   /* for error suppression */
   H5E_auto2_t old_func;
   void *old_client_data;
 
   hid_t dataset_creation_plist = -1;
-  hid_t mem_dataspace = -1;
 
   dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
   assert(dataset_creation_plist >= 0);
 
   assert(H5Pset_fill_value(dataset_creation_plist, DTYPE, &nan_float) >= 0);
 
-  mem_dataspace = H5Screate(H5S_SCALAR);
-  assert(mem_dataspace >= 0);
+  for (supercontig_t *supercontig = supercontigs->supercontigs;
+       supercontig < supercontigs->supercontigs + supercontigs-> len;
+       supercontig++) {
 
-  /* suppress errors */
-  H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data);
-  H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+    /* find the start that fits into this supercontig */
+    buf_offset_start = buf_filled_start - buf_start;
+    if (buf_offset_start < supercontig->start) {
+      buf_filled_start = buf_start + supercontig->start;
+      buf_offset_start = supercontig->start;
+    }
+    if (buf_offset_start >= supercontig->end) {
+      continue;
+    }
+    assert (buf_offset_start >= supercontig->start);
 
-  dataset = H5Dopen(supercontig.group, DATASET_NAME, H5P_DEFAULT);
+    /* find the end that fits into this supercontig */
+    buf_offset_end = buf_filled_end - buf_start;
+    if (buf_offset_end > supercontig->end) {
+      buf_filled_end_ptr = buf_start + supercontig->end;
+      buf_offset_end = supercontig->end;
+    }
+    if (buf_offset_end < supercontig->start) {
+      continue;
+    }
+    assert (buf_offset_end <= supercontig->end);
 
-  /* re-enable errors */
-  H5Eset_auto(H5E_DEFAULT, old_func, old_client_data);
+    /* XXX: set mem dataspace */
+    mem_dataspace_dims[0] = buf_offset_end - buf_offset_start
+    mem_dataspace = H5Screate_simple(1, mem_dataspace_dims, NULL);
+    assert(mem_dataspace >= 0);
 
-  if (dataset >= 0) {
-    file_dataspace = H5Dget_space(dataset);
-    assert(file_dataspace >= 0);
-  } else {
-    file_dataspace = H5Screate(H5S_SIMPLE);
-    assert(file_dataspace >= 0);
+    dataset = open_dataset(supercontig->group, DATASET_NAME, H5P_DEFAULT);
 
-    num_cols = get_num_cols(h5file);
-    printf("num cols: %lld\n", num_cols);
+    if (dataset >= 0) {
+      /* set file dataspace */
+      file_dataspace = H5Dget_space(dataset);
+      assert(file_dataspace >= 0);
+    } else {
+      /* calc dimensions */
+      num_cols = get_num_cols(h5file);
+      printf("num cols: %lld\n", num_cols);
 
-    dims[0] = supercontig.end - supercontig.start;
-    dims[1] = num_cols;
+      file_dataspace_dims[0] = supercontig->end - supercontig->start;
+      file_dataspace_dims[1] = num_cols;
 
-    assert(H5Sset_extent_simple(file_dataspace, CARDINALITY, dims, dims)
-           >= 0);
+      /* create dataspace */
+      file_dataspace = H5Screate_simple(CARDINALITY, file_dataspace_dims,
+                                        NULL);
+      assert(file_dataspace >= 0);
 
-    chunk_dims[1] = num_cols;
-    assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims)
-           >= 0);
+      /* create chunkspace */
+      chunk_dims[1] = num_cols;
+      assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims)
+             >= 0);
 
-    printf("creating %lld x %lld dataset\n", dims[0], dims[1]);
-    dataset = H5Dcreate(supercontig.group, DATASET_NAME, DTYPE,
-                        file_dataspace, H5P_DEFAULT,
-                        dataset_creation_plist, H5P_DEFAULT);
-    assert(dataset >= 0);
-    printf("done\n");
-  }
+      /* create dataset */
+      printf("creating %lld x %lld dataset\n",
+             file_dataspace_dims[0], file_dataspace_dims[1]);
+      dataset = H5Dcreate(supercontig.group, DATASET_NAME, DTYPE,
+                          file_dataspace, H5P_DEFAULT,
+                          dataset_creation_plist, H5P_DEFAULT);
+      assert(dataset >= 0);
+      printf("done\n");
 
-      /*
-     at end, write to supercontigs in segments
+      /* XXX: set PyTables attrs: new func */
+    }
+
+    /*
+      at end, write to supercontigs in segments
 
       XXX: select new slab and write
       assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
@@ -253,14 +299,14 @@ void write_XXX(XXX) {
 
       assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
                       H5P_DEFAULT, &datum) >= 0);
-      */
+    */
 
-  close_dataspace(mem_dataspace);
+    close_dataspace(file_dataspace);
+    close_dataspace(mem_dataspace);
+  }
 
   assert(H5Pclose(dataset_creation_plist) >= 0);
-
 }
-#endif
 
 void proc_wigfix_header(char *line, hid_t *h5file,
                         supercontig_array_t *supercontigs,
@@ -331,7 +377,7 @@ int main(void) {
   char *tailptr;
 
   float *buf_start = NULL;
-  float *buf_offset, *buf_ptr, *buf_end;
+  float *buf_filled_start, *buf_ptr, *buf_end;
 
   supercontig_array_t supercontigs;
 
@@ -346,7 +392,7 @@ int main(void) {
 
   proc_wigfix_header(line, &h5file, &supercontigs,
                      &buf_start, &buf_end, &buf_ptr);
-  buf_offset = buf_ptr;
+  buf_filled_start = buf_ptr;
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
@@ -355,14 +401,14 @@ int main(void) {
         *buf_ptr++ = datum;
       } /* else: ignore data until we get to another header line */
     } else {
-      /*      write_buf()*/
+      write_buf(h5file, buf_start, buf_end, buf_filled_start, buf_ptr, &supercontigs);
       proc_wigfix_header(line, &h5file, &supercontigs,
                          &buf_start, &buf_end, &buf_ptr);
-      buf_offset = buf_ptr;
+      buf_filled_start = buf_ptr;
     }
   }
 
-  /* write_buf() */
+  /* XXX: write_buf() */
   free_supercontig_array(&supercontigs);
   free(line);
   free(buf_start);
