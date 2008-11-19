@@ -170,7 +170,6 @@ int main(void) {
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
     if (*tailptr == '\n' && h5file >= 0) {
-      printf(" [%lld]", select_start[0]);
       if (!(select_start[0] % 100000)) {
         printf(" [%lld]", select_start[0]);
       }
