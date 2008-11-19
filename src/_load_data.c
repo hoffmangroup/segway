@@ -286,6 +286,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 
 int main(void) {
   char *line = NULL;
+  char *line_copy;
   size_t size_line = 0;
   char *tailptr;
 
@@ -322,7 +323,9 @@ int main(void) {
      strtof rather than using getline */
 
   assert (getline(&line, &size_line, stdin) >= 0);
-  proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
+  line_copy = strdup(line); /* XXX: why? */
+  proc_wigfix_header(line_copy, &h5file, &supercontigs, &buf, &buf_len);
+  free(line_copy);
   buf_ptr = buf;
   buf_end = buf_ptr + buf_len;
 
@@ -333,7 +336,9 @@ int main(void) {
         *buf_ptr++ = datum;
       } /* else: ignore the data */
     } else {
+      line_copy = strdup(line); /* XXX: why? */
       proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
+      free(line_copy);
 
       buf_ptr = buf;
       buf_end = buf_ptr + buf_len;
