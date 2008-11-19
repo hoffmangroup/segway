@@ -326,9 +326,7 @@ int main(void) {
 
   size_line = 0;
   while (getline(&line, &size_line, stdin) >= 0) {
-    printf(line);
     datum = strtof(line, &tailptr);
-    printf("%f\n", datum);
     if (*tailptr == '\n') {
       if (buf_ptr < buf_end) {
         *buf_ptr++ = datum;
