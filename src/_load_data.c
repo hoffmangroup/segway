@@ -283,7 +283,7 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
       /* create dataset */
       printf("creating %lld x %lld dataset\n",
              file_dataspace_dims[0], file_dataspace_dims[1]);
-      dataset = H5Dcreate(supercontig.group, DATASET_NAME, DTYPE,
+      dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
                           file_dataspace, H5P_DEFAULT,
                           dataset_creation_plist, H5P_DEFAULT);
       assert(dataset >= 0);
