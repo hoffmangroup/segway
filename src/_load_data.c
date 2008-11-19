@@ -90,7 +90,7 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
   subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
   assert(subgroup >= 0);
 
-  printf("%s: %d\n", name, subgroup);
+  printf(" %s: %d\n", name, subgroup);
 
   get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &supercontig->start);
   get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
@@ -297,7 +297,7 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
 
     /* select file hyperslab */
     select_start[0] = buf_offset_start - supercontig->start;
-    select_count[0] = buf_offset_end - select_start[0];
+    select_count[0] = buf_offset_end - buf_offset_start;
     assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
                                NULL, select_count, NULL) >= 0);
 
