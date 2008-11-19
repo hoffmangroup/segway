@@ -125,7 +125,6 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   /* mallocs chrom; caller must free() it */
 
   char *save_ptr;
-  char *save_ptr_orig;
   char *token;
   char *tailptr;
   char *newstring;
@@ -139,12 +138,12 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
 
   assert(!strncmp(FMT_WIGFIX, line, strlen(FMT_WIGFIX)));
 
-  save_ptr_orig = save_ptr = strdup(line);
+  save_ptr = strdupa(line);
   newstring = line + strlen(FMT_WIGFIX);
 
   while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
     loc_eq = strchr(token, '=');
-    key = strndup(token, loc_eq - token);
+    key = strndupa(token, loc_eq - token);
     val = loc_eq + 1;
 
     if (!strcmp(key, KEY_CHROM)) {
@@ -161,11 +160,6 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
     }
 
     newstring = NULL;
-    free(key);
-  }
-
-  if (save_ptr) {
-    free(save_ptr_orig);
   }
 }
 
@@ -256,7 +250,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   printf("%s (%ld)\n", chrom, start);
 
   /* set h5filename */
-  h5filename = malloc(strlen(chrom)+strlen(SUFFIX_H5)+1);
+  h5filename = alloca(strlen(chrom)+strlen(SUFFIX_H5)+1);
   suffix = stpcpy(h5filename, chrom);
   strcpy(suffix, SUFFIX_H5);
   free(chrom);
@@ -289,8 +283,6 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* XXX: need to ensure sorting */
   *buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
   *buf = malloc(*buf_len * sizeof(float));
-
-  free(h5filename);
 }
 
 int main(void) {
