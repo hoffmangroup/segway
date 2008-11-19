@@ -1,3 +1,7 @@
+/* XXXopt: probably the most important place for optimization is chunk
+   space, but you should do profiling to see whether writing is the
+   slowest bit */
+
 #define _GNU_SOURCE
 
 #include <assert.h>
