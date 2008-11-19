@@ -137,7 +137,7 @@ int main(void) {
   long new_start;
 
   size_t buf_len;
-  float *buf;
+  float *buf, *buf_ptr, *buf_end;
 
   supercontig_t supercontig;
 
@@ -172,17 +172,20 @@ int main(void) {
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
-    if (*tailptr == '\n' && h5file >= 0) {
-      if (!(select_start[0] % 10)) {
+    if (*tailptr == '\n' && h5file >= 0 && buf_ptr < buf_end) {
+      if (!(select_start[0] % 100000)) {
         printf(" [%lld]", select_start[0]);
       }
+      *buf_ptr = datum;
+      /*
+      XXX: select new slab and write
       assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
                                  NULL, select_count, NULL) >= 0);
 
-      /* XXXopt: write in memory instead of each time */
       assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
                       H5P_DEFAULT, &datum) >= 0);
-      select_start[0]++;
+      */
+      buf_ptr++;
     } else {
       /* strip trailing newline */
       *strchr(line, '\n') = '\0';
@@ -281,9 +284,13 @@ int main(void) {
       select_start[0] = new_start - supercontig.start;
 
       buf_len = supercontig.end - select_start[0];
+      buf_size = buf_len * sizeof(float);
       printf("allocating %zd floats... ", buf_len);
-      buf = malloc(buf_len * sizeof(float));
+      buf = malloc(buf_size);
       printf("done\n");
+
+      buf_ptr = buf;
+      buf_end = buf_ptr + buf_size;
     }
   }
 
