@@ -251,7 +251,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* set h5filename */
   h5filename = strndupa(chrom, strlen(chrom)+strlen(EXT_H5));
   strcpy(h5filename+strlen(chrom), EXT_H5);
-  free(chrom);
+  /* free(chrom); */
 
   /* XXXopt: don't close if it's the same file */
   if (*buf) {
@@ -326,7 +326,6 @@ int main(void) {
   buf_ptr = buf;
   buf_end = buf_ptr + buf_len;
 
-  size_line = 0;
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
     if (*tailptr == '\n') {
