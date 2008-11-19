@@ -9,7 +9,6 @@
 #include <hdf5.h>
 
 #define FMT_WIGFIX "fixedStep "
-#define LEN_FMT_WIGFIX strlen(FMT_WIGFIX)
 #define DELIM_WIG " "
 
 #define KEY_CHROM "chrom"
@@ -137,12 +136,12 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   /* strip trailing newline */
   *strchr(line, '\n') = '\0';
 
-  assert(!strncmp(FMT_WIGFIX, line, LEN_FMT_WIGFIX));
+  assert(!strncmp(FMT_WIGFIX, line, strlen(FMT_WIGFIX)));
 
   save_ptr = strdupa(line);
-  newstring = line + LEN_FMT_WIGFIX;
+  newstring = line + strlen(FMT_WIGFIX);
 
-  while (token = (strtok_r(newstring, DELIM_WIG, &save_ptr))) {
+  while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
     loc_eq = strchr(token, '=');
     key = strndup(token, loc_eq - token);
     val = loc_eq + 1;
