@@ -323,6 +323,7 @@ int main(void) {
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
+    printf("%f\n", datum);
     if (*tailptr == '\n') {
       if (buf_ptr < buf_end) {
         *buf_ptr++ = datum;
