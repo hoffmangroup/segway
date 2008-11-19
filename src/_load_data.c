@@ -143,7 +143,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
 
   while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
     loc_eq = strchr(token, '=');
-    key = strndupa(token, loc_eq - token);
+    key = strndup(token, loc_eq - token);
     val = loc_eq + 1;
 
     if (!strcmp(key, KEY_CHROM)) {
@@ -160,6 +160,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
     }
 
     newstring = NULL;
+    free(key);
   }
 
   if (save_ptr) {
