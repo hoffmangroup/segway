@@ -259,7 +259,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 
   /* allocate supercontig metadata array */
   assert(H5Gget_info(root, &root_info) >= 0);
-  init_supercontig_array(root_info.nlinks, &supercontigs);
+  init_supercontig_array(root_info.nlinks, supercontigs);
 
   /* populate supercontig metadata array */
   assert(H5Lvisit(root, H5_INDEX_NAME, H5_ITER_INC, supercontig_visitor,
@@ -270,8 +270,8 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* allocate buffer: enough to assign values from 0 to the end of the
      last supercontig */
   /* XXX: need to ensure sorting */
-  *buf_len = supercontigs.supercontig[supercontigs.len-1];
-  buf = malloc(buf_len * sizeof(float));
+  *buf_len = supercontigs->supercontig[supercontigs->len-1];
+  buf = malloc(*buf_len * sizeof(float));
 }
 
 int main(void) {
@@ -282,7 +282,7 @@ int main(void) {
   size_t buf_len = 0;
   float *buf, *buf_ptr, *buf_end;
 
-  supercontig_t supercontig;
+  supercontig_array_t supercontigs;
 
   float datum;
 
@@ -291,8 +291,6 @@ int main(void) {
   hid_t dataset_creation_plist = -1;
   hid_t mem_dataspace = -1;
   hid_t file_dataspace = -1;
-
-  supercontig.group = -1;
 
   hsize_t num_cols;
 
@@ -335,12 +333,7 @@ int main(void) {
       buf_end = buf_ptr + buf_len;
   }
 
-
-  /* XXXwrite dataset in memory */
   close_dataspace(mem_dataspace);
-  close_dataspace(file_dataspace);
-  close_dataset(dataset);
-  close_group(supercontig.group);
   close_file(h5file);
 
   assert(H5Pclose(dataset_creation_plist) >= 0);
