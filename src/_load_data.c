@@ -172,7 +172,8 @@ int main(void) {
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
-    if (*tailptr == '\n' && h5file >= 0 && buf_ptr < buf_end) {
+    if (*tailptr == '\n' && h5file >= 0) {
+      asssert(buf_ptr < buf_end);
       if (!((buf_ptr - buf) % 1000)) {
         printf(" [%lld]", select_start[0]);
       }
