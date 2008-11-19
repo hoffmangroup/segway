@@ -125,6 +125,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   /* mallocs chrom; caller must free() it */
 
   char *save_ptr;
+  char *save_ptr_orig;
   char *token;
   char *tailptr;
   char *newstring;
@@ -138,7 +139,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
 
   assert(!strncmp(FMT_WIGFIX, line, strlen(FMT_WIGFIX)));
 
-  save_ptr = strdup(line);
+  save_ptr_orig = save_ptr = strdup(line);
   newstring = line + strlen(FMT_WIGFIX);
 
   while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
@@ -164,7 +165,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   }
 
   if (save_ptr) {
-    free(save_ptr);
+    free(save_ptr_orig);
   }
 }
 
