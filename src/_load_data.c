@@ -25,6 +25,7 @@
 #define EXT_H5 ".h5"
 
 #define CARDINALITY 2
+#define COL 0 /* XXX: this really can't be hard-coded, just for debugging */
 
 const float nan_float = NAN;
 
@@ -127,31 +128,58 @@ int main(void) {
 
   char *chrom;
   char *h5filename = NULL;
-  long new_start;
+  long new_start, offset;
 
   supercontig_t supercontig;
 
   float datum;
 
   hid_t h5file = -1;
-  hid_t dataspace = -1;
   hid_t dataset = -1;
   hid_t dataset_creation_plist = -1;
+  hid_t mem_dataspace = -1;
+  hid_t file_dataspace = -1;
 
   supercontig.group = -1;
 
-  hsize_t dims[CARDINALITY];
   hsize_t num_cols;
+
+  hsize_t dims[CARDINALITY];
+  hsize_t select_start[CARDINALITY];
+  hsize_t select_count[CARDINALITY] = {1, 1};
+
+  /* for error suppression */
+  herr_t (*old_func)(void*);
+  void *old_client_data;
 
   dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
   assert(dataset_creation_plist >= 0);
 
   assert(H5Pset_fill_value(dataset_creation_plist, DTYPE, &nan_float) >= 0);
 
+  mem_dataspace = H5Screate(H5S_SCALAR);
+  assert(mem_dataspace >= 0);
+
   while (getline(&line, &size_line, stdin) >= 0) {
     *strchr(line, '\n') = '\0';
 
-    if (!strncmp(FMT_WIGFIX, line, LEN_FMT_WIGFIX)) {
+    datum = strtof(line, &tailptr);
+    if (!*tailptr && h5file >= 0) {
+      select_start = {offset, COL};
+      assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
+                                 NULL, select_count, NULL) >= 0);
+
+      /* XXXopt: write in memory instead of each time */
+      printf("writing %f...", datum);
+      assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
+                      H5P_DEFAULT, &datum) >= 0);
+      printf(" done\n");
+      offset++;
+    } else {
+      /* XXX: most of this should go to another function:
+         parse_wigfix_header() */
+      assert(!strncmp(FMT_WIGFIX, line, LEN_FMT_WIGFIX));
+
       h5filename = NULL;
       new_start = -1;
 
@@ -186,7 +214,7 @@ int main(void) {
 
       /* XXXopt: don't close if it's the same file or supercontig */
       /* XXX: write dataset in memory */
-      close_dataspace(dataspace);
+      close_dataspace(file_dataspace);
       close_dataset(dataset);
       close_group(supercontig.group);
       close_group(h5file);
@@ -201,13 +229,22 @@ int main(void) {
                    &supercontig) >= 1) {
         printf(" (%d, %d)\n", supercontig.start, supercontig.end);
       }
-      /* XXX: suppress errors here */
+
+      /* suppress errors */
+      H5Eget_auto2(H5E_DEFAULT, &old_func, &old_client_data);
+      H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
+
       dataset = H5Dopen(supercontig.group, DATASET_NAME, H5P_DEFAULT);
 
-      if (dataset < 0) {
-        /* XXX: CArrays are actually H5S_SCALAR*/
-        dataspace = H5Screate(H5S_SIMPLE);
-        assert (dataspace >= 0);
+      /* re-enable errors */
+      H5Eset_auto2(H5E_DEFAULT, old_func, old_client_data);
+
+      if (dataset >= 0) {
+        file_dataspace = H5Dget_space(dataset);
+        assert(file_dataspace >= 0);
+      } else {
+        file_dataspace = H5Screate(H5S_SIMPLE);
+        assert(file_dataspace >= 0);
 
         num_cols = get_num_cols(h5file);
         printf("num cols: %lld\n", num_cols);
@@ -215,39 +252,29 @@ int main(void) {
         dims[0] = supercontig.end - supercontig.start;
         dims[1] = num_cols;
 
-        assert(H5Sset_extent_simple(dataspace, CARDINALITY, dims, dims) >= 0);
+        assert(H5Sset_extent_simple(file_dataspace, CARDINALITY, dims, dims)
+               >= 0);
 
         printf("creating %lld x %lld dataset\n", dims[0], dims[1]);
 
-        dataset = H5Dcreate(supercontig.group, DATASET_NAME, DTYPE, dataspace,
-                            H5P_DEFAULT, dataset_creation_plist, H5P_DEFAULT);
+        dataset = H5Dcreate(supercontig.group, DATASET_NAME, DTYPE,
+                            file_dataspace, H5P_DEFAULT,
+                            dataset_creation_plist, H5P_DEFAULT);
         assert(dataset >= 0);
         printf("done\n");
+
+        offset = new_start - supercontig_start;
       }
-
-    } else {
-      assert(h5file >= 0);
-      datum = strtof(line, &tailptr);
-
-      assert(!*tailptr);
-
-      dataspace_mem = XXX;
-      dataspace_file = XXX;
-
-      /* XXXopt: set compact so that there is caching*/
-      /* XXXopt: write in memory instead of each time */
-      printf("writing %f...", datum);
-      assert(H5Dwrite(dataset, DTYPE, dataspace_mem, dataspace_file,
-                      H5P_DEFAULT, &datum) >= 0);
-      printf(" done\n");
     }
   }
 
   /* XXXwrite dataset in memory */
-  close_dataspace(dataspace);
+  close_dataspace(mem_dataspace);
+  close_dataspace(file_dataspace);
   close_dataset(dataset);
   close_group(supercontig.group);
   close_group(h5file);
 
   assert(H5Pclose(dataset_creation_plist) >= 0);
 }
+
