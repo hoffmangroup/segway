@@ -284,6 +284,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* XXXopt: don't close if it's the same file */
   if (*buf) {
     free(*buf);
+    free(supercontigs->supercontigs);
   }
   close_file(*h5file);
 
@@ -348,6 +349,10 @@ int main(void) {
       buf_end = buf_ptr + buf_len;
     }
   }
+
+  free(supercontigs->supercontigs);
+  free(line);
+  free(buf);
 
   close_file(h5file);
 
