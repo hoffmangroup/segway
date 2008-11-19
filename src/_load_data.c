@@ -243,6 +243,8 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 
   /* do writing if buf_len > 0 */
 
+  char *line_copy;
+
   line_copy = strdup(line); /* XXX: why? */
   parse_wigfix_header(line_copy, &chrom, &start, &step);
   free(line_copy);
