@@ -263,7 +263,7 @@ int main(void) {
         assert(dataset >= 0);
         printf("done\n");
 
-        offset = new_start - supercontig_start;
+        offset = new_start - supercontig.start;
       }
     }
   }
