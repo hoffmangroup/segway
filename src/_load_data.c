@@ -138,7 +138,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   save_ptr = strdupa(line);
   newstring = line + LEN_FMT_WIGFIX;
 
-  while (token = strtok_r(newstring, DELIM_WIG, &save_ptr)) {
+  while (token = (strtok_r(newstring, DELIM_WIG, &save_ptr))) {
     loc_eq = strchr(token, '=');
     key = strndup(token, loc_eq - token);
     val = loc_eq + 1;
@@ -170,6 +170,9 @@ void init_supercontig_array(size_t len,
 
 #if 0
 void write_XXX(XXX) {
+  /* for error suppression */
+  H5E_auto2_t old_func;
+  void *old_client_data;
 
   /* suppress errors */
   H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data);
@@ -299,10 +302,6 @@ int main(void) {
   hsize_t select_count[CARDINALITY] = {1, 1};
   hsize_t chunk_dims[CARDINALITY] = {1000000, -1};
 
-  /* for error suppression */
-  H5E_auto2_t old_func;
-  void *old_client_data;
-
   dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
   assert(dataset_creation_plist >= 0);
 
@@ -338,5 +337,7 @@ int main(void) {
   close_file(h5file);
 
   assert(H5Pclose(dataset_creation_plist) >= 0);
+
+  return 0;
 }
 
