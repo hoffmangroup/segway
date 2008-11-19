@@ -285,7 +285,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 }
 
 int main(void) {
-  char *line;
+  char *line = NULL;
   size_t size_line = 0;
   char *tailptr;
 
