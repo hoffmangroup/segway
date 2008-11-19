@@ -256,7 +256,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   printf("%s (%ld)\n", chrom, start);
 
   /* set h5filename */
-  h5filename = strndupa(chrom, strlen(chrom)+strlen(EXT_H5));
+  h5filename = strndup(chrom, strlen(chrom)+strlen(EXT_H5));
   strcpy(h5filename+strlen(chrom), EXT_H5);
   free(chrom);
 
@@ -289,6 +289,8 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   *buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
   *buf = malloc(*buf_len * sizeof(float));
   printf("allocated\n");
+
+  free(h5filename);
 }
 
 int main(void) {
