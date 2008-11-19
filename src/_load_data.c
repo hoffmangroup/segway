@@ -224,7 +224,7 @@ void write_XXX(XXX) {
 
 void proc_wigfix_header(char *line, hid_t *h5file,
                         supercontig_array_t *supercontigs,
-                        float *buf, size_t *buf_len) {
+                        float **buf, size_t *buf_len) {
   long start = -1;
   long step = 1;
 
@@ -270,8 +270,8 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* allocate buffer: enough to assign values from 0 to the end of the
      last supercontig */
   /* XXX: need to ensure sorting */
-  *buf_len = supercontigs->supercontig[supercontigs->len-1];
-  buf = malloc(*buf_len * sizeof(float));
+  *buf_len = supercontigs->supercontigs[supercontigs->len-1];
+  *buf = malloc(*buf_len * sizeof(float));
 }
 
 int main(void) {
@@ -331,6 +331,7 @@ int main(void) {
 
       buf_ptr = buf;
       buf_end = buf_ptr + buf_len;
+    }
   }
 
   close_dataspace(mem_dataspace);
