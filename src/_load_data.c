@@ -277,6 +277,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* XXX: need to ensure sorting */
   *buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
   *buf = malloc(*buf_len * sizeof(float));
+  printf("allocated\n");
 }
 
 int main(void) {
