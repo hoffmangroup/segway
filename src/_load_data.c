@@ -90,7 +90,7 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
   subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
   assert(subgroup >= 0);
 
-  printf("%s: %d\n", name, group);
+  printf("%s: %d\n", name, subgroup);
 
   get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &supercontig->start);
   get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
