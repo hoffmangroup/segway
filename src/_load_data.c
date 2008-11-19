@@ -35,6 +35,13 @@ typedef struct {
   hid_t group;
 } supercontig_t;
 
+
+typedef struct {
+  size_t len;
+  supercontig_t *supercontigs;
+  supercontig_t *supercontig_curr;
+} supercontig_array_t;
+
 void get_attr(hid_t loc, const char *name, hid_t mem_type_id, void *buf) {
   hid_t attr;
 
@@ -72,26 +79,21 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
                            const H5L_info_t *info,
                            void *op_info) {
   hid_t subgroup;
-  int start;
-  int end;
   supercontig_t *supercontig;
+  supercontig_array_t *supercontigs;
 
-  supercontig = (supercontig_t *) op_info;
+  supercontigs = (supercontig_array_t *) op_info;
 
+  supercontig = supercontigs->supercontig_curr++;
+
+  /* leave open */
   subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
   assert(subgroup >= 0);
 
-  get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &start);
-  get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &end);
+  get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &supercontig->start);
+  get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
+  supercontig->group = subgroup;
 
-  if (start <= supercontig->start && supercontig->start < end) {
-    supercontig->start = start;
-    supercontig->end = end;
-    supercontig->group = subgroup;
-    return 1;
-  }
-
-  assert(H5Gclose(subgroup) >= 0);
   return 0;
 }
 
@@ -158,36 +160,15 @@ void parse_wigfix_header(char *line, char **chrom, int *start, int *step) {
   }
 }
 
-void proc_wigfix_header(char *line) {
-  long start = -1;
-  long step = 1;
+void init_supercontig_array(size_t len,
+                            supercontig_array_t *supercontigs) {
+  supercontigs.len = len;
+  supercontigs.supercontigs = malloc(len * sizeof(supercontig_t));
+  supercontigs.supercontig_curr = supercontigs.supercontigs;
+}
 
-  char *chrom = NULL;
-  char *h5filename = NULL;
-
-  parse_wigfix_header(line, &chrom, &start, &step);
-  assert(chrom && start >= 0 && step == 1);
-
-  printf("%s (%ld)\n", chrom, start);
-
-  /* set h5filename */
-  h5filename = strndupa(val, strlen(val)+strlen(EXT_H5));
-  strcpy(h5filename+strlen(val), EXT_H5);
-
-  /* XXXopt: don't close if it's the same file */
-  close_dataspace(file_dataspace);
-  close_dataset(dataset);
-  close_group(supercontig.group);
-  close_file(h5file);
-
-  h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
-  assert(h5file >= 0);
-
-  supercontig.start = start;
-  if (H5Lvisit(h5file, H5_INDEX_NAME, H5_ITER_INC, supercontig_visitor,
-               &supercontig) >= 1) {
-    printf(" (%d, %d)\n", supercontig.start, supercontig.end);
-  }
+#if 0
+void write_XXX(XXX) {
 
   /* suppress errors */
   H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data);
@@ -226,19 +207,69 @@ void proc_wigfix_header(char *line) {
     printf("done\n");
   }
 
-  select_start[0] = start - supercontig.start;
+      /*
+     at end, write to supercontigs in segments
 
-  buf_len = supercontig.end - select_start[0];
-  printf("allocating %zd floats... ", buf_len);
-  buf = malloc(buf_len * sizeof(float));
-  printf("done\n");
+      XXX: select new slab and write
+      assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
+                                 NULL, select_count, NULL) >= 0);
 
-  buf_ptr = buf;
-  buf_end = buf_ptr + buf_len;
+      assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
+                      H5P_DEFAULT, &datum) >= 0);
+      */
 
+}
+#endif
+
+void proc_wigfix_header(char *line, hid_t *h5file,
+                        supercontig_array_t *supercontigs,
+                        float *buf, size_t *buf_len) {
+  long start = -1;
+  long step = 1;
+
+  char *chrom = NULL;
+  char *h5filename = NULL;
+
+  hid_t root = -1;
+
+  H5G_info_t root_info;
+
+  /* do writing if buf_len > 0 */
+
+  parse_wigfix_header(line, &chrom, &start, &step);
+  assert(chrom && start >= 0 && step == 1);
+
+  printf("%s (%ld)\n", chrom, start);
+
+  /* set h5filename */
+  h5filename = strndupa(chrom, strlen(chrom)+strlen(EXT_H5));
+  strcpy(h5filename+strlen(chrom), EXT_H5);
   free(chrom)
 
-  return XXX;
+  /* XXXopt: don't close if it's the same file */
+  close_file(h5file);
+
+  /* open the chromosome file */
+  h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
+  assert(h5file >= 0);
+  root = H5Gopen(h5file, "/", H5P_DEFAULT);
+  assert(root >= 0);
+
+  /* allocate supercontig metadata array */
+  assert(H5Gget_info(root, &root_info) >= 0);
+  init_supercontig_array(root_info.nlinks, &supercontigs);
+
+  /* populate supercontig metadata array */
+  assert(H5Lvisit(root, H5_INDEX_NAME, H5_ITER_INC, supercontig_visitor,
+                  &supercontigs) == 0);
+
+  assert(H5Gclose(root) >= 0);
+
+  /* allocate buffer: enough to assign values from 0 to the end of the
+     last supercontig */
+  /* XXX: need to ensure sorting */
+  *buf_len = supercontigs.supercontig[supercontigs.len-1];
+  buf = malloc(buf_len * sizeof(float));
 }
 
 int main(void) {
@@ -246,7 +277,7 @@ int main(void) {
   size_t size_line = 0;
   char *tailptr;
 
-  size_t buf_len;
+  size_t buf_len = 0;
   float *buf, *buf_ptr, *buf_end;
 
   supercontig_t supercontig;
@@ -283,33 +314,25 @@ int main(void) {
   /* XXXopt: would be faster to just read a big block and do repeated
      strtof rather than using getline */
 
-  /* XXX: new plan:
-     on header line, malloc a buffer big enough to fit 0-end of last chunk
-     write to this buffer
-     at end, write to supercontigs in segments
-  */
+  assert (getline(&line, &size_line, stdin) >= 0);
+  proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
-    if (*tailptr == '\n' && h5file >= 0 && buf_ptr < buf_end) {
-      if (!((buf_ptr - buf) % 100000)) {
-        printf(" [%lld]", buf_ptr - buf);
-      }
-      *buf_ptr++ = datum;
-      /*
-      XXX: select new slab and write
-      assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
-                                 NULL, select_count, NULL) >= 0);
-
-      assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
-                      H5P_DEFAULT, &datum) >= 0);
-      */
+    if (*tailptr == '\n') {
+      if (buf_ptr < buf_end) {
+        *buf_ptr++ = datum;
+      } /* else: ignore the data */
     } else {
       /* strip trailing newline */
       *strchr(line, '\n') = '\0';
 
-      proc_wigfix_header(line);
+      proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
+
+      buf_ptr = buf;
+      buf_end = buf_ptr + buf_len;
   }
+
 
   /* XXXwrite dataset in memory */
   close_dataspace(mem_dataspace);
