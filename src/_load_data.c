@@ -182,6 +182,8 @@ void free_supercontig_array(supercontig_array_t *supercontigs) {
 
 /* suppresses errors */
 hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
+  hid_t dataset;
+
   /* for error suppression */
   H5E_auto2_t old_func;
   void *old_client_data;
@@ -250,7 +252,7 @@ void write_buf(hid_t *h5file, float *buf_start, float *buf_end,
     assert (buf_offset_end <= supercontig->end);
 
     /* XXX: set mem dataspace */
-    mem_dataspace_dims[0] = buf_offset_end - buf_offset_start
+    mem_dataspace_dims[0] = buf_offset_end - buf_offset_start;
     mem_dataspace = H5Screate_simple(1, mem_dataspace_dims, NULL);
     assert(mem_dataspace >= 0);
 
