@@ -136,7 +136,7 @@ int main(void) {
   char *h5filename = NULL;
   long new_start;
 
-  size_t buf_len;
+  size_t buf_len, buf_size;
   float *buf, *buf_ptr, *buf_end;
 
   supercontig_t supercontig;
