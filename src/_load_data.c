@@ -254,7 +254,9 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   free(chrom);
 
   /* XXXopt: don't close if it's the same file */
-  free(buf);
+  if (*buf) {
+    free(*buf);
+  }
   close_file(*h5file);
 
   /* open the chromosome file */
@@ -288,7 +290,8 @@ int main(void) {
   char *tailptr;
 
   size_t buf_len = 0;
-  float *buf, *buf_ptr, *buf_end;
+  float *buf = NULL;
+  float *buf_ptr, *buf_end;
 
   supercontig_array_t supercontigs;
 
