@@ -87,6 +87,7 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
   supercontig = supercontigs->supercontig_curr++;
 
   /* leave open */
+  printf("%s\n", name);
   subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
   assert(subgroup >= 0);
 
@@ -265,7 +266,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   init_supercontig_array(root_info.nlinks, supercontigs);
 
   /* populate supercontig metadata array */
-  assert(H5Lvisit(*h5file, H5_INDEX_NAME, H5_ITER_INC, supercontig_visitor,
+  assert(H5Lvisit(root, H5_INDEX_NAME, H5_ITER_INC, supercontig_visitor,
                   &supercontigs) == 0);
 
   assert(H5Gclose(root) >= 0);
