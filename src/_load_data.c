@@ -136,7 +136,7 @@ int main(void) {
   char *h5filename = NULL;
   long new_start;
 
-  size_t buf_len, buf_size;
+  size_t buf_len;
   float *buf, *buf_ptr, *buf_end;
 
   supercontig_t supercontig;
@@ -169,6 +169,9 @@ int main(void) {
 
   mem_dataspace = H5Screate(H5S_SCALAR);
   assert(mem_dataspace >= 0);
+
+  /* XXXopt: would be faster to just read a big block and do repeated
+     strtof rather than using getline */
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
@@ -286,13 +289,12 @@ int main(void) {
       select_start[0] = new_start - supercontig.start;
 
       buf_len = supercontig.end - select_start[0];
-      buf_size = buf_len * sizeof(float);
       printf("allocating %zd floats... ", buf_len);
-      buf = malloc(buf_size);
+      buf = malloc(buf_len * sizeof(float));
       printf("done\n");
 
       buf_ptr = buf;
-      buf_end = buf_ptr + buf_size;
+      buf_end = buf_ptr + buf_len;
     }
   }
 
