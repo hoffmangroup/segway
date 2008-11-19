@@ -134,6 +134,9 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   char *key;
   char *val;
 
+  /* strip trailing newline */
+  *strchr(line, '\n') = '\0';
+
   assert(!strncmp(FMT_WIGFIX, line, LEN_FMT_WIGFIX));
 
   save_ptr = strdupa(line);
@@ -151,6 +154,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
       assert(!*tailptr);
     } else if (!strcmp(key, KEY_STEP)) {
       *step = strtol(val, &tailptr, 10);
+      assert(!*tailptr);
     } else {
       printf("can't understand key: %s", key);
       exit(1);
@@ -322,6 +326,7 @@ int main(void) {
   buf_end = buf_ptr + buf_len;
 
   while (getline(&line, &size_line, stdin) >= 0) {
+    printf(line);
     datum = strtof(line, &tailptr);
     printf("%f\n", datum);
     if (*tailptr == '\n') {
@@ -329,9 +334,6 @@ int main(void) {
         *buf_ptr++ = datum;
       } /* else: ignore the data */
     } else {
-      /* strip trailing newline */
-      *strchr(line, '\n') = '\0';
-
       proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
 
       buf_ptr = buf;
