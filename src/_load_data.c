@@ -138,7 +138,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
 
   assert(!strncmp(FMT_WIGFIX, line, strlen(FMT_WIGFIX)));
 
-  save_ptr = strdupa(line);
+  save_ptr = strdup(line);
   newstring = line + strlen(FMT_WIGFIX);
 
   while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
@@ -161,6 +161,8 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
 
     newstring = NULL;
   }
+
+  free(save_ptr);
 }
 
 void init_supercontig_array(size_t len,
