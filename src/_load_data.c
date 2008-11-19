@@ -121,11 +121,12 @@ void close_file(hid_t h5file) {
   }
 }
 
-void parse_wigfix_header(char *line, char **chrom, int *start, int *step) {
+void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   /* mallocs chrom; caller must free() it */
 
   char *save_ptr;
   char *token;
+  char *tailptr;
   char *newstring;
 
   char *loc_eq;
@@ -162,9 +163,9 @@ void parse_wigfix_header(char *line, char **chrom, int *start, int *step) {
 
 void init_supercontig_array(size_t len,
                             supercontig_array_t *supercontigs) {
-  supercontigs.len = len;
-  supercontigs.supercontigs = malloc(len * sizeof(supercontig_t));
-  supercontigs.supercontig_curr = supercontigs.supercontigs;
+  supercontigs->len = len;
+  supercontigs->supercontigs = malloc(len * sizeof(supercontig_t));
+  supercontigs->supercontig_curr = supercontigs.supercontigs;
 }
 
 #if 0
