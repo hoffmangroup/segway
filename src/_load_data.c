@@ -172,9 +172,31 @@ void init_supercontig_array(size_t len,
 
 #if 0
 void write_XXX(XXX) {
+  hid_t dataset = -1;
+
+  hid_t file_dataspace = -1;
+
+  hsize_t num_cols;
+
+  hsize_t dims[CARDINALITY];
+  hsize_t select_start[CARDINALITY] = {-1, COL};
+  hsize_t select_count[CARDINALITY] = {1, 1};
+  hsize_t chunk_dims[CARDINALITY] = {1000000, -1};
+
   /* for error suppression */
   H5E_auto2_t old_func;
   void *old_client_data;
+
+  hid_t dataset_creation_plist = -1;
+  hid_t mem_dataspace = -1;
+
+  dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
+  assert(dataset_creation_plist >= 0);
+
+  assert(H5Pset_fill_value(dataset_creation_plist, DTYPE, &nan_float) >= 0);
+
+  mem_dataspace = H5Screate(H5S_SCALAR);
+  assert(mem_dataspace >= 0);
 
   /* suppress errors */
   H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data);
@@ -223,6 +245,10 @@ void write_XXX(XXX) {
       assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
                       H5P_DEFAULT, &datum) >= 0);
       */
+
+  close_dataspace(mem_dataspace);
+
+  assert(H5Pclose(dataset_creation_plist) >= 0);
 
 }
 #endif
@@ -299,25 +325,6 @@ int main(void) {
   float datum;
 
   hid_t h5file = -1;
-  hid_t dataset = -1;
-  hid_t dataset_creation_plist = -1;
-  hid_t mem_dataspace = -1;
-  hid_t file_dataspace = -1;
-
-  hsize_t num_cols;
-
-  hsize_t dims[CARDINALITY];
-  hsize_t select_start[CARDINALITY] = {-1, COL};
-  hsize_t select_count[CARDINALITY] = {1, 1};
-  hsize_t chunk_dims[CARDINALITY] = {1000000, -1};
-
-  dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
-  assert(dataset_creation_plist >= 0);
-
-  assert(H5Pset_fill_value(dataset_creation_plist, DTYPE, &nan_float) >= 0);
-
-  mem_dataspace = H5Screate(H5S_SCALAR);
-  assert(mem_dataspace >= 0);
 
   /* XXXopt: would be faster to just read a big block and do repeated
      strtof rather than using getline */
@@ -342,10 +349,7 @@ int main(void) {
     }
   }
 
-  close_dataspace(mem_dataspace);
   close_file(h5file);
-
-  assert(H5Pclose(dataset_creation_plist) >= 0);
 
   return 0;
 }
