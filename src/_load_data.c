@@ -318,6 +318,8 @@ int main(void) {
 
   assert (getline(&line, &size_line, stdin) >= 0);
   proc_wigfix_header(line, &h5file, &supercontigs, &buf, &buf_len);
+  buf_ptr = buf;
+  buf_end = buf_ptr + buf_len;
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
