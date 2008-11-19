@@ -236,6 +236,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   char *h5filename = NULL;
 
   hid_t root = -1;
+  hsize_t idx = 0;
 
   H5G_info_t root_info;
 
@@ -266,7 +267,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   init_supercontig_array(root_info.nlinks, supercontigs);
 
   /* populate supercontig metadata array */
-  assert(H5Literate(root, H5_INDEX_NAME, H5_ITER_INC, NULL,
+  assert(H5Literate(root, H5_INDEX_NAME, H5_ITER_INC, &idx,
                     supercontig_visitor, &supercontigs) == 0);
 
   assert(H5Gclose(root) >= 0);
