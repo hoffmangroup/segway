@@ -21,7 +21,7 @@
 #define DATASET_NAME "continuous"
 #define DTYPE H5T_IEEE_F32LE
 
-#define EXT_H5 ".h5"
+#define SUFFIX_H5 ".h5"
 
 #define CARDINALITY 2
 #define COL 0 /* XXX: this really can't be hard-coded, just for debugging */
@@ -241,6 +241,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 
   char *chrom = NULL;
   char *h5filename = NULL;
+  char *suffix;
 
   hid_t root = -1;
   hsize_t idx = 0;
@@ -253,16 +254,19 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 
   line_copy = strdup(line); /* XXX: why? */
   parse_wigfix_header(line_copy, &chrom, &start, &step);
-  free(line_copy);
 
   assert(chrom && start >= 0 && step == 1);
 
   printf("%s (%ld)\n", chrom, start);
 
   /* set h5filename */
-  h5filename = strndup(chrom, strlen(chrom)+strlen(EXT_H5));
-  strcpy(h5filename+strlen(chrom), EXT_H5);
+  printf("chrom: %s\n", chrom);
+  printf("line_copy: %s\n", line_copy);
+  h5filename = malloc(strlen(chrom)+strlen(SUFFIX_H5)+1);
+  suffix = stpcpy(h5filename, chrom);
+  strcpy(suffix, SUFFIX_H5);
   free(chrom);
+  printf("line_copy: %s\n", line_copy);
 
   /* XXXopt: don't close if it's the same file */
   if (*buf) {
@@ -283,7 +287,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 
   /* populate supercontig metadata array */
   assert(H5Literate(root, H5_INDEX_NAME, H5_ITER_INC, &idx,
-                    supercontig_visitor, &supercontigs) == 0);
+                    supercontig_visitor, supercontigs) == 0);
 
   assert(H5Gclose(root) >= 0);
 
@@ -294,7 +298,10 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   *buf = malloc(*buf_len * sizeof(float));
   printf("allocated\n");
 
+  printf("line_copy: %s\n", line_copy);
   free(h5filename);
+  printf("line_copy: %s\n", line_copy);
+  free(line_copy);
 }
 
 int main(void) {
@@ -336,6 +343,8 @@ int main(void) {
      strtof rather than using getline */
 
   assert (getline(&line, &size_line, stdin) >= 0);
+  line_copy = strdup(line); /* XXX: why? */
+  free(line_copy);
   line_copy = strdup(line); /* XXX: why? */
   proc_wigfix_header(line_copy, &h5file, &supercontigs, &buf, &buf_len);
   free(line_copy);
