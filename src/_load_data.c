@@ -320,7 +320,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* XXX: need to ensure sorting */
   buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
 
-  *buf_start = malloc(*buf_len * sizeof(float));
+  *buf_start = malloc(buf_len * sizeof(float));
   *buf_ptr = *buf_start + start;
   *buf_end = *buf_start + buf_len;
 }
@@ -355,13 +355,14 @@ int main(void) {
         *buf_ptr++ = datum;
       } /* else: ignore data until we get to another header line */
     } else {
-      write_buf(
+      /*      write_buf()*/
       proc_wigfix_header(line, &h5file, &supercontigs,
                          &buf_start, &buf_end, &buf_ptr);
       buf_offset = buf_ptr;
     }
   }
 
+  /* write_buf() */
   free_supercontig_array(&supercontigs);
   free(line);
   free(buf_start);
