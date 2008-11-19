@@ -177,7 +177,7 @@ int main(void) {
     datum = strtof(line, &tailptr);
     if (*tailptr == '\n' && h5file >= 0 && buf_ptr < buf_end) {
       if (!((buf_ptr - buf) % 10000)) {
-        printf(" [%lld]", select_start[0]);
+        printf(" [%lld]", buf_ptr - buf);
       }
       *buf_ptr++ = datum;
       /*
