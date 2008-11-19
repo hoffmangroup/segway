@@ -90,7 +90,7 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
   subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
   assert(subgroup >= 0);
 
-  printf(" %s: %d\n", name, subgroup);
+  fprintf(stderr, " %s: %d\n", name, subgroup);
 
   get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &supercontig->start);
   get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
@@ -157,7 +157,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
       *step = strtol(val, &tailptr, 10);
       assert(!*tailptr);
     } else {
-      printf("can't understand key: %s", key);
+      fprintf(stderr, "can't understand key: %s", key);
       exit(1);
     }
 
@@ -283,14 +283,14 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
              >= 0);
 
       /* create dataset */
-      printf("creating %lld x %lld dataset in %d...",
+      fprintf(stderr, "creating %lld x %lld dataset in %d...",
              file_dataspace_dims[0], file_dataspace_dims[1],
              supercontig->group);
       dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
                           file_dataspace, H5P_DEFAULT,
                           dataset_creation_plist, H5P_DEFAULT);
       assert(dataset >= 0);
-      printf(" done\n");
+      fprintf(stderr, " done\n");
 
       /* XXX: set PyTables attrs: new func */
     }
@@ -302,10 +302,10 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
                                NULL, select_count, NULL) >= 0);
 
     /* write */
-    printf("writing %lld floats...", select_count[0]);
+    fprintf(stderr, "writing %lld floats...", select_count[0]);
     assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
                     H5P_DEFAULT, buf_filled_start) >= 0);
-    printf(" done\n");
+    fprintf(stderr, " done\n");
 
     assert(H5Dclose(dataset) >= 0);
 
@@ -338,7 +338,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
 
   assert(chrom && start >= 0 && step == 1);
 
-  printf("%s (%ld)\n", chrom, start);
+  fprintf(stderr, "%s (%ld)\n", chrom, start);
 
   /* set h5filename */
   h5filename = alloca(strlen(chrom)+strlen(SUFFIX_H5)+1);
