@@ -176,6 +176,7 @@ int main(void) {
       if (!((buf_ptr - buf) % 1000)) {
         printf(" [%lld]", select_start[0]);
       }
+      printf("/%zd/\n", buf_ptr - buf);
       *buf_ptr = datum;
       /*
       XXX: select new slab and write
