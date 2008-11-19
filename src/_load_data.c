@@ -350,7 +350,7 @@ int main(void) {
     }
   }
 
-  free(supercontigs->supercontigs);
+  free(supercontigs.supercontigs);
   free(line);
   free(buf);
 
