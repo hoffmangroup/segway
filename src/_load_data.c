@@ -307,6 +307,8 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
                     H5P_DEFAULT, buf_filled_start) >= 0);
     printf(" done\n");
 
+    assert(H5Dclose(dataset) >= 0);
+
     /* close dataspaces */
     close_dataspace(file_dataspace);
     close_dataspace(mem_dataspace);
