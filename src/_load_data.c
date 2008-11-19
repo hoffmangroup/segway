@@ -165,7 +165,7 @@ void init_supercontig_array(size_t len,
                             supercontig_array_t *supercontigs) {
   supercontigs->len = len;
   supercontigs->supercontigs = malloc(len * sizeof(supercontig_t));
-  supercontigs->supercontig_curr = supercontigs.supercontigs;
+  supercontigs->supercontig_curr = supercontigs->supercontigs;
 }
 
 #if 0
@@ -245,15 +245,16 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* set h5filename */
   h5filename = strndupa(chrom, strlen(chrom)+strlen(EXT_H5));
   strcpy(h5filename+strlen(chrom), EXT_H5);
-  free(chrom)
+  free(chrom);
 
   /* XXXopt: don't close if it's the same file */
-  close_file(h5file);
+  close_file(*h5file);
 
   /* open the chromosome file */
-  h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
-  assert(h5file >= 0);
-  root = H5Gopen(h5file, "/", H5P_DEFAULT);
+  *h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
+  assert(*h5file >= 0);
+
+  root = H5Gopen(*h5file, "/", H5P_DEFAULT);
   assert(root >= 0);
 
   /* allocate supercontig metadata array */
