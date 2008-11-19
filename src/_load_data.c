@@ -145,11 +145,11 @@ int main(void) {
   hsize_t num_cols;
 
   hsize_t dims[CARDINALITY];
-  hsize_t select_start[CARDINALITY];
+  hsize_t select_start[CARDINALITY] = {-1, COL};
   hsize_t select_count[CARDINALITY] = {1, 1};
 
   /* for error suppression */
-  herr_t (*old_func)(void*);
+  H5E_auto2_t old_func;
   void *old_client_data;
 
   dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
@@ -165,7 +165,7 @@ int main(void) {
 
     datum = strtof(line, &tailptr);
     if (!*tailptr && h5file >= 0) {
-      select_start = {offset, COL};
+      select_start[0] = offset;
       assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
                                  NULL, select_count, NULL) >= 0);
 
@@ -231,13 +231,13 @@ int main(void) {
       }
 
       /* suppress errors */
-      H5Eget_auto2(H5E_DEFAULT, &old_func, &old_client_data);
-      H5Eset_auto2(H5E_DEFAULT, NULL, NULL);
+      H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data);
+      H5Eset_auto(H5E_DEFAULT, NULL, NULL);
 
       dataset = H5Dopen(supercontig.group, DATASET_NAME, H5P_DEFAULT);
 
       /* re-enable errors */
-      H5Eset_auto2(H5E_DEFAULT, old_func, old_client_data);
+      H5Eset_auto(H5E_DEFAULT, old_func, old_client_data);
 
       if (dataset >= 0) {
         file_dataspace = H5Dget_space(dataset);
