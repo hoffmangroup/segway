@@ -173,7 +173,7 @@ int main(void) {
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
     if (*tailptr == '\n' && h5file >= 0 && buf_ptr < buf_end) {
-      if (!(select_start[0] % 100000)) {
+      if (!((buf_ptr - buf) % 100000)) {
         printf(" [%lld]", select_start[0]);
       }
       *buf_ptr = datum;
@@ -188,7 +188,6 @@ int main(void) {
       buf_ptr++;
     } else {
       /* strip trailing newline */
-      printf(line);
       *strchr(line, '\n') = '\0';
 
       /* XXX: most of this should go to another function:
