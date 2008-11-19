@@ -25,7 +25,7 @@
 
 #define CARDINALITY 2
 #define COL 0 /* XXX: this really can't be hard-coded, just for debugging */
-#define CHUNK_NROWS 1000000
+#define CHUNK_NROWS 1000
 
 const float nan_float = NAN;
 
