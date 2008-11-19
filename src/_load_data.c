@@ -170,7 +170,8 @@ int main(void) {
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
     if (*tailptr == '\n' && h5file >= 0) {
-      if (!(select_start[0] % 2)) {
+      printf(" [%lld]", select_start[0]);
+      if (!(select_start[0] % 100000)) {
         printf(" [%lld]", select_start[0]);
       }
       assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
