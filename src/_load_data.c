@@ -188,6 +188,7 @@ int main(void) {
       buf_ptr++;
     } else {
       /* strip trailing newline */
+      printf(line);
       *strchr(line, '\n') = '\0';
 
       /* XXX: most of this should go to another function:
