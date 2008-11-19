@@ -270,7 +270,7 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   /* allocate buffer: enough to assign values from 0 to the end of the
      last supercontig */
   /* XXX: need to ensure sorting */
-  *buf_len = supercontigs->supercontigs[supercontigs->len-1];
+  *buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
   *buf = malloc(*buf_len * sizeof(float));
 }
 
