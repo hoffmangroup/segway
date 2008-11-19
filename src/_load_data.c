@@ -274,9 +274,8 @@ int main(void) {
                             dataset_creation_plist, H5P_DEFAULT);
         assert(dataset >= 0);
         printf("done\n");
-
-        select_start[0] = new_start - supercontig.start;
       }
+      select_start[0] = new_start - supercontig.start;
     }
   }
 
