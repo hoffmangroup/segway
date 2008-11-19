@@ -182,6 +182,10 @@ void free_supercontig_array(supercontig_array_t *supercontigs) {
 
 /* suppresses errors */
 hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
+  /* for error suppression */
+  H5E_auto2_t old_func;
+  void *old_client_data;
+
   /* suppress errors */
   H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data);
   H5Eset_auto(H5E_DEFAULT, NULL, NULL);
@@ -211,10 +215,6 @@ void write_buf(hid_t *h5file, float *buf_start, float *buf_end,
   hsize_t select_start[CARDINALITY] = {-1, COL};
   hsize_t select_count[CARDINALITY] = {1, 1};
   hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, -1};
-
-  /* for error suppression */
-  H5E_auto2_t old_func;
-  void *old_client_data;
 
   hid_t dataset_creation_plist = -1;
 
