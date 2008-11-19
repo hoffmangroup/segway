@@ -324,6 +324,7 @@ int main(void) {
   buf_ptr = buf;
   buf_end = buf_ptr + buf_len;
 
+  size_line = 0;
   while (getline(&line, &size_line, stdin) >= 0) {
     printf(line);
     datum = strtof(line, &tailptr);
