@@ -93,7 +93,6 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
   get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &supercontig->start);
   get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
   supercontig->group = subgroup;
-  printf("adding group %d", subgroup);
 
   return 0;
 }
@@ -173,9 +172,8 @@ void init_supercontig_array(size_t len,
 
 void free_supercontig_array(supercontig_array_t *supercontigs) {
   for (supercontig_t *supercontig = supercontigs->supercontigs;
-       supercontig <= supercontigs->supercontigs + supercontigs-> len;
+       supercontig < supercontigs->supercontigs + supercontigs-> len;
        supercontig++) {
-    printf("removing group: %d\n", supercontig->group);
     assert(H5Gclose(supercontig->group) >= 0);
   }
   free(supercontigs->supercontigs);
