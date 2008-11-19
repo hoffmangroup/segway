@@ -175,13 +175,11 @@ int main(void) {
 
   while (getline(&line, &size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
-    if (*tailptr == '\n' && h5file >= 0) {
-      assert(buf_ptr < buf_end);
-      if (!((buf_ptr - buf) % 1000)) {
+    if (*tailptr == '\n' && h5file >= 0 && buf_ptr < buf_end) {
+      if (!((buf_ptr - buf) % 10000)) {
         printf(" [%lld]", select_start[0]);
       }
-      printf("/%zd/\n", buf_ptr - buf);
-      *buf_ptr = datum;
+      *buf_ptr++ = datum;
       /*
       XXX: select new slab and write
       assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
@@ -190,7 +188,6 @@ int main(void) {
       assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
                       H5P_DEFAULT, &datum) >= 0);
       */
-      buf_ptr++;
     } else {
       /* strip trailing newline */
       *strchr(line, '\n') = '\0';
