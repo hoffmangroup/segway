@@ -200,7 +200,7 @@ hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
   return dataset;
 }
 
-void write_buf(hid_t *h5file, float *buf_start, float *buf_end,
+void write_buf(hid_t h5file, float *buf_start, float *buf_end,
                float *buf_filled_start, float *buf_filled_end,
                supercontig_array_t *supercontigs) {
   float *buf_filled_end_ptr; /* for one supercontig */
