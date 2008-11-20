@@ -2,8 +2,11 @@
    space, but you should do profiling to see whether writing is the
    slowest bit */
 
+/* XXX: need to add compression */
+
 #define _GNU_SOURCE
 
+#include <argp.h>
 #include <assert.h>
 #include <math.h>
 #include <stdio.h>
@@ -27,9 +30,11 @@
 
 #define SUFFIX_H5 ".h5"
 
+#define NARGS 2
 #define CARDINALITY 2
-#define COL 0 /* XXX: this really can't be hard-coded, just for debugging */
-#define CHUNK_NROWS 1000 /* XXX: this needs to adjust, be smaller than max size */
+
+/* XXX: this needs to adjust, but always be smaller than max size for a dataset*/
+#define CHUNK_NROWS 1000
 
 const float nan_float = NAN;
 
@@ -57,9 +62,12 @@ void get_attr(hid_t loc, const char *name, hid_t mem_type_id, void *buf) {
   assert(H5Aclose(attr) >= 0);
 }
 
-hsize_t get_num_cols(hid_t h5file) {
-  hid_t attr, root, dataspace;
-  hsize_t dim;
+/* fetch num_cols and the col for a particular trackname */
+void get_cols(hid_t h5file, char *trackname, hsize_t *num_cols,
+                 hsize_t *col) {
+  hid_t attr, root, dataspace, datatype;
+  hsize_t data_size;
+  char *attr_data;
 
   root = H5Gopen(h5file, "/", H5P_DEFAULT);
   assert(root >= 0);
@@ -70,13 +78,27 @@ hsize_t get_num_cols(hid_t h5file) {
   dataspace = H5Aget_space(attr);
   assert(dataspace >= 0);
 
-  assert (H5Sget_simple_extent_dims(dataspace, &dim, NULL) == 1);
-
+  assert(H5Sget_simple_extent_dims(dataspace, num_cols, NULL) == 1);
   assert(H5Sclose(dataspace) >= 0);
+
+  datatype = H5Aget_type(attr);
+  assert(datatype >= 0);
+
+  data_size = H5Aget_storage_size(attr);
+  assert(data_size >= 0);
+
+  attr_data = alloca(data_size);
+  assert(attr_data);
+
+  assert(H5Aread(attr, datatype, attr_data) >= 0);
+  printf(attr_data);
+
+#if 0
+  col = XXX;
+#endif
+
   assert(H5Aclose(attr) >= 0);
   assert(H5Gclose(root) >= 0);
-
-  return dim;
 }
 
 herr_t supercontig_visitor(hid_t g_id, const char *name,
@@ -146,15 +168,20 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   assert(!strncmp(FMT_WIGFIX, line, strlen(FMT_WIGFIX)));
 
   save_ptr = strdupa(line);
+  assert(save_ptr);
+
   newstring = line + strlen(FMT_WIGFIX);
 
   while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
     loc_eq = strchr(token, '=');
     key = strndupa(token, loc_eq - token);
+    assert(key);
+
     val = loc_eq + 1;
 
     if (!strcmp(key, KEY_CHROM)) {
       *chrom = strdup(val);
+      assert(*chrom);
     } else if (!strcmp(key, KEY_START)) {
       *start = strtol(val, &tailptr, 10);
       assert(!*tailptr);
@@ -173,7 +200,10 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
 void init_supercontig_array(size_t len,
                             supercontig_array_t *supercontigs) {
   supercontigs->len = len;
+
   supercontigs->supercontigs = malloc(len * sizeof(supercontig_t));
+  assert(supercontigs->supercontigs);
+
   supercontigs->supercontig_curr = supercontigs->supercontigs;
 }
 
@@ -195,33 +225,31 @@ hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
   void *old_client_data;
 
   /* suppress errors */
-  H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data);
-  H5Eset_auto(H5E_DEFAULT, NULL, NULL);
+  assert(H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data) >= 0);
+  assert(H5Eset_auto(H5E_DEFAULT, NULL, NULL) >= 0);
 
   dataset = H5Dopen(loc, name, dapl);
 
   /* re-enable errors */
-  H5Eset_auto(H5E_DEFAULT, old_func, old_client_data);
+  assert(H5Eset_auto(H5E_DEFAULT, old_func, old_client_data) >= 0);
 
   return dataset;
 }
 
-void write_buf(hid_t h5file, float *buf_start, float *buf_end,
+void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
                float *buf_filled_start, float *buf_filled_end,
                supercontig_array_t *supercontigs) {
-  float *buf_filled_end_ptr; /* for one supercontig */
   size_t buf_offset_start, buf_offset_end;
   hid_t dataset = -1;
 
   hid_t mem_dataspace = -1;
   hid_t file_dataspace = -1;
 
-  hsize_t num_cols;
+  hsize_t num_cols, col;
 
   hsize_t mem_dataspace_dims[1];
   hsize_t file_dataspace_dims[CARDINALITY];
-  hsize_t select_start[CARDINALITY] = {-1, COL};
-  hsize_t select_count[CARDINALITY] = {1, 1};
+  hsize_t select_start[CARDINALITY];
   hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, -1};
 
   hid_t dataset_creation_plist = -1;
@@ -249,8 +277,6 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
     /* find the end that fits into this supercontig */
     buf_offset_end = buf_filled_end - buf_start;
     if (buf_offset_end > supercontig->end) {
-      /* XXX: I think this is unused */
-      buf_filled_end_ptr = buf_start + supercontig->end;
       buf_offset_end = supercontig->end;
     }
     if (buf_offset_end < supercontig->start) {
@@ -263,6 +289,9 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
     mem_dataspace = H5Screate_simple(1, mem_dataspace_dims, NULL);
     assert(mem_dataspace >= 0);
 
+    /* calc dimensions */
+    get_cols(h5file, trackname, &num_cols, &col);
+
     /* set dataset if it exists */
     dataset = open_dataset(supercontig->group, DATASET_NAME, H5P_DEFAULT);
 
@@ -271,9 +300,6 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
       file_dataspace = H5Dget_space(dataset);
       assert(file_dataspace >= 0);
     } else {
-      /* calc dimensions */
-      num_cols = get_num_cols(h5file);
-
       file_dataspace_dims[0] = supercontig->end - supercontig->start;
       file_dataspace_dims[1] = num_cols;
 
@@ -302,12 +328,14 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
 
     /* select file hyperslab */
     select_start[0] = buf_offset_start - supercontig->start;
-    select_count[0] = buf_offset_end - buf_offset_start;
+    select_start[1] = col;
+
+    /* count has same dims as mem_dataspace */
     assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
-                               NULL, select_count, NULL) >= 0);
+                               NULL, mem_dataspace_dims, NULL) >= 0);
 
     /* write */
-    fprintf(stderr, "writing %lld floats...", select_count[0]);
+    fprintf(stderr, "writing %lld floats...", mem_dataspace_dims[0]);
     assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
                     H5P_DEFAULT, buf_filled_start) >= 0);
     fprintf(stderr, " done\n");
@@ -322,7 +350,7 @@ void write_buf(hid_t h5file, float *buf_start, float *buf_end,
   assert(H5Pclose(dataset_creation_plist) >= 0);
 }
 
-void proc_wigfix_header(char *line, hid_t *h5file,
+void proc_wigfix_header(char *line, char *h5dirname, hid_t *h5file,
                         supercontig_array_t *supercontigs,
                         float **buf_start, float **buf_end, float **buf_ptr) {
   long start = -1;
@@ -346,8 +374,12 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   fprintf(stderr, "%s (%ld)\n", chrom, start);
 
   /* set h5filename */
-  h5filename = alloca(strlen(chrom)+strlen(SUFFIX_H5)+1);
-  suffix = stpcpy(h5filename, chrom);
+  h5filename = alloca(strlen(h5dirname)+strlen(chrom)+strlen(SUFFIX_H5)+2);
+  assert(h5filename);
+
+  suffix = stpcpy(h5filename, h5dirname);
+  suffix = stpcpy(suffix, "/");
+  suffix = stpcpy(suffix, chrom);
   strcpy(suffix, SUFFIX_H5);
   free(chrom);
 
@@ -381,11 +413,13 @@ void proc_wigfix_header(char *line, hid_t *h5file,
   buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
 
   *buf_start = malloc(buf_len * sizeof(float));
+  assert(*buf_start);
+
   *buf_ptr = *buf_start + start;
   *buf_end = *buf_start + buf_len;
 }
 
-int main(void) {
+void load_data(char *h5dirname, char *trackname) {
   char *line = NULL;
   size_t size_line = 0;
   char *tailptr;
@@ -404,7 +438,7 @@ int main(void) {
 
   assert (getline(&line, &size_line, stdin) >= 0);
 
-  proc_wigfix_header(line, &h5file, &supercontigs,
+  proc_wigfix_header(line, h5dirname, &h5file, &supercontigs,
                      &buf_start, &buf_end, &buf_ptr);
   buf_filled_start = buf_ptr;
 
@@ -415,21 +449,71 @@ int main(void) {
         *buf_ptr++ = datum;
       } /* else: ignore data until we get to another header line */
     } else {
-      write_buf(h5file, buf_start, buf_end, buf_filled_start, buf_ptr,
-                &supercontigs);
-      proc_wigfix_header(line, &h5file, &supercontigs,
+      write_buf(h5file, trackname, buf_start, buf_end, buf_filled_start,
+                buf_ptr, &supercontigs);
+      proc_wigfix_header(line, h5dirname, &h5file, &supercontigs,
                          &buf_start, &buf_end, &buf_ptr);
       buf_filled_start = buf_ptr;
     }
   }
 
-  /* XXX: write_buf() */
+
+  write_buf(h5file, trackname, buf_start, buf_end, buf_filled_start, buf_ptr,
+            &supercontigs);
+
+  /* free heap variables */
   free_supercontig_array(&supercontigs);
   free(line);
   free(buf_start);
 
   close_file(h5file);
+}
 
+const char *argp_program_version = "$Revision$";
+const char *argp_program_bug_address = "Michael Hoffman <mmh1@washington.edu>";
+
+static char doc[] = "A fast loader of genomic data into HDF5";
+static char args_doc[] = "DST TRACKNAME";
+
+static error_t parse_opt (int key, char *arg, struct argp_state *state) {
+  char **arguments = state->input;
+
+  switch (key) {
+  case ARGP_KEY_ARG:
+    if (state->arg_num >= NARGS) {
+      argp_usage(state);
+      exit(EXIT_FAILURE);
+    }
+    arguments[state->arg_num] = arg;
+    break;
+
+  case ARGP_KEY_END:
+    if (state->arg_num < NARGS) {
+      argp_usage(state);
+      exit(EXIT_FAILURE);
+    }
+
+    break;
+  default:
+    return ARGP_ERR_UNKNOWN;
+  }
   return 0;
+}
+
+
+static struct argp argp = {0, parse_opt, args_doc, doc};
+
+int main(int argc, char **argv) {
+  char *arguments[NARGS];
+  char *h5dirname, *trackname;
+
+  assert(argp_parse(&argp, argc, argv, 0, 0, arguments) == 0);
+
+  h5dirname = arguments[0];
+  trackname = arguments[1];
+
+  load_data(h5dirname, trackname);
+
+  return EXIT_SUCCESS;
 }
 
