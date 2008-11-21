@@ -1,13 +1,20 @@
 /* XXXopt: probably the most important place for optimization is chunk
    space, but you should do profiling to see whether writing is the
-   slowest bit */
+   slowest bit
 
-/* XXX: need to add compression */
+   another optimization would be to inflate data yourself, then try to
+   process multiple input tracks in parallel (reduce number of writes
+   by num_cols)
+
+   uncompressing and recompressing all the data for every new track is
+   probably pretty expensive
+*/
 
 #define _GNU_SOURCE
 
 #include <argp.h>
 #include <assert.h>
+#include <error.h>
 #include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -34,7 +41,8 @@
 #define CARDINALITY 2
 
 /* XXX: this needs to adjust, but always be smaller than max size for a dataset*/
-#define CHUNK_NROWS 1000
+#define CHUNK_NROWS 10000
+#define DEFLATE_LEVEL 1
 
 const float nan_float = NAN;
 
@@ -43,7 +51,6 @@ typedef struct {
   int end;
   hid_t group;
 } supercontig_t;
-
 
 typedef struct {
   size_t len;
@@ -62,11 +69,48 @@ void get_attr(hid_t loc, const char *name, hid_t mem_type_id, void *buf) {
   assert(H5Aclose(attr) >= 0);
 }
 
+void set_attr(hid_t loc, const char *name, hid_t datatype, hid_t dataspace,
+              const void *buf) {
+  hid_t attr;
+
+  attr = H5Acreate(loc, name, datatype, dataspace, H5P_DEFAULT, H5P_DEFAULT);
+  assert(attr >= 0);
+
+  assert(H5Awrite(attr, datatype, buf) >= 0);
+
+  assert(H5Aclose(attr) >= 0);
+}
+
+/* set an attr from a C string */
+void set_attr_str(hid_t loc, const char *name, const char *buf) {
+  hid_t datatype, dataspace, mem_type_id;
+  hsize_t buf_len;
+
+  /* create datatype */
+  datatype = H5Tcopy(H5T_C_S1);
+  assert(datatype >= 0);
+
+  buf_len = strlen(buf);
+  /* 0 length in datatype size not supported */
+  if (buf_len == 0) {
+    buf_len = 1;
+  }
+  assert(H5Tset_size(datatype, buf_len) >= 0);
+
+  /* create dataspace */
+  dataspace = H5Screate(H5S_SCALAR);
+  assert(dataspace >= 0);
+
+  mem_type_id = H5T_STRING;
+
+  set_attr(loc, name, datatype, dataspace, buf);
+}
+
 /* fetch num_cols and the col for a particular trackname */
 void get_cols(hid_t h5file, char *trackname, hsize_t *num_cols,
-                 hsize_t *col) {
+              hsize_t *col) {
   hid_t attr, root, dataspace, datatype;
-  hsize_t data_size;
+  hsize_t data_size, cell_size, num_cells;
   char *attr_data;
 
   root = H5Gopen(h5file, "/", H5P_DEFAULT);
@@ -83,19 +127,32 @@ void get_cols(hid_t h5file, char *trackname, hsize_t *num_cols,
 
   datatype = H5Aget_type(attr);
   assert(datatype >= 0);
+  assert(H5Tget_class(datatype) == H5T_STRING);
+
+  cell_size = H5Tget_size(datatype);
+  assert(cell_size >= 0);
 
   data_size = H5Aget_storage_size(attr);
   assert(data_size >= 0);
+
+  num_cells = data_size / cell_size;
 
   attr_data = alloca(data_size);
   assert(attr_data);
 
   assert(H5Aread(attr, datatype, attr_data) >= 0);
-  printf(attr_data);
 
-#if 0
-  col = XXX;
-#endif
+  *col = 0;
+  for (*col = 0; *col <= num_cells; (*col)++) {
+    if (*col == num_cells) {
+      fprintf(stderr, "can't find trackname: %s\n", trackname);
+      exit(EXIT_FAILURE);
+    } else {
+      if (!strncmp(attr_data + (*col * cell_size), trackname, cell_size)) {
+        break;
+      }
+    }
+  }
 
   assert(H5Aclose(attr) >= 0);
   assert(H5Gclose(root) >= 0);
@@ -236,6 +293,14 @@ hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
   return dataset;
 }
 
+/* make existing dataset into a PyTables CArray by setting appropriate
+   attrs */
+void make_pytables_carray(hid_t dataset) {
+  set_attr_str(dataset, "CLASS", "CARRAY");
+  set_attr_str(dataset, "TITLE", "");
+  set_attr_str(dataset, "VERSION", "1.0");
+}
+
 void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
                float *buf_filled_start, float *buf_filled_end,
                supercontig_array_t *supercontigs) {
@@ -247,7 +312,7 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
 
   hsize_t num_cols, col;
 
-  hsize_t mem_dataspace_dims[1];
+  hsize_t mem_dataspace_dims[CARDINALITY] = {-1, 1};
   hsize_t file_dataspace_dims[CARDINALITY];
   hsize_t select_start[CARDINALITY];
   hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, -1};
@@ -312,6 +377,7 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
       chunk_dims[1] = num_cols;
       assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims)
              >= 0);
+      assert(H5Pset_deflate(dataset_creation_plist, DEFLATE_LEVEL) >= 0);
 
       /* create dataset */
       fprintf(stderr, "creating %lld x %lld dataset in %d...",
@@ -323,7 +389,7 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
       assert(dataset >= 0);
       fprintf(stderr, " done\n");
 
-      /* XXX: set PyTables attrs: new func */
+      make_pytables_carray(dataset);
     }
 
     /* select file hyperslab */
@@ -436,7 +502,10 @@ void load_data(char *h5dirname, char *trackname) {
   /* XXXopt: would be faster to just read a big block and do repeated
      strtof rather than using getline */
 
-  assert (getline(&line, &size_line, stdin) >= 0);
+  if (getline(&line, &size_line, stdin) < 0) {
+    error_at_line(EXIT_FAILURE, errno, __FILE__, __LINE__,
+                  "failed to read first line");
+  }
 
   proc_wigfix_header(line, h5dirname, &h5file, &supercontigs,
                      &buf_start, &buf_end, &buf_ptr);

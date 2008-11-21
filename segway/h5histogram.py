@@ -13,11 +13,12 @@ import sys
 
 from collections import defaultdict
 from functools import partial
-from numpy import array, concatenate, histogram, isfinite, NINF, PINF, zeros
+from numpy import (array, concatenate, histogram, iinfo, isfinite, NINF, PINF,
+                   zeros)
 from tables import openFile
 
 from ._util import (DTYPE_IDENTIFY, fill_array,
-                    get_col_index as _get_col_index, iinfo, iter_chroms_coords,
+                    get_col_index as _get_col_index, iter_chroms_coords,
                     load_coords, walk_continuous_supercontigs)
 
 BINS = 100

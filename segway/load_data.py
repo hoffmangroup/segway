@@ -29,16 +29,13 @@ from os import extsep
 import sys
 from warnings import warn
 
-from numpy import amin, amax, array, float32, isnan, NAN, NINF, PINF, where
+from numpy import float32, NAN, NINF, PINF
 from path import path
 from tabdelim import DictReader
 from tables import Float32Atom, NoSuchNodeError, openFile
 
 #from .bed import read_native
-from .load_seq import MIN_GAP_LEN
-from ._util import (fill_array, get_tracknames, gzip_open, init_num_obs,
-                    new_extrema, walk_continuous_supercontigs,
-                    walk_supercontigs)
+from ._util import get_tracknames, gzip_open, walk_supercontigs
 
 ATOM = Float32Atom(dflt=NAN)
 
@@ -370,68 +367,6 @@ def load_any(chromosomes, trackname, filename):
     else:
         return load_uncompressed(chromosomes, trackname, filename)
 
-def write_metadata(chromosome):
-    print >>sys.stderr, "writing metadata for %s" % chromosome.title
-
-    num_obs = None
-    mins = None
-    maxs = None
-
-    for supercontig, continuous in walk_continuous_supercontigs(chromosome):
-        if num_obs is None:
-            ## initialize at first array
-            num_obs = init_num_obs(num_obs, continuous)
-
-            extrema_shape = (num_obs,)
-            mins = fill_array(PINF, extrema_shape)
-            maxs = fill_array(NINF, extrema_shape)
-
-        # only runs when assertions checked
-        elif __debug__:
-            init_num_obs(num_obs, continuous) # for the assertion
-
-        ## read data
-        observations = continuous.read()
-        mask_missing = isnan(observations)
-
-        observations[mask_missing] = PINF
-        mins = new_extrema(amin, observations, mins)
-
-        observations[mask_missing] = NINF
-        maxs = new_extrema(amax, observations, maxs)
-
-        ## find chunks that have less than MIN_GAP_LEN missing data
-        ## gaps in a row
-        rows_num_missing = mask_missing.sum(1)
-        mask_rows_any_nonmissing = rows_num_missing < num_obs
-        indices_nonmissing = where(mask_rows_any_nonmissing)[0]
-
-        starts = []
-        ends = []
-
-        last_index = -MIN_GAP_LEN
-        for index in indices_nonmissing:
-            if index - last_index >= MIN_GAP_LEN:
-                if starts:
-                    # add 1 because we want slice(start, end) to
-                    # include the last_index
-                    ends.append(last_index + 1)
-
-                starts.append(index)
-            last_index = index
-
-        ends.append(last_index + 1)
-
-        assert len(starts) == len(ends)
-
-        supercontig_attrs = supercontig._v_attrs
-        supercontig_attrs.chunk_starts = array(starts)
-        supercontig_attrs.chunk_ends = array(ends)
-
-    chromosome_attrs = chromosome.root._v_attrs
-    chromosome_attrs.mins = mins
-    chromosome_attrs.maxs = maxs
-
 def load_data(outdirname, trackname, *filenames):
     outdirpath = path(outdirname)
 
@@ -441,9 +376,6 @@ def load_data(outdirname, trackname, *filenames):
     try:
         for col_index, filename in enumerate(filenames):
             load_any(chromosomes, trackname, filename)
-
-        for chromosome in chromosomes.itervalues():
-            write_metadata(chromosome)
     finally:
         for chromosome in chromosomes.itervalues():
             chromosome.close()
