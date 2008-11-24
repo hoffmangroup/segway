@@ -56,6 +56,8 @@ def calc_histogram(trackname, filenames, data_range, include_coords,
     hist, edges = histogram_custom(array([]))
     chrom_iterator = iter_chroms_coords(filenames, include_coords)
     for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
+        assert not chromosome.root._v_attrs.dirty
+
         col_index = get_col_index(chromosome, trackname)
 
         supercontig_walker = walk_continuous_supercontigs(chromosome)

@@ -25,6 +25,7 @@ def name_tracks(dirname, *tracknames):
             if "tracknames" in attrs:
                 raise ValueError("%s already has named tracks" % filepath)
 
+            attrs.dirty = True
             attrs.tracknames = array(tracknames)
 
 def parse_options(args):

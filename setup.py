@@ -42,6 +42,8 @@ segway = segway.run:main [parallel]
 segway-load-seq = segway.load_seq:main
 segway-name-tracks = segway.name_tracks:main
 segway-load-data = segway.load_data:main
+segway-save-metadata = segway.save_metadata:main
+
 h5histogram = segway.h5histogram:main
 h5values = segway.h5values:main
 """

@@ -11,31 +11,24 @@ __version__ = "$Revision$"
 
 import sys
 
-from numpy import amin, amax, array, isnan, where
+from numpy import amin, amax, array, isnan, NINF, PINF, where
 from tables import openFile
 
 from .load_seq import MIN_GAP_LEN
-from ._util import (fill_array, init_num_obs, new_extrema, NINF, PINF,
+from ._util import (fill_array, get_tracknames, init_num_obs, new_extrema,
                     walk_continuous_supercontigs)
 
 def write_metadata(chromosome):
     print >>sys.stderr, "writing metadata for %s" % chromosome.title
 
-    num_obs = None
-    mins = None
-    maxs = None
+    num_obs = len(get_tracknames(chromosome))
+    extrema_shape = (num_obs,)
+    mins = fill_array(PINF, extrema_shape)
+    maxs = fill_array(NINF, extrema_shape)
 
     for supercontig, continuous in walk_continuous_supercontigs(chromosome):
-        if num_obs is None:
-            ## initialize at first array
-            num_obs = init_num_obs(num_obs, continuous)
-
-            extrema_shape = (num_obs,)
-            mins = fill_array(PINF, extrema_shape)
-            maxs = fill_array(NINF, extrema_shape)
-
         # only runs when assertions checked
-        elif __debug__:
+        if __debug__:
             init_num_obs(num_obs, continuous) # for the assertion
 
         ## read data
@@ -79,6 +72,7 @@ def write_metadata(chromosome):
     chromosome_attrs = chromosome.root._v_attrs
     chromosome_attrs.mins = mins
     chromosome_attrs.maxs = maxs
+    chromosome_attrs.dirty = False
 
 def save_metadata(*filenames):
     for filename in filenames:

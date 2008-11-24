@@ -392,6 +392,9 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
       make_pytables_carray(dataset);
     }
 
+    /* XXX: set dirty attribute */
+    /* XXX: need to look up boolean attributes, etc. */
+
     /* select file hyperslab */
     select_start[0] = buf_offset_start - supercontig->start;
     select_start[1] = col;

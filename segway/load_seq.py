@@ -80,8 +80,10 @@ def load_seq(filenames, outdirname):
         with file(filename) as infile:
             for defline, seq in LightIterator(infile):
                 h5filename = outdirpath / extsep.join([defline, EXT_H5])
-                h5file = openFile(h5filename, "w", defline, filters=FILTERS_GZIP)
+                h5file = openFile(h5filename, "w", defline,
+                                  filters=FILTERS_GZIP)
                 with h5file as h5file:
+                    h5file.root._v_attr.dirty = True
                     read_seq(h5file, seq)
 
 def parse_options(args):

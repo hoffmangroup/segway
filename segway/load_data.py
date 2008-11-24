@@ -223,7 +223,10 @@ def chromosome_factory(outdirpath, key):
     # only runs when there is not already a dictionary entry
     filename = outdirpath / extsep.join([key, EXT_H5])
 
-    return openFile(filename, "r+")
+    res = openFile(filename, "r+")
+    res.root._v_attrs.dirty = True
+
+    return res
 
 def write_score(chromosome, start, end, score, col_index, num_cols):
     raise NotImplementedError, "should eliminate all callers"

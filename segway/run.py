@@ -23,8 +23,9 @@ import sys
 from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import (amin, amax, append, array, diag, diff, empty, finfo, float32,
-                   fromfile, insert, invert, isnan, newaxis, NINF, where)
+from numpy import (amin, amax, append, array, diag, diff, empty, finfo,
+                   float32, fromfile, insert, invert, isnan, newaxis, NINF,
+                   where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -84,6 +85,7 @@ RES_REQ_IDS = ["mem_requested", "mem_free"]
 
 # for a four-way model
 MEM_REQS = {2: [3619, 8098728],
+            3: [1553, 16121352],
             4: [5768, 14442884]}
 
 # defaults
@@ -100,14 +102,11 @@ NAME_PLACEHOLDER = "bundle"
 # programs
 ENV_CMD = "/usr/bin/env"
 BASH_CMD = "bash"
-EM_TRAIN_CMD = "gmtkEMtrainNew"
-EM_TRAIN_CMD_STR = '%s "$@"' % EM_TRAIN_CMD
 
 BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
-EM_TRAIN_CMDLINE = BASH_CMDLINE + [EM_TRAIN_CMD_STR]
 
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkTriangulate")
-EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF(EM_TRAIN_CMD)
+EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkEMtrainNew")
 VITERBI_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkViterbiNew")
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
@@ -150,10 +149,11 @@ RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC = "seg.inc"
 
-DIRICHLET_FRAG = "0 dirichlet_seg_seg 1 CARD_SEG CARD_SEG"
+DIRICHLET_FRAG = "0 dirichlet_seg_seg 2 CARD_SEG CARD_SEG"
 
 DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
-DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
+DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG\n" \
+    "DirichletTable dirichlet_seg_seg"
 
 MEAN_TMPL = "$index mean_${seg}_${track} 1 ${rand}"
 
@@ -318,7 +318,8 @@ def make_spec(name, items):
     return "\n".join(items) + "\n"
 
 def make_table_spec(frag, table):
-    return " ".join([frag] + [str(row) for row in table])
+    items = [frag] + [" ".join(map(str, row)) for row in table]
+    return "\n".join(items) + "\n"
 
 # def make_dt_spec(num_tracks):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
@@ -544,12 +545,12 @@ class Runner(object):
 
         return self.dirpath / filebasename
 
-    def set_params_filename(self, start_index=None):
+    def set_params_filename(self, start_index=None, new=False):
         # if this is not run and params_filename is
         # unspecified, then it won't be passed to gmtkViterbiNew
 
         params_filename = self.params_filename
-        if not start_index and params_filename:
+        if not new and params_filename:
             if (not self.delete_existing
                 and path(params_filename).exists()):
                 # it already exists and you don't want to force regen
@@ -558,9 +559,11 @@ class Runner(object):
             self.params_filename = \
                 self.make_filename(PREFIX_PARAMS, start_index, EXT_PARAMS)
 
-    def set_log_likelihood_filename(self, start_index=None):
-        self.log_likelihood_filename = \
-            self.make_filename(PREFIX_LIKELIHOOD, start_index, EXT_LIKELIHOOD)
+    def set_log_likelihood_filename(self, start_index=None, new=False):
+        if new or not self.log_likelihood_filename:
+            self.log_likelihood_filename = \
+                self.make_filename(PREFIX_LIKELIHOOD, start_index,
+                                   EXT_LIKELIHOOD)
 
     def make_output_dirpath(self, dirname, start_index):
         res = self.dirpath / "output" / dirname / str(start_index)
@@ -703,6 +706,8 @@ class Runner(object):
 
         chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
         for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
+            assert not chromosome.root._v_attrs.dirty
+
             # metadata
             try:
                 mins, maxs = accum_extrema(chromosome, mins, maxs)
@@ -837,6 +842,10 @@ class Runner(object):
 #            else:
 #                min_track_fudged = min_track - ldexp(abs(min_track), FUDGE_EP)
 #
+            # this happens for really big numbers or really small
+            # numbers; you only have 7 orders of magnitude to play
+            # with on a float32
+            assert float32(min_track) - float32(1.0) != float32(min_track)
             mapping["min_track"] = min_track - 1.0
 
             if data is not None:
@@ -852,7 +861,9 @@ class Runner(object):
 
     def make_dirichlet_spec(self):
         dirichlet_table = make_dirichlet_table(self.num_segs, self.num_bases)
-        return make_table_spec(DIRICHLET_FRAG, dirichlet_table)
+        items = [make_table_spec(DIRICHLET_FRAG, dirichlet_table)]
+
+        return make_spec("DIRICHLET_TAB", items)
 
     def make_dense_cpt_spec(self):
         num_segs = self.num_segs
@@ -920,7 +931,7 @@ class Runner(object):
     def make_mx_spec(self):
         return self.make_spec_multiseg("MX", MX_TMPL)
 
-    def save_input_master(self, start_index=None):
+    def save_input_master(self, start_index=None, new=False):
         tracknames = self.tracknames
         num_segs = self.num_segs
         mins = self.mins
@@ -928,8 +939,7 @@ class Runner(object):
 
         include_filename = self.gmtk_include_filename
 
-        # if start_index >= 1, then always make a new file
-        if start_index:
+        if new:
             input_master_filename = None
         else:
             input_master_filename = self.input_master_filename
@@ -1083,6 +1093,9 @@ class Runner(object):
                    native_specs={}):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
+        # convoluted so I don't have to deal with a lot of escaping issues
+        cmdline = BASH_CMDLINE + ['%s "$@"' % gmtk_cmdline[0]] + gmtk_cmdline
+
         if self.dry_run:
             print " ".join(gmtk_cmdline)
             return None
@@ -1094,7 +1107,7 @@ class Runner(object):
         job_tmpl.name = job_name
 
         job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = EM_TRAIN_CMDLINE + gmtk_cmdline
+        job_tmpl.args = cmdline
 
         job_tmpl.outputPath = ":" + (self.output_dirpath / job_name)
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
@@ -1143,8 +1156,8 @@ class Runner(object):
             kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
 
-            if chunk_index == last_chunk_index:
-                kwargs_chunk["dirichletPriors"] = True
+            # -dirichletPriors T only on the last (smallest) chunk
+            kwargs_chunk["dirichletPriors"] = (chunk_index == last_chunk_index)
 
             jobid = queue_train_custom(chunk_index, chunk_mem_req,
                                        **kwargs_chunk)
@@ -1184,9 +1197,12 @@ class Runner(object):
              verbosity=VERBOSITY)
 
     def run_train_start(self, session, start_index, interrupt_event):
-        self.save_input_master(start_index)
-        self.set_params_filename(start_index)
-        self.set_log_likelihood_filename(start_index)
+        # make new files if you have more than one random start
+        new = self.random_starts > 1
+
+        self.save_input_master(start_index, new)
+        self.set_params_filename(start_index, new)
+        self.set_log_likelihood_filename(start_index, new)
         self.set_output_dirpaths(start_index)
 
         log_likelihood_filename = self.log_likelihood_filename
@@ -1311,7 +1327,12 @@ class Runner(object):
         # len(dst_filenames) == len(TRAIN_ATTRNAMES) == len(return value
         # of Runner.run_train_start())-1. This is asserted below.
 
-        self.save_input_master()
+        random_starts = self.random_starts
+        assert random_starts >= 1
+
+        if random_starts == 1:
+            self.save_input_master()
+
         if self.input_master_filename_new:
             input_master_filename = self.input_master_filename
         else:
@@ -1326,7 +1347,7 @@ class Runner(object):
         threads = []
         with Session() as session:
             try:
-                for start_index in xrange(self.random_starts):
+                for start_index in xrange(random_starts):
                     thread = RandomStartThread(self, session, start_index,
                                                interrupt_event)
                     thread.start()
@@ -1384,13 +1405,20 @@ class Runner(object):
         self.set_output_dirpaths("identify")
 
         # XXX: kill submitted jobs on exception
+        jobids = []
         with Session() as session:
+            queue_identify = partial(self.queue_gmtk, session, prog)
+
             for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
                                              **identify_kwargs)
                 job_name = self.make_job_name_identify(chunk_index)
-                self.queue_gmtk(session, prog, identify_kwargs_chunk, job_name,
-                                chunk_mem_req)
+
+                jobid = queue_identify(identify_kwargs_chunk, job_name,
+                                       chunk_mem_req)
+                jobids.append(jobid)
+
+            session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER, True)
 
         if not self.dry_run:
             # XXXopt: could be done in parallel as well
