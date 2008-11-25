@@ -13,8 +13,8 @@ import sys
 
 from collections import defaultdict
 from functools import partial
-from numpy import (array, concatenate, histogram, iinfo, isfinite, NINF, PINF,
-                   zeros)
+from numpy import (array, concatenate, histogram, iinfo, isfinite, ndarray,
+                   NINF, PINF, zeros)
 from tables import openFile
 
 from ._util import (DTYPE_IDENTIFY, fill_array,
@@ -68,15 +68,19 @@ def calc_histogram(trackname, filenames, data_range, include_coords,
 
             if include_coords:
                 # adjust coords
-                chr_include_coords = chr_include_coords - supercontig_start
+                supercontig_include_coords = (chr_include_coords
+                                              - supercontig_start)
 
                 # set all negative coords to 0
-                chr_include_coords[chr_include_coords < 0] = 0
+                supercontig_include_coords[supercontig_include_coords < 0] = 0
             else:
                 # slice(None, None) means the whole sequence
-                chr_include_coords = [[None, None]]
+                supercontig_include_coords = [[None, None]]
 
-            for coords in chr_include_coords:
+            for coords in supercontig_include_coords:
+                if coords[0] >= len(continuous):
+                    continue
+
                 row_slice = slice(*coords)
 
                 col = continuous[row_slice, col_index]
@@ -96,24 +100,27 @@ def calc_histogram(trackname, filenames, data_range, include_coords,
                         chunk_attrs = chunk.root._v_attrs
                         chunk_start = chunk_attrs.start - supercontig_start
                         chunk_end = chunk_attrs.end - supercontig_start
-                        chunk_identify = chunk.root.identify
 
-                        assert chunk_identify.dtype == DTYPE_IDENTIFY
+                        chunk_identify = chunk.root.identify
+                        assert chunk_identify.atom.dtype == DTYPE_IDENTIFY
 
                         if (chunk_start >= coords_end
                             or chunk_end <= coords_start):
                             continue
 
-                        chunk_start_offset = coords_start-chunk_start
+                        chunk_identify_array = None
+
+                        chunk_start_offset = coords_start - chunk_start
                         if chunk_start_offset > 0:
-                            chunk_identify = \
+                            chunk_identify_array = \
                                 chunk_identify[chunk_start_offset:]
                         elif chunk_start_offset < 0:
                             padding_shape = (-chunk_start_offset,)
                             padding = fill_array(MAX_IDENTIFY, padding_shape,
                                                  DTYPE_IDENTIFY)
-                            padded_list = [padding, chunk_identify]
-                            chunk_identify = concatenate(padded_list)
+                            padded_list = [padding, chunk_identify.read()]
+
+                            chunk_identify_array = concatenate(padded_list)
 
                         # if there is not enough padding at end,
                         # things will work. Need to correct if there
@@ -121,11 +128,19 @@ def calc_histogram(trackname, filenames, data_range, include_coords,
                         if chunk_end > coords_end:
                             # -1 if it is one longer, etc.
                             chunk_end_offset = chunk_end-coords_end
-                            chunk_identify = chunk_identify[:chunk_end_offset]
+                            chunk_identify_array = \
+                                chunk_identify[:chunk_end_offset]
 
-                        assert len(chunk_identify) <= coords_end - coords_start
+                        if chunk_identify_array is None:
+                            chunk_identify_array = chunk_identify.read()
 
-                        col_bitmap[chunk_identify == identify_label] = True
+                        assert isinstance(chunk_identify_array, ndarray)
+
+                        assert (len(chunk_identify_array)
+                                <= coords_end - coords_start)
+
+                        loc_true = chunk_identify_array == identify_label
+                        col_bitmap[loc_true] = True
 
                     col = col[col_bitmap]
 
@@ -171,15 +186,21 @@ def h5histogram(trackname, filenames, include_coords_filename=None,
                 include_identify_filelistname=None, identify_label=1):
     print "\t".join(FIELDNAMES)
 
+    # two passes to avoid running out of memory
+    data_range = calc_range(trackname, filenames)
+
     include_coords = load_coords(include_coords_filename)
     include_identify_dict = \
         load_include_identify(include_identify_filelistname)
 
-    # two passes to avoid running out of memory
-    data_range = calc_range(trackname, filenames)
-    hist, edges = calc_histogram(trackname, filenames, data_range,
-                                 include_coords, include_identify_dict,
-                                 identify_label)
+    try:
+        hist, edges = calc_histogram(trackname, filenames, data_range,
+                                     include_coords, include_identify_dict,
+                                     identify_label)
+    finally:
+        for include_identify_h5files in include_identify_dict.itervalues():
+            for include_identify_h5file in include_identify_h5files:
+                include_identify_h5file.close()
 
     print_histogram(hist, edges)
 
@@ -196,7 +217,7 @@ def parse_options(args):
     parser.add_option("--include-identify", metavar="FILELIST",
                       help="limit to label identified in files in FILELIST")
 
-    parser.add_option("--identify-label", metavar="LABEL", default=1,
+    parser.add_option("--identify-label", metavar="LABEL", default=1, type=int,
                       help="limit to LABEL in a list of specified identify"
                       " files")
 
