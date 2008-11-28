@@ -63,30 +63,33 @@ def calc_distance(h5filenames, bedfilenames):
                 query.shape = tuple(reversed(query.shape))
                 query += supercontig_start
 
-                # XXX: this is all a bit inefficient
                 # this is like the cross product, but it is a
                 # subtraction instead
-                import pdb; pdb.set_trace()
-                
                 sbjct_ix, query_ix = ix_(sbjct.ravel(), query.ravel())
                 distances = sbjct_ix - query_ix
 
-                a = distances[::2, ::2]
-                b = distances[::2, 1::2]
-                c = distances[1::2, ::2]
-                d = distances[1::2, 1::2]
+                # repeating block of
+                # [[sbjct_start-query_start sbjct_start-query_end]
+                #  [sbjct_end-query_start   sbjct_end-query_end]]
+                sbjct_start_minus_query_end = distances[::2, 1::2]
+                sbjct_end_minus_query_start = distances[1::2, ::2]
 
-                overlap = (((a <= 0) & (c > 0)) | ((b < 0) & (d >= 0))
-                           | ((a >= 0) & (b < 0)))
+                overlap = ((sbjct_start_minus_query_end < 0)
+                           & (sbjct_end_minus_query_start > 0))
                 which_overlap = overlap.sum(0) > 0
 
                 print >>sys.stderr, ("%s/%s: %s/%s"
                                      % (h5filename, seg_label,
                                         which_overlap.sum(), len(query)))
 
+                # compress number of sbjcts to 1
                 closest_distances = abs(distances).min(0)
+
+                # reshape so major axis is number of queries
                 closest_distances.shape = (len(query), 2)
                 closest_distances[which_overlap] = 0
+
+                # compress minor axis (coordinate start or end)
                 closest_distances = closest_distances.min(1)
 
                 for closest_distance in closest_distances:
