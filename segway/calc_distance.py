@@ -63,9 +63,11 @@ def calc_distance(h5filenames, bedfilenames):
                 query.shape = tuple(reversed(query.shape))
                 query += supercontig_start
 
-                # XXX: this is all a bit inefficient, need help
+                # XXX: this is all a bit inefficient
                 # this is like the cross product, but it is a
                 # subtraction instead
+                import pdb; pdb.set_trace()
+                
                 sbjct_ix, query_ix = ix_(sbjct.ravel(), query.ravel())
                 distances = sbjct_ix - query_ix
 
