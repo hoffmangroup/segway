@@ -14,7 +14,7 @@ import shutil
 import sys
 from tempfile import mkdtemp
 
-from numpy import array, empty, intc
+from numpy import append, array, diff, empty, insert, intc
 from path import path
 from pkg_resources import resource_filename, resource_string
 from tables import openFile, Filters, NoSuchNodeError
@@ -203,6 +203,25 @@ def iter_chroms_coords(filenames, coords):
 
         with openFile(filename) as chromosome:
             yield chrom, filename, chromosome, chr_include_coords
+
+def find_segment_starts(data):
+    """
+    find segment starts and the data at those positions
+    """
+    len_data = len(data)
+
+    # unpack tuple, ignore rest
+    end_pos, = diff(data).nonzero()
+
+    # add one to get the start positions, and add a 0 at the beginning
+    start_pos = insert(end_pos + 1, 0, 0)
+    labels = data[start_pos]
+
+    # after generating labels, add an extraneous start position so
+    # where_seg+1 doesn't go out of bounds
+    start_pos = append(start_pos, len_data)
+
+    return start_pos, labels
 
 def main(args=sys.argv[1:]):
     pass

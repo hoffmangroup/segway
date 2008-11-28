@@ -21,7 +21,6 @@ from ._util import (DTYPE_IDENTIFY, fill_array,
                     get_col_index as _get_col_index, iter_chroms_coords,
                     load_coords, walk_continuous_supercontigs)
 
-BINS = 100
 FIELDNAMES = ["lower_edge", "count"]
 
 IINFO_IDENTIFY = iinfo(DTYPE_IDENTIFY)
@@ -48,9 +47,9 @@ def calc_range(trackname, filenames):
 
     return minimum, maximum
 
-def calc_histogram(trackname, filenames, data_range, include_coords,
+def calc_histogram(trackname, filenames, data_range, num_bins, include_coords,
                    include_identify_dict, identify_label):
-    histogram_custom = partial(histogram, bins=BINS, range=data_range,
+    histogram_custom = partial(histogram, bins=num_bins, range=data_range,
                                new=True)
 
     hist, edges = histogram_custom(array([]))
@@ -182,7 +181,7 @@ def load_include_identify(filelistname):
 
     return res
 
-def h5histogram(trackname, filenames, include_coords_filename=None,
+def h5histogram(trackname, filenames, num_bins, include_coords_filename=None,
                 include_identify_filelistname=None, identify_label=1):
     print "\t".join(FIELDNAMES)
 
@@ -195,8 +194,8 @@ def h5histogram(trackname, filenames, include_coords_filename=None,
 
     try:
         hist, edges = calc_histogram(trackname, filenames, data_range,
-                                     include_coords, include_identify_dict,
-                                     identify_label)
+                                     num_bins, include_coords,
+                                     include_identify_dict, identify_label)
     finally:
         for include_identify_h5files in include_identify_dict.itervalues():
             for include_identify_h5file in include_identify_h5files:
@@ -224,6 +223,9 @@ def parse_options(args):
     parser.add_option("-c", "--col", metavar="COL",
                       help="write values in column COL (default first column)")
 
+    parser.add_option("-b", "--num-bins", metavar="BINS", type=int,
+                      default=100, help="use BINS bins")
+
     options, args = parser.parse_args(args)
 
     if not len(args) >= 1:
@@ -235,7 +237,7 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    return h5histogram(options.col, args, options.include_coords,
+    return h5histogram(options.col, args, options.num_bins, options.include_coords,
                        options.include_identify, options.identify_label)
 
 if __name__ == "__main__":

@@ -23,8 +23,8 @@ import sys
 from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import (amin, amax, append, array, diag, diff, empty, finfo,
-                   float32, fromfile, insert, invert, isnan, newaxis, NINF,
+from numpy import (amin, amax, array, diag, diff, empty, finfo,
+                   float32, fromfile, invert, isnan, newaxis, NINF,
                    where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
@@ -34,9 +34,11 @@ from tables import Atom, openFile
 from path import path
 
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
-                    DTYPE_SEG_LEN, fill_array, FILTERS_GZIP, get_tracknames,
-                    init_num_obs, iter_chroms_coords, load_coords,
-                    NamedTemporaryDir, PKG, walk_continuous_supercontigs)
+                    DTYPE_SEG_LEN, fill_array, find_segment_starts,
+                    FILTERS_GZIP, get_tracknames, init_num_obs,
+                    iter_chroms_coords, load_coords,
+                    NamedTemporaryDir, PKG,
+                    walk_continuous_supercontigs)
 
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
@@ -380,21 +382,12 @@ def make_name_collection_spec(num_segs, tracknames):
     return make_spec("NAME_COLLECTION", items)
 
 def print_segment_summary_stats(data, seg_len_files):
-    # XXX: should use HDF5 instead
-    len_data = len(data)
+    # XXX: should use HDF5 output instead
 
-    # unpack tuple, ignore rest
-    change_pos, = diff(data).nonzero()
-
-    start_pos = insert(change_pos + 1, 0, 0)
-    data_start = data[start_pos]
-
-    # after generating data_start, add an extraneous start position so
-    # where_seg+1 doesn't go out of bounds
-    start_pos = append(start_pos, len_data)
+    start_pos, labels = find_segment_starts(data)
 
     for seg_index, seg_len_file in enumerate(seg_len_files):
-        where_seg, = where(data_start == seg_index)
+        where_seg, = where(labels == seg_index)
         coords_seg = start_pos.take([where_seg, where_seg+1])
 
         lens_seg = diff(coords_seg, axis=0).ravel()

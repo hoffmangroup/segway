@@ -240,7 +240,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
       *chrom = strdup(val);
       assert(*chrom);
     } else if (!strcmp(key, KEY_START)) {
-      *start = strtol(val, &tailptr, 10);
+      *start = strtol(val, &tailptr, 10) - 1;
       assert(!*tailptr);
     } else if (!strcmp(key, KEY_STEP)) {
       *step = strtol(val, &tailptr, 10);
@@ -254,8 +254,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   }
 }
 
-void init_supercontig_array(size_t len,
-                            supercontig_array_t *supercontigs) {
+void init_supercontig_array(size_t len, supercontig_array_t *supercontigs) {
   supercontigs->len = len;
 
   supercontigs->supercontigs = malloc(len * sizeof(supercontig_t));
