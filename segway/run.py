@@ -34,8 +34,8 @@ from tables import Atom, openFile
 from path import path
 
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
-                    DTYPE_SEG_LEN, fill_array, find_segment_starts,
-                    FILTERS_GZIP, get_tracknames, init_num_obs,
+                    DTYPE_SEG_LEN, EXT_GZ, fill_array, find_segment_starts,
+                    FILTERS_GZIP, get_tracknames, gzip_open, init_num_obs,
                     iter_chroms_coords, load_coords,
                     NamedTemporaryDir, PKG,
                     walk_continuous_supercontigs)
@@ -121,6 +121,7 @@ def extjoin(*args):
     return extsep.join(args)
 
 # extensions and suffixes
+EXT_BED = "bed"
 EXT_IDENTIFY = "identify.h5"
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
@@ -129,7 +130,6 @@ EXT_INT = "int"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
 EXT_TAB = "tab"
-EXT_BED = "bed"
 
 def make_prefix_fmt(num):
     # make sure there are sufficient leading zeros
@@ -381,7 +381,7 @@ def make_name_collection_spec(num_segs, tracknames):
 
     return make_spec("NAME_COLLECTION", items)
 
-def print_segment_summary_stats(start_pos, labels, seg_len_files):
+def write_segment_summary_stats(start_pos, labels, seg_len_files):
     # XXX: should use HDF5 output instead
 
     for seg_index, seg_len_file in enumerate(seg_len_files):
@@ -424,9 +424,9 @@ def write_bed(outfile, start_pos, labels, coords, tracknames):
         row = [chrom, str(seg_start), str(seg_end), str(seg_label)]
         print >>outfile, "\t".join(row)
 
-def load_gmtk_out_save_bed((chrom, start, end), gmtk_outfilename,
-                           identify_filename, bed_filename, seg_len_files,
-                           tracknames):
+def load_gmtk_out_write_bed((chrom, start, end), gmtk_outfilename,
+                            identify_filename, bed_file, seg_len_files,
+                            tracknames):
     data = load_gmtk_out(gmtk_outfilename)
 
     identify_file = openFile(identify_filename, "w", chrom,
@@ -436,11 +436,8 @@ def load_gmtk_out_save_bed((chrom, start, end), gmtk_outfilename,
 
     start_pos, labels = find_segment_starts(data)
 
-    # XXX: gzip via a pipe
-    with open(bed_filename, "w") as bed_file:
-        write_bed(bed_file, start_pos, labels, (chrom, start, end), tracknames)
-
-    print_segment_summary_stats(start_pos, labels, seg_len_files)
+    write_bed(bed_file, start_pos, labels, (chrom, start, end), tracknames)
+    write_segment_summary_stats(start_pos, labels, seg_len_files)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -1027,15 +1024,14 @@ class Runner(object):
         setattr(self, name, dst_filename)
 
     def gmtk_out2bed(self):
-        prefix_fmt = make_prefix_fmt(self.num_chunks)
-        bed_filebasename_fmt_list = [PKG, prefix_fmt, EXT_BED]
-        bed_filebasename_fmt = "".join(bed_filebasename_fmt_list)
+        bed_filebasename = "".join([PKG, EXT_BED, EXT_GZ])
 
+        prefix_fmt = make_prefix_fmt(self.num_chunks)
         identify_filebase_fmt_list = [PKG, prefix_fmt, EXT_IDENTIFY]
         identify_filebasename_fmt = "".join(identify_filebase_fmt_list)
 
         out_dirpath = path(self.bed_dirname)
-        bed_filepath_fmt = out_dirpath / bed_filebasename_fmt
+        bed_filepath_fmt = out_dirpath / bed_filebasename
         identify_filepath_fmt = out_dirpath / identify_filebasename_fmt
 
         seg_len_filebasename_fmt = "".join([PREFIX_SEG_LEN_FMT, EXT_INT])
@@ -1053,14 +1049,14 @@ class Runner(object):
         # chunk_coord = (chrom, chromStart, chromEnd)
         zipper = izip(count(), self.output_filenames, self.chunk_coords)
         with nested(*map(open_wb, seg_len_filenames)) as seg_len_files:
-            for index, gmtk_outfilename, chunk_coord in zipper:
-                bed_filename = bed_filepath_fmt % index
-                identify_filename = identify_filepath_fmt % index
+            with gzip_open(bed_filepath, "w") as bed_file:
+                for index, gmtk_outfilename, chunk_coord in zipper:
+                    identify_filename = identify_filepath_fmt % index
 
-                print >>identify_filelist, identify_filename
-                load_gmtk_out_save_bed(chunk_coord, gmtk_outfilename,
-                                       identify_filename, bed_filename,
-                                       seg_len_files, self.tracknames)
+                    print >>identify_filelist, identify_filename
+                    load_gmtk_out_write_bed(chunk_coord, gmtk_outfilename,
+                                           identify_filename, bed_file,
+                                           seg_len_files, self.tracknames)
 
     def prog_factory(self, prog):
         """
@@ -1392,8 +1388,6 @@ class Runner(object):
 
                  cppCommandOptions=make_cpp_options(params_filename),
                  **self.make_gmtk_kwargs())
-
-        gmtk_cmdline = prog.build_cmdline(options=identify_kwargs)
 
         self.set_output_dirpaths("identify")
 
