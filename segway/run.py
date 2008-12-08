@@ -1031,7 +1031,7 @@ class Runner(object):
         identify_filebasename_fmt = "".join(identify_filebase_fmt_list)
 
         out_dirpath = path(self.bed_dirname)
-        bed_filepath_fmt = out_dirpath / bed_filebasename
+        bed_filepath = out_dirpath / bed_filebasename
         identify_filepath_fmt = out_dirpath / identify_filebasename_fmt
 
         seg_len_filebasename_fmt = "".join([PREFIX_SEG_LEN_FMT, EXT_INT])
