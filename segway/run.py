@@ -421,7 +421,8 @@ def write_bed(outfile, start_pos, labels, coords, tracknames):
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels)
     for seg_start, seg_end, seg_label in zipper:
-        print >>outfile, "\t".join([chrom, seg_start, seg_end, seg_label])
+        row = [chrom, str(seg_start), str(seg_end), str(seg_label)]
+        print >>outfile, "\t".join(row)
 
 def load_gmtk_out_save_bed((chrom, start, end), gmtk_outfilename,
                            identify_filename, bed_filename, seg_len_files,
