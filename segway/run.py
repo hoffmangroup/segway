@@ -1468,7 +1468,7 @@ def parse_options(args):
     parser.add_option("--observations", "-o", metavar="DIR",
                       help="use or create observations in DIR")
 
-    parser.add_option("--bed", "-w", metavar="DIR",
+    parser.add_option("--bed", "-b", metavar="DIR",
                       help="use or create bed tracks in DIR",
                       default="out")
 
