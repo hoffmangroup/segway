@@ -1024,7 +1024,7 @@ class Runner(object):
         setattr(self, name, dst_filename)
 
     def gmtk_out2bed(self):
-        bed_filebasename = "".join([PKG, EXT_BED, EXT_GZ])
+        bed_filebasename = extjoin(PKG, EXT_BED, EXT_GZ)
 
         prefix_fmt = make_prefix_fmt(self.num_chunks)
         identify_filebase_fmt_list = [PKG, prefix_fmt, EXT_IDENTIFY]
