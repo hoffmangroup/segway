@@ -51,7 +51,7 @@ TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
 ISLAND = False
-WIG_DIRNAME = "out"
+BED_DIRNAME = "out"
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
@@ -129,7 +129,7 @@ EXT_INT = "int"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
 EXT_TAB = "tab"
-EXT_WIG = "wig"
+EXT_BED = "bed"
 
 def make_prefix_fmt(num):
     # make sure there are sufficient leading zeros
@@ -381,10 +381,8 @@ def make_name_collection_spec(num_segs, tracknames):
 
     return make_spec("NAME_COLLECTION", items)
 
-def print_segment_summary_stats(data, seg_len_files):
+def print_segment_summary_stats(start_pos, labels, seg_len_files):
     # XXX: should use HDF5 output instead
-
-    start_pos, labels = find_segment_starts(data)
 
     for seg_index, seg_len_file in enumerate(seg_len_files):
         where_seg, = where(labels == seg_index)
@@ -413,21 +411,20 @@ def write_identify(h5file, data, chrom, start, end, tracknames):
 
     c_array[...] = data
 
-def write_wig(outfile, output, (chrom, start, end), tracknames):
-    """
-    output is a 1D numpy.array
-    """
-    # convert from zero- to one-based
-    start_1based = start + 1
+def write_bed(outfile, start_pos, labels, coords, tracknames):
+    # XXX: add in optional browser track line (see SVN revisions
+    # previous to 195)
 
-    print >>outfile, TRACK_FMT % (chrom, start_1based, end)
-    print >>outfile, WIG_HEADER % ", ".join(tracknames)
-    print >>outfile, FIXEDSTEP_FMT % (chrom, start_1based)
+    (chrom, region_start, region_end) = coords
 
-    output.tofile(outfile, "\n", "%d")
+    start_pos += region_start
 
-def load_gmtk_out_save_wig((chrom, start, end), gmtk_outfilename,
-                           identify_filename, wig_filename, seg_len_files,
+    zipper = zip(start_pos[:-1], start_pos[1:], labels)
+    for seg_start, seg_end, seg_label in zipper:
+        print >>outfile, "\t".join([chrom, seg_start, seg_end, seg_label])
+
+def load_gmtk_out_save_bed((chrom, start, end), gmtk_outfilename,
+                           identify_filename, bed_filename, seg_len_files,
                            tracknames):
     data = load_gmtk_out(gmtk_outfilename)
 
@@ -436,11 +433,13 @@ def load_gmtk_out_save_wig((chrom, start, end), gmtk_outfilename,
     with identify_file:
         write_identify(identify_file, data, chrom, start, end, tracknames)
 
-    # XXX: gzip via a pipe
-    with open(wig_filename, "w") as wig_file:
-        write_wig(wig_file, data, (chrom, start, end), tracknames)
+    start_pos, labels = find_segment_starts(data)
 
-    print_segment_summary_stats(data, seg_len_files)
+    # XXX: gzip via a pipe
+    with open(bed_filename, "w") as bed_file:
+        write_bed(bed_file, start_pos, labels, (chrom, start, end), tracknames)
+
+    print_segment_summary_stats(start_pos, labels, seg_len_files)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -494,7 +493,7 @@ class Runner(object):
         self.output_filenames = None
 
         self.obs_dirname = None
-        self.wig_dirname = None
+        self.bed_dirname = None
 
         self.include_coords_filename = None
 
@@ -587,8 +586,8 @@ class Runner(object):
                 dirpath.listdir()):
                 raise
 
-    def make_wig_dir(self):
-        self.make_dir(self.wig_dirname)
+    def make_bed_dir(self):
+        self.make_dir(self.bed_dirname)
 
     def make_obs_filelistpath(self, ext):
         return self.obs_dirpath / extjoin(ext, EXT_LIST)
@@ -1016,7 +1015,7 @@ class Runner(object):
         if identify:
             self.save_output_filelist()
             self.save_dumpnames()
-            self.make_wig_dir()
+            self.make_bed_dir()
 
     def move_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -1026,16 +1025,16 @@ class Runner(object):
 
         setattr(self, name, dst_filename)
 
-    def gmtk_out2wig(self):
+    def gmtk_out2bed(self):
         prefix_fmt = make_prefix_fmt(self.num_chunks)
-        wig_filebasename_fmt_list = [PKG, prefix_fmt, EXT_WIG]
-        wig_filebasename_fmt = "".join(wig_filebasename_fmt_list)
+        bed_filebasename_fmt_list = [PKG, prefix_fmt, EXT_BED]
+        bed_filebasename_fmt = "".join(bed_filebasename_fmt_list)
 
         identify_filebase_fmt_list = [PKG, prefix_fmt, EXT_IDENTIFY]
         identify_filebasename_fmt = "".join(identify_filebase_fmt_list)
 
-        out_dirpath = path(self.wig_dirname)
-        wig_filepath_fmt = out_dirpath / wig_filebasename_fmt
+        out_dirpath = path(self.bed_dirname)
+        bed_filepath_fmt = out_dirpath / bed_filebasename_fmt
         identify_filepath_fmt = out_dirpath / identify_filebasename_fmt
 
         seg_len_filebasename_fmt = "".join([PREFIX_SEG_LEN_FMT, EXT_INT])
@@ -1054,12 +1053,12 @@ class Runner(object):
         zipper = izip(count(), self.output_filenames, self.chunk_coords)
         with nested(*map(open_wb, seg_len_filenames)) as seg_len_files:
             for index, gmtk_outfilename, chunk_coord in zipper:
-                wig_filename = wig_filepath_fmt % index
+                bed_filename = bed_filepath_fmt % index
                 identify_filename = identify_filepath_fmt % index
 
                 print >>identify_filelist, identify_filename
-                load_gmtk_out_save_wig(chunk_coord, gmtk_outfilename,
-                                       identify_filename, wig_filename,
+                load_gmtk_out_save_bed(chunk_coord, gmtk_outfilename,
+                                       identify_filename, bed_filename,
                                        seg_len_files, self.tracknames)
 
     def prog_factory(self, prog):
@@ -1415,7 +1414,7 @@ class Runner(object):
 
         if not self.dry_run:
             # XXXopt: could be done in parallel as well
-            self.gmtk_out2wig()
+            self.gmtk_out2bed()
 
     def _run(self):
         """
@@ -1469,8 +1468,8 @@ def parse_options(args):
     parser.add_option("--observations", "-o", metavar="DIR",
                       help="use or create observations in DIR")
 
-    parser.add_option("--wiggle", "-w", metavar="DIR",
-                      help="use or create wiggle tracks in DIR",
+    parser.add_option("--bed", "-w", metavar="DIR",
+                      help="use or create bed tracks in DIR",
                       default="out")
 
     parser.add_option("--input-master", "-i", metavar="FILE",
@@ -1515,17 +1514,17 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
     dirname = options.directory
-    wig_dirname = options.wiggle
+    bed_dirname = options.bed
 
-    if dirname and not wig_dirname:
-        wig_dirname = path(dirname) / WIG_DIRNAME
+    if dirname and not bed_dirname:
+        bed_dirname = path(dirname) / BED_DIRNAME
 
     runner = Runner()
 
     runner.h5filenames = args
     runner.dirname = dirname
     runner.obs_dirname = options.observations
-    runner.wig_dirname = wig_dirname
+    runner.bed_dirname = bed_dirname
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
     runner.params_filename = options.trainable_params

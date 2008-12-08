@@ -207,6 +207,8 @@ def iter_chroms_coords(filenames, coords):
 def find_segment_starts(data):
     """
     find segment starts and the data at those positions
+
+    returns lists of len num_segments+1, num_segments
     """
     len_data = len(data)
 
