@@ -1320,8 +1320,8 @@ class Runner(object):
         random_starts = self.random_starts
         assert random_starts >= 1
 
-        if random_starts == 1:
-            self.save_input_master()
+        # XXX: why did I have "if random_starts == 1:" preceding this line?
+        self.save_input_master()
 
         if self.input_master_filename_new:
             input_master_filename = self.input_master_filename
