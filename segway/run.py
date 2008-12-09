@@ -343,8 +343,6 @@ def prob_transition_from_expected_len(length):
     # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
     return length / (1 + length)
 
-def make_dirichlet_table(num_segs, num_bases, len_seg_expected, len_seg_strength):
-
 def make_dense_cpt_start_seg_spec(num_segs):
     return make_random_spec(DENSE_CPT_START_SEG_FRAG, 1, num_segs)
 
