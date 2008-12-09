@@ -43,7 +43,7 @@ from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
 
-# XXX: should be options
+## XXX: should be options
 NUM_SEGS = 2
 MAX_EM_ITERS = 100
 VERBOSITY = 0 # XXX: should vary based on DRMAA submission or not
@@ -55,10 +55,6 @@ BED_DIRNAME = "out"
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
-
-# ratio of number of Dirichlet counts to add relative to amount of
-# training data
-LEN_SEG_STRENGTH = 1
 
 DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
 
@@ -86,12 +82,17 @@ MEM_REQ_BUNDLE = "500M"
 RES_REQ_IDS = ["mem_requested", "mem_free"]
 
 # for a four-way model
-MEM_REQS = {2: [3619, 8098728],
+MEM_REQS = {1: [3619, 8098728],
+            2: [3619, 8098728],
             3: [1553, 16121352],
             4: [5768, 14442884]}
 
-# defaults
+## defaults
 RANDOM_STARTS = 1
+
+# ratio of number of Dirichlet counts to add relative to amount of
+# training data
+LEN_SEG_STRENGTH = 1.0
 
 # replace NAN with SENTINEL to avoid warnings
 # XXX: replace with something negative and outlandish again
@@ -350,7 +351,7 @@ def make_dirichlet_table(num_segs, num_bases):
     probs[probs == 0.0] = prob_nondiag
 
     # astype(int) means flooring the floats
-    pseudocounts_per_row = (LEN_SEG_STRENGTH * num_bases) / num_segs
+    pseudocounts_per_row = (self.len_seg_strength * num_bases) / num_segs
     pseudocounts = (probs * pseudocounts_per_row).astype(int)
 
     return pseudocounts
@@ -1463,6 +1464,8 @@ def parse_options(args):
     parser.add_option("--observations", "-o", metavar="DIR",
                       help="use or create observations in DIR")
 
+    # XXX: separate this (now a single file) from output identity file
+    # directory
     parser.add_option("--bed", "-b", metavar="DIR",
                       help="use or create bed tracks in DIR",
                       default="out")
@@ -1487,6 +1490,11 @@ def parse_options(args):
     parser.add_option("--random-starts", "-r", type=int, default=RANDOM_STARTS,
                       metavar="NUM",
                       help="randomize start parameters NUM times")
+
+    parser.add_option("--prior-strength", type=float, default=LEN_SEG_STRENGTH,
+                      metavar="RATIO",
+                      help="use RATIO times the number of data counts as the"
+                      " number of pseudocounts for the segment length prior")
 
     # XXX: group here: flag options
     parser.add_option("--force", "-f", action="store_true",
@@ -1526,6 +1534,7 @@ def main(args=sys.argv[1:]):
     runner.include_coords_filename = options.include_coords
 
     runner.random_starts = options.random_starts
+    runner.len_seg_strength = options.prior_strength
 
     runner.delete_existing = options.force
     runner.train = not options.no_train
