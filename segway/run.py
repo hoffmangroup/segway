@@ -343,18 +343,7 @@ def prob_transition_from_expected_len(length):
     # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
     return length / (1 + length)
 
-def make_dirichlet_table(num_segs, num_bases):
-    prob_diag = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
-    prob_nondiag = (1.0 - prob_diag) / (num_segs - 1)
-
-    probs = diag(fill_array(prob_diag, num_segs))
-    probs[probs == 0.0] = prob_nondiag
-
-    # astype(int) means flooring the floats
-    pseudocounts_per_row = (self.len_seg_strength * num_bases) / num_segs
-    pseudocounts = (probs * pseudocounts_per_row).astype(int)
-
-    return pseudocounts
+def make_dirichlet_table(num_segs, num_bases, len_seg_expected, len_seg_strength):
 
 def make_dense_cpt_start_seg_spec(num_segs):
     return make_random_spec(DENSE_CPT_START_SEG_FRAG, 1, num_segs)
@@ -850,8 +839,24 @@ class Runner(object):
     def make_spec_multiseg(self, name, *args, **kwargs):
         return make_spec(name, self.make_items_multiseg(*args, **kwargs))
 
+    def make_dirichlet_table(self):
+        num_segs = self.num_segs
+
+        prob_diag = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
+        prob_nondiag = (1.0 - prob_diag) / (num_segs - 1)
+
+        probs = diag(fill_array(prob_diag, num_segs))
+        probs[probs == 0.0] = prob_nondiag
+
+        # astype(int) means flooring the floats
+        total_pseudocounts = self.len_seg_strength * self.num_bases
+        pseudocounts_per_row = total_pseudocounts / num_segs
+        pseudocounts = (probs * pseudocounts_per_row).astype(int)
+
+        return pseudocounts
+
     def make_dirichlet_spec(self):
-        dirichlet_table = make_dirichlet_table(self.num_segs, self.num_bases)
+        dirichlet_table = self.make_dirichlet_table()
         items = [make_table_spec(DIRICHLET_FRAG, dirichlet_table)]
 
         return make_spec("DIRICHLET_TAB", items)
