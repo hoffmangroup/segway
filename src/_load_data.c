@@ -5,9 +5,6 @@
    another optimization would be to inflate data yourself, then try to
    process multiple input tracks in parallel (reduce number of writes
    by num_cols)
-
-   uncompressing and recompressing all the data for every new track is
-   probably pretty expensive
 */
 
 #define _GNU_SOURCE
@@ -42,7 +39,6 @@
 
 /* XXX: this needs to adjust, but always be smaller than max size for a dataset*/
 #define CHUNK_NROWS 10000
-#define DEFLATE_LEVEL 1
 
 const float nan_float = NAN;
 
@@ -376,7 +372,6 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
       chunk_dims[1] = num_cols;
       assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims)
              >= 0);
-      assert(H5Pset_deflate(dataset_creation_plist, DEFLATE_LEVEL) >= 0);
 
       /* create dataset */
       fprintf(stderr, "creating %lld x %lld dataset in %d...",
