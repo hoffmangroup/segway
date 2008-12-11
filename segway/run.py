@@ -1252,17 +1252,23 @@ class Runner(object):
                 try:
                     job_info = session.wait(bundle_jobid, timeout_no_wait)
                 except ExitTimeoutError:
+                    # ExitTimeoutError: not ready yet
                     interrupt_event.wait(SESSION_WAIT_TIMEOUT)
-                    # XXX: Py2.6+: use is_set() isntead of isSet()
-                    if interrupt_event.isSet():
-                        for jobid in parallel_jobids + [bundle_jobid]:
-                            try:
-                                print >>sys.stderr, "killing job %s" % jobid
-                                control(jobid, terminate)
-                            except BaseException, err:
-                                print >>sys.stderr, ("ignoring exception: %r"
-                                                     % err)
-                        raise KeyboardInterrupt
+                except ValueError:
+                    # ValueError: the job terminated abnormally
+                    # so interrupt everybody
+                    interrupt_event.set()
+
+                # XXX: Py2.6+: use is_set() instead of isSet()
+                if interrupt_event.isSet():
+                    for jobid in parallel_jobids + [bundle_jobid]:
+                        try:
+                            print >>sys.stderr, "killing job %s" % jobid
+                            control(jobid, terminate)
+                        except BaseException, err:
+                            print >>sys.stderr, ("ignoring exception: %r"
+                                                 % err)
+                    raise KeyboardInterrupt
 
             last_log_likelihood = log_likelihood
             log_likelihood = self.load_log_likelihood()
@@ -1366,6 +1372,7 @@ class Runner(object):
                 raise
 
         if not self.dry_run:
+            # finds the max by log_likelihood
             src_filenames = max(start_params)[1:]
 
             assert (len(TRAIN_ATTRNAMES) == len(src_filenames)
@@ -1459,55 +1466,63 @@ class Runner(object):
 
 def parse_options(args):
     from optparse import OptionParser
+    from ._util import OptionGroup
 
     usage = "%prog [OPTION]... H5FILE..."
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
-    # XXX: group here: filenames
-    parser.add_option("--observations", "-o", metavar="DIR",
-                      help="use or create observations in DIR")
 
-    # XXX: separate this (now a single file) from output identity file
-    # directory
-    parser.add_option("--bed", "-b", metavar="DIR",
-                      help="use or create bed tracks in DIR",
-                      default="out")
+    with OptionGroup(parser, "Model files") as group:
+        group.add_option("--input-master", "-i", metavar="FILE",
+                          help="use or create input master in FILE")
 
-    parser.add_option("--input-master", "-i", metavar="FILE",
-                      help="use or create input master in FILE")
+        group.add_option("--structure", "-s", metavar="FILE",
+                          help="use or create structure in FILE")
 
-    parser.add_option("--structure", "-s", metavar="FILE",
-                      help="use or create structure in FILE")
+        group.add_option("--trainable-params", "-p", metavar="FILE",
+                          help="use or create trainable parameters in FILE")
 
-    parser.add_option("--trainable-params", "-p", metavar="FILE",
-                      help="use or create trainable parameters in FILE")
+    with OptionGroup(parser, "Output files") as group:
+        # XXX: separate this (now a single file) from output identity file
+        # directory
+        group.add_option("--bed", "-b", metavar="DIR",
+                          help="use or create bed tracks in DIR",
+                          default="out")
 
-    parser.add_option("--directory", "-d", metavar="DIR",
-                      help="create all other files in DIR")
+    with OptionGroup(parser, "Intermediate files") as group:
+        group.add_option("--observations", "-o", metavar="DIR",
+                          help="use or create observations in DIR")
 
-    # this is a 0-based file (I know because ENm008 starts at position 0)
-    parser.add_option("--include-coords", metavar="FILE",
-                      help="limit to genomic coordinates in FILE")
+        group.add_option("--directory", "-d", metavar="DIR",
+                          help="create all other files in DIR")
 
-    # XXX: group here: variables
-    parser.add_option("--random-starts", "-r", type=int, default=RANDOM_STARTS,
-                      metavar="NUM",
-                      help="randomize start parameters NUM times")
+        # This is a 0-based file.
+        # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
+        group.add_option("--include-coords", metavar="FILE",
+                          help="limit to genomic coordinates in FILE")
 
-    parser.add_option("--prior-strength", type=float, default=LEN_SEG_STRENGTH,
-                      metavar="RATIO",
-                      help="use RATIO times the number of data counts as the"
-                      " number of pseudocounts for the segment length prior")
+    with OptionGroup(parser, "Variables") as group:
+        group.add_option()
+        group.add_option("--random-starts", "-r", type=int,
+                         default=RANDOM_STARTS, metavar="NUM",
+                         help="randomize start parameters NUM times")
 
-    # XXX: group here: flag options
-    parser.add_option("--force", "-f", action="store_true",
-                      help="delete any preexisting files")
-    parser.add_option("--no-identify", "-I", action="store_true",
-                      help="do not identify segments")
-    parser.add_option("--no-train", "-T", action="store_true",
-                      help="do not train model")
-    parser.add_option("--dry-run", "-n", action="store_true",
-                      help="write all files, but do not run any executables")
+        group.add_option("--prior-strength", type=float,
+                         default=LEN_SEG_STRENGTH, metavar="RATIO",
+                         help="use RATIO times the number of data counts as"
+                         " the number of pseudocounts for the segment length"
+                         " prior")
+
+    with OptionGroup(parser, "Flags") as group:
+        group.add_option("--force", "-f", action="store_true",
+                         help="delete any preexisting files")
+        group.add_option("--no-identify", "-I", action="store_true",
+                         help="do not identify segments")
+        group.add_option("--no-train", "-T", action="store_true",
+                         help="do not train model")
+        group.add_option("--dry-run", "-n", action="store_true",
+                         help="write all files, but do not run any"
+                         " executables")
 
     options, args = parser.parse_args(args)
 
