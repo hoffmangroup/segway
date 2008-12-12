@@ -9,6 +9,7 @@ from collections import defaultdict
 from contextlib import closing
 from functools import partial
 from gzip import open as _gzip_open
+from optparse import OptionGroup as _OptionGroup
 from os import extsep
 import shutil
 import sys
@@ -81,15 +82,14 @@ class LightIterator(object):
         lines = []
         defline_old = self._defline
 
-        while 1:
-            line = self._handle.readline()
+        for line in self._handle:
             if not line:
                 if not defline_old and not lines:
                     raise StopIteration
                 if defline_old:
                     self._defline = None
                     break
-            elif line[0] == '>':
+            elif line.startswith(">"):
                 self._defline = line[1:].rstrip()
                 if defline_old or lines:
                     break
@@ -98,7 +98,17 @@ class LightIterator(object):
             else:
                 lines.append(line.rstrip())
 
+        if not lines:
+            raise StopIteration
+
         return defline_old, ''.join(lines)
+
+class OptionGroup(_OptionGroup):
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc_info):
+        self.parser.add_option_group(self)
 
 def walk_supercontigs(h5file):
     root = h5file.root

@@ -166,7 +166,7 @@ def print_histogram(hist, edges):
 
 def load_include_identify(filelistname):
     if filelistname is None:
-        return
+        return {}
 
     res = defaultdict(list)
 

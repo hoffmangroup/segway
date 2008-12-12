@@ -24,7 +24,7 @@ from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import (amin, amax, array, diag, diff, empty, finfo,
-                   float32, fromfile, invert, isnan, newaxis, NINF,
+                   float32, fromfile, invert, isnan, newaxis, NINF, s_,
                    where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
@@ -35,7 +35,7 @@ from path import path
 
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
                     DTYPE_SEG_LEN, EXT_GZ, fill_array, find_segment_starts,
-                    FILTERS_GZIP, get_tracknames, gzip_open, init_num_obs,
+                    FILTERS_GZIP, get_tracknames, gzip_open,
                     iter_chroms_coords, load_coords,
                     NamedTemporaryDir, PKG,
                     walk_continuous_supercontigs)
@@ -44,7 +44,7 @@ DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
 
 ## XXX: should be options
-NUM_SEGS = 2
+NUM_SEGS = 2 # XXX: will require CARD_SEG to be set
 MAX_EM_ITERS = 100
 VERBOSITY = 0 # XXX: should vary based on DRMAA submission or not
 TEMPDIR_PREFIX = PKG + "-"
@@ -139,6 +139,8 @@ def make_prefix_fmt(num):
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
+
+# XXX: do not hardcode
 PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)
 
 SUFFIX_LIST = extsep + EXT_LIST
@@ -523,6 +525,28 @@ class Runner(object):
 
         return self.dirpath / filebasename
 
+    def set_tracknames(self, chromosome):
+        # XXXopt: a lot of stuff here repeated for every chromosome
+        # unnecessarily
+        tracknames = get_tracknames(chromosome)
+        include_tracknames = set(self.include_tracknames)
+
+        if include_tracknames:
+            indexed_tracknames = ((index, trackname)
+                                  for index, trackname in enumerate(tracknames)
+                                  if trackname in include_tracknames)
+            track_indexes, tracknames = zip(*indexed_tracknames)
+            track_indexes = array(track_indexes)
+
+        if self.tracknames is None:
+            self.tracknames = tracknames
+            self.track_indexes = track_indexes
+        elif (self.tracknames != tracknames
+              or (self.track_indexes != track_indexes).any()):
+            raise ValueError("all tracknames attributes must be identical")
+
+        return track_indexes
+
     def set_params_filename(self, start_index=None, new=False):
         # if this is not run and params_filename is
         # unspecified, then it won't be passed to gmtkViterbiNew
@@ -677,7 +701,7 @@ class Runner(object):
         save_observations_chunk = self.save_observations_chunk
         delete_existing = self.delete_existing
 
-        num_tracks = None
+        num_tracks = None # this is before any subsetting
         chunk_index = 0
         chunk_coords = []
         num_bases = 0
@@ -693,17 +717,13 @@ class Runner(object):
                 # this means there is no data for that chromosome
                 continue
 
-            tracknames = get_tracknames(chromosome)
-            if self.tracknames is None:
-                self.tracknames = tracknames
-            elif self.tracknames != tracknames:
-                raise ValueError("all tracknames attributes must be identical")
+            track_indexes = self.set_tracknames(chromosome)
+            num_tracks = len(track_indexes)
 
             # observations
             supercontig_walker = walk_continuous_supercontigs(chromosome)
             for supercontig, continuous in supercontig_walker:
-                # init_num_obs() also asserts same shape
-                num_tracks = init_num_obs(num_tracks, continuous)
+                assert continuous.shape[1] >= num_tracks
 
                 supercontig_attrs = supercontig._v_attrs
                 supercontig_start = supercontig_attrs.start
@@ -757,10 +777,20 @@ class Runner(object):
 
                     # if they don't both exist
                     if not (float_filepath.exists() and int_filepath.exists()):
-                        rows = continuous[chunk_start:chunk_end, ...]
+                        # read rows first into a numpy.array because
+                        # you can't do complex imports on a
+                        # numpy.Array
+                        min_col = track_indexes.min()
+                        max_col = track_indexes.max() + 1
+                        col_slice = s_[min_col:max_col]
+
+                        rows = continuous[chunk_start:chunk_end, col_slice]
+
+                        # correct for min_col offset
+                        cells = rows[..., track_indexes - min_col]
 
                         save_observations_chunk(float_filepath, int_filepath,
-                                                rows)
+                                                cells)
 
                     chunk_index += 1
 
@@ -1472,38 +1502,47 @@ def parse_options(args):
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
 
-    with OptionGroup(parser, "Model files") as group:
-        group.add_option("--input-master", "-i", metavar="FILE",
-                          help="use or create input master in FILE")
-
-        group.add_option("--structure", "-s", metavar="FILE",
-                          help="use or create structure in FILE")
-
-        group.add_option("--trainable-params", "-p", metavar="FILE",
-                          help="use or create trainable parameters in FILE")
-
-    with OptionGroup(parser, "Output files") as group:
-        # XXX: separate this (now a single file) from output identity file
-        # directory
-        group.add_option("--bed", "-b", metavar="DIR",
-                          help="use or create bed tracks in DIR",
-                          default="out")
-
-    with OptionGroup(parser, "Intermediate files") as group:
-        group.add_option("--observations", "-o", metavar="DIR",
-                          help="use or create observations in DIR")
-
-        group.add_option("--directory", "-d", metavar="DIR",
-                          help="create all other files in DIR")
+    with OptionGroup(parser, "Data subset") as group:
+        group.add_option("-t", "--track", action="append", default=[],
+                         metavar="TRACK",
+                         help="append TRACK to list of tracks to use"
+                         " (default all)")
 
         # This is a 0-based file.
         # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
         group.add_option("--include-coords", metavar="FILE",
                           help="limit to genomic coordinates in FILE")
 
+    with OptionGroup(parser, "Model files") as group:
+        group.add_option("-i", "--input-master", metavar="FILE",
+                          help="use or create input master in FILE")
+
+        group.add_option("-s", "--structure", metavar="FILE",
+                          help="use or create structure in FILE")
+
+        group.add_option("-p", "--trainable-params", metavar="FILE",
+                          help="use or create trainable parameters in FILE")
+
+    with OptionGroup(parser, "Output files") as group:
+        # XXX: separate this (now a single file) from output identity file
+        # directory
+        group.add_option("-b", "--bed", metavar="DIR",
+                          help="use or create bed tracks in DIR",
+                          default="out")
+
+    with OptionGroup(parser, "Intermediate files") as group:
+        # XXX: consider removing this option
+        # this probably isn't necessary as observations are written
+        # out pretty quickly now
+        group.add_option("-o", "--observations", metavar="DIR",
+                          help="use or create observations in DIR")
+
+        group.add_option("-d", "--directory", metavar="DIR",
+                          help="create all other files in DIR")
+
+
     with OptionGroup(parser, "Variables") as group:
-        group.add_option()
-        group.add_option("--random-starts", "-r", type=int,
+        group.add_option("-r", "--random-starts", type=int,
                          default=RANDOM_STARTS, metavar="NUM",
                          help="randomize start parameters NUM times")
 
@@ -1514,13 +1553,13 @@ def parse_options(args):
                          " prior")
 
     with OptionGroup(parser, "Flags") as group:
-        group.add_option("--force", "-f", action="store_true",
+        group.add_option("-f", "--force", action="store_true",
                          help="delete any preexisting files")
-        group.add_option("--no-identify", "-I", action="store_true",
+        group.add_option("-I", "--no-identify", action="store_true",
                          help="do not identify segments")
-        group.add_option("--no-train", "-T", action="store_true",
+        group.add_option("-T", "--no-train", action="store_true",
                          help="do not train model")
-        group.add_option("--dry-run", "-n", action="store_true",
+        group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
                          " executables")
 
@@ -1553,6 +1592,7 @@ def main(args=sys.argv[1:]):
 
     runner.random_starts = options.random_starts
     runner.len_seg_strength = options.prior_strength
+    runner.include_tracknames = options.track
 
     runner.delete_existing = options.force
     runner.train = not options.no_train

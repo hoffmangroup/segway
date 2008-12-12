@@ -173,9 +173,6 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
   get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
   supercontig->group = subgroup;
 
-  fprintf(stderr, " %s (%d, %d): %d\n", name, supercontig->start,
-          supercontig->end, subgroup);
-
   return 0;
 }
 
@@ -310,7 +307,7 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
   hsize_t mem_dataspace_dims[CARDINALITY] = {-1, 1};
   hsize_t file_dataspace_dims[CARDINALITY];
   hsize_t select_start[CARDINALITY];
-  hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, -1};
+  hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, 1};
 
   hid_t dataset_creation_plist = -1;
 
@@ -369,14 +366,12 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
       assert(file_dataspace >= 0);
 
       /* create chunkspace */
-      chunk_dims[1] = num_cols;
       assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims)
              >= 0);
 
       /* create dataset */
-      fprintf(stderr, "creating %lld x %lld dataset in %d...",
-             file_dataspace_dims[0], file_dataspace_dims[1],
-             supercontig->group);
+      fprintf(stderr, " creating %lld x %lld dataset...",
+             file_dataspace_dims[0], file_dataspace_dims[1]);
       dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
                           file_dataspace, H5P_DEFAULT,
                           dataset_creation_plist, H5P_DEFAULT);
@@ -398,7 +393,7 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
                                NULL, mem_dataspace_dims, NULL) >= 0);
 
     /* write */
-    fprintf(stderr, "writing %lld floats...", mem_dataspace_dims[0]);
+    fprintf(stderr, " writing %lld floats...", mem_dataspace_dims[0]);
     assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
                     H5P_DEFAULT, buf_filled_start) >= 0);
     fprintf(stderr, " done\n");

@@ -17,7 +17,7 @@ import sys
 from path import path
 from tables import openFile
 
-from ._util import FILTERS_GZIP, LightIterator
+from ._util import EXT_GZ, FILTERS_GZIP, gzip_open, LightIterator
 
 MIN_GAP_LEN = 100000
 assert not MIN_GAP_LEN % 2 # must be even for division
@@ -77,13 +77,19 @@ def load_seq(filenames, outdirname):
     for filename in filenames:
         print >>sys.stderr, filename
 
-        with file(filename) as infile:
+        if filename.endswith(EXT_GZ):
+            infile = gzip_open(filename)
+        else:
+            infile = file(filename)
+
+        # needed to process gzip_open stuff
+        with infile as infile:
             for defline, seq in LightIterator(infile):
                 h5filename = outdirpath / extsep.join([defline, EXT_H5])
                 h5file = openFile(h5filename, "w", defline,
                                   filters=FILTERS_GZIP)
                 with h5file as h5file:
-                    h5file.root._v_attr.dirty = True
+                    h5file.root._v_attrs.dirty = True
                     read_seq(h5file, seq)
 
 def parse_options(args):
