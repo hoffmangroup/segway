@@ -43,7 +43,7 @@
 
 const float nan_float = NAN;
 
-enum file_format {FMT_BED, FMT_WIGFIX, FMT_WIGVAR};
+typedef enum {FMT_BED, FMT_WIGFIX, FMT_WIGVAR} file_format;
 
 typedef struct {
   int start;
@@ -480,32 +480,25 @@ void proc_wigfix_header(char *line, char *h5dirname, hid_t *h5file,
   *buf_end = *buf_start + buf_len;
 }
 
-file_format sniff_header_line(const char *line) {
-  if (!strncmp(ID_WIGFIX, line, strlen(ID_WIGFIX))) {
-    return FMT_WIGFIX;
-  } else if (!strncmp(ID_WIGVAR, line, strlen(ID_WIGVAR))) {
-    return FMT_WIGVAR;
-  } else {
-    fprintf(stderr, "only fixedStep and variableStep formats supported\n");
-    exit(EXIT_FAILURE);
-    /* return FMT_BED; */
-  }
-}
+void proc_wigfix(char *h5dirname, char *trackname, char *line,
+                 size_t *size_line) {
+  char *tailptr;
 
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX redo this ridiculous signature, you don't need to pass information back to load_data'''
-
-void proc_wigfix(char *line, char *h5dirname, hid_t *h5file,
-                 supercontig_array_t *supercontigs,
-                 float **buf_start, float **buf_end, float **buf_ptr) {
+  float *buf_start = NULL;
   float *buf_filled_start, *buf_ptr, *buf_end;
 
-  proc_wigfix_header(line, h5dirname, h5file, supercontigs,
-                     buf_start, buf_end, buf_ptr);
+  supercontig_array_t supercontigs;
 
+  float datum;
+
+  hid_t h5file = -1;
+
+  proc_wigfix_header(line, h5dirname, &h5file, &supercontigs,
+                     &buf_start, &buf_end, &buf_ptr);
 
   buf_filled_start = buf_ptr;
 
-  while (getline(&line, &size_line, stdin) >= 0) {
+  while (getline(&line, size_line, stdin) >= 0) {
     datum = strtof(line, &tailptr);
     if (*tailptr == '\n') {
       if (buf_ptr < buf_end) {
@@ -522,20 +515,34 @@ void proc_wigfix(char *line, char *h5dirname, hid_t *h5file,
 
   write_buf(h5file, trackname, buf_start, buf_end, buf_filled_start, buf_ptr,
             &supercontigs);
+
+  free_supercontig_array(&supercontigs);
+  free(buf_start);
+
+  close_file(h5file);
+}
+
+void proc_wigvar(char *h5dirname, char *trackname, char *line,
+                 size_t *size_line) {
+  fprintf(stderr, "only fixedStep format supported\n");
+  exit(EXIT_FAILURE);
+}
+
+file_format sniff_header_line(const char *line) {
+  if (!strncmp(ID_WIGFIX, line, strlen(ID_WIGFIX))) {
+    return FMT_WIGFIX;
+  } else if (!strncmp(ID_WIGVAR, line, strlen(ID_WIGVAR))) {
+    return FMT_WIGVAR;
+  } else {
+    fprintf(stderr, "only fixedStep and variableStep formats supported\n");
+    exit(EXIT_FAILURE);
+    /* return FMT_BED; */
+  }
 }
 
 void load_data(char *h5dirname, char *trackname) {
   char *line = NULL;
   size_t size_line = 0;
-  char *tailptr;
-
-  float *buf_start = NULL;
-
-  supercontig_array_t supercontigs;
-
-  float datum;
-
-  hid_t h5file = -1;
 
   file_format fmt;
 
@@ -553,11 +560,10 @@ void load_data(char *h5dirname, char *trackname) {
      format, you are stuck */
   switch (fmt) {
   case FMT_WIGFIX:
-    proc_wigfix(line, h5dirname, &h5file, &supercontigs,
-                &buf_start, &buf_end, &buf_ptr);
+    proc_wigfix(h5dirname, trackname, line, &size_line);
     break;
   case FMT_WIGVAR:
-    XXX;
+    proc_wigvar(h5dirname, trackname, line, &size_line);
     break;
   case FMT_BED:
   default:
@@ -567,11 +573,7 @@ void load_data(char *h5dirname, char *trackname) {
   }
 
   /* free heap variables */
-  free_supercontig_array(&supercontigs);
   free(line);
-  free(buf_start);
-
-  close_file(h5file);
 }
 
 /** command-line interface **/
@@ -579,7 +581,7 @@ void load_data(char *h5dirname, char *trackname) {
 const char *argp_program_version = "$Revision$";
 const char *argp_program_bug_address = "Michael Hoffman <mmh1@washington.edu>";
 
-static char doc[] = "A fast loader of genomic data into HDF5";
+static char doc[] = "Loads genomic data into HDF5";
 static char args_doc[] = "DST TRACKNAME";
 
 static error_t parse_opt (int key, char *arg, struct argp_state *state) {
