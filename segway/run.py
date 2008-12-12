@@ -90,10 +90,6 @@ MEM_REQS = {1: [3619, 8098728],
 ## defaults
 RANDOM_STARTS = 1
 
-# ratio of number of Dirichlet counts to add relative to amount of
-# training data
-LEN_SEG_STRENGTH = 1.0
-
 # replace NAN with SENTINEL to avoid warnings
 # XXX: replace with something negative and outlandish again
 SENTINEL = float32(9.87654321)
@@ -157,8 +153,8 @@ RES_INC = "seg.inc"
 DIRICHLET_FRAG = "0 dirichlet_seg_seg 2 CARD_SEG CARD_SEG"
 
 DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
-DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG\n" \
-    "DirichletTable dirichlet_seg_seg"
+DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
+DIRICHLET_SEG_SEG_FRAG = "DirichletTable dirichlet_seg_seg"
 
 MEAN_TMPL = "$index mean_${seg}_${track} 1 ${rand}"
 
@@ -344,12 +340,6 @@ def make_random_spec(frag, *args, **kwargs):
 def prob_transition_from_expected_len(length):
     # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
     return length / (1 + length)
-
-def make_dense_cpt_start_seg_spec(num_segs):
-    return make_random_spec(DENSE_CPT_START_SEG_FRAG, 1, num_segs)
-
-def make_dense_cpt_seg_seg_spec(num_segs):
-    return make_random_spec(DENSE_CPT_SEG_SEG_FRAG, num_segs, num_segs)
 
 def make_name_collection_spec(num_segs, tracknames):
     substitute = Template(NAME_COLLECTION_TMPL).substitute
@@ -889,11 +879,24 @@ class Runner(object):
 
         return make_spec("DIRICHLET_TAB", items)
 
+    def make_dense_cpt_start_seg_spec(self):
+        return make_random_spec(DENSE_CPT_START_SEG_FRAG, 1, self.num_segs)
+
+    def make_dense_cpt_seg_seg_spec(self):
+        num_segs = self.num_segs
+
+        if self.len_seg_strength > 0:
+            frag = "\n".join([DENSE_CPT_SEG_SEG_FRAG, DIRICHLET_SEG_SEG_FRAG])
+        else:
+            frag = DENSE_CPT_SEG_SEG_FRAG
+
+        return make_random_spec(frag, num_segs, num_segs)
+
     def make_dense_cpt_spec(self):
         num_segs = self.num_segs
 
-        items = [make_dense_cpt_start_seg_spec(num_segs),
-                 make_dense_cpt_seg_seg_spec(num_segs)]
+        items = [self.make_dense_cpt_start_seg_spec(),
+                 self.make_dense_cpt_seg_seg_spec()]
 
         return make_spec("DENSE_CPT", items)
 
@@ -968,7 +971,11 @@ class Runner(object):
         else:
             input_master_filename = self.input_master_filename
 
-        dirichlet_spec = self.make_dirichlet_spec()
+        if self.len_seg_strength > 0:
+            dirichlet_spec = self.make_dirichlet_spec()
+        else:
+            dirichlet_spec = ""
+
         dense_cpt_spec = self.make_dense_cpt_spec()
 
         means = self.rand_means()
@@ -1544,13 +1551,14 @@ def parse_options(args):
     with OptionGroup(parser, "Variables") as group:
         group.add_option("-r", "--random-starts", type=int,
                          default=RANDOM_STARTS, metavar="NUM",
-                         help="randomize start parameters NUM times")
+                         help="randomize start parameters NUM times"
+                         " (default 1)")
 
-        group.add_option("--prior-strength", type=float,
-                         default=LEN_SEG_STRENGTH, metavar="RATIO",
+        group.add_option("--prior-strength", type=float, default=0,
+                         metavar="RATIO",
                          help="use RATIO times the number of data counts as"
                          " the number of pseudocounts for the segment length"
-                         " prior")
+                         " prior (default 0)")
 
     with OptionGroup(parser, "Flags") as group:
         group.add_option("-f", "--force", action="store_true",
