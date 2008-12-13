@@ -37,13 +37,17 @@
 
 #define NARGS 2
 #define CARDINALITY 2
+#define BASE 10
 
-/* XXX: this needs to adjust, but always be smaller than max size for a dataset */
+/* XXX: this needs to adjust, but always be smaller than max size for
+   a dataset */
 #define CHUNK_NROWS 10000
 
 const float nan_float = NAN;
 
-typedef enum {FMT_BED, FMT_WIGFIX, FMT_WIGVAR} file_format;
+typedef enum {
+  FMT_BED, FMT_WIGFIX, FMT_WIGVAR
+} file_format;
 
 typedef struct {
   int start;
@@ -52,10 +56,27 @@ typedef struct {
 } supercontig_t;
 
 typedef struct {
-  size_t len;
+  hid_t h5file; /* handle to the file */
+  char *chrom; /* name of chromosome */
+  size_t num_supercontigs;
   supercontig_t *supercontigs;
   supercontig_t *supercontig_curr;
-} supercontig_array_t;
+} chromosome_t;
+
+/* XXX: GNU-only extension; should be wrapped */
+__attribute__((noreturn)) void fatal(char *msg) {
+  fprintf(stderr, msg);
+  fprintf(stderr, "\n");
+  exit(EXIT_FAILURE);
+}
+
+void *xmalloc(size_t size)
+{
+  register void *value = malloc(size);
+  if (value == 0)
+    fatal("virtual memory exhausted");
+  return value;
+}
 
 void get_attr(hid_t loc, const char *name, hid_t mem_type_id, void *buf) {
   hid_t attr;
@@ -106,13 +127,13 @@ void set_attr_str(hid_t loc, const char *name, const char *buf) {
 }
 
 /* fetch num_cols and the col for a particular trackname */
-void get_cols(hid_t h5file, char *trackname, hsize_t *num_cols,
+void get_cols(chromosome_t *chromosome, char *trackname, hsize_t *num_cols,
               hsize_t *col) {
   hid_t attr, root, dataspace, datatype;
   hsize_t data_size, cell_size, num_cells;
   char *attr_data;
 
-  root = H5Gopen(h5file, "/", H5P_DEFAULT);
+  root = H5Gopen(chromosome->h5file, "/", H5P_DEFAULT);
   assert(root >= 0);
 
   attr = H5Aopen_name(root, "tracknames");
@@ -124,31 +145,33 @@ void get_cols(hid_t h5file, char *trackname, hsize_t *num_cols,
   assert(H5Sget_simple_extent_dims(dataspace, num_cols, NULL) == 1);
   assert(H5Sclose(dataspace) >= 0);
 
-  datatype = H5Aget_type(attr);
-  assert(datatype >= 0);
-  assert(H5Tget_class(datatype) == H5T_STRING);
+  if (trackname && col) {
+    datatype = H5Aget_type(attr);
+    assert(datatype >= 0);
+    assert(H5Tget_class(datatype) == H5T_STRING);
 
-  cell_size = H5Tget_size(datatype);
-  assert(cell_size >= 0);
+    cell_size = H5Tget_size(datatype);
+    assert(cell_size >= 0);
 
-  data_size = H5Aget_storage_size(attr);
-  assert(data_size >= 0);
+    data_size = H5Aget_storage_size(attr);
+    assert(data_size >= 0);
 
-  num_cells = data_size / cell_size;
+    num_cells = data_size / cell_size;
 
-  attr_data = alloca(data_size);
-  assert(attr_data);
+    attr_data = alloca(data_size);
+    assert(attr_data);
 
-  assert(H5Aread(attr, datatype, attr_data) >= 0);
+    assert(H5Aread(attr, datatype, attr_data) >= 0);
 
-  *col = 0;
-  for (*col = 0; *col <= num_cells; (*col)++) {
-    if (*col == num_cells) {
-      fprintf(stderr, "can't find trackname: %s\n", trackname);
-      exit(EXIT_FAILURE);
-    } else {
-      if (!strncmp(attr_data + (*col * cell_size), trackname, cell_size)) {
-        break;
+    *col = 0;
+    for (*col = 0; *col <= num_cells; (*col)++) {
+      if (*col == num_cells) {
+        fprintf(stderr, "can't find trackname: %s\n", trackname);
+        exit(EXIT_FAILURE);
+      } else {
+        if (!strncmp(attr_data + (*col * cell_size), trackname, cell_size)) {
+          break;
+        }
       }
     }
   }
@@ -162,11 +185,11 @@ herr_t supercontig_visitor(hid_t g_id, const char *name,
                            void *op_info) {
   hid_t subgroup;
   supercontig_t *supercontig;
-  supercontig_array_t *supercontigs;
+  chromosome_t *chromosome;
 
-  supercontigs = (supercontig_array_t *) op_info;
+  chromosome = (chromosome_t *) op_info;
 
-  supercontig = supercontigs->supercontig_curr++;
+  supercontig = chromosome->supercontig_curr++;
 
   /* leave open */
   subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
@@ -203,19 +226,33 @@ void close_file(hid_t h5file) {
   }
 }
 
-void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
+void parse_wiggle_header(char *line, file_format fmt, char **chrom,
+                         long *start, long *step) {
   /* mallocs chrom; caller must free() it */
 
   char *save_ptr;
   char *token;
   char *tailptr;
   char *newstring;
+  char *id;
 
   char *loc_eq;
   char *key;
   char *val;
 
-  assert(!strncmp(ID_WIGFIX, line, strlen(ID_WIGFIX)));
+  switch (fmt) {
+  case FMT_WIGFIX:
+    id = ID_WIGFIX;
+    break;
+  case FMT_WIGVAR:
+    id = ID_WIGVAR;
+    break;
+  default:
+    fprintf(stderr, "unsupported format: %d", fmt);
+    exit(EXIT_FAILURE);
+  }
+
+  assert(!strncmp(id, line, strlen(id)));
 
   /* strip trailing newline */
   *strchr(line, '\n') = '\0';
@@ -223,7 +260,7 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   save_ptr = strdupa(line);
   assert(save_ptr);
 
-  newstring = line + strlen(ID_WIGFIX);
+  newstring = line + strlen(id);
 
   while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
     loc_eq = strchr(token, '=');
@@ -236,10 +273,12 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
       *chrom = strdup(val);
       assert(*chrom);
     } else if (!strcmp(key, KEY_START)) {
-      *start = strtol(val, &tailptr, 10) - 1;
+      assert(start); /* don't write a null pointer */
+      *start = strtol(val, &tailptr, BASE) - 1;
       assert(!*tailptr);
     } else if (!strcmp(key, KEY_STEP)) {
-      *step = strtol(val, &tailptr, 10);
+      assert(step); /* don't write a null pointer */
+      *step = strtol(val, &tailptr, BASE);
       assert(!*tailptr);
     } else {
       fprintf(stderr, "can't understand key: %s\n", key);
@@ -250,22 +289,62 @@ void parse_wigfix_header(char *line, char **chrom, long *start, long *step) {
   }
 }
 
-void init_supercontig_array(size_t len, supercontig_array_t *supercontigs) {
-  supercontigs->len = len;
-
-  supercontigs->supercontigs = malloc(len * sizeof(supercontig_t));
-  assert(supercontigs->supercontigs);
-
-  supercontigs->supercontig_curr = supercontigs->supercontigs;
+void init_supercontig_array(size_t num_supercontigs, chromosome_t *chromosome)
+{
+  chromosome->num_supercontigs = num_supercontigs;
+  chromosome->supercontigs = xmalloc(num_supercontigs * sizeof(supercontig_t));
+  chromosome->supercontig_curr = chromosome->supercontigs;
 }
 
-void free_supercontig_array(supercontig_array_t *supercontigs) {
-  for (supercontig_t *supercontig = supercontigs->supercontigs;
-       supercontig < supercontigs->supercontigs + supercontigs-> len;
-       supercontig++) {
+supercontig_t *last_supercontig(chromosome_t *chromosome) {
+  return chromosome->supercontigs + chromosome->num_supercontigs - 1;
+}
+
+/** *_chromosome **/
+
+void init_chromosome(chromosome_t *chromosome) {
+  chromosome->chrom = NULL;
+  chromosome->h5file = -1;
+}
+
+void open_chromosome(chromosome_t *chromosome, const char *h5filename) {
+  hid_t root = -1;
+  H5G_info_t root_info;
+
+  /* must be specified to H5Literate; allows interruption and
+     resumption, but I don't use it */
+  hsize_t idx = 0;
+
+  /* open the chromosome file */
+  chromosome->h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
+  assert(chromosome->h5file >= 0);
+
+  /* open the root group */
+  root = H5Gopen(chromosome->h5file, "/", H5P_DEFAULT);
+  assert(root >= 0);
+
+  /* allocate supercontig metadata array */
+  assert(H5Gget_info(root, &root_info) >= 0);
+  init_supercontig_array(root_info.nlinks, chromosome);
+
+  /* populate supercontig metadata array */
+  assert(H5Literate(root, H5_INDEX_NAME, H5_ITER_INC, &idx,
+                    supercontig_visitor, chromosome) == 0);
+
+  assert(H5Gclose(root) >= 0);
+
+}
+
+void close_chromosome(chromosome_t *chromosome) {
+  free(chromosome->chrom);
+
+  for (supercontig_t *supercontig = chromosome->supercontigs;
+       supercontig <= last_supercontig(chromosome); supercontig++) {
     assert(H5Gclose(supercontig->group) >= 0);
   }
-  free(supercontigs->supercontigs);
+  free(chromosome->supercontigs);
+
+  close_file(chromosome->h5file);
 }
 
 /* suppresses errors */
@@ -296,33 +375,91 @@ void make_pytables_carray(hid_t dataset) {
   set_attr_str(dataset, "VERSION", "1.0");
 }
 
-void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
-               float *buf_filled_start, float *buf_filled_end,
-               supercontig_array_t *supercontigs) {
-  size_t buf_offset_start, buf_offset_end;
-  hid_t dataset = -1;
+hid_t open_supercontig_dataset(supercontig_t *supercontig, hsize_t num_cols) {
+  /* creates it if it doesn't already exist;
+     returns a handle for H5Dread or H5Dwrite */
 
-  hid_t mem_dataspace = -1;
+  hid_t dataset = -1;
+  hid_t dataset_creation_plist = -1;
   hid_t file_dataspace = -1;
 
-  hsize_t num_cols, col;
-
-  hsize_t mem_dataspace_dims[CARDINALITY] = {-1, 1};
   hsize_t file_dataspace_dims[CARDINALITY];
-  hsize_t select_start[CARDINALITY];
   hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, 1};
 
-  hid_t dataset_creation_plist = -1;
-
+  /* set up creation options */
   dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
   assert(dataset_creation_plist >= 0);
 
   assert(H5Pset_fill_value(dataset_creation_plist, DTYPE, &nan_float) >= 0);
 
-  for (supercontig_t *supercontig = supercontigs->supercontigs;
-       supercontig < supercontigs->supercontigs + supercontigs-> len;
-       supercontig++) {
+  /* open dataset if it already exists */
+  dataset = open_dataset(supercontig->group, DATASET_NAME, H5P_DEFAULT);
 
+  if (dataset < 0) {
+    /* create dataspace */
+    file_dataspace_dims[0] = supercontig->end - supercontig->start;
+    file_dataspace_dims[1] = num_cols;
+
+    file_dataspace = H5Screate_simple(CARDINALITY, file_dataspace_dims, NULL);
+    assert(file_dataspace >= 0);
+
+    /* create chunkspace */
+    assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims) >= 0);
+
+    /* create dataset */
+    fprintf(stderr, " creating %lld x %lld dataset...",
+            file_dataspace_dims[0], file_dataspace_dims[1]);
+    dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
+                        file_dataspace, H5P_DEFAULT, dataset_creation_plist,
+                        H5P_DEFAULT);
+    assert(dataset >= 0);
+    fprintf(stderr, " done\n");
+
+    make_pytables_carray(dataset);
+  }
+
+  /* XXX: set dirty attribute */
+  /* XXX: need to look up in documentation: boolean attributes, etc. */
+
+  assert(H5Pclose(dataset_creation_plist) >= 0);
+
+  return dataset;
+}
+
+hid_t get_file_dataspace(hid_t dataset) {
+  hid_t dataspace;
+
+  dataspace = H5Dget_space(dataset);
+  assert(dataspace >= 0);
+
+  return dataspace;
+}
+
+hid_t get_col_dataspace(hsize_t *dims) {
+  hid_t dataspace;
+
+  dataspace = H5Screate_simple(1, dims, NULL);
+  assert(dataspace >= 0);
+
+  return dataspace;
+}
+
+void write_buf(chromosome_t *chromosome, char *trackname,
+               float *buf_start,
+               float *buf_filled_start, float *buf_filled_end) {
+  size_t buf_offset_start, buf_offset_end;
+  hid_t dataset;
+
+  hid_t mem_dataspace;
+  hid_t file_dataspace = -1;
+
+  hsize_t num_cols, col;
+
+  hsize_t mem_dataspace_dims[CARDINALITY] = {-1, 1};
+  hsize_t select_start[CARDINALITY];
+
+  for (supercontig_t *supercontig = chromosome->supercontigs;
+       supercontig <= last_supercontig(chromosome); supercontig++) {
     /* find the start that fits into this supercontig */
     buf_offset_start = buf_filled_start - buf_start;
     if (buf_offset_start < supercontig->start) {
@@ -346,46 +483,16 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
 
     /* set mem dataspace */
     mem_dataspace_dims[0] = buf_offset_end - buf_offset_start;
-    mem_dataspace = H5Screate_simple(1, mem_dataspace_dims, NULL);
-    assert(mem_dataspace >= 0);
+    mem_dataspace = get_col_dataspace(mem_dataspace_dims);
 
     /* calc dimensions */
-    get_cols(h5file, trackname, &num_cols, &col);
+    get_cols(chromosome, trackname, &num_cols, &col);
 
-    /* set dataset if it exists */
-    dataset = open_dataset(supercontig->group, DATASET_NAME, H5P_DEFAULT);
+    /* open or create dataset */
+    dataset = open_supercontig_dataset(supercontig, num_cols);
 
-    if (dataset >= 0) {
-      /* set file dataspace */
-      file_dataspace = H5Dget_space(dataset);
-      assert(file_dataspace >= 0);
-    } else {
-      file_dataspace_dims[0] = supercontig->end - supercontig->start;
-      file_dataspace_dims[1] = num_cols;
-
-      /* create dataspace */
-      file_dataspace = H5Screate_simple(CARDINALITY, file_dataspace_dims,
-                                        NULL);
-      assert(file_dataspace >= 0);
-
-      /* create chunkspace */
-      assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims)
-             >= 0);
-
-      /* create dataset */
-      fprintf(stderr, " creating %lld x %lld dataset...",
-             file_dataspace_dims[0], file_dataspace_dims[1]);
-      dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
-                          file_dataspace, H5P_DEFAULT,
-                          dataset_creation_plist, H5P_DEFAULT);
-      assert(dataset >= 0);
-      fprintf(stderr, " done\n");
-
-      make_pytables_carray(dataset);
-    }
-
-    /* XXX: set dirty attribute */
-    /* XXX: need to look up boolean attributes, etc. */
+    /* get file dataspace */
+    file_dataspace = get_file_dataspace(dataset);
 
     /* select file hyperslab */
     select_start[0] = buf_offset_start - supercontig->start;
@@ -401,83 +508,138 @@ void write_buf(hid_t h5file, char *trackname, float *buf_start, float *buf_end,
                     H5P_DEFAULT, buf_filled_start) >= 0);
     fprintf(stderr, " done\n");
 
-    assert(H5Dclose(dataset) >= 0);
-
-    /* close dataspaces */
+    /* close all */
+    close_dataset(dataset);
     close_dataspace(file_dataspace);
     close_dataspace(mem_dataspace);
   }
-
-  assert(H5Pclose(dataset_creation_plist) >= 0);
 }
 
-void proc_wigfix_header(char *line, char *h5dirname, hid_t *h5file,
-                        supercontig_array_t *supercontigs,
+void seek_chromosome(char *chrom, char *h5dirname, chromosome_t *chromosome) {
+  char *h5filename = NULL;
+  char *h5filename_suffix;
+
+  fprintf(stderr, "%s\n", chrom);
+
+  /* allocate space for h5filename, including 2 extra bytes for '/' and '\0' */
+  h5filename = alloca(strlen(h5dirname) + strlen(chrom) + strlen(SUFFIX_H5)
+                      + 2);
+  assert(h5filename);
+
+  /* set h5filename */
+  h5filename_suffix = stpcpy(h5filename, h5dirname);
+  h5filename_suffix = stpcpy(h5filename_suffix, "/");
+  h5filename_suffix = stpcpy(h5filename_suffix, chrom);
+  strcpy(h5filename_suffix, SUFFIX_H5);
+
+  close_chromosome(chromosome);
+  open_chromosome(chromosome, h5filename);
+}
+
+void malloc_chromosome_buf(chromosome_t *chromosome,
+                           float **buf_start, float **buf_end) {
+  /* allocate enough space to assign values from 0 to the end of the
+     last supercontig */
+
+  size_t buf_len;
+
+  /* XXX: last_supercontig(chromosome) might not return the maximum
+     value; you really need to iterate through all of them */
+  buf_len = last_supercontig(chromosome)->end;
+
+  if (*buf_start) {
+    free(*buf_start);
+  }
+  *buf_start = xmalloc(buf_len * sizeof(float));
+  *buf_end = *buf_start + buf_len;
+}
+
+void proc_wigfix_header(char *line, char *h5dirname, chromosome_t *chromosome,
                         float **buf_start, float **buf_end, float **buf_ptr) {
   long start = -1;
   long step = 1;
-  size_t buf_len;
 
   char *chrom = NULL;
-  char *h5filename = NULL;
-  char *suffix;
-
-  hid_t root = -1;
-  hsize_t idx = 0;
-
-  H5G_info_t root_info;
 
   /* do writing if buf_len > 0 */
-  parse_wigfix_header(line, &chrom, &start, &step);
+  parse_wiggle_header(line, FMT_WIGFIX, &chrom, &start, &step);
+  assert(chrom && step == 1);
 
-  assert(chrom && start >= 0 && step == 1);
-
-  fprintf(stderr, "%s (%ld)\n", chrom, start);
-
-  /* set h5filename */
-  h5filename = alloca(strlen(h5dirname)+strlen(chrom)+strlen(SUFFIX_H5)+2);
-  assert(h5filename);
-
-  suffix = stpcpy(h5filename, h5dirname);
-  suffix = stpcpy(suffix, "/");
-  suffix = stpcpy(suffix, chrom);
-  strcpy(suffix, SUFFIX_H5);
-  free(chrom);
-
-  /* XXXopt: don't close if it's the same file */
-  if (*buf_start) {
-    free(*buf_start);
-    free_supercontig_array(supercontigs);
+  /* chromosome->chrom is always initialized, at least to NULL, and
+     chrom is never NULL */
+  if (strcmp(chrom, chromosome->chrom)) {
+    /* only reseek and malloc if it is different */
+    seek_chromosome(chrom, h5dirname, chromosome);
+    malloc_chromosome_buf(chromosome, buf_start, buf_end);
   }
-  close_file(*h5file);
-
-  /* open the chromosome file */
-  *h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
-  assert(*h5file >= 0);
-
-  root = H5Gopen(*h5file, "/", H5P_DEFAULT);
-  assert(root >= 0);
-
-  /* allocate supercontig metadata array */
-  assert(H5Gget_info(root, &root_info) >= 0);
-  init_supercontig_array(root_info.nlinks, supercontigs);
-
-  /* populate supercontig metadata array */
-  assert(H5Literate(root, H5_INDEX_NAME, H5_ITER_INC, &idx,
-                    supercontig_visitor, supercontigs) == 0);
-
-  assert(H5Gclose(root) >= 0);
-
-  /* allocate buffer: enough to assign values from 0 to the end of the
-     last supercontig */
-  /* XXX: need to ensure sorting */
-  buf_len = ((supercontigs->supercontigs)[supercontigs->len-1]).end;
-
-  *buf_start = malloc(buf_len * sizeof(float));
-  assert(*buf_start);
 
   *buf_ptr = *buf_start + start;
-  *buf_end = *buf_start + buf_len;
+}
+
+void proc_wigvar_header(char *line, char *h5dirname, chromosome_t *chromosome,
+                        char *trackname, float **buf_start, float **buf_end) {
+  char *chrom = NULL;
+
+  hid_t mem_dataspace, file_dataspace;
+  hid_t dataset;
+
+  hsize_t num_cols, col;
+
+  hsize_t mem_dataspace_dims[CARDINALITY] = {-1, 1};
+  hsize_t select_start[CARDINALITY];
+
+  /* do writing if buf_len > 0 */
+  parse_wiggle_header(line, FMT_WIGFIX, &chrom, NULL, NULL);
+  assert(chrom);
+
+  /* chromosome->chrom is always initialized, at least to NULL, and
+     chrom is never NULL */
+  if (strcmp(chrom, chromosome->chrom)) {
+    /* only reseek and malloc if it is different */
+    /* XXX: should probably be an assertion rather than an if */
+    seek_chromosome(chrom, h5dirname, chromosome);
+    malloc_chromosome_buf(chromosome, buf_start, buf_end);
+
+    /* clear memory */
+    for (float *buf_ptr = *buf_start; buf_ptr < *buf_end; buf_ptr++) {
+      *buf_ptr = NAN;
+    }
+
+    /* calc dimensions */
+    get_cols(chromosome, trackname, &num_cols, &col);
+
+    for (supercontig_t *supercontig = chromosome->supercontigs;
+         supercontig <= last_supercontig(chromosome); supercontig++) {
+      /* set mem dataspace */
+      mem_dataspace_dims[0] = supercontig->end - supercontig->start;
+      mem_dataspace = get_col_dataspace(mem_dataspace_dims);
+
+      /* open or create dataset */
+      dataset = open_supercontig_dataset(supercontig, num_cols);
+
+      /* get file dataspace */
+      file_dataspace = get_file_dataspace(dataset);
+
+      /* select file hyperslab */
+      select_start[0] = 0;
+      select_start[1] = col;
+
+      /* count has same dims as mem_dataspace */
+      assert(H5Sselect_hyperslab(file_dataspace, H5S_SELECT_SET, select_start,
+                                 NULL, mem_dataspace_dims, NULL) >= 0);
+
+      /* read */
+      fprintf(stderr, " reading %lld floats...", mem_dataspace_dims[0]);
+      assert(H5Dread(dataset, DTYPE, mem_dataspace, file_dataspace,
+                     H5P_DEFAULT, buf_start) >= 0);
+      fprintf(stderr, " done\n");
+
+      /* close all */
+      close_dataset(dataset);
+      close_dataspace(file_dataspace);
+      close_dataspace(mem_dataspace);
+    }
+  }
 }
 
 void proc_wigfix(char *h5dirname, char *trackname, char *line,
@@ -487,13 +649,13 @@ void proc_wigfix(char *h5dirname, char *trackname, char *line,
   float *buf_start = NULL;
   float *buf_filled_start, *buf_ptr, *buf_end;
 
-  supercontig_array_t supercontigs;
+  chromosome_t chromosome;
 
   float datum;
 
-  hid_t h5file = -1;
+  init_chromosome(&chromosome);
 
-  proc_wigfix_header(line, h5dirname, &h5file, &supercontigs,
+  proc_wigfix_header(line, h5dirname, &chromosome,
                      &buf_start, &buf_end, &buf_ptr);
 
   buf_filled_start = buf_ptr;
@@ -505,27 +667,60 @@ void proc_wigfix(char *h5dirname, char *trackname, char *line,
         *buf_ptr++ = datum;
       } /* else: ignore data until we get to another header line */
     } else {
-      write_buf(h5file, trackname, buf_start, buf_end, buf_filled_start,
-                buf_ptr, &supercontigs);
-      proc_wigfix_header(line, h5dirname, &h5file, &supercontigs,
+      write_buf(&chromosome, trackname, buf_start, buf_filled_start, buf_ptr);
+      proc_wigfix_header(line, h5dirname, &chromosome,
                          &buf_start, &buf_end, &buf_ptr);
       buf_filled_start = buf_ptr;
     }
   }
 
-  write_buf(h5file, trackname, buf_start, buf_end, buf_filled_start, buf_ptr,
-            &supercontigs);
+  write_buf(&chromosome, trackname, buf_start, buf_filled_start, buf_ptr);
 
-  free_supercontig_array(&supercontigs);
+  close_chromosome(&chromosome);
   free(buf_start);
-
-  close_file(h5file);
 }
 
 void proc_wigvar(char *h5dirname, char *trackname, char *line,
                  size_t *size_line) {
-  fprintf(stderr, "only fixedStep format supported\n");
-  exit(EXIT_FAILURE);
+  char *tailptr;
+
+  float *buf_start = NULL;
+  float *buf_end, *buf_ptr;
+
+  chromosome_t chromosome;
+
+  long start;
+
+  init_chromosome(&chromosome);
+
+  proc_wigvar_header(line, h5dirname, &chromosome, trackname,
+                     &buf_start, &buf_end);
+
+  while (getline(&line, size_line, stdin) >= 0) {
+    start = strtol(line, &tailptr, BASE);
+
+    /* next char must be space */
+    if (*tailptr == ' ') {
+      buf_ptr = buf_start + start;
+      assert(buf_ptr < buf_end);
+
+      /* advance to next number */
+      line = tailptr;
+      *buf_ptr = strtof(line, &tailptr);
+
+      /* must be EOL */
+      assert(*tailptr == '\n');
+    } else {
+      write_buf(&chromosome, trackname, buf_start, buf_start, buf_end);
+      proc_wigvar_header(line, h5dirname, &chromosome, trackname,
+                         &buf_start, &buf_end);
+    }
+  }
+
+  write_buf(&chromosome, trackname, buf_start, buf_start, buf_end);
+
+  close_chromosome(&chromosome);
+  free(buf_start);
 }
 
 file_format sniff_header_line(const char *line) {
@@ -533,12 +728,15 @@ file_format sniff_header_line(const char *line) {
     return FMT_WIGFIX;
   } else if (!strncmp(ID_WIGVAR, line, strlen(ID_WIGVAR))) {
     return FMT_WIGVAR;
-  } else {
-    fprintf(stderr, "only fixedStep and variableStep formats supported\n");
-    exit(EXIT_FAILURE);
-    /* return FMT_BED; */
   }
+
+  fatal("only fixedStep and variableStep formats supported");
+  /* return FMT_BED; */
+
+  return -1;
 }
+
+/** programmatic interface **/
 
 void load_data(char *h5dirname, char *trackname) {
   char *line = NULL;
@@ -567,8 +765,7 @@ void load_data(char *h5dirname, char *trackname) {
     break;
   case FMT_BED:
   default:
-    fprintf(stderr, "only fixedStep and variableStep formats supported\n");
-    exit(EXIT_FAILURE);
+    fatal("only fixedStep and variableStep formats supported");
     break;
   }
 

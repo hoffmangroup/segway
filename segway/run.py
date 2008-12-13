@@ -528,6 +528,9 @@ class Runner(object):
             track_indexes, tracknames = zip(*indexed_tracknames)
             track_indexes = array(track_indexes)
 
+        # replace illegal characters
+        tracknames = [trackname.replace(".", "_") for trackname in tracknames]
+
         if self.tracknames is None:
             self.tracknames = tracknames
             self.track_indexes = track_indexes
