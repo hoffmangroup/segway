@@ -1,5 +1,5 @@
 LDFLAGS=-lhdf5
-CFLAGS=-g -std=c99 -O3 -march=nocona -pipe -fomit-frame-pointer -pedantic -Wall
+CFLAGS=-g -std=c99 -march=nocona -pipe -fomit-frame-pointer -pedantic -Wall -O3
 
 all: _load_data
 _load_data.o: _load_data.c

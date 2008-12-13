@@ -26,6 +26,7 @@
 #define KEY_CHROM "chrom"
 #define KEY_START "start"
 #define KEY_STEP "step"
+#define KEY_SPAN "span"
 
 #define ATTR_START "start"
 #define ATTR_END "end"
@@ -227,8 +228,9 @@ void close_file(hid_t h5file) {
 }
 
 void parse_wiggle_header(char *line, file_format fmt, char **chrom,
-                         long *start, long *step) {
+                         long *start, long *step, long *span) {
   /* mallocs chrom; caller must free() it */
+  /* start and step may be null pointers */
 
   char *save_ptr;
   char *token;
@@ -262,6 +264,14 @@ void parse_wiggle_header(char *line, file_format fmt, char **chrom,
 
   newstring = line + strlen(id);
 
+  *span = 1;
+  if (start) {
+    *start = 1;
+  }
+  if (step) {
+    *step = 1;
+  }
+
   while ((token = strtok_r(newstring, DELIM_WIG, &save_ptr))) {
     loc_eq = strchr(token, '=');
     key = strndupa(token, loc_eq - token);
@@ -269,17 +279,28 @@ void parse_wiggle_header(char *line, file_format fmt, char **chrom,
 
     val = loc_eq + 1;
 
+    errno = 0;
+
     if (!strcmp(key, KEY_CHROM)) {
       *chrom = strdup(val);
       assert(*chrom);
+
     } else if (!strcmp(key, KEY_START)) {
       assert(start); /* don't write a null pointer */
+
+      /* correct 1-based coordinate */
       *start = strtol(val, &tailptr, BASE) - 1;
-      assert(!*tailptr);
+      assert(!errno && !*tailptr);
+
     } else if (!strcmp(key, KEY_STEP)) {
       assert(step); /* don't write a null pointer */
       *step = strtol(val, &tailptr, BASE);
-      assert(!*tailptr);
+      assert(!errno && !*tailptr);
+
+    } else if (!strcmp(key, KEY_SPAN)) {
+      *span = strtol(val, &tailptr, BASE);
+      assert(!errno && !*tailptr);
+
     } else {
       fprintf(stderr, "can't understand key: %s\n", key);
       exit(EXIT_FAILURE);
@@ -303,7 +324,8 @@ supercontig_t *last_supercontig(chromosome_t *chromosome) {
 /** *_chromosome **/
 
 void init_chromosome(chromosome_t *chromosome) {
-  chromosome->chrom = NULL;
+  chromosome->chrom = xmalloc(sizeof(char));
+  *(chromosome->chrom) = '\0';
   chromosome->h5file = -1;
 }
 
@@ -337,6 +359,10 @@ void open_chromosome(chromosome_t *chromosome, const char *h5filename) {
 
 void close_chromosome(chromosome_t *chromosome) {
   free(chromosome->chrom);
+
+  if (chromosome->h5file < 0) {
+    return;
+  }
 
   for (supercontig_t *supercontig = chromosome->supercontigs;
        supercontig <= last_supercontig(chromosome); supercontig++) {
@@ -534,6 +560,8 @@ void seek_chromosome(char *chrom, char *h5dirname, chromosome_t *chromosome) {
 
   close_chromosome(chromosome);
   open_chromosome(chromosome, h5filename);
+
+  chromosome->chrom = chrom;
 }
 
 void malloc_chromosome_buf(chromosome_t *chromosome,
@@ -555,15 +583,16 @@ void malloc_chromosome_buf(chromosome_t *chromosome,
 }
 
 void proc_wigfix_header(char *line, char *h5dirname, chromosome_t *chromosome,
-                        float **buf_start, float **buf_end, float **buf_ptr) {
+                        float **buf_start, float **buf_end, float **buf_ptr,
+                        long *span) {
   long start = -1;
   long step = 1;
 
   char *chrom = NULL;
 
   /* do writing if buf_len > 0 */
-  parse_wiggle_header(line, FMT_WIGFIX, &chrom, &start, &step);
-  assert(chrom && step == 1);
+  parse_wiggle_header(line, FMT_WIGFIX, &chrom, &start, &step, span);
+  assert(chrom && start >= 0 && step == 1 && *span >= 1);
 
   /* chromosome->chrom is always initialized, at least to NULL, and
      chrom is never NULL */
@@ -577,7 +606,8 @@ void proc_wigfix_header(char *line, char *h5dirname, chromosome_t *chromosome,
 }
 
 void proc_wigvar_header(char *line, char *h5dirname, chromosome_t *chromosome,
-                        char *trackname, float **buf_start, float **buf_end) {
+                        char *trackname, float **buf_start, float **buf_end,
+                        long *span) {
   char *chrom = NULL;
 
   hid_t mem_dataspace, file_dataspace;
@@ -589,8 +619,8 @@ void proc_wigvar_header(char *line, char *h5dirname, chromosome_t *chromosome,
   hsize_t select_start[CARDINALITY];
 
   /* do writing if buf_len > 0 */
-  parse_wiggle_header(line, FMT_WIGFIX, &chrom, NULL, NULL);
-  assert(chrom);
+  parse_wiggle_header(line, FMT_WIGVAR, &chrom, NULL, NULL, span);
+  assert(chrom && *span >= 1);
 
   /* chromosome->chrom is always initialized, at least to NULL, and
      chrom is never NULL */
@@ -631,7 +661,7 @@ void proc_wigvar_header(char *line, char *h5dirname, chromosome_t *chromosome,
       /* read */
       fprintf(stderr, " reading %lld floats...", mem_dataspace_dims[0]);
       assert(H5Dread(dataset, DTYPE, mem_dataspace, file_dataspace,
-                     H5P_DEFAULT, buf_start) >= 0);
+                     H5P_DEFAULT, (*buf_start) + supercontig->start) >= 0);
       fprintf(stderr, " done\n");
 
       /* close all */
@@ -651,17 +681,21 @@ void proc_wigfix(char *h5dirname, char *trackname, char *line,
 
   chromosome_t chromosome;
 
+  long span = 1;
   float datum;
 
   init_chromosome(&chromosome);
 
   proc_wigfix_header(line, h5dirname, &chromosome,
-                     &buf_start, &buf_end, &buf_ptr);
+                     &buf_start, &buf_end, &buf_ptr, &span);
 
   buf_filled_start = buf_ptr;
 
   while (getline(&line, size_line, stdin) >= 0) {
+    errno = 0;
     datum = strtof(line, &tailptr);
+    assert(!errno);
+
     if (*tailptr == '\n') {
       if (buf_ptr < buf_end) {
         *buf_ptr++ = datum;
@@ -669,7 +703,7 @@ void proc_wigfix(char *h5dirname, char *trackname, char *line,
     } else {
       write_buf(&chromosome, trackname, buf_start, buf_filled_start, buf_ptr);
       proc_wigfix_header(line, h5dirname, &chromosome,
-                         &buf_start, &buf_end, &buf_ptr);
+                         &buf_start, &buf_end, &buf_ptr, &span);
       buf_filled_start = buf_ptr;
     }
   }
@@ -685,35 +719,57 @@ void proc_wigvar(char *h5dirname, char *trackname, char *line,
   char *tailptr;
 
   float *buf_start = NULL;
-  float *buf_end, *buf_ptr;
+  float *buf_end;
+  float *fill_start, *fill_end;
+  float datum;
 
   chromosome_t chromosome;
 
   long start;
+  long span = 1;
 
   init_chromosome(&chromosome);
 
   proc_wigvar_header(line, h5dirname, &chromosome, trackname,
-                     &buf_start, &buf_end);
+                     &buf_start, &buf_end, &span);
 
   while (getline(&line, size_line, stdin) >= 0) {
-    start = strtol(line, &tailptr, BASE);
+    /* correcting 1-based coordinate */
+    errno = 0;
+    start = strtol(line, &tailptr, BASE) - 1;
+    assert(!errno && start >= 0);
 
     /* next char must be space */
-    if (*tailptr == ' ') {
-      buf_ptr = buf_start + start;
-      assert(buf_ptr < buf_end);
-
-      /* advance to next number */
-      line = tailptr;
-      *buf_ptr = strtof(line, &tailptr);
+    if (isblank(*tailptr)) {
+      errno = 0;
+      datum = strtof(tailptr, &tailptr);
+      assert(!errno);
 
       /* must be EOL */
       assert(*tailptr == '\n');
+
+      fill_start = buf_start + start;
+      if (fill_start > buf_end) {
+        fprintf(stderr, " ignoring data at %s:%ld\n", chromosome.chrom, start);
+        continue;
+      }
+
+      fill_end = fill_start + span;
+      if (fill_end > buf_end) {
+        fprintf(stderr, " ignoring data at %s:%ld+%ld\n",
+                chromosome.chrom, start, span);
+        fill_end = buf_end;
+      }
+
+      /* write into buffer */
+      for (float *buf_ptr = fill_start; buf_ptr < fill_end; buf_ptr++) {
+        *buf_ptr = datum;
+      }
+
     } else {
       write_buf(&chromosome, trackname, buf_start, buf_start, buf_end);
       proc_wigvar_header(line, h5dirname, &chromosome, trackname,
-                         &buf_start, &buf_end);
+                         &buf_start, &buf_end, &span);
     }
   }
 
