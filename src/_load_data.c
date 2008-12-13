@@ -7,6 +7,8 @@
    by num_cols)
 */
 
+/** includes **/
+
 #define _GNU_SOURCE
 
 #include <argp.h>
@@ -18,6 +20,8 @@
 #include <string.h>
 
 #include <hdf5.h>
+
+/** constants **/
 
 #define ID_WIGVAR "variableStep "
 #define ID_WIGFIX "fixedStep "
@@ -46,6 +50,8 @@
 
 const float nan_float = NAN;
 
+/** typedefs **/
+
 typedef enum {
   FMT_BED, FMT_WIGFIX, FMT_WIGVAR
 } file_format;
@@ -64,6 +70,8 @@ typedef struct {
   supercontig_t *supercontig_curr;
 } chromosome_t;
 
+/** helper functions **/
+
 /* XXX: GNU-only extension; should be wrapped */
 __attribute__((noreturn)) void fatal(char *msg) {
   fprintf(stderr, msg);
@@ -78,6 +86,8 @@ void *xmalloc(size_t size)
     fatal("virtual memory exhausted");
   return value;
 }
+
+/** general-purpose HDF5 attribute helper functions **/
 
 void get_attr(hid_t loc, const char *name, hid_t mem_type_id, void *buf) {
   hid_t attr;
@@ -126,6 +136,152 @@ void set_attr_str(hid_t loc, const char *name, const char *buf) {
 
   set_attr(loc, name, datatype, dataspace, buf);
 }
+
+/** dataset **/
+
+/* suppresses errors */
+hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
+  hid_t dataset;
+
+  /* for error suppression */
+  H5E_auto2_t old_func;
+  void *old_client_data;
+
+  /* suppress errors */
+  assert(H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data) >= 0);
+  assert(H5Eset_auto(H5E_DEFAULT, NULL, NULL) >= 0);
+
+  dataset = H5Dopen(loc, name, dapl);
+
+  /* re-enable errors */
+  assert(H5Eset_auto(H5E_DEFAULT, old_func, old_client_data) >= 0);
+
+  return dataset;
+}
+
+void close_dataset(hid_t dataset) {
+  if (dataset >= 0) {
+    assert(H5Dclose(dataset) >= 0);
+  }
+}
+
+/** dataspace **/
+
+hid_t get_file_dataspace(hid_t dataset) {
+  hid_t dataspace;
+
+  dataspace = H5Dget_space(dataset);
+  assert(dataspace >= 0);
+
+  return dataspace;
+}
+
+void close_dataspace(hid_t dataspace) {
+  if (dataspace >= 0) {
+    assert(H5Sclose(dataspace) >= 0);
+  }
+}
+
+/** other HDF5 **/
+
+void close_group(hid_t group) {
+  if (group >= 0) {
+    assert(H5Gclose(group) >= 0);
+  }
+}
+
+void close_file(hid_t h5file) {
+  if (h5file >= 0) {
+    assert(H5Fclose(h5file) >= 0);
+  }
+}
+
+/** chromosome functions **/
+
+void init_chromosome(chromosome_t *chromosome) {
+  chromosome->chrom = xmalloc(sizeof(char));
+  *(chromosome->chrom) = '\0';
+  chromosome->h5file = -1;
+}
+
+void init_supercontig_array(size_t num_supercontigs, chromosome_t *chromosome)
+{
+  chromosome->num_supercontigs = num_supercontigs;
+  chromosome->supercontigs = xmalloc(num_supercontigs * sizeof(supercontig_t));
+  chromosome->supercontig_curr = chromosome->supercontigs;
+}
+
+herr_t supercontig_visitor(hid_t g_id, const char *name,
+                           const H5L_info_t *info,
+                           void *op_info) {
+  hid_t subgroup;
+  supercontig_t *supercontig;
+  chromosome_t *chromosome;
+
+  chromosome = (chromosome_t *) op_info;
+
+  supercontig = chromosome->supercontig_curr++;
+
+  /* leave open */
+  subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
+  assert(subgroup >= 0);
+
+  get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &supercontig->start);
+  get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
+  supercontig->group = subgroup;
+
+  return 0;
+}
+
+supercontig_t *last_supercontig(chromosome_t *chromosome) {
+  return chromosome->supercontigs + chromosome->num_supercontigs - 1;
+}
+
+void open_chromosome(chromosome_t *chromosome, const char *h5filename) {
+  hid_t root = -1;
+  H5G_info_t root_info;
+
+  /* must be specified to H5Literate; allows interruption and
+     resumption, but I don't use it */
+  hsize_t idx = 0;
+
+  /* open the chromosome file */
+  chromosome->h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
+  assert(chromosome->h5file >= 0);
+
+  /* open the root group */
+  root = H5Gopen(chromosome->h5file, "/", H5P_DEFAULT);
+  assert(root >= 0);
+
+  /* allocate supercontig metadata array */
+  assert(H5Gget_info(root, &root_info) >= 0);
+  init_supercontig_array(root_info.nlinks, chromosome);
+
+  /* populate supercontig metadata array */
+  assert(H5Literate(root, H5_INDEX_NAME, H5_ITER_INC, &idx,
+                    supercontig_visitor, chromosome) == 0);
+
+  assert(H5Gclose(root) >= 0);
+
+}
+
+void close_chromosome(chromosome_t *chromosome) {
+  free(chromosome->chrom);
+
+  if (chromosome->h5file < 0) {
+    return;
+  }
+
+  for (supercontig_t *supercontig = chromosome->supercontigs;
+       supercontig <= last_supercontig(chromosome); supercontig++) {
+    assert(H5Gclose(supercontig->group) >= 0);
+  }
+  free(chromosome->supercontigs);
+
+  close_file(chromosome->h5file);
+}
+
+/** specific auxiliary functions **/
 
 /* fetch num_cols and the col for a particular trackname */
 void get_cols(chromosome_t *chromosome, char *trackname, hsize_t *num_cols,
@@ -181,50 +337,87 @@ void get_cols(chromosome_t *chromosome, char *trackname, hsize_t *num_cols,
   assert(H5Gclose(root) >= 0);
 }
 
-herr_t supercontig_visitor(hid_t g_id, const char *name,
-                           const H5L_info_t *info,
-                           void *op_info) {
-  hid_t subgroup;
-  supercontig_t *supercontig;
-  chromosome_t *chromosome;
-
-  chromosome = (chromosome_t *) op_info;
-
-  supercontig = chromosome->supercontig_curr++;
-
-  /* leave open */
-  subgroup = H5Gopen(g_id, name, H5P_DEFAULT);
-  assert(subgroup >= 0);
-
-  get_attr(subgroup, ATTR_START, H5T_STD_I32LE, &supercontig->start);
-  get_attr(subgroup, ATTR_END, H5T_STD_I32LE, &supercontig->end);
-  supercontig->group = subgroup;
-
-  return 0;
+/* make existing dataset into a PyTables CArray by setting appropriate
+   attrs */
+void make_pytables_carray(hid_t dataset) {
+  set_attr_str(dataset, "CLASS", "CARRAY");
+  set_attr_str(dataset, "TITLE", "");
+  set_attr_str(dataset, "VERSION", "1.0");
 }
 
-void close_dataset(hid_t dataset) {
-  if (dataset >= 0) {
-    assert(H5Dclose(dataset) >= 0);
+hid_t open_supercontig_dataset(supercontig_t *supercontig, hsize_t num_cols) {
+  /* creates it if it doesn't already exist;
+     returns a handle for H5Dread or H5Dwrite */
+
+  hid_t dataset = -1;
+  hid_t dataset_creation_plist = -1;
+  hid_t file_dataspace = -1;
+
+  hsize_t file_dataspace_dims[CARDINALITY];
+  hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, 1};
+
+  /* set up creation options */
+  dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
+  assert(dataset_creation_plist >= 0);
+
+  assert(H5Pset_fill_value(dataset_creation_plist, DTYPE, &nan_float) >= 0);
+
+  /* open dataset if it already exists */
+  dataset = open_dataset(supercontig->group, DATASET_NAME, H5P_DEFAULT);
+
+  if (dataset < 0) {
+    /* create dataspace */
+    file_dataspace_dims[0] = supercontig->end - supercontig->start;
+    file_dataspace_dims[1] = num_cols;
+
+    file_dataspace = H5Screate_simple(CARDINALITY, file_dataspace_dims, NULL);
+    assert(file_dataspace >= 0);
+
+    /* create chunkspace */
+    assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims) >= 0);
+
+    /* create dataset */
+    fprintf(stderr, " creating %lld x %lld dataset...",
+            file_dataspace_dims[0], file_dataspace_dims[1]);
+    dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
+                        file_dataspace, H5P_DEFAULT, dataset_creation_plist,
+                        H5P_DEFAULT);
+    assert(dataset >= 0);
+    fprintf(stderr, " done\n");
+
+    make_pytables_carray(dataset);
   }
+
+  /* XXX: set dirty attribute */
+  /* XXX: need to look up in documentation: boolean attributes, etc. */
+
+  assert(H5Pclose(dataset_creation_plist) >= 0);
+
+  return dataset;
 }
 
-void close_dataspace(hid_t dataspace) {
-  if (dataspace >= 0) {
-    assert(H5Sclose(dataspace) >= 0);
-  }
+hid_t get_col_dataspace(hsize_t *dims) {
+  hid_t dataspace;
+
+  dataspace = H5Screate_simple(1, dims, NULL);
+  assert(dataspace >= 0);
+
+  return dataspace;
 }
 
-void close_group(hid_t group) {
-  if (group >= 0) {
-    assert(H5Gclose(group) >= 0);
-  }
-}
+/** general parsing **/
 
-void close_file(hid_t h5file) {
-  if (h5file >= 0) {
-    assert(H5Fclose(h5file) >= 0);
+file_format sniff_header_line(const char *line) {
+  if (!strncmp(ID_WIGFIX, line, strlen(ID_WIGFIX))) {
+    return FMT_WIGFIX;
+  } else if (!strncmp(ID_WIGVAR, line, strlen(ID_WIGVAR))) {
+    return FMT_WIGVAR;
   }
+
+  fatal("only fixedStep and variableStep formats supported");
+  /* return FMT_BED; */
+
+  return -1;
 }
 
 void parse_wiggle_header(char *line, file_format fmt, char **chrom,
@@ -310,165 +503,7 @@ void parse_wiggle_header(char *line, file_format fmt, char **chrom,
   }
 }
 
-void init_supercontig_array(size_t num_supercontigs, chromosome_t *chromosome)
-{
-  chromosome->num_supercontigs = num_supercontigs;
-  chromosome->supercontigs = xmalloc(num_supercontigs * sizeof(supercontig_t));
-  chromosome->supercontig_curr = chromosome->supercontigs;
-}
-
-supercontig_t *last_supercontig(chromosome_t *chromosome) {
-  return chromosome->supercontigs + chromosome->num_supercontigs - 1;
-}
-
-/** *_chromosome **/
-
-void init_chromosome(chromosome_t *chromosome) {
-  chromosome->chrom = xmalloc(sizeof(char));
-  *(chromosome->chrom) = '\0';
-  chromosome->h5file = -1;
-}
-
-void open_chromosome(chromosome_t *chromosome, const char *h5filename) {
-  hid_t root = -1;
-  H5G_info_t root_info;
-
-  /* must be specified to H5Literate; allows interruption and
-     resumption, but I don't use it */
-  hsize_t idx = 0;
-
-  /* open the chromosome file */
-  chromosome->h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
-  assert(chromosome->h5file >= 0);
-
-  /* open the root group */
-  root = H5Gopen(chromosome->h5file, "/", H5P_DEFAULT);
-  assert(root >= 0);
-
-  /* allocate supercontig metadata array */
-  assert(H5Gget_info(root, &root_info) >= 0);
-  init_supercontig_array(root_info.nlinks, chromosome);
-
-  /* populate supercontig metadata array */
-  assert(H5Literate(root, H5_INDEX_NAME, H5_ITER_INC, &idx,
-                    supercontig_visitor, chromosome) == 0);
-
-  assert(H5Gclose(root) >= 0);
-
-}
-
-void close_chromosome(chromosome_t *chromosome) {
-  free(chromosome->chrom);
-
-  if (chromosome->h5file < 0) {
-    return;
-  }
-
-  for (supercontig_t *supercontig = chromosome->supercontigs;
-       supercontig <= last_supercontig(chromosome); supercontig++) {
-    assert(H5Gclose(supercontig->group) >= 0);
-  }
-  free(chromosome->supercontigs);
-
-  close_file(chromosome->h5file);
-}
-
-/* suppresses errors */
-hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
-  hid_t dataset;
-
-  /* for error suppression */
-  H5E_auto2_t old_func;
-  void *old_client_data;
-
-  /* suppress errors */
-  assert(H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data) >= 0);
-  assert(H5Eset_auto(H5E_DEFAULT, NULL, NULL) >= 0);
-
-  dataset = H5Dopen(loc, name, dapl);
-
-  /* re-enable errors */
-  assert(H5Eset_auto(H5E_DEFAULT, old_func, old_client_data) >= 0);
-
-  return dataset;
-}
-
-/* make existing dataset into a PyTables CArray by setting appropriate
-   attrs */
-void make_pytables_carray(hid_t dataset) {
-  set_attr_str(dataset, "CLASS", "CARRAY");
-  set_attr_str(dataset, "TITLE", "");
-  set_attr_str(dataset, "VERSION", "1.0");
-}
-
-hid_t open_supercontig_dataset(supercontig_t *supercontig, hsize_t num_cols) {
-  /* creates it if it doesn't already exist;
-     returns a handle for H5Dread or H5Dwrite */
-
-  hid_t dataset = -1;
-  hid_t dataset_creation_plist = -1;
-  hid_t file_dataspace = -1;
-
-  hsize_t file_dataspace_dims[CARDINALITY];
-  hsize_t chunk_dims[CARDINALITY] = {CHUNK_NROWS, 1};
-
-  /* set up creation options */
-  dataset_creation_plist = H5Pcreate(H5P_DATASET_CREATE);
-  assert(dataset_creation_plist >= 0);
-
-  assert(H5Pset_fill_value(dataset_creation_plist, DTYPE, &nan_float) >= 0);
-
-  /* open dataset if it already exists */
-  dataset = open_dataset(supercontig->group, DATASET_NAME, H5P_DEFAULT);
-
-  if (dataset < 0) {
-    /* create dataspace */
-    file_dataspace_dims[0] = supercontig->end - supercontig->start;
-    file_dataspace_dims[1] = num_cols;
-
-    file_dataspace = H5Screate_simple(CARDINALITY, file_dataspace_dims, NULL);
-    assert(file_dataspace >= 0);
-
-    /* create chunkspace */
-    assert(H5Pset_chunk(dataset_creation_plist, CARDINALITY, chunk_dims) >= 0);
-
-    /* create dataset */
-    fprintf(stderr, " creating %lld x %lld dataset...",
-            file_dataspace_dims[0], file_dataspace_dims[1]);
-    dataset = H5Dcreate(supercontig->group, DATASET_NAME, DTYPE,
-                        file_dataspace, H5P_DEFAULT, dataset_creation_plist,
-                        H5P_DEFAULT);
-    assert(dataset >= 0);
-    fprintf(stderr, " done\n");
-
-    make_pytables_carray(dataset);
-  }
-
-  /* XXX: set dirty attribute */
-  /* XXX: need to look up in documentation: boolean attributes, etc. */
-
-  assert(H5Pclose(dataset_creation_plist) >= 0);
-
-  return dataset;
-}
-
-hid_t get_file_dataspace(hid_t dataset) {
-  hid_t dataspace;
-
-  dataspace = H5Dget_space(dataset);
-  assert(dataspace >= 0);
-
-  return dataspace;
-}
-
-hid_t get_col_dataspace(hsize_t *dims) {
-  hid_t dataspace;
-
-  dataspace = H5Screate_simple(1, dims, NULL);
-  assert(dataspace >= 0);
-
-  return dataspace;
-}
+/** writing **/
 
 void write_buf(chromosome_t *chromosome, char *trackname,
                float *buf_start,
@@ -582,6 +617,8 @@ void malloc_chromosome_buf(chromosome_t *chromosome,
   *buf_end = *buf_start + buf_len;
 }
 
+/** wigFix **/
+
 void proc_wigfix_header(char *line, char *h5dirname, chromosome_t *chromosome,
                         float **buf_start, float **buf_end, float **buf_ptr,
                         long *span) {
@@ -604,6 +641,50 @@ void proc_wigfix_header(char *line, char *h5dirname, chromosome_t *chromosome,
 
   *buf_ptr = *buf_start + start;
 }
+
+void proc_wigfix(char *h5dirname, char *trackname, char *line,
+                 size_t *size_line) {
+  char *tailptr;
+
+  float *buf_start = NULL;
+  float *buf_filled_start, *buf_ptr, *buf_end;
+
+  chromosome_t chromosome;
+
+  long span = 1;
+  float datum;
+
+  init_chromosome(&chromosome);
+
+  proc_wigfix_header(line, h5dirname, &chromosome,
+                     &buf_start, &buf_end, &buf_ptr, &span);
+
+  buf_filled_start = buf_ptr;
+
+  while (getline(&line, size_line, stdin) >= 0) {
+    errno = 0;
+    datum = strtof(line, &tailptr);
+    assert(!errno);
+
+    if (*tailptr == '\n') {
+      if (buf_ptr < buf_end) {
+        *buf_ptr++ = datum;
+      } /* else: ignore data until we get to another header line */
+    } else {
+      write_buf(&chromosome, trackname, buf_start, buf_filled_start, buf_ptr);
+      proc_wigfix_header(line, h5dirname, &chromosome,
+                         &buf_start, &buf_end, &buf_ptr, &span);
+      buf_filled_start = buf_ptr;
+    }
+  }
+
+  write_buf(&chromosome, trackname, buf_start, buf_filled_start, buf_ptr);
+
+  close_chromosome(&chromosome);
+  free(buf_start);
+}
+
+/** wigVar **/
 
 void proc_wigvar_header(char *line, char *h5dirname, chromosome_t *chromosome,
                         char *trackname, float **buf_start, float **buf_end,
@@ -672,48 +753,6 @@ void proc_wigvar_header(char *line, char *h5dirname, chromosome_t *chromosome,
   }
 }
 
-void proc_wigfix(char *h5dirname, char *trackname, char *line,
-                 size_t *size_line) {
-  char *tailptr;
-
-  float *buf_start = NULL;
-  float *buf_filled_start, *buf_ptr, *buf_end;
-
-  chromosome_t chromosome;
-
-  long span = 1;
-  float datum;
-
-  init_chromosome(&chromosome);
-
-  proc_wigfix_header(line, h5dirname, &chromosome,
-                     &buf_start, &buf_end, &buf_ptr, &span);
-
-  buf_filled_start = buf_ptr;
-
-  while (getline(&line, size_line, stdin) >= 0) {
-    errno = 0;
-    datum = strtof(line, &tailptr);
-    assert(!errno);
-
-    if (*tailptr == '\n') {
-      if (buf_ptr < buf_end) {
-        *buf_ptr++ = datum;
-      } /* else: ignore data until we get to another header line */
-    } else {
-      write_buf(&chromosome, trackname, buf_start, buf_filled_start, buf_ptr);
-      proc_wigfix_header(line, h5dirname, &chromosome,
-                         &buf_start, &buf_end, &buf_ptr, &span);
-      buf_filled_start = buf_ptr;
-    }
-  }
-
-  write_buf(&chromosome, trackname, buf_start, buf_filled_start, buf_ptr);
-
-  close_chromosome(&chromosome);
-  free(buf_start);
-}
-
 void proc_wigvar(char *h5dirname, char *trackname, char *line,
                  size_t *size_line) {
   char *tailptr;
@@ -777,19 +816,6 @@ void proc_wigvar(char *h5dirname, char *trackname, char *line,
 
   close_chromosome(&chromosome);
   free(buf_start);
-}
-
-file_format sniff_header_line(const char *line) {
-  if (!strncmp(ID_WIGFIX, line, strlen(ID_WIGFIX))) {
-    return FMT_WIGFIX;
-  } else if (!strncmp(ID_WIGVAR, line, strlen(ID_WIGVAR))) {
-    return FMT_WIGVAR;
-  }
-
-  fatal("only fixedStep and variableStep formats supported");
-  /* return FMT_BED; */
-
-  return -1;
 }
 
 /** programmatic interface **/
