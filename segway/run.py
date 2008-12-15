@@ -1122,6 +1122,35 @@ class Runner(object):
     def make_job_name_identify(self, chunk_index):
         return "vit%d.%s.%s" % (chunk_index, self.dirpath.name, getpid())
 
+    def make_gmtk_kwargs(self):
+        num_tracks = self.num_tracks
+
+        return dict(strFile=self.structure_filename,
+
+                    of1=self.float_filelistpath,
+                    fmt1="binary",
+                    nf1=num_tracks,
+                    ni1=0,
+                    iswp1=False,
+
+                    of2=self.int_filelistpath,
+                    fmt2="binary",
+                    nf2=0,
+                    ni2=num_tracks,
+                    iswp2=False,
+
+                    verbosity=VERBOSITY)
+
+    def make_chunk_mem_reqs(self):
+        # XXX: should probably have different mem reqs for train or viterbi
+        num_tracks = self.num_tracks
+
+        chunk_lens = [end - start for chr, start, end in self.chunk_coords]
+
+        self.chunk_lens = chunk_lens
+        self.chunk_mem_reqs = [make_mem_req(chunk_len, num_tracks)
+                               for chunk_len in chunk_lens]
+
     def queue_gmtk(self, session, prog, kwargs, job_name, mem_req,
                    native_specs={}):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
@@ -1297,7 +1326,11 @@ class Runner(object):
                 except ValueError:
                     # ValueError: the job terminated abnormally
                     # so interrupt everybody
-                    interrupt_event.set()
+                    if self.keep_going:
+                        return (None, None, None, None)
+                    else:
+                        interrupt_event.set()
+                        raise
 
                 # XXX: Py2.6+: use is_set() instead of isSet()
                 if interrupt_event.isSet():
@@ -1320,35 +1353,6 @@ class Runner(object):
         # log_likelihood and a list of src_filenames to save
         return (log_likelihood, self.input_master_filename,
                 last_params_filename, log_likelihood_filename)
-
-    def make_gmtk_kwargs(self):
-        num_tracks = self.num_tracks
-
-        return dict(strFile=self.structure_filename,
-
-                    of1=self.float_filelistpath,
-                    fmt1="binary",
-                    nf1=num_tracks,
-                    ni1=0,
-                    iswp1=False,
-
-                    of2=self.int_filelistpath,
-                    fmt2="binary",
-                    nf2=0,
-                    ni2=num_tracks,
-                    iswp2=False,
-
-                    verbosity=VERBOSITY)
-
-    def make_chunk_mem_reqs(self):
-        # XXX: should probably have different mem reqs for train or viterbi
-        num_tracks = self.num_tracks
-
-        chunk_lens = [end - start for chr, start, end in self.chunk_coords]
-
-        self.chunk_lens = chunk_lens
-        self.chunk_mem_reqs = [make_mem_req(chunk_len, num_tracks)
-                               for chunk_len in chunk_lens]
 
     def run_train(self):
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
@@ -1570,6 +1574,9 @@ def parse_options(args):
                          help="do not identify segments")
         group.add_option("-T", "--no-train", action="store_true",
                          help="do not train model")
+        group.add_option("-k", "--keep-going", action="store_true",
+                         help="keep going in some threads even when you have"
+                         " errors in another")
         group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
                          " executables")
@@ -1609,6 +1616,7 @@ def main(args=sys.argv[1:]):
     runner.train = not options.no_train
     runner.identify = not options.no_identify
     runner.dry_run = options.dry_run
+    runner.keep_going = options.keep_going
 
     return runner()
 
