@@ -1151,6 +1151,15 @@ class Runner(object):
         self.chunk_mem_reqs = [make_mem_req(chunk_len, num_tracks)
                                for chunk_len in chunk_lens]
 
+    def chunk_mem_reqs_decreasing(self):
+        # sort chunks by decreasing size, so the most difficult chunks
+        # are dropped in the queue first
+        zipper = izip(self.chunk_lens, count(), self.chunk_mem_reqs)
+
+        # XXX: use itertools instead of a generator
+        for _, chunk_index, chunk_mem_req in sorted(zipper, reverse=True):
+            yield chunk_index, chunk_mem_req
+
     def queue_gmtk(self, session, prog, kwargs, job_name, mem_req,
                    native_specs={}):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
@@ -1194,15 +1203,6 @@ class Runner(object):
 
         return self.queue_gmtk(session, prog, kwargs, name, mem_req,
                                native_specs)
-
-    def chunk_mem_reqs_decreasing(self):
-        # sort chunks by decreasing size, so the most difficult chunks
-        # are dropped in the queue first
-        zipper = izip(self.chunk_lens, count(), self.chunk_mem_reqs)
-
-        # XXX: use itertools instead of a generator
-        for _, chunk_index, chunk_mem_req in sorted(zipper, reverse=True):
-            yield chunk_index, chunk_mem_req
 
     def queue_train_parallel(self, session, params_filename, start_index,
                              round_index, **kwargs):
