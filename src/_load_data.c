@@ -776,10 +776,12 @@ void proc_wigvar(char *h5dirname, char *trackname, char *line,
     /* correcting 1-based coordinate */
     errno = 0;
     start = strtol(line, &tailptr, BASE) - 1;
-    assert(!errno && start >= 0);
+    assert(!errno);
 
     /* next char must be space */
-    if (isblank(*tailptr)) {
+    if (tailptr != line && isblank(*tailptr)) {
+      assert(start >= 0);
+
       errno = 0;
       datum = strtof(tailptr, &tailptr);
       assert(!errno);

@@ -50,6 +50,7 @@ def write_metadata(chromosome):
         starts = []
         ends = []
 
+        # so that index - last_index is always >= MIN_GAP_LEN
         last_index = -MIN_GAP_LEN
         for index in indices_nonmissing:
             if index - last_index >= MIN_GAP_LEN:
@@ -61,7 +62,8 @@ def write_metadata(chromosome):
                 starts.append(index)
             last_index = index
 
-        ends.append(last_index + 1)
+        if last_index >= 0:
+            ends.append(last_index + 1)
 
         assert len(starts) == len(ends)
 
