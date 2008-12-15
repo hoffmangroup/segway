@@ -46,7 +46,6 @@ DISTRIBUTION_GAMMA = "gamma"
 ## XXX: should be options
 NUM_SEGS = 2 # XXX: will require CARD_SEG to be set
 MAX_EM_ITERS = 100
-VERBOSITY = 0 # XXX: should vary based on DRMAA submission or not
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
@@ -1139,7 +1138,7 @@ class Runner(object):
                     ni2=num_tracks,
                     iswp2=False,
 
-                    verbosity=VERBOSITY)
+                    verbosity=self.verbosity)
 
     def make_chunk_mem_reqs(self):
         # XXX: should probably have different mem reqs for train or viterbi
@@ -1256,7 +1255,7 @@ class Runner(object):
         prog = self.prog_factory(TRIANGULATE_PROG)
 
         prog(strFile=self.structure_filename,
-             verbosity=VERBOSITY)
+             verbosity=self.verbosity)
 
     def run_train_start(self, session, start_index, interrupt_event):
         # make new files if you have more than one random start
@@ -1419,6 +1418,9 @@ class Runner(object):
             # finds the max by log_likelihood
             src_filenames = max(start_params)[1:]
 
+            if None in src_filenames:
+                raise ValueError, "all training threads failed"
+
             assert (len(TRAIN_ATTRNAMES) == len(src_filenames)
                     == len(dst_filenames))
 
@@ -1567,6 +1569,10 @@ def parse_options(args):
                          " the number of pseudocounts for the segment length"
                          " prior (default 0)")
 
+        group.add_option("-v", "--verbosity", type=int, default=0,
+                         metavar="NUM",
+                         help="show messages with verbosity NUM")
+
     with OptionGroup(parser, "Flags") as group:
         group.add_option("-f", "--force", action="store_true",
                          help="delete any preexisting files")
@@ -1611,6 +1617,7 @@ def main(args=sys.argv[1:]):
     runner.random_starts = options.random_starts
     runner.len_seg_strength = options.prior_strength
     runner.include_tracknames = options.track
+    runner.verbosity = options.verbosity
 
     runner.delete_existing = options.force
     runner.train = not options.no_train
