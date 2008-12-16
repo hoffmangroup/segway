@@ -70,6 +70,11 @@ DISTRIBUTION = DISTRIBUTION_GAMMA
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
+ORD_A = ord("A")
+ORD_C = ord("C")
+ORD_G = ord("G")
+ORD_T = ord("T")
+
 # for extra memory savings, set to (False) or (not ISLAND)
 COMPONENT_CACHE = True
 
@@ -431,6 +436,29 @@ def generate_tmpl_mappings(segnames, tracknames):
                        index=num_tracks*seg_index + track_index,
                        distribution=DISTRIBUTION)
 
+def make_dinucleotide_int_data(seq):
+    """
+    makes an array with two columns, one with 0..15=AA..TT and the other
+    as a presence variable. Set column one to 0 when not present
+    """
+    nucleotide_int_data = ((seq == ORD_A) + (seq == ORD_C) * 2
+                           + (seq == ORD_G) * 3 + (seq == ORD_T) * 4) - 1
+    nucleotide_missing = nucleotide_int_data == -1
+
+    dinucleotide_int_data = ((nucleotide_int_data[:-1] * 4)
+                             + nucleotide_int_data[1:]) XXX append an extra 0
+    dinucleotide_missing = (nucleotide_missing[:-1]
+                            + nucleotide_missing[1:]) XXX append an extra 1
+
+    XXX first extra column: dinucleotide AA=0 TT=15
+    XXX second extra column: some missing=0; some present = 1
+    # there are so few N boundaries that it is okay to
+    # disregard the whole dinucleotide when half is N
+
+    XXX empty((len(seq), 2), DTYPE_OBS_INT)
+
+    return XXX
+
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
         # keeps it from rewriting variables that will be used
@@ -658,23 +686,31 @@ class Runner(object):
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.dirname, self.delete_existing)
 
-    def save_observations_chunk(self, float_filepath, int_filepath, data):
+    def save_observations_chunk(self, float_filepath, int_filepath, float_data,
+                                seq_data):
         # input function in GMTK_ObservationMatrix.cc:
         # ObservationMatrix::readBinSentence
 
         # input per frame is a series of float32s, followed by a series of
         # int32s it is better to optimize both sides here by sticking all
         # the floats in one file, and the ints in another one
-        mask_missing = isnan(data)
-        mask_nonmissing = empty(mask_missing.shape, DTYPE_OBS_INT)
+        mask_missing = isnan(float_data)
 
-        # output -> mask_nonmissing
-        invert(mask_missing, mask_nonmissing)
+        # output -> int_data
+        # done in two steps so I can specify output type
+        int_data = empty(mask_missing.shape, DTYPE_OBS_INT)
+        invert(mask_missing, int_data)
 
-        data[mask_missing] = SENTINEL
+        float_data[mask_missing] = SENTINEL
 
-        data.tofile(float_filepath)
-        mask_nonmissing.tofile(int_filepath)
+        if seq_data is not None:
+            XXX make_dinucleotide_int_data(seq_data)
+
+            # XXXopt: use the correctly sized matrix in the first place
+            XXX horizontally stack with int_data
+
+        float_data.tofile(float_filepath)
+        int_data.tofile(int_filepath)
 
     def write_observations(self, float_filelist, int_filelist):
         include_coords = self.include_coords
@@ -778,11 +814,16 @@ class Runner(object):
 
                         rows = continuous[chunk_start:chunk_end, col_slice]
 
+                        if self.use_sequence:
+                            seq_cells = supercontig.seq[chunk_start:chunk_end]
+                        else:
+                            seq_cells = None
+
                         # correct for min_col offset
                         cells = rows[..., track_indexes - min_col]
 
                         save_observations_chunk(float_filepath, int_filepath,
-                                                cells)
+                                                cells, seq_cells)
 
                     chunk_index += 1
 
@@ -1574,6 +1615,8 @@ def parse_options(args):
                          help="show messages with verbosity NUM")
 
     with OptionGroup(parser, "Flags") as group:
+        group.add_option("--use-sequence", action="store_true",
+                         help="use nucleotide sequence")
         group.add_option("-f", "--force", action="store_true",
                          help="delete any preexisting files")
         group.add_option("-I", "--no-identify", action="store_true",
@@ -1619,6 +1662,7 @@ def main(args=sys.argv[1:]):
     runner.include_tracknames = options.track
     runner.verbosity = options.verbosity
 
+    runner.use_sequence = options.use_sequence
     runner.delete_existing = options.force
     runner.train = not options.no_train
     runner.identify = not options.no_identify

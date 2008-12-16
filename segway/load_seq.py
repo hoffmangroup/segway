@@ -14,7 +14,7 @@ from os import extsep
 from re import compile, VERBOSE
 import sys
 
-from numpy import frombuffer
+from numpy import frombuffer, uint8
 from path import path
 from tables import openFile, UInt8Atom
 
@@ -38,7 +38,7 @@ def create_supercontig(h5file, index, seq, start, end):
     name = SUPERCONTIG_NAME_FMT % index
     supercontig = h5file.createGroup("/", name)
 
-    seq_array = frombuffer(seq)
+    seq_array = frombuffer(seq, uint8)
     h5file.createCArray(supercontig, "seq", ATOM, seq_array.shape)
 
     supercontig.seq[...] = seq_array
