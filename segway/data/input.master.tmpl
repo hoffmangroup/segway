@@ -10,12 +10,12 @@ DT_IN_FILE inline
 $name_collection_spec
 $dirichlet_spec
 
-#ifndef USE_TRAINABLE_PARAMS
-
 DPMF_IN_FILE inline
 1
 
 0 dpmf_always 1 1.0
+
+#ifndef INPUT_PARAMS_FILENAME
 
 $dense_cpt_spec
 $mean_spec
@@ -23,5 +23,14 @@ $covar_spec
 $gamma_spec
 $mc_spec
 $mx_spec
+
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+REAL_MAT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+MC_IN_FILE INPUT_PARAMS_FILENAME ascii
+MX_IN_FILE INPUT_PARAMS_FILENAME ascii
 
 #endif

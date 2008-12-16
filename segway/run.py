@@ -23,9 +23,9 @@ import sys
 from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import (add, amin, amax, append, arange, array, column_stack, diag, diff,
-                   empty, finfo, float32, fromfile, invert, isnan, newaxis,
-                   NINF, s_, where)
+from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
+                   diff, empty, finfo, float32, fromfile, invert, isnan,
+                   newaxis, NINF, s_, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -54,6 +54,8 @@ BED_DIRNAME = "out"
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
+SWAP_ENDIAN = False
+
 
 DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
 
@@ -103,6 +105,8 @@ RANDOM_STARTS = 1
 # XXX: replace with something negative and outlandish again
 SENTINEL = float32(9.87654321)
 
+CPP_DIRECTIVE_FMT = "-D%s=%s"
+
 ACC_FILENAME_FMT = "acc.%s.%s.bin"
 GMTK_INDEX_PLACEHOLDER = "@D"
 NAME_PLACEHOLDER = "bundle"
@@ -120,8 +124,6 @@ NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
 NATIVE_SPEC_DEFAULT = dict(w="n")
-
-OPT_USE_TRAINABLE_PARAMS = "-DUSE_TRAINABLE_PARAMS"
 
 def extjoin(*args):
     return extsep.join(args)
@@ -156,6 +158,7 @@ IDENTIFY_FILELISTBASENAME = extjoin("identify", EXT_LIST)
 # templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
 RES_INPUT_MASTER_TMPL = "input.master.tmpl"
+RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC = "seg.inc"
 
@@ -197,6 +200,12 @@ WIG_HEADER = 'track type=wiggle_0 name=%s ' \
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
+
+## shared memory
+
+abandon = False
+
+## functions
 
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
@@ -308,11 +317,21 @@ def make_mem_req(len, num_tracks):
 
     return "%dM" % ceil(res / 2**20)
 
-def make_cpp_options(params_filename):
-    if params_filename:
-        return OPT_USE_TRAINABLE_PARAMS
-    else:
-        return None
+def make_cpp_options(input_params_filename, output_params_filename=None):
+    directives = {}
+
+    if input_params_filename:
+        directives["INPUT_PARAMS_FILENAME"] = input_params_filename
+
+    if output_params_filename:
+        directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
+
+    res = " ".join(CPP_DIRECTIVE_FMT % item for item in directives.iteritems())
+
+    if res:
+        return res
+
+    # default: return None
 
 def make_native_spec(**kwargs):
     options = NATIVE_SPEC_DEFAULT.copy()
@@ -466,7 +485,7 @@ def make_dinucleotide_int_data(seq):
     add(nucleotide_int_data[:-1] * 4, nucleotide_int_data[1:],
         dinucleotide_int_data)
 
-    # second column: presence_dinucleotide: some missing=0; some present = 1
+    # second column: presence_dinucleotide: some missing=0; all present = 1
     # there are so few N boundaries that it is okay to
     # disregard the whole dinucleotide when half is N
     dinucleotide_missing = (nucleotide_missing[:-1] + nucleotide_missing[1:])
@@ -1084,6 +1103,9 @@ class Runner(object):
     def save_dont_train(self):
         self.dont_train_filename = self.save_resource(RES_DONT_TRAIN)
 
+    def save_output_master(self):
+        self.output_master_filename = self.save_resource(RES_OUTPUT_MASTER)
+
     def save_output_filelist(self):
         dirpath = self.dirpath
         num_chunks = self.num_chunks
@@ -1128,7 +1150,10 @@ class Runner(object):
 
         if train:
             self.save_dont_train()
-            self.set_params_filename() # might turn off self.train
+            self.save_output_master()
+
+            # might turn off self.train, if the params already exist
+            self.set_params_filename()
             self.set_log_likelihood_filename()
 
         if identify:
@@ -1206,13 +1231,13 @@ class Runner(object):
                     fmt1="binary",
                     nf1=self.num_tracks,
                     ni1=0,
-                    iswp1=False,
+                    iswp1=SWAP_ENDIAN,
 
                     of2=self.int_filelistpath,
                     fmt2="binary",
                     nf2=0,
                     ni2=self.num_int_cols,
-                    iswp2=False,
+                    iswp2=SWAP_ENDIAN,
 
                     verbosity=self.verbosity)
 
@@ -1266,11 +1291,9 @@ class Runner(object):
 
         return session.runJob(job_tmpl)
 
-    def queue_train(self, session, params_filename, start_index, round_index,
+    def queue_train(self, session, start_index, round_index,
                     chunk_index, mem_req, hold_jid=None, **kwargs):
         kwargs["inputMasterFile"] = self.input_master_filename
-        kwargs["inputTrainableParameters"] = params_filename
-        kwargs["cppCommandOptions"] = make_cpp_options(params_filename)
 
         prog = self.train_prog
         name = self.make_job_name_train(start_index, round_index, chunk_index)
@@ -1279,10 +1302,12 @@ class Runner(object):
         return self.queue_gmtk(session, prog, kwargs, name, mem_req,
                                native_specs)
 
-    def queue_train_parallel(self, session, params_filename, start_index,
+    def queue_train_parallel(self, session, input_params_filename, start_index,
                              round_index, **kwargs):
-        queue_train_custom = partial(self.queue_train, session,
-                                     params_filename, start_index, round_index)
+        queue_train_custom = partial(self.queue_train, session, start_index,
+                                     round_index)
+
+        kwargs["cppCommandOptions"] = make_cpp_options(input_params_filename)
 
         res = [] # task ids
 
@@ -1310,8 +1335,12 @@ class Runner(object):
         acc_filename = self.make_acc_filename(start_index,
                                               GMTK_INDEX_PLACEHOLDER)
 
+        cpp_options = make_cpp_options(input_params_filename,
+                                       output_params_filename)
+
         kwargs = \
-            dict(outputTrainableParameters=output_params_filename,
+            dict(outputMasterFile=self.output_master_filename,
+                 cppCommandOptions=cpp_options,
                  trrng="nil",
                  loadAccRange="0:%s" % (self.num_chunks-1),
                  loadAccFile=acc_filename,
@@ -1322,7 +1351,7 @@ class Runner(object):
         else:
             hold_jid = ",".join(parallel_jobids)
 
-        return self.queue_train(session, input_params_filename, start_index,
+        return self.queue_train(session, start_index,
                                 round_index, NAME_PLACEHOLDER, MEM_REQ_BUNDLE,
                                 hold_jid, **kwargs)
 
@@ -1404,11 +1433,11 @@ class Runner(object):
                     if self.keep_going:
                         return (None, None, None, None)
                     else:
+                        abandon = True
                         interrupt_event.set()
                         raise
 
-                # XXX: Py2.6+: use is_set() instead of isSet()
-                if interrupt_event.isSet():
+                if abandon:
                     for jobid in parallel_jobids + [bundle_jobid]:
                         try:
                             print >>sys.stderr, "killing job %s" % jobid
@@ -1484,6 +1513,7 @@ class Runner(object):
                     # therefore did not set thread.result
                     start_params.append(thread.result)
             except KeyboardInterrupt:
+                abandon = True
                 interrupt_event.set()
                 for thread in threads:
                     thread.join()
@@ -1514,7 +1544,6 @@ class Runner(object):
 
         identify_kwargs = \
             dict(inputMasterFile=self.input_master_filename,
-                 inputTrainableParameters=params_filename,
 
                  ofilelist=self.output_filelistname,
                  dumpNames=self.dumpnames_filename,
