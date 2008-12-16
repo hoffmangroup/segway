@@ -462,11 +462,9 @@ def make_dinucleotide_int_data(seq):
     # 4 CA CC CG CT
     # 8 GA GC GG GT
     # 12 TA TC TG TT
-    import pdb; pdb.set_trace()
     dinucleotide_int_data = empty(col_shape, DTYPE_OBS_INT)
     add(nucleotide_int_data[:-1] * 4, nucleotide_int_data[1:],
         dinucleotide_int_data)
-
 
     # second column: presence_dinucleotide: some missing=0; some present = 1
     # there are so few N boundaries that it is okay to
