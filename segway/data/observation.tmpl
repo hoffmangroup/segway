@@ -1,13 +1,13 @@
-   variable: nonmissing_$track {
-     type: discrete observed $nonmissing_index:$nonmissing_index cardinality CARD_NONMISSING;
+   variable: presence_$track {
+     type: discrete observed $presence_index:$presence_index cardinality CARD_PRESENCE;
 
-     conditionalparents: CONDITIONALPARENTS_NONMISSING;
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
    }
 
    variable: $track {
      type: continuous observed $track_index:$track_index;
 
-     switchingparents: nonmissing_$track(0) using mapping("map_parent");
+     switchingparents: presence_$track(0) using mapping("map_parent");
 
      conditionalparents: nil using mixture("internal:UnityScore")
                          | seg(0) using mixture collection("collection_seg_$track")

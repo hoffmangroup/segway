@@ -1,7 +1,7 @@
-  variable: nonmissing_dinucleotide {
-     type: discrete observed $nonmissing_index:$nonmissing_index cardinality CARD_NONMISSING;
+  variable: presence_dinucleotide {
+     type: discrete observed $presence_index:$presence_index cardinality CARD_PRESENCE;
 
-     conditionalparents: CONDITIONALPARENTS_NONMISSING;
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
   }
 
   variable: dinucleotide {

@@ -676,7 +676,7 @@ class Runner(object):
         observations = \
             "\n".join(observation_sub(track=track,
                                       track_index=track_index,
-                                      nonmissing_index=num_tracks+track_index)
+                                      presence_index=num_tracks+track_index)
                       for track_index, track in enumerate(tracknames))
 
         mapping = dict(include_filename=self.gmtk_include_filename,

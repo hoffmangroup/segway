@@ -8,7 +8,7 @@
 %% cardinalities
 
 % data exists or is missing?
-#define CARD_NONMISSING 2
+#define CARD_PRESENCE 2
 
 % which segment?
 #define CARD_SEG 2
@@ -22,6 +22,6 @@
 
 %% conditionalparents
 
-#define CONDITIONALPARENTS_NONMISSING nil using DenseCPT("internal:UnityScore")
+#define CONDITIONALPARENTS_PRESENCE nil using DenseCPT("internal:UnityScore")
 
 #endif
