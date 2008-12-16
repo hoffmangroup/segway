@@ -14,8 +14,9 @@ from os import extsep
 from re import compile, VERBOSE
 import sys
 
+from numpy import frombuffer
 from path import path
-from tables import openFile
+from tables import openFile, UInt8Atom
 
 from ._util import EXT_GZ, FILTERS_GZIP, gzip_open, LightIterator
 
@@ -31,9 +32,16 @@ DNA_LETTERS_UNAMBIG = "ACGTacgt"
 EXT_H5 = "h5"
 SUPERCONTIG_NAME_FMT = "supercontig_%s"
 
-def create_supercontig(h5file, index, start, end):
+ATOM = UInt8Atom()
+
+def create_supercontig(h5file, index, seq, start, end):
     name = SUPERCONTIG_NAME_FMT % index
     supercontig = h5file.createGroup("/", name)
+
+    seq_array = frombuffer(seq)
+    h5file.createCArray(supercontig, "seq", ATOM, seq_array.shape)
+
+    supercontig.seq[...] = seq_array
 
     attrs = supercontig._v_attrs
     attrs.start = start
@@ -46,10 +54,11 @@ def create_supercontig(h5file, index, start, end):
 # the previous code (r22) might have worked fine. Consider backing down to
 # it at some point.
 #
+# XXXopt: a numpy implementation might be better
 re_gap_segment = compile(r"""
-(?:([^%s]{%d}[^%s]{%d,})                                  # group(0): ambig
+(?:([^%s]{%d}[^%s]{%d,})                                  # group(1): ambig
    |                                                      #  OR
-   ((?:(?:[%s]+|^)(?:[^%s]{1,%d}[^%s]{,%d}(?![^%s]))*)+)) # group(1): unambig
+   ((?:(?:[%s]+|^)(?:[^%s]{1,%d}[^%s]{,%d}(?![^%s]))*)+)) # group(2): unambig
 """ % (DNA_LETTERS_UNAMBIG, REGEX_SEGMENT_LEN,
        DNA_LETTERS_UNAMBIG, REGEX_SEGMENT_LEN,
        DNA_LETTERS_UNAMBIG, DNA_LETTERS_UNAMBIG, REGEX_SEGMENT_LEN,
@@ -60,8 +69,10 @@ def read_seq(h5file, seq):
     supercontig_index = 0
 
     for m_segment in re_gap_segment.finditer(seq):
-        if m_segment.group(2):
-            create_supercontig(h5file, supercontig_index, *m_segment.span())
+        seq_unambig = m_segment.group(2)
+        if seq_unambig:
+            span = m_segment.span()
+            create_supercontig(h5file, supercontig_index, seq_unambig, *span)
             supercontig_index += 1
         else:
             assert m_segment.group(1)

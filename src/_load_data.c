@@ -5,6 +5,8 @@
    another optimization would be to inflate data yourself, then try to
    process multiple input tracks in parallel (reduce number of writes
    by num_cols)
+
+   doing this plus parallel HDF5 would probably get an enormous speedup
 */
 
 /** includes **/
@@ -15,6 +17,7 @@
 #include <assert.h>
 #include <error.h>
 #include <math.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -429,7 +432,7 @@ void parse_wiggle_header(char *line, file_format fmt, char **chrom,
   char *token;
   char *tailptr;
   char *newstring;
-  char *id;
+  char *id_str;
 
   char *loc_eq;
   char *key;
@@ -437,17 +440,17 @@ void parse_wiggle_header(char *line, file_format fmt, char **chrom,
 
   switch (fmt) {
   case FMT_WIGFIX:
-    id = ID_WIGFIX;
+    id_str = ID_WIGFIX;
     break;
   case FMT_WIGVAR:
-    id = ID_WIGVAR;
+    id_str = ID_WIGVAR;
     break;
   default:
     fprintf(stderr, "unsupported format: %d", fmt);
     exit(EXIT_FAILURE);
   }
 
-  assert(!strncmp(id, line, strlen(id)));
+  assert(!strncmp(id_str, line, strlen(id_str)));
 
   /* strip trailing newline */
   *strchr(line, '\n') = '\0';
@@ -455,7 +458,7 @@ void parse_wiggle_header(char *line, file_format fmt, char **chrom,
   save_ptr = strdupa(line);
   assert(save_ptr);
 
-  newstring = line + strlen(id);
+  newstring = line + strlen(id_str);
 
   *span = 1;
   if (start) {
@@ -505,10 +508,24 @@ void parse_wiggle_header(char *line, file_format fmt, char **chrom,
 
 /** writing **/
 
+bool has_data(float *buf_start, float *buf_end) {
+  /* check that there is even one data point in the supercontig
+     offset region */
+  for (float *buf_ptr = buf_start; buf_ptr < buf_end; buf_ptr++) {
+    if (!isnan(*buf_ptr)) {
+      return true;
+    };
+  }
+
+  return false;
+}
+
 void write_buf(chromosome_t *chromosome, char *trackname,
                float *buf_start,
                float *buf_filled_start, float *buf_filled_end) {
-  size_t buf_offset_start, buf_offset_end;
+  float *buf_supercontig_start, *buf_supercontig_end;
+
+  size_t start_offset, end_offset;
   hid_t dataset;
 
   hid_t mem_dataspace;
@@ -522,28 +539,43 @@ void write_buf(chromosome_t *chromosome, char *trackname,
   for (supercontig_t *supercontig = chromosome->supercontigs;
        supercontig <= last_supercontig(chromosome); supercontig++) {
     /* find the start that fits into this supercontig */
-    buf_offset_start = buf_filled_start - buf_start;
-    if (buf_offset_start < supercontig->start) {
-      buf_filled_start = buf_start + supercontig->start;
-      buf_offset_start = supercontig->start;
+    start_offset = buf_filled_start - buf_start;
+    if (start_offset < supercontig->start) {
+      /* truncate */
+      buf_supercontig_start = buf_start + supercontig->start;
+      start_offset = supercontig->start;
+    } else {
+      buf_supercontig_start = buf_filled_start;
     }
-    if (buf_offset_start >= supercontig->end) {
+    if (start_offset >= supercontig->end) {
+      /* beyond the range of this supercontig */
       continue;
     }
-    assert (buf_offset_start >= supercontig->start);
 
     /* find the end that fits into this supercontig */
-    buf_offset_end = buf_filled_end - buf_start;
-    if (buf_offset_end > supercontig->end) {
-      buf_offset_end = supercontig->end;
+    end_offset = buf_filled_end - buf_start;
+    if (end_offset > supercontig->end) {
+      /* truncate */
+      buf_supercontig_end = buf_start + supercontig->end;
+      end_offset = supercontig->end;
+    } else {
+      buf_supercontig_end = buf_filled_end;
     }
-    if (buf_offset_end < supercontig->start) {
+    if (end_offset < supercontig->start) {
       continue;
     }
-    assert (buf_offset_end <= supercontig->end);
+
+    assert(start_offset >= supercontig->start
+           && end_offset <= supercontig->end
+           && end_offset > start_offset);
+
+    /* check for at least one data point */
+    if (!has_data(buf_supercontig_start, buf_supercontig_end)) {
+      continue;
+    }
 
     /* set mem dataspace */
-    mem_dataspace_dims[0] = buf_offset_end - buf_offset_start;
+    mem_dataspace_dims[0] = end_offset - start_offset;
     mem_dataspace = get_col_dataspace(mem_dataspace_dims);
 
     /* calc dimensions */
@@ -556,7 +588,7 @@ void write_buf(chromosome_t *chromosome, char *trackname,
     file_dataspace = get_file_dataspace(dataset);
 
     /* select file hyperslab */
-    select_start[0] = buf_offset_start - supercontig->start;
+    select_start[0] = start_offset - supercontig->start;
     select_start[1] = col;
 
     /* count has same dims as mem_dataspace */
@@ -566,7 +598,7 @@ void write_buf(chromosome_t *chromosome, char *trackname,
     /* write */
     fprintf(stderr, " writing %lld floats...", mem_dataspace_dims[0]);
     assert(H5Dwrite(dataset, DTYPE, mem_dataspace, file_dataspace,
-                    H5P_DEFAULT, buf_filled_start) >= 0);
+                    H5P_DEFAULT, buf_supercontig_start) >= 0);
     fprintf(stderr, " done\n");
 
     /* close all */
