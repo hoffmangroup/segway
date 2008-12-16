@@ -67,13 +67,14 @@ def write_metadata(chromosome):
 
         assert len(starts) == len(ends)
 
-        if not starts:
+        if starts:
+            supercontig_attrs = supercontig._v_attrs
+            supercontig_attrs.chunk_starts = array(starts)
+            supercontig_attrs.chunk_ends = array(ends)
+        else:
             # remove empty supercontigs continuous
             continuous._f_remove()
 
-        supercontig_attrs = supercontig._v_attrs
-        supercontig_attrs.chunk_starts = array(starts)
-        supercontig_attrs.chunk_ends = array(ends)
 
     chromosome_attrs = chromosome.root._v_attrs
     chromosome_attrs.mins = mins
