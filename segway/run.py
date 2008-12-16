@@ -23,9 +23,9 @@ import sys
 from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
-from numpy import (amin, amax, array, diag, diff, empty, finfo,
-                   float32, fromfile, invert, isnan, newaxis, NINF, s_,
-                   where)
+from numpy import (add, amin, amax, append, arange, array, column_stack, diag, diff,
+                   empty, finfo, float32, fromfile, invert, isnan, newaxis,
+                   NINF, s_, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -44,7 +44,7 @@ DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
 
 ## XXX: should be options
-NUM_SEGS = 2 # XXX: will require CARD_SEG to be set
+NUM_SEGS = 2 # XXX: to change, will require CARD_SEG to be set
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
@@ -74,6 +74,11 @@ ORD_A = ord("A")
 ORD_C = ord("C")
 ORD_G = ord("G")
 ORD_T = ord("T")
+ORD_a = ord("a")
+ORD_c = ord("c")
+ORD_g = ord("g")
+ORD_t = ord("t")
+NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 
 # for extra memory savings, set to (False) or (not ISLAND)
 COMPONENT_CACHE = True
@@ -441,23 +446,39 @@ def make_dinucleotide_int_data(seq):
     makes an array with two columns, one with 0..15=AA..TT and the other
     as a presence variable. Set column one to 0 when not present
     """
-    nucleotide_int_data = ((seq == ORD_A) + (seq == ORD_C) * 2
-                           + (seq == ORD_G) * 3 + (seq == ORD_T) * 4) - 1
+    nucleotide_int_data = (((seq == ORD_A) + (seq == ORD_a))
+                           + ((seq == ORD_C) + (seq == ORD_c)) * 2
+                           + ((seq == ORD_G) + (seq == ORD_g)) * 3
+                           + ((seq == ORD_T) + (seq == ORD_t)) * 4) - 1
     nucleotide_missing = nucleotide_int_data == -1
 
-    dinucleotide_int_data = ((nucleotide_int_data[:-1] * 4)
-                             + nucleotide_int_data[1:]) XXX append an extra 0
-    dinucleotide_missing = (nucleotide_missing[:-1]
-                            + nucleotide_missing[1:]) XXX append an extra 1
+    # rewrite all Ns as A now that you have the missingness mask
+    nucleotide_int_data[nucleotide_int_data == -1] = 0
+    col_shape = (len(nucleotide_int_data)-1,)
 
-    XXX first extra column: dinucleotide AA=0 TT=15
-    XXX second extra column: some missing=0; some present = 1
+    # first column: dinucleotide: AA..TT=0..15
+    # combine, and add extra AA stub at end, which will be set missing
+    # 0 AA AC AG AT
+    # 4 CA CC CG CT
+    # 8 GA GC GG GT
+    # 12 TA TC TG TT
+    import pdb; pdb.set_trace()
+    dinucleotide_int_data = empty(col_shape, DTYPE_OBS_INT)
+    add(nucleotide_int_data[:-1] * 4, nucleotide_int_data[1:],
+        dinucleotide_int_data)
+
+
+    # second column: presence_dinucleotide: some missing=0; some present = 1
     # there are so few N boundaries that it is okay to
     # disregard the whole dinucleotide when half is N
+    dinucleotide_missing = (nucleotide_missing[:-1] + nucleotide_missing[1:])
 
-    XXX empty((len(seq), 2), DTYPE_OBS_INT)
+    dinucleotide_presence = empty(dinucleotide_missing.shape, DTYPE_OBS_INT)
+    invert(dinucleotide_missing, dinucleotide_presence)
 
-    return XXX
+    # XXXopt: set these up properly in the first place instead of
+    # column_stacking at the end
+    return column_stack([dinucleotide_int_data, dinucleotide_presence])
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
@@ -554,6 +575,8 @@ class Runner(object):
                                   if trackname in include_tracknames)
             track_indexes, tracknames = zip(*indexed_tracknames)
             track_indexes = array(track_indexes)
+        else:
+            track_indexes = arange(len(tracknames))
 
         # replace illegal characters
         tracknames = [trackname.replace(".", "_") for trackname in tracknames]
@@ -704,10 +727,10 @@ class Runner(object):
         float_data[mask_missing] = SENTINEL
 
         if seq_data is not None:
-            XXX make_dinucleotide_int_data(seq_data)
+            extra_int_data = make_dinucleotide_int_data(seq_data)
 
             # XXXopt: use the correctly sized matrix in the first place
-            XXX horizontally stack with int_data
+            int_data = column_stack([int_data, extra_int_data])
 
         float_data.tofile(float_filepath)
         int_data.tofile(int_filepath)
@@ -815,7 +838,17 @@ class Runner(object):
                         rows = continuous[chunk_start:chunk_end, col_slice]
 
                         if self.use_sequence:
-                            seq_cells = supercontig.seq[chunk_start:chunk_end]
+                            seq = supercontig.seq
+                            len_seq = len(seq)
+
+                            if chunk_end < len_seq:
+                                seq_cells = seq[chunk_start:chunk_end+1]
+                            elif chunk_end == len(seq):
+                                seq_chunk = seq[chunk_start:chunk_end]
+                                seq_cells = append(seq_chunk, ord("N"))
+                            else:
+                                raise ValueError("sequence too short"
+                                                 " for supercontig")
                         else:
                             seq_cells = None
 
@@ -831,6 +864,12 @@ class Runner(object):
         self.maxs = maxs
 
         self.num_tracks = num_tracks
+
+        if self.use_sequence:
+            self.num_int_cols = num_tracks + NUM_SEQ_COLS
+        else:
+            self.num_int_cols = num_tracks
+
         self.num_chunks = chunk_index
         self.num_bases = num_bases
         self.chunk_coords = chunk_coords
@@ -1163,20 +1202,18 @@ class Runner(object):
         return "vit%d.%s.%s" % (chunk_index, self.dirpath.name, getpid())
 
     def make_gmtk_kwargs(self):
-        num_tracks = self.num_tracks
-
         return dict(strFile=self.structure_filename,
 
                     of1=self.float_filelistpath,
                     fmt1="binary",
-                    nf1=num_tracks,
+                    nf1=self.num_tracks,
                     ni1=0,
                     iswp1=False,
 
                     of2=self.int_filelistpath,
                     fmt2="binary",
                     nf2=0,
-                    ni2=num_tracks,
+                    ni2=self.num_int_cols,
                     iswp2=False,
 
                     verbosity=self.verbosity)
