@@ -11,7 +11,7 @@ __version__ = "$Revision$"
 
 import sys
 
-from numpy import amin, amax, array, isnan, NINF, PINF, where
+from numpy import amin, amax, array, isnan, NINF, PINF, square, where
 from tables import openFile
 
 from .load_seq import MIN_GAP_LEN
@@ -22,11 +22,16 @@ def write_metadata(chromosome):
     print >>sys.stderr, "writing metadata for %s" % chromosome.title
 
     num_obs = len(get_tracknames(chromosome))
-    extrema_shape = (num_obs,)
-    mins = fill_array(PINF, extrema_shape)
-    maxs = fill_array(NINF, extrema_shape)
+    row_shape = (num_obs,)
+    mins = fill_array(PINF, row_shape)
+    maxs = fill_array(NINF, row_shape)
+    sums = fill_array(0.0, row_shape)
+    sums_squares = fill_array(0.0, row_shape)
+    num_datapoints = fill_array(0, row_shape)
 
     for supercontig, continuous in walk_continuous_supercontigs(chromosome):
+        print >>sys.stderr, " scanning %s" % supercontig._v_name
+
         # only runs when assertions checked
         if __debug__:
             init_num_obs(num_obs, continuous) # for the assertion
@@ -41,18 +46,25 @@ def write_metadata(chromosome):
         observations[mask_missing] = NINF
         maxs = new_extrema(amax, observations, maxs)
 
+        observations[mask_missing] = 0.0
+        sums += observations.sum(0)
+        sums_squares += square(observations).sum(0)
+
+        # add the number of observations minus those that are missing
+        num_datapoints += observations.shape[0] - mask_missing.sum(0)
+
         ## find chunks that have less than MIN_GAP_LEN missing data
         ## gaps in a row
         rows_num_missing = mask_missing.sum(1)
-        mask_rows_any_nonmissing = rows_num_missing < num_obs
-        indices_nonmissing = where(mask_rows_any_nonmissing)[0]
+        mask_rows_any_present = rows_num_missing < num_obs
+        indices_present = where(mask_rows_any_present)[0]
 
         starts = []
         ends = []
 
         # so that index - last_index is always >= MIN_GAP_LEN
         last_index = -MIN_GAP_LEN
-        for index in indices_nonmissing:
+        for index in indices_present:
             if index - last_index >= MIN_GAP_LEN:
                 if starts:
                     # add 1 because we want slice(start, end) to
@@ -79,6 +91,9 @@ def write_metadata(chromosome):
     chromosome_attrs = chromosome.root._v_attrs
     chromosome_attrs.mins = mins
     chromosome_attrs.maxs = maxs
+    chromosome_attrs.sums = sums
+    chromosome_attrs.sums_squares = sums_squares
+    chromosome_attrs.num_datapoints = num_datapoints
     chromosome_attrs.dirty = False
 
 def save_metadata(*filenames):

@@ -24,8 +24,8 @@ from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
-                   diff, empty, finfo, float32, fromfile, invert, isnan,
-                   newaxis, NINF, s_, where)
+                   diff, empty, finfo, float32, fromfile, intc, invert, isnan,
+                   newaxis, NINF, outer, s_, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -37,8 +37,8 @@ from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
                     DTYPE_SEG_LEN, EXT_GZ, fill_array, find_segment_starts,
                     FILTERS_GZIP, get_tracknames, gzip_open,
                     iter_chroms_coords, load_coords,
-                    NamedTemporaryDir, PKG,
-                    walk_continuous_supercontigs)
+                    NamedTemporaryDir, PKG, walk_continuous_supercontigs,
+                    walk_supercontigs)
 
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
@@ -96,7 +96,9 @@ RES_REQ_IDS = ["mem_requested", "mem_free"]
 MEM_REQS = {1: [3619, 8098728],
             2: [3619, 8098728],
             3: [1553, 16121352],
-            4: [5768, 14442884]}
+            4: [5768, 14442884],
+            5: [5768, 14442884], # XXX: must correct
+            6: [5768, 14442884]}
 
 ## defaults
 RANDOM_STARTS = 1
@@ -124,6 +126,8 @@ NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
 NATIVE_SPEC_DEFAULT = dict(w="n")
+
+SPECIAL_TRACKNAMES = ["dinucleotide"]
 
 def extjoin(*args):
     return extsep.join(args)
@@ -164,8 +168,11 @@ RES_INC = "seg.inc"
 
 DIRICHLET_FRAG = "0 dirichlet_seg_seg 2 CARD_SEG CARD_SEG"
 
+# XXX: manually indexing these things is silly
 DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
 DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
+DENSE_CPT_SEG_DINUCLEOTIDE_FRAG = \
+    "2 seg_dinucleotide 1 CARD_SEG CARD_DINUCLEOTIDE"
 DIRICHLET_SEG_SEG_FRAG = "DirichletTable dirichlet_seg_seg"
 
 MEAN_TMPL = "$index mean_${seg}_${track} 1 ${rand}"
@@ -200,10 +207,6 @@ WIG_HEADER = 'track type=wiggle_0 name=%s ' \
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
-
-## shared memory
-
-abandon = False
 
 ## functions
 
@@ -242,6 +245,9 @@ def is_training_progressing(last_ll, curr_ll,
     # in the case of NaNs
     return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
 
+def resource_substitute(resourcename):
+    return Template(data_string(resourcename)).substitute
+
 def save_template(filename, resource, mapping, dirname=None,
                   delete_existing=False, start_index=None):
     """
@@ -268,20 +274,6 @@ def save_template(filename, resource, mapping, dirname=None,
         outfile.write(text)
 
     return filename, True
-
-def accum_extrema(chromosome, mins, maxs):
-    chromosome_attrs = chromosome.root._v_attrs
-    chromosome_mins = chromosome_attrs.mins
-    chromosome_maxs = chromosome_attrs.maxs
-
-    if mins is None:
-        mins = chromosome_mins
-        maxs = chromosome_maxs
-    else:
-        mins = amin([chromosome_mins, mins], 0)
-        maxs = amax([chromosome_maxs, maxs], 0)
-
-    return mins, maxs
 
 def find_overlaps(start, end, coords):
     """
@@ -421,11 +413,13 @@ def write_identify(h5file, data, chrom, start, end, tracknames):
 
 def write_bed(outfile, start_pos, labels, coords, tracknames):
     # XXX: add in optional browser track line (see SVN revisions
-    # previous to 195)
+    # previous to 195)--this is why tracknames are included
 
     (chrom, region_start, region_end) = coords
 
     start_pos += region_start
+
+    print >>outfile, WIG_HEADER % ", ".join(tracknames)
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels)
     for seg_start, seg_end, seg_label in zipper:
@@ -496,6 +490,13 @@ def make_dinucleotide_int_data(seq):
     # XXXopt: set these up properly in the first place instead of
     # column_stacking at the end
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
+
+def walk_all_supercontigs(h5file):
+    """
+    shares interface with walk_continuous_supercontigs()
+    """
+    for supercontig in walk_supercontigs(h5file):
+        yield supercontig, None
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
@@ -584,22 +585,48 @@ class Runner(object):
         # XXXopt: a lot of stuff here repeated for every chromosome
         # unnecessarily
         tracknames = get_tracknames(chromosome)
-        include_tracknames = set(self.include_tracknames)
+
+        # includes specials
+        include_tracknames_all = self.include_tracknames
+
+        # XXX: some repetition in next two assignments
+        tracknames_all = [trackname
+                          for trackname in tracknames + SPECIAL_TRACKNAMES
+                          if trackname in include_tracknames_all]
+
+        include_tracknames = frozenset(trackname
+                                       for trackname in include_tracknames_all
+                                       if trackname not in SPECIAL_TRACKNAMES)
 
         if include_tracknames:
             indexed_tracknames = ((index, trackname)
                                   for index, trackname in enumerate(tracknames)
                                   if trackname in include_tracknames)
+
+            # redefine tracknames:
             track_indexes, tracknames = zip(*indexed_tracknames)
             track_indexes = array(track_indexes)
+
+            # check that there aren't any missing tracks
+            assert len(tracknames) == len(include_tracknames)
+        elif include_tracknames_all:
+            # there are special tracknames only
+            tracknames = []
+            track_indexes = array([], intc)
+            # XXX: this is too late to keep the file from being opened
+            # all this junk should be refactored earlier, it doesn't
+            # need to run every contig
+            self.float_filelistpath = None
         else:
             track_indexes = arange(len(tracknames))
+            tracknames_all = tracknames
 
-        # replace illegal characters
+        # replace illegal characters in tracknames only, not tracknames_all
         tracknames = [trackname.replace(".", "_") for trackname in tracknames]
 
         if self.tracknames is None:
             self.tracknames = tracknames
+            self.tracknames_all = tracknames_all
             self.track_indexes = track_indexes
         elif (self.tracknames != tracknames
               or (self.track_indexes != track_indexes).any()):
@@ -708,16 +735,26 @@ class Runner(object):
         self.gmtk_include_filename = self.save_resource(RES_INC)
 
     def save_structure(self):
-        observation_tmpl = Template(data_string("observation.tmpl"))
-        observation_sub = observation_tmpl.substitute
+        observation_sub = resource_substitute("observation.tmpl")
 
         tracknames = self.tracknames
         num_tracks = self.num_tracks
-        observations = \
-            "\n".join(observation_sub(track=track,
-                                      track_index=track_index,
-                                      presence_index=num_tracks+track_index)
-                      for track_index, track in enumerate(tracknames))
+
+        observation_items = []
+        for track_index, track in enumerate(tracknames):
+            item = observation_sub(track=track, track_index=track_index,
+                                   presence_index=num_tracks+track_index)
+            observation_items.append(item)
+
+        if self.use_dinucleotide:
+            dinucleotide_sub = resource_substitute("dinucleotide.tmpl")
+
+            item = dinucleotide_sub(dinucleotide_index=num_tracks*2,
+                                    presence_index=num_tracks*2+1)
+            observation_items.append(item)
+
+        assert observation_items # must be at least one track
+        observations = "\n".join(observation_items)
 
         mapping = dict(include_filename=self.gmtk_include_filename,
                        observations=observations)
@@ -734,35 +771,68 @@ class Runner(object):
         # input per frame is a series of float32s, followed by a series of
         # int32s it is better to optimize both sides here by sticking all
         # the floats in one file, and the ints in another one
-        mask_missing = isnan(float_data)
+        if float_data is None:
+            int_data = None
+        else:
+            mask_missing = isnan(float_data)
 
-        # output -> int_data
-        # done in two steps so I can specify output type
-        int_data = empty(mask_missing.shape, DTYPE_OBS_INT)
-        invert(mask_missing, int_data)
+            # output -> int_data
+            # done in two steps so I can specify output type
+            int_data = empty(mask_missing.shape, DTYPE_OBS_INT)
+            invert(mask_missing, int_data)
 
-        float_data[mask_missing] = SENTINEL
+            float_data[mask_missing] = SENTINEL
+
+            float_data.tofile(float_filepath)
 
         if seq_data is not None:
             extra_int_data = make_dinucleotide_int_data(seq_data)
 
             # XXXopt: use the correctly sized matrix in the first place
-            int_data = column_stack([int_data, extra_int_data])
+            if int_data is None:
+                int_data = extra_int_data
+            else:
+                int_data = column_stack([int_data, extra_int_data])
 
-        float_data.tofile(float_filepath)
         int_data.tofile(int_filepath)
+
+    def accum_metadata(self, chromosome):
+        """
+        accumulate metadata for a chromsome to the Runner instance
+
+        returns True if there is metadata
+        returns False if there is not
+        """
+
+        chromosome_attrs = chromosome.root._v_attrs
+
+        try:
+            chromosome_mins = chromosome_attrs.mins
+            chromosome_maxs = chromosome_attrs.maxs
+            chromosome_sums = chromosome_attrs.sums
+            chromosome_sums_squares = chromosome_attrs.sums_squares
+            chromosome_num_datapoints = chromosome_attrs.num_datapoints
+        except AttributeError:
+            # this means there is no data for that chromosome
+            return False
+
+        if self.mins is None:
+            self.mins = chromosome_mins
+            self.maxs = chromosome_maxs
+            self.sums = chromosome_sums
+            self.sums_squares = chromosome_sums_squares
+            self.num_datapoints = chromosome_num_datapoints
+        else:
+            self.mins = amin([chromosome_mins, self.mins], 0)
+            self.maxs = amax([chromosome_maxs, self.maxs], 0)
+            self.sums += chromosome_sums
+            self.sums_squares += chromosome_sums_squares
+            self.num_datapoints += chromosome_num_datapoints
+
+        return True
 
     def write_observations(self, float_filelist, int_filelist):
         include_coords = self.include_coords
-
-        # originally, the metadata and observations parts were two
-        # separate passes, but this is no longer needed. the comment
-        # is for convenience in case I need to go back to two separate
-        # passes
-
-        # metadata
-        mins = None
-        maxs = None
 
         # observations
         make_obs_filepaths = self.make_obs_filepaths
@@ -774,24 +844,27 @@ class Runner(object):
         chunk_coords = []
         num_bases = 0
 
+        use_dinucleotide = "dinucleotide" in self.include_tracknames
+
         chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
         for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
             assert not chromosome.root._v_attrs.dirty
 
-            # metadata
-            try:
-                mins, maxs = accum_extrema(chromosome, mins, maxs)
-            except AttributeError:
-                # this means there is no data for that chromosome
+            # if there is no metadata, then skip the chromosome
+            if not self.accum_metadata(chromosome):
                 continue
 
             track_indexes = self.set_tracknames(chromosome)
             num_tracks = len(track_indexes)
 
             # observations
-            supercontig_walker = walk_continuous_supercontigs(chromosome)
+            if num_tracks:
+                supercontig_walker = walk_continuous_supercontigs(chromosome)
+            else:
+                supercontig_walker = walk_all_supercontigs(chromosome)
+
             for supercontig, continuous in supercontig_walker:
-                assert continuous.shape[1] >= num_tracks
+                assert continuous is None or continuous.shape[1] >= num_tracks
 
                 supercontig_attrs = supercontig._v_attrs
                 supercontig_start = supercontig_attrs.start
@@ -799,8 +872,12 @@ class Runner(object):
                 convert_chunks_custom = partial(convert_chunks,
                                                 supercontig_attrs)
 
-                starts = convert_chunks_custom("chunk_starts")
-                ends = convert_chunks_custom("chunk_ends")
+                if continuous is None:
+                    starts = [supercontig_start]
+                    ends = [supercontig_attrs.end]
+                else:
+                    starts = convert_chunks_custom("chunk_starts")
+                    ends = convert_chunks_custom("chunk_ends")
 
                 ## iterate through chunks and write
                 ## izip so it can be modified in place
@@ -848,13 +925,19 @@ class Runner(object):
                         # read rows first into a numpy.array because
                         # you can't do complex imports on a
                         # numpy.Array
-                        min_col = track_indexes.min()
-                        max_col = track_indexes.max() + 1
-                        col_slice = s_[min_col:max_col]
+                        if continuous is None:
+                            cells = None
+                        else:
+                            min_col = track_indexes.min()
+                            max_col = track_indexes.max() + 1
+                            col_slice = s_[min_col:max_col]
 
-                        rows = continuous[chunk_start:chunk_end, col_slice]
+                            rows = continuous[chunk_start:chunk_end, col_slice]
 
-                        if self.use_sequence:
+                            # correct for min_col offset
+                            cells = rows[..., track_indexes - min_col]
+
+                        if use_dinucleotide:
                             seq = supercontig.seq
                             len_seq = len(seq)
 
@@ -864,25 +947,20 @@ class Runner(object):
                                 seq_chunk = seq[chunk_start:chunk_end]
                                 seq_cells = append(seq_chunk, ord("N"))
                             else:
-                                raise ValueError("sequence too short"
-                                                 " for supercontig")
+                                raise ValueError("sequence too short for"
+                                                 " supercontig")
                         else:
                             seq_cells = None
-
-                        # correct for min_col offset
-                        cells = rows[..., track_indexes - min_col]
 
                         save_observations_chunk(float_filepath, int_filepath,
                                                 cells, seq_cells)
 
                     chunk_index += 1
 
-        self.mins = mins
-        self.maxs = maxs
-
         self.num_tracks = num_tracks
 
-        if self.use_sequence:
+        self.use_dinucleotide = use_dinucleotide
+        if use_dinucleotide:
             self.num_int_cols = num_tracks + NUM_SEQ_COLS
         else:
             self.num_int_cols = num_tracks
@@ -892,7 +970,7 @@ class Runner(object):
         self.chunk_coords = chunk_coords
 
     def open_writable_or_dummy(self, filepath):
-        if self.delete_existing or filepath.exists():
+        if not filepath or (not self.delete_existing and filepath.exists()):
             return closing(StringIO()) # dummy output
         else:
             return open(filepath, "w")
@@ -991,11 +1069,35 @@ class Runner(object):
 
         return make_random_spec(frag, num_segs, num_segs)
 
+    def make_dinucleotide_table_row(self):
+        # simple one-parameter model
+        gc = uniform()
+        at = 1 - gc
+
+        a = at / 2
+        c = gc / 2
+        g = gc - c
+        t = 1 - a - c - g
+
+        acgt = array([a, c, g, t])
+
+        # shape: (16,)
+        return outer(acgt, acgt).ravel()
+
+    def make_dense_cpt_seg_dinucleotide_spec(self):
+        table = [self.make_dinucleotide_table_row()
+                 for seg_index in xrange(self.num_segs)]
+
+        return make_table_spec(DENSE_CPT_SEG_DINUCLEOTIDE_FRAG, table)
+
     def make_dense_cpt_spec(self):
         num_segs = self.num_segs
 
         items = [self.make_dense_cpt_start_seg_spec(),
                  self.make_dense_cpt_seg_seg_spec()]
+
+        if self.use_dinucleotide:
+            items.append(self.make_dense_cpt_seg_dinucleotide_spec())
 
         return make_spec("DENSE_CPT", items)
 
@@ -1034,6 +1136,7 @@ class Runner(object):
             track_index = mapping["track_index"]
             index = mapping["index"] * 2
 
+            # factory for new dictionaries that start with mapping
             mapping_plus = partial(dict, **mapping)
 
             cell_indices = (seg_index, track_index)
@@ -1189,6 +1292,8 @@ class Runner(object):
         identify_filelistname = out_dirpath / IDENTIFY_FILELISTBASENAME
         identify_filelist = open(identify_filelistname, "w")
 
+        tracknames = self.tracknames_all
+
         # XXX: this should be gzipped
         open_wb = partial(open, mode="wb")
 
@@ -1201,8 +1306,8 @@ class Runner(object):
 
                     print >>identify_filelist, identify_filename
                     load_gmtk_out_write_bed(chunk_coord, gmtk_outfilename,
-                                           identify_filename, bed_file,
-                                           seg_len_files, self.tracknames)
+                                            identify_filename, bed_file,
+                                            seg_len_files, tracknames)
 
     def prog_factory(self, prog):
         """
@@ -1225,25 +1330,32 @@ class Runner(object):
         return "vit%d.%s.%s" % (chunk_index, self.dirpath.name, getpid())
 
     def make_gmtk_kwargs(self):
-        return dict(strFile=self.structure_filename,
+        res = dict(strFile=self.structure_filename,
+                   verbosity=self.verbosity)
 
-                    of1=self.float_filelistpath,
-                    fmt1="binary",
-                    nf1=self.num_tracks,
-                    ni1=0,
-                    iswp1=SWAP_ENDIAN,
+        assert self.int_filelistpath
+        if self.int_filelistpath:
+            res.update(of1=self.int_filelistpath,
+                       fmt1="binary",
+                       nf1=0,
+                       ni1=self.num_int_cols,
+                       iswp1=SWAP_ENDIAN)
 
-                    of2=self.int_filelistpath,
-                    fmt2="binary",
-                    nf2=0,
-                    ni2=self.num_int_cols,
-                    iswp2=SWAP_ENDIAN,
+        if self.float_filelistpath:
+            res.update(of2=self.float_filelistpath,
+                       fmt2="binary",
+                       nf2=self.num_tracks,
+                       ni2=0,
+                       iswp2=SWAP_ENDIAN)
 
-                    verbosity=self.verbosity)
+        return res
 
     def make_chunk_mem_reqs(self):
         # XXX: should probably have different mem reqs for train or viterbi
         num_tracks = self.num_tracks
+
+        if self.use_dinucleotide:
+            num_tracks += 1
 
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
 
@@ -1433,11 +1545,10 @@ class Runner(object):
                     if self.keep_going:
                         return (None, None, None, None)
                     else:
-                        abandon = True
                         interrupt_event.set()
                         raise
 
-                if abandon:
+                if interrupt_event.isSet():
                     for jobid in parallel_jobids + [bundle_jobid]:
                         try:
                             print >>sys.stderr, "killing job %s" % jobid
@@ -1513,7 +1624,6 @@ class Runner(object):
                     # therefore did not set thread.result
                     start_params.append(thread.result)
             except KeyboardInterrupt:
-                abandon = True
                 interrupt_event.set()
                 for thread in threads:
                     thread.join()
@@ -1567,6 +1677,8 @@ class Runner(object):
                                        chunk_mem_req)
                 jobids.append(jobid)
 
+            # XXX: search ask on DRMAA mailing list--how to allow
+            # KeyboardInterrupt here?
             session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER, True)
 
         if not self.dry_run:
@@ -1679,8 +1791,6 @@ def parse_options(args):
                          help="show messages with verbosity NUM")
 
     with OptionGroup(parser, "Flags") as group:
-        group.add_option("--use-sequence", action="store_true",
-                         help="use nucleotide sequence")
         group.add_option("-f", "--force", action="store_true",
                          help="delete any preexisting files")
         group.add_option("-I", "--no-identify", action="store_true",
@@ -1726,7 +1836,6 @@ def main(args=sys.argv[1:]):
     runner.include_tracknames = options.track
     runner.verbosity = options.verbosity
 
-    runner.use_sequence = options.use_sequence
     runner.delete_existing = options.force
     runner.train = not options.no_train
     runner.identify = not options.no_identify

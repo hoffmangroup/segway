@@ -7,5 +7,8 @@
   variable: dinucleotide {
      type: discrete observed $dinucleotide_index:$dinucleotide_index cardinality CARD_DINUCLEOTIDE;
 
-     conditionalparents: seg(0) using DenseCPT("seg_dinucleotide");
+     switchingparents: presence_dinucleotide(0) using mapping("map_parent");
+
+     conditionalparents: nil using DenseCPT("internal:UnityScore")
+                         | seg(0) using DenseCPT("seg_dinucleotide");
   }
