@@ -15,7 +15,7 @@ from copy import copy
 from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip
-from math import ceil, floor, ldexp, log10
+from math import ceil, floor, frexp, ldexp, log10
 from os import extsep, getpid
 from shutil import move
 from string import Template
@@ -25,7 +25,7 @@ from threading import Event, Thread
 from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
                    diff, empty, finfo, float32, fromfile, intc, invert, isnan,
-                   newaxis, NINF, outer, s_, where)
+                   newaxis, NINF, outer, s_, square, vectorize, where)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -56,7 +56,6 @@ JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
 SWAP_ENDIAN = False
 
-
 DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
 
 FINFO_FLOAT32 = finfo(float32)
@@ -65,6 +64,9 @@ TINY_FLOAT32 = FINFO_FLOAT32.tiny
 
 FUDGE_EP = -17 # ldexp(1, -17) = ~1e-6
 assert FUDGE_EP > MACHEP_FLOAT32
+
+# binary
+JITTER_ORDERS_MAGNITUDE = 5 # log10(2**5) = 1.5 decimal orders of magnitude
 
 FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 
@@ -497,6 +499,18 @@ def walk_all_supercontigs(h5file):
     """
     for supercontig in walk_supercontigs(h5file):
         yield supercontig, None
+
+def jitter_cell(cell):
+    """
+    adds some random noise
+    """
+    # get the binary exponent and subtract JITTER_ORDERS_MAGNITUDE
+    # e.g. 3 * 2**10 --> 1 * 2**5
+    max_noise = ldexp(1, frexp(cell)[1] - JITTER_ORDERS_MAGNITUDE)
+
+    return cell + uniform(-max_noise, max_noise)
+
+jitter = vectorize(jitter_cell)
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
@@ -982,17 +996,18 @@ class Runner(object):
             with open_writable_or_dummy(self.int_filelistpath) as int_filelist:
                 self.write_observations(float_filelist, int_filelist)
 
-    def rand_means(self):
-        low = self.mins
-        high = self.maxs
-        num_segs = self.num_segs
+    def calc_means_vars(self):
+        means = self.sums / self.num_datapoints
 
-        assert len(low) == len(high)
+        # this is an unstable way of calculating the variance,
+        # but it should be good enough
+        # Numerical Recipes in C, Eqn 14.1.7
+        # XXX: best would be to switch to the pairwise parallel method
+        # (see Wikipedia)
 
-        # size parameter is so that we always get an array, even if it
-        # has shape = (1,)
-        return array([uniform(low, high, len(low))
-                      for seg_index in xrange(num_segs)])
+        vars = (self.sums_squares / self.num_datapoints) - square(means)
+
+        return means, vars
 
     def make_items_multiseg(self, tmpl, data=None, segnames=None):
         tracknames = self.tracknames
@@ -1008,7 +1023,7 @@ class Runner(object):
             track_index = mapping["track_index"]
             min_track = mins[track_index]
 
-            # fudge the minimum by a very small amount this is not
+            # fudge the minimum by a very small amount. this is not
             # continuous, but hopefully we won't get values where it
             # matters
             # XXX: restore this after GMTK issues fixed
@@ -1127,8 +1142,8 @@ class Runner(object):
         # vars = shapes * scales**2
         #
         # therefore:
-        scales = vars / means
-        shapes = means**2 / vars
+        scales = jitter(vars / means)
+        shapes = jitter(means**2 / vars)
 
         res = []
         for mapping in generate_tmpl_mappings(self.segnames, self.tracknames):
@@ -1163,8 +1178,6 @@ class Runner(object):
     def save_input_master(self, start_index=None, new=False):
         tracknames = self.tracknames
         num_segs = self.num_segs
-        mins = self.mins
-        maxs = self.maxs
 
         include_filename = self.gmtk_include_filename
 
@@ -1180,10 +1193,14 @@ class Runner(object):
 
         dense_cpt_spec = self.make_dense_cpt_spec()
 
-        means = self.rand_means()
-        vars = array([maxs - mins for seg_index in xrange(num_segs)])
+        # XXX: another idea would be to calculate an ML estimate for
+        # the gamma distribution rather than the ML estimate for the
+        # mean and converting
+        means, vars = self.calc_means_vars()
 
         if DISTRIBUTION == DISTRIBUTION_NORM:
+            raise NotImplementedError("XXX: need to jitter mean/var")
+
             mean_spec = self.make_mean_spec(means)
             covar_spec = self.make_covar_spec(COVAR_TIED, vars)
             gamma_spec = ""
