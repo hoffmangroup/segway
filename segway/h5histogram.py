@@ -237,8 +237,9 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    return h5histogram(options.col, args, options.num_bins, options.include_coords,
-                       options.include_identify, options.identify_label)
+    return h5histogram(options.col, args, options.num_bins,
+                       options.include_coords, options.include_identify,
+                       options.identify_label)
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -22,7 +22,7 @@ XXX: NumPy should install automatically, but it doesn't.
 Additionally, the Sunflower setup script will automatically install
 the following packages or newer versions:
 
-- PyTables_ 2.1b3
+- PyTables_ 2.1
 - path.py 2.2
 - setuptools 0.6c8
 - optbuild 0.1.5

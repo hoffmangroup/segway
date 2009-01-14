@@ -69,6 +69,7 @@ assert FUDGE_EP > MACHEP_FLOAT32
 JITTER_ORDERS_MAGNITUDE = 5 # log10(2**5) = 1.5 decimal orders of magnitude
 
 FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
+ABSOLUTE_FUDGE = 0.001
 
 DISTRIBUTION = DISTRIBUTION_GAMMA
 
@@ -92,9 +93,9 @@ MIN_FRAMES = 2
 MAX_FRAMES = 1000000000 # 1 billion
 MEM_REQ_PARALLEL = "10.5G"
 MEM_REQ_BUNDLE = "500M"
-RES_REQ_IDS = ["mem_requested", "mem_free"]
+RES_REQ_IDS = ["mem_requested"]
 
-# for a four-way model
+# linear model for memory requests for number of data columns
 MEM_REQS = {1: [3619, 8098728],
             2: [3619, 8098728],
             3: [1553, 16121352],
@@ -1035,8 +1036,10 @@ class Runner(object):
             # this happens for really big numbers or really small
             # numbers; you only have 7 orders of magnitude to play
             # with on a float32
-            assert float32(min_track) - float32(1.0) != float32(min_track)
-            mapping["min_track"] = min_track - 1.0
+            min_track_f32 = float32(min_track)
+
+            assert min_track_f32 - float32(ABSOLUTE_FUDGE) != min_track_f32
+            mapping["min_track"] = min_track - ABSOLUTE_FUDGE
 
             if data is not None:
                 seg_index = mapping["seg_index"]
@@ -1142,8 +1145,8 @@ class Runner(object):
         # vars = shapes * scales**2
         #
         # therefore:
-        scales = jitter(vars / means)
-        shapes = jitter(means**2 / vars)
+        scales = vars / means
+        shapes = means**2 / vars
 
         res = []
         for mapping in generate_tmpl_mappings(self.segnames, self.tracknames):
@@ -1154,9 +1157,8 @@ class Runner(object):
             # factory for new dictionaries that start with mapping
             mapping_plus = partial(dict, **mapping)
 
-            cell_indices = (seg_index, track_index)
-            scale = scales[cell_indices]
-            shape = shapes[cell_indices]
+            scale = jitter(scales[track_index])
+            shape = jitter(shapes[track_index])
 
             mapping_scale = mapping_plus(rand=scale, index=index)
             res.append(substitute_scale(mapping_scale))
