@@ -38,10 +38,11 @@ classifiers = ["Natural Language :: English",
 # correctly to fallback when it's not there
 entry_points = """
 [console_scripts]
-segway-load-seq = segway.load_seq:main
-segway-name-tracks = segway.name_tracks:main
-segway-load-data = segway.load_data:main
-segway-save-metadata = segway.save_metadata:main
+genomedata-load-seq = segway.load_seq:main
+genomedata-name-tracks = segway.name_tracks:main
+genomedata-load-data = segway.load_data:main
+genomedata-save-metadata = segway.save_metadata:main
+
 segway = segway.run:main [parallel]
 segway-calc-distance = segway.calc_distance:main
 
