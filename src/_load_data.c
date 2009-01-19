@@ -723,7 +723,7 @@ void proc_wigfix(char *h5dirname, char *trackname, char *line,
       } else {
         /* else: ignore data until we get to another header line */
         fprintf(stderr, " ignoring data at %s:%ld\n",
-                fill_start - buf_start, chromosome.chrom);
+                chromosome.chrom, fill_start - buf_start);
       }
     } else {
       write_buf(&chromosome, trackname, buf_start, buf_end,
