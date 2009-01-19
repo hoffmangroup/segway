@@ -640,7 +640,7 @@ void seek_chromosome(char *chrom, char *h5dirname, chromosome_t *chromosome) {
 void malloc_chromosome_buf(chromosome_t *chromosome,
                            float **buf_start, float **buf_end) {
   /* allocate enough space to assign values from 0 to the end of the
-     last supercontig */
+     last supercontig, and fill with NAN */
 
   size_t buf_len;
 
@@ -653,6 +653,11 @@ void malloc_chromosome_buf(chromosome_t *chromosome,
   }
   *buf_start = xmalloc(buf_len * sizeof(float));
   *buf_end = *buf_start + buf_len;
+
+  /* clear memory */
+  for (float *buf_ptr = *buf_start; buf_ptr < *buf_end; buf_ptr++) {
+    *buf_ptr = NAN;
+  }
 }
 
 /** wigFix **/
@@ -767,11 +772,6 @@ void proc_wigvar_header(char *line, char *h5dirname, chromosome_t *chromosome,
     /* XXX: should probably be an assertion rather than an if */
     seek_chromosome(chrom, h5dirname, chromosome);
     malloc_chromosome_buf(chromosome, buf_start, buf_end);
-
-    /* clear memory */
-    for (float *buf_ptr = *buf_start; buf_ptr < *buf_end; buf_ptr++) {
-      *buf_ptr = NAN;
-    }
 
     /* calc dimensions */
     get_cols(chromosome, trackname, &num_cols, &col);
