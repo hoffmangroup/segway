@@ -5,9 +5,9 @@
 LONG_DESCRIPTION
 """
 
-__version__ = "0.1.0a4"
+__version__ = "0.1.0"
 
-# Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
@@ -58,7 +58,7 @@ gtf2bed = segway.gtf2bed:main
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
 install_requires = ["textinput", "optbuild>0.1.4", "tables>2.0.4", "numpy",
-                    "path"]
+                    "path"] # XXX: add "genomedata"
 
 # XXX: ask if there is a way to specify this at the command-line
 extras_require = dict(parallel=["DRMAA-python"])

@@ -3,6 +3,8 @@ from __future__ import division, with_statement
 
 """
 h5histogram: prints histogram
+
+XXX a lot of this is copied and updated in the external validation tool
 """
 
 __version__ = "$Revision$"

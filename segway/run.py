@@ -42,6 +42,7 @@ from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
 
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
+DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA]
 
 ## XXX: should be options
 NUM_SEGS = 2 # XXX: to change, will require CARD_SEG to be set
@@ -70,8 +71,6 @@ JITTER_ORDERS_MAGNITUDE = 5 # log10(2**5) = 1.5 decimal orders of magnitude
 
 FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 ABSOLUTE_FUDGE = 0.001
-
-DISTRIBUTION = DISTRIBUTION_GAMMA
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
@@ -447,16 +446,6 @@ def load_gmtk_out_write_bed((chrom, start, end), gmtk_outfilename,
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
 
-def generate_tmpl_mappings(segnames, tracknames):
-    num_tracks = len(tracknames)
-
-    for seg_index, segname in enumerate(segnames):
-        for track_index, trackname in enumerate(tracknames):
-            yield dict(seg=segname, track=trackname,
-                       seg_index=seg_index, track_index=track_index,
-                       index=num_tracks*seg_index + track_index,
-                       distribution=DISTRIBUTION)
-
 def make_dinucleotide_int_data(seq):
     """
     makes an array with two columns, one with 0..15=AA..TT and the other
@@ -590,6 +579,22 @@ class Runner(object):
         filename = self.include_coords_filename
 
         self.include_coords = load_coords(filename)
+
+    def generate_tmpl_mappings(self, segnames=None, tracknames=None):
+        if segnames is None:
+            segnames = self.segnames
+
+        if tracknames is None:
+            tracknames = self.tracknames
+
+        num_tracks = len(tracknames)
+
+        for seg_index, segname in enumerate(segnames):
+            for track_index, trackname in enumerate(tracknames):
+                yield dict(seg=segname, track=trackname,
+                           seg_index=seg_index, track_index=track_index,
+                           index=num_tracks*seg_index + track_index,
+                           distribution=self.distribution)
 
     def make_filename(self, *exts):
         filebasename = extjoin_not_none(*exts)
@@ -1010,40 +1015,43 @@ class Runner(object):
 
         return means, vars
 
+    def get_track_lt_min(self, track_index):
+        """
+        returns a value less than a minimum in a track
+        """
+        # XXX: refactor into a new function
+        min_track = self.mins[track_index]
+
+        # fudge the minimum by a very small amount. this is not
+        # continuous, but hopefully we won't get values where it
+        # matters
+        # XXX: restore this after GMTK issues fixed
+        # if min_track == 0.0:
+        #     min_track_fudged = FUDGE_TINY
+        # else:
+        #     min_track_fudged = min_track - ldexp(abs(min_track), FUDGE_EP)
+
+        # this happens for really big numbers or really small
+        # numbers; you only have 7 orders of magnitude to play
+        # with on a float32
+        min_track_f32 = float32(min_track)
+
+        assert min_track_f32 - float32(ABSOLUTE_FUDGE) != min_track_f32
+        return min_track - ABSOLUTE_FUDGE
+
     def make_items_multiseg(self, tmpl, data=None, segnames=None):
-        tracknames = self.tracknames
-        mins = self.mins
-
-        if segnames is None:
-            segnames = self.segnames
-
         substitute = Template(tmpl).substitute
 
         res = []
-        for mapping in generate_tmpl_mappings(segnames, tracknames):
+        for mapping in self.generate_tmpl_mappings(segnames):
             track_index = mapping["track_index"]
-            min_track = mins[track_index]
 
-            # fudge the minimum by a very small amount. this is not
-            # continuous, but hopefully we won't get values where it
-            # matters
-            # XXX: restore this after GMTK issues fixed
-#            if min_track == 0.0:
-#                min_track_fudged = FUDGE_TINY
-#            else:
-#                min_track_fudged = min_track - ldexp(abs(min_track), FUDGE_EP)
-#
-            # this happens for really big numbers or really small
-            # numbers; you only have 7 orders of magnitude to play
-            # with on a float32
-            min_track_f32 = float32(min_track)
-
-            assert min_track_f32 - float32(ABSOLUTE_FUDGE) != min_track_f32
-            mapping["min_track"] = min_track - ABSOLUTE_FUDGE
+            if self.distribution == DISTRIBUTION_GAMMA:
+                mapping["min_track"] = self.get_track_lt_min(track_index)
 
             if data is not None:
                 seg_index = mapping["seg_index"]
-                mapping["rand"] = data[seg_index, track_index]
+                mapping["rand"] = jitter(data[track_index])
 
             res.append(substitute(mapping))
 
@@ -1149,7 +1157,7 @@ class Runner(object):
         shapes = means**2 / vars
 
         res = []
-        for mapping in generate_tmpl_mappings(self.segnames, self.tracknames):
+        for mapping in self.generate_tmpl_mappings():
             seg_index = mapping["seg_index"]
             track_index = mapping["track_index"]
             index = mapping["index"] * 2
@@ -1172,7 +1180,7 @@ class Runner(object):
         return make_spec("REAL_MAT", self.make_items_gamma(*args, **kwargs))
 
     def make_mc_spec(self):
-        return self.make_spec_multiseg("MC", MC_TMPLS[DISTRIBUTION])
+        return self.make_spec_multiseg("MC", MC_TMPLS[self.distribution])
 
     def make_mx_spec(self):
         return self.make_spec_multiseg("MX", MX_TMPL)
@@ -1195,23 +1203,23 @@ class Runner(object):
 
         dense_cpt_spec = self.make_dense_cpt_spec()
 
-        # XXX: another idea would be to calculate an ML estimate for
-        # the gamma distribution rather than the ML estimate for the
-        # mean and converting
         means, vars = self.calc_means_vars()
 
-        if DISTRIBUTION == DISTRIBUTION_NORM:
-            raise NotImplementedError("XXX: need to jitter mean/var")
-
+        distribution = self.distribution
+        if distribution == DISTRIBUTION_NORM:
             mean_spec = self.make_mean_spec(means)
             covar_spec = self.make_covar_spec(COVAR_TIED, vars)
             gamma_spec = ""
-        elif DISTRIBUTION == DISTRIBUTION_GAMMA:
+        elif distribution == DISTRIBUTION_GAMMA:
             mean_spec = ""
             covar_spec = ""
+
+            # XXX: another option is to calculate an ML estimate for
+            # the gamma distribution rather than the ML estimate for the
+            # mean and converting
             gamma_spec = self.make_gamma_spec(means, vars)
         else:
-            raise ValueError("distribution %s not supported" % DISTRIBUTION)
+            raise ValueError("distribution %s not supported" % distribution)
 
         mc_spec = self.make_mc_spec()
         mx_spec = self.make_mx_spec()
@@ -1794,6 +1802,10 @@ def parse_options(args):
 
 
     with OptionGroup(parser, "Variables") as group:
+        group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
+                         metavar="DIST", default=DISTRIBUTION_NORM,
+                         help="use DIST distribution")
+
         group.add_option("-r", "--random-starts", type=int,
                          default=RANDOM_STARTS, metavar="NUM",
                          help="randomize start parameters NUM times"
@@ -1850,6 +1862,7 @@ def main(args=sys.argv[1:]):
     runner.params_filename = options.trainable_params
     runner.include_coords_filename = options.include_coords
 
+    runner.distribution = options.distribution
     runner.random_starts = options.random_starts
     runner.len_seg_strength = options.prior_strength
     runner.include_tracknames = options.track

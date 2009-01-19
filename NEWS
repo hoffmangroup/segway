@@ -1,7 +1,47 @@
+0.1.0a5:
+
+* new segway option: --distribution: choices are norm, gamma
+* default distribution is now norm
+
 0.1.0a4:
 
-* understandable structure files (e.g. "obs0" becomes "h3k27me3")
-* save log likelihood files
+* Now requires optbuild>0.1.4
+* Understandable structure files (e.g. the name for observation track "obs0" becomes "h3k27me3")
+* Save log likelihood files
+* Rename segway-load-seq -> genomedata-load-seq
+* Rename segway-load-data -> genomedata-load-data
+* Rename segway-name-tracks -> genomedata-name-tracks
+* New command genomedata-save-metadata
+* New command: _load_data: load data quickly (in C)
+
+(These five commands will eventually be split out into a new genomedata package)
+
+* New command: segway-calc-distance: calculate distance between identified segments and an external BED feature file
+* New command: gtf2bed: convert GTF to BED format
+
+* New segway option --track: use only a particular track
+* Generate a "dinucleotide" track when specified with --track
+* New segway option --prior-strength: uses dirichlet tables on seg_seg transition CPT
+* segway --help now uses option groups
+
+* New h5histogram options: --include-identify, --identify-label: now
+  allows getting histogram per identified segment
+* New h5histogram option: --num-bins: allow specification of number of histogram bins
+
+* identification output files are now gzipped bed rather than wig
+* rename "nonmissing" to "presence" throughout
+* Move from normal distribution to gamma distribution
+* Calculate starting parameters based on something close to the maximum likelihood estimation plus jitter
+* Hacky (and wrong) support for memory requirements for up to six
+  observation tracks, will be redone when GMTK memory optimization is
+  done
+
+* better handling of errors and KeyboardInterrupts during parallel operation of segway
+* Stops using deprecated -inputTrainableParameters option to GMTK
+
+* Checking for unset metadata before using genomedata files
+* Corrections to README
+* Bugfixes
 
 0.1.0a3:
 
