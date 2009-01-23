@@ -110,6 +110,7 @@ class OptionGroup(_OptionGroup):
     def __exit__(self, *exc_info):
         self.parser.add_option_group(self)
 
+# XXX: replace with iter(genomedata.Chromosome)
 def walk_supercontigs(h5file):
     root = h5file.root
 
@@ -119,6 +120,7 @@ def walk_supercontigs(h5file):
 
         yield supercontig
 
+# XXX: replace with genomedata.Chromosome.itercontinuous
 def walk_continuous_supercontigs(h5file):
     for supercontig in walk_supercontigs(h5file):
         try:
@@ -126,6 +128,7 @@ def walk_continuous_supercontigs(h5file):
         except NoSuchNodeError:
             continue
 
+# XXX: replace with genomedata.fill_array
 def fill_array(scalar, shape, dtype=None, *args, **kwargs):
     if dtype is None:
         dtype = array(scalar).dtype
@@ -150,6 +153,7 @@ def init_num_obs(num_obs, continuous):
 def gzip_open(*args, **kwargs):
     return closing(_gzip_open(*args, **kwargs))
 
+# XXX: replace with genomedata.Chromosome.tracknames_continuous
 def get_tracknames(chromosome):
     return chromosome.root._v_attrs.tracknames.tolist()
 
