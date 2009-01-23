@@ -2,6 +2,8 @@
 
 * new segway option: --distribution: choices are norm, gamma
 * default distribution is now norm
+* _load_data: add support for wigFix with step, span values set
+* _util.py: mark some functions for replacement with genomedata
 
 0.1.0a4:
 
