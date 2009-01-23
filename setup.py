@@ -63,22 +63,23 @@ install_requires = ["textinput", "optbuild>0.1.4", "tables>2.0.4", "numpy",
 # XXX: ask if there is a way to specify this at the command-line
 extras_require = dict(parallel=["DRMAA-python"])
 
-setup(name=name,
-      version=__version__,
-      description=short_description,
-      author="Michael Hoffman",
-      author_email="mmh1@washington.edu",
-      url=url,
-      download_url=download_url,
-      classifiers=classifiers,
-      long_description=long_description,
-      dependency_links=dependency_links,
-      install_requires=install_requires,
-      extras_require=extras_require,
-      zip_safe=True,
+if __name__ == "__main__":
+    setup(name=name,
+          version=__version__,
+          description=short_description,
+          author="Michael Hoffman",
+          author_email="mmh1@washington.edu",
+          url=url,
+          download_url=download_url,
+          classifiers=classifiers,
+          long_description=long_description,
+          dependency_links=dependency_links,
+          install_requires=install_requires,
+          extras_require=extras_require,
+          zip_safe=True,
 
-      # XXX: this should be based off of __file__ instead
-      packages=find_packages("."),
-      include_package_data=True,
-      entry_points=entry_points
-      )
+          # XXX: this should be based off of __file__ instead
+          packages=find_packages("."),
+          include_package_data=True,
+          entry_points=entry_points
+          )
