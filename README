@@ -19,7 +19,7 @@ You must have the following installed before installing segway:
 
 XXX: NumPy should install automatically, but it doesn't.
 
-Additionally, the Sunflower setup script will automatically install
+Additionally, the Segway setup script will automatically install
 the following packages or newer versions:
 
 - PyTables_ 2.1
