@@ -1,4 +1,10 @@
-0.1.0a5:
+0.1.1:
+
+* changed -b option: now specifies name of segmentation file rather than a directory it is put in
+* stop creating lots of auxiliary output files during Viterbi identify
+* fix bug: don't repeat track line multiple times in BED file
+
+0.1.0:
 
 * new segway option: --distribution: choices are norm, gamma
 * default distribution is now norm
