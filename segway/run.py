@@ -10,7 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
-from contextlib import closing, contextmanager, nested
+from contextlib import closing, contextmanager
 from copy import copy
 from errno import EEXIST, ENOENT
 from functools import partial
@@ -24,19 +24,17 @@ from threading import Event, Thread
 
 from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
-                   diff, empty, finfo, float32, fromfile, intc, invert, isnan,
-                   newaxis, NINF, outer, s_, square, vectorize, where)
+                   empty, finfo, float32, fromfile, intc, invert, isnan,
+                   newaxis, NINF, outer, s_, square, vectorize)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
                       OptionBuilder_ShortOptWithSpace_TF)
-from tables import Atom, openFile
 from path import path
 
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
-                    DTYPE_SEG_LEN, EXT_GZ, fill_array, find_segment_starts,
-                    FILTERS_GZIP, get_tracknames, gzip_open,
-                    iter_chroms_coords, load_coords,
+                    EXT_GZ, fill_array, find_segment_starts, get_tracknames,
+                    gzip_open, iter_chroms_coords, load_coords,
                     NamedTemporaryDir, PKG, walk_continuous_supercontigs,
                     walk_supercontigs)
 
@@ -51,7 +49,6 @@ TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
 ISLAND = False
-BED_DIRNAME = "out"
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
@@ -159,7 +156,7 @@ PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
 
-IDENTIFY_FILELISTBASENAME = extjoin("identify", EXT_LIST)
+BED_FILEBASENAME = extjoin(PKG, EXT_BED, EXT_GZ) # "segway.bed.gz"
 
 # templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
@@ -383,35 +380,9 @@ def make_name_collection_spec(num_segs, tracknames):
 
     return make_spec("NAME_COLLECTION", items)
 
-def write_segment_summary_stats(start_pos, labels, seg_len_files):
-    # XXX: should use HDF5 output instead
-
-    for seg_index, seg_len_file in enumerate(seg_len_files):
-        where_seg, = where(labels == seg_index)
-        coords_seg = start_pos.take([where_seg, where_seg+1])
-
-        lens_seg = diff(coords_seg, axis=0).ravel()
-
-        lens_seg.astype(DTYPE_SEG_LEN).tofile(seg_len_file)
-
 def load_gmtk_out(filename):
     # gmtkViterbiNew.cc writes things with C sizeof(int) == numpy.intc
     return fromfile(filename, dtype=DTYPE_IDENTIFY)
-
-def write_identify(h5file, data, chrom, start, end, tracknames):
-    root = h5file.root
-    attrs = root._v_attrs
-
-    attrs.chrom = chrom
-    attrs.start = start
-    attrs.end = end
-    attrs.tracknames = array(tracknames)
-
-    # this is slower than just using a tables.Array, but it allows compression
-    atom = Atom.from_dtype(data.dtype)
-    c_array = h5file.createCArray(root, "identify", atom, data.shape)
-
-    c_array[...] = data
 
 def write_bed(outfile, start_pos, labels, coords):
     (chrom, region_start, region_end) = coords
@@ -423,20 +394,13 @@ def write_bed(outfile, start_pos, labels, coords):
         row = [chrom, str(seg_start), str(seg_end), str(seg_label)]
         print >>outfile, "\t".join(row)
 
-def load_gmtk_out_write_bed((chrom, start, end), gmtk_outfilename,
-                            identify_filename, bed_file, seg_len_files,
+def load_gmtk_out_write_bed((chrom, start, end), gmtk_outfilename, bed_file,
                             tracknames):
     data = load_gmtk_out(gmtk_outfilename)
-
-    identify_file = openFile(identify_filename, "w", chrom,
-                             filters=FILTERS_GZIP)
-    with identify_file:
-        write_identify(identify_file, data, chrom, start, end, tracknames)
 
     start_pos, labels = find_segment_starts(data)
 
     write_bed(bed_file, start_pos, labels, (chrom, start, end))
-    write_segment_summary_stats(start_pos, labels, seg_len_files)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -536,7 +500,7 @@ class Runner(object):
         self.output_filenames = None
 
         self.obs_dirname = None
-        self.bed_dirname = None
+        self.bed_filename = None
 
         self.include_coords_filename = None
 
@@ -697,9 +661,6 @@ class Runner(object):
             if (err.errno != EEXIST or not dirpath.isdir() or
                 dirpath.listdir()):
                 raise
-
-    def make_bed_dir(self):
-        self.make_dir(self.bed_dirname)
 
     def make_obs_filelistpath(self, ext):
         return self.obs_dirpath / extjoin(ext, EXT_LIST)
@@ -1284,7 +1245,6 @@ class Runner(object):
         if identify:
             self.save_output_filelist()
             self.save_dumpnames()
-            self.make_bed_dir()
 
     def move_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -1295,45 +1255,23 @@ class Runner(object):
         setattr(self, name, dst_filename)
 
     def gmtk_out2bed(self):
-        bed_filebasename = extjoin(PKG, EXT_BED, EXT_GZ)
+        bed_filename = self.bed_filename
 
-        prefix_fmt = make_prefix_fmt(self.num_chunks)
-        identify_filebase_fmt_list = [PKG, prefix_fmt, EXT_IDENTIFY]
-        identify_filebasename_fmt = "".join(identify_filebase_fmt_list)
-
-        out_dirpath = path(self.bed_dirname)
-        bed_filepath = out_dirpath / bed_filebasename
-        identify_filepath_fmt = out_dirpath / identify_filebasename_fmt
-
-        seg_len_filebasename_fmt = "".join([PREFIX_SEG_LEN_FMT, EXT_INT])
-        seg_len_filepath_fmt = out_dirpath / seg_len_filebasename_fmt
-
-        seg_len_filenames = [seg_len_filepath_fmt % seg_index
-                             for seg_index in xrange(NUM_SEGS)]
-
-        identify_filelistname = out_dirpath / IDENTIFY_FILELISTBASENAME
-        identify_filelist = open(identify_filelistname, "w")
+        if bed_filename is None:
+            bed_filename = self.dirpath / BED_FILEBASENAME
 
         tracknames = self.tracknames_all
 
-        # XXX: this should be gzipped
-        open_wb = partial(open, mode="wb")
-
         # chunk_coord = (chrom, chromStart, chromEnd)
         zipper = izip(count(), self.output_filenames, self.chunk_coords)
-        with nested(*map(open_wb, seg_len_filenames)) as seg_len_files:
-            with gzip_open(bed_filepath, "w") as bed_file:
-                # XXX: add in optional browser track line (see SVN revisions
-                # previous to 195)
-                print >>bed_file, WIG_HEADER % ", ".join(tracknames)
+        with gzip_open(bed_filename, "w") as bed_file:
+            # XXX: add in browser track line (see SVN revisions
+            # previous to 195)
+            print >>bed_file, WIG_HEADER % ", ".join(tracknames)
 
-                for index, gmtk_outfilename, chunk_coord in zipper:
-                    identify_filename = identify_filepath_fmt % index
-
-                    print >>identify_filelist, identify_filename
-                    load_gmtk_out_write_bed(chunk_coord, gmtk_outfilename,
-                                            identify_filename, bed_file,
-                                            seg_len_files, tracknames)
+            for index, gmtk_outfilename, chunk_coord in zipper:
+                load_gmtk_out_write_bed(chunk_coord, gmtk_outfilename,
+                                        bed_file, tracknames)
 
     def prog_factory(self, prog):
         """
@@ -1784,11 +1722,8 @@ def parse_options(args):
                           help="use or create trainable parameters in FILE")
 
     with OptionGroup(parser, "Output files") as group:
-        # XXX: separate this (now a single file) from output identity file
-        # directory
-        group.add_option("-b", "--bed", metavar="DIR",
-                          help="use or create bed tracks in DIR",
-                          default="out")
+        group.add_option("-b", "--bed", metavar="FILE",
+                          help="create bed track in FILE")
 
     with OptionGroup(parser, "Intermediate files") as group:
         # XXX: consider removing this option
@@ -1845,18 +1780,14 @@ def parse_options(args):
 
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
-    dirname = options.directory
-    bed_dirname = options.bed
-
-    if dirname and not bed_dirname:
-        bed_dirname = path(dirname) / BED_DIRNAME
 
     runner = Runner()
 
     runner.h5filenames = args
-    runner.dirname = dirname
+    runner.dirname = options.directory
     runner.obs_dirname = options.observations
-    runner.bed_dirname = bed_dirname
+    runner.bed_filename = options.bed
+
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
     runner.params_filename = options.trainable_params
