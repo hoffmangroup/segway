@@ -413,15 +413,10 @@ def write_identify(h5file, data, chrom, start, end, tracknames):
 
     c_array[...] = data
 
-def write_bed(outfile, start_pos, labels, coords, tracknames):
-    # XXX: add in optional browser track line (see SVN revisions
-    # previous to 195)--this is why tracknames are included
-
+def write_bed(outfile, start_pos, labels, coords):
     (chrom, region_start, region_end) = coords
 
     start_pos += region_start
-
-    print >>outfile, WIG_HEADER % ", ".join(tracknames)
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels)
     for seg_start, seg_end, seg_label in zipper:
@@ -440,7 +435,7 @@ def load_gmtk_out_write_bed((chrom, start, end), gmtk_outfilename,
 
     start_pos, labels = find_segment_starts(data)
 
-    write_bed(bed_file, start_pos, labels, (chrom, start, end), tracknames)
+    write_bed(bed_file, start_pos, labels, (chrom, start, end))
     write_segment_summary_stats(start_pos, labels, seg_len_files)
 
 def set_cwd_job_tmpl(job_tmpl):
@@ -1328,6 +1323,10 @@ class Runner(object):
         zipper = izip(count(), self.output_filenames, self.chunk_coords)
         with nested(*map(open_wb, seg_len_filenames)) as seg_len_files:
             with gzip_open(bed_filepath, "w") as bed_file:
+                # XXX: add in optional browser track line (see SVN revisions
+                # previous to 195)
+                print >>bed_file, WIG_HEADER % ", ".join(tracknames)
+
                 for index, gmtk_outfilename, chunk_coord in zipper:
                     identify_filename = identify_filepath_fmt % index
 
@@ -1414,6 +1413,7 @@ class Runner(object):
 
         # shouldn't this be jobName? not in the Python DRMAA implementation
         # XXX: report upstream
+        print >>sys.stderr, "job_tmpl.name = %s" % job_name
         job_tmpl.name = job_name
 
         job_tmpl.remoteCommand = ENV_CMD
