@@ -44,6 +44,7 @@ genomedata-load-data = segway.load_data:main
 genomedata-save-metadata = segway.save_metadata:main
 
 segway = segway.run:main [parallel]
+segway-res-usage = segway.res_usage:main [parallel]
 segway-calc-distance = segway.calc_distance:main
 
 h5histogram = segway.h5histogram:main

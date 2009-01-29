@@ -1,7 +1,10 @@
 0.1.1:
 
-* changed -b option: now specifies name of segmentation file rather than a directory it is put in
+* changed -b option: It now specifies a BED filename instead of a directory where a file
+named segway.bed.gz is found.
 * stop creating lots of auxiliary output files during Viterbi identify
+* there is no directory named "out" created by default
+* add segway-res-usage program to calibrate resource usage
 * fix bug: don't repeat track line multiple times in BED file
 
 0.1.0:

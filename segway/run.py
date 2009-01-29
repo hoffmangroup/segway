@@ -301,13 +301,6 @@ def find_overlaps(start, end, coords):
 
     return res
 
-def make_mem_req(len, num_tracks):
-    # will fail if it's not pre-defined
-    slope, intercept = MEM_REQS[num_tracks]
-    res = slope * len + intercept
-
-    return "%dM" % ceil(res / 2**20)
-
 def make_cpp_options(input_params_filename, output_params_filename=None):
     directives = {}
 
@@ -524,6 +517,7 @@ class Runner(object):
         self.train = True # EM train # this should become an int for num_starts
         self.identify = True # viterbi
         self.dry_run = False
+        self.use_dinucleotide = None
 
         # functions
         self.train_prog = None
@@ -695,6 +689,14 @@ class Runner(object):
         return (make_obs_filepath_custom(EXT_FLOAT),
                 make_obs_filepath_custom(EXT_INT))
 
+    def print_obs_filepaths(self, float_filelist, int_filelist,
+                            *args, **kwargs):
+        float_filepath, int_filepath = self.make_obs_filepaths(*args, **kwargs)
+        print >>float_filelist, float_filepath
+        print >>int_filelist, int_filepath
+
+        return float_filepath, int_filepath
+
     def save_resource(self, resname):
         orig_filename = data_filename(resname)
 
@@ -811,7 +813,9 @@ class Runner(object):
         include_coords = self.include_coords
 
         # observations
-        make_obs_filepaths = self.make_obs_filepaths
+        print_obs_filepaths_custom = partial(self.print_obs_filepaths,
+                                             float_filelist=float_filelist,
+                                             int_filelist=int_filelist)
         save_observations_chunk = self.save_observations_chunk
         delete_existing = self.delete_existing
 
@@ -887,7 +891,7 @@ class Runner(object):
                     chunk_coords.append((chrom, start, end))
 
                     float_filepath, int_filepath = \
-                        make_obs_filepaths(chrom, chunk_index)
+                        print_obs_filepaths_custom(chrom, chunk_index)
 
                     print >>float_filelist, float_filepath
                     print >>int_filelist, int_filepath
@@ -1314,6 +1318,14 @@ class Runner(object):
 
         return res
 
+    @staticmethod
+    def make_mem_req(chunk_len, num_tracks):
+        # will fail if it's not pre-defined
+        slope, intercept = MEM_REQS[num_tracks]
+        res = slope * chunk_len + intercept
+
+        return "%dM" % ceil(res / 2**20)
+
     def make_chunk_mem_reqs(self):
         # XXX: should probably have different mem reqs for train or viterbi
         num_tracks = self.num_tracks
@@ -1321,10 +1333,13 @@ class Runner(object):
         if self.use_dinucleotide:
             num_tracks += 1
 
+        self.make_chunk_lens()
+
         chunk_lens = [end - start for chr, start, end in self.chunk_coords]
 
         self.chunk_lens = chunk_lens
-        self.chunk_mem_reqs = [make_mem_req(chunk_len, num_tracks)
+
+        self.chunk_mem_reqs = [self.make_mem_req(chunk_len, num_tracks)
                                for chunk_len in chunk_lens]
 
     def chunk_mem_reqs_decreasing(self):
@@ -1650,7 +1665,7 @@ class Runner(object):
             # XXXopt: could be done in parallel as well
             self.gmtk_out2bed()
 
-    def _run(self):
+    def run(self):
         """
         main run, after dirname is specified
         """
@@ -1670,7 +1685,7 @@ class Runner(object):
         if self.identify:
             self.run_identify()
 
-    def __call__(self):
+    def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
 
         dirname = self.dirname
@@ -1678,7 +1693,7 @@ class Runner(object):
             if self.delete_existing or not path(dirname).isdir():
                 self.make_dir(dirname)
 
-            self._run()
+            self._run(*args, **kwargs)
         else:
             try:
                 with NamedTemporaryDir(prefix=TEMPDIR_PREFIX) as tempdir:
