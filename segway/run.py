@@ -25,7 +25,7 @@ from threading import Event, Thread
 from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
                    empty, finfo, float32, fromfile, intc, invert, isnan,
-                   newaxis, NINF, outer, s_, square, vectorize)
+                   newaxis, NINF, outer, s_, square, tile, vectorize)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
@@ -38,12 +38,28 @@ from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
                     NamedTemporaryDir, PKG, walk_continuous_supercontigs,
                     walk_supercontigs)
 
+# XXX: I should really get some sort of Enum for this, I think Peter
+# Norvig has one
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
 DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_NORM
 
 ## XXX: should be options
+MEAN_METHOD_UNIFORM = "uniform" # randomly pick from the range
+MEAN_METHOD_ML_JITTER = "ml_jitter" # maximum likelihood, then jitter
+MEAN_METHODS = [MEAN_METHOD_UNIFORM, MEAN_METHOD_ML_JITTER]
+MEAN_METHOD = MEAN_METHOD_UNIFORM
+
+COVAR_METHOD_MAX_RANGE = "max_range" # maximum range
+COVAR_METHOD_ML_JITTER = "ml_jitter" # maximum likelihood, then jitter
+COVAR_METHODS = [COVAR_METHOD_MAX_RANGE, COVAR_METHOD_ML_JITTER]
+COVAR_METHOD = COVAR_METHOD_MAX_RANGE
+
+PARAM_METHOD_ML_JITTER = "ml_jitter"
+PARAM_METHOD_MEAN_RANDOM_VAR_MAX = "mean_random_var_max"
+PARAM_METHOD = PARAM_METHOD_MEAN_RANDOM_VAR_MAX
+
 NUM_SEGS = 2 # XXX: to change, will require CARD_SEG to be set
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
@@ -214,6 +230,9 @@ TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 ## functions
+
+def vstack_tile(array_like, reps):
+    return tile(array_like, (reps, 1))
 
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
@@ -975,7 +994,8 @@ class Runner(object):
                 self.write_observations(float_filelist, int_filelist)
 
     def calc_means_vars(self):
-        means = self.sums / self.num_datapoints
+        num_datapoints = self.num_datapoints
+        means = self.sums / num_datapoints
 
         # this is an unstable way of calculating the variance,
         # but it should be good enough
@@ -983,9 +1003,8 @@ class Runner(object):
         # XXX: best would be to switch to the pairwise parallel method
         # (see Wikipedia)
 
-        vars = (self.sums_squares / self.num_datapoints) - square(means)
-
-        return means, vars
+        self.means = means
+        self.vars = (self.sums_squares / num_datapoints) - square(means)
 
     def get_track_lt_min(self, track_index):
         """
@@ -1023,7 +1042,7 @@ class Runner(object):
 
             if data is not None:
                 seg_index = mapping["seg_index"]
-                mapping["rand"] = jitter(data[track_index])
+                mapping["rand"] = data[seg_index, track_index]
 
             res.append(substitute(mapping))
 
@@ -1099,10 +1118,43 @@ class Runner(object):
 
         return make_spec("DENSE_CPT", items)
 
-    def make_mean_spec(self, means):
-        return self.make_spec_multiseg("MEAN", MEAN_TMPL, means)
+    def rand_means(self):
+        low = self.mins
+        high = self.maxs
+        num_segs = self.num_segs
 
-    def make_covar_spec(self, tied, vars):
+        assert len(low) == len(high)
+
+        # size parameter is so that we always get an array, even if it
+        # has shape = (1,)
+
+        # iterator so that we regenerate uniform for every seg
+        return array([uniform(low, high, len(low))
+                      for seg_index in xrange(num_segs)])
+
+    def make_means(self):
+        if MEAN_METHOD == MEAN_METHOD_UNIFORM:
+            return self.rand_means()
+        elif MEAN_METHOD == MEAN_METHOD_ML_JITTER:
+            return jitter(vstack_tile(self.means, self.num_segs))
+
+        raise ValueError("unsupported MEAN_METHOD")
+
+    def make_mean_spec(self):
+        return self.make_spec_multiseg("MEAN", MEAN_TMPL, self.make_means())
+
+    def make_covars(self):
+        num_segs = self.num_segs
+
+        if COVAR_METHOD == COVAR_METHOD_MAX_RANGE:
+            ranges = self.maxs - self.mins
+            return vstack_tile(ranges, num_segs)
+        elif COVAR_METHOD == COVAR_METHOD_ML_JITTER:
+            return jitter(vstack_tile(self.vars, num_segs))
+
+        raise ValueError("unsupported COVAR_METHOD")
+
+    def make_covar_spec(self, tied):
         if tied:
             segnames = ["any"]
             tmpl = COVAR_TMPL_TIED
@@ -1110,11 +1162,14 @@ class Runner(object):
             segnames = None
             tmpl = COVAR_TMPL_UNTIED
 
-        # always start with maximum variance
+        vars = self.make_covars()
 
         return self.make_spec_multiseg("COVAR", tmpl, vars, segnames)
 
-    def make_items_gamma(self, means, vars):
+    def make_items_gamma(self):
+        means = self.means
+        vars = self.vars
+
         substitute_scale = Template(GAMMASCALE_TMPL).substitute
         substitute_shape = Template(GAMMASHAPE_TMPL).substitute
 
@@ -1148,8 +1203,8 @@ class Runner(object):
 
         return res
 
-    def make_gamma_spec(self, *args, **kwargs):
-        return make_spec("REAL_MAT", self.make_items_gamma(*args, **kwargs))
+    def make_gamma_spec(self):
+        return make_spec("REAL_MAT", self.make_items_gamma())
 
     def make_mc_spec(self):
         return self.make_spec_multiseg("MC", MC_TMPLS[self.distribution])
@@ -1175,12 +1230,12 @@ class Runner(object):
 
         dense_cpt_spec = self.make_dense_cpt_spec()
 
-        means, vars = self.calc_means_vars()
+        self.calc_means_vars()
 
         distribution = self.distribution
         if distribution == DISTRIBUTION_NORM:
-            mean_spec = self.make_mean_spec(means)
-            covar_spec = self.make_covar_spec(COVAR_TIED, vars)
+            mean_spec = self.make_mean_spec()
+            covar_spec = self.make_covar_spec(COVAR_TIED)
             gamma_spec = ""
         elif distribution == DISTRIBUTION_GAMMA:
             mean_spec = ""
@@ -1189,7 +1244,7 @@ class Runner(object):
             # XXX: another option is to calculate an ML estimate for
             # the gamma distribution rather than the ML estimate for the
             # mean and converting
-            gamma_spec = self.make_gamma_spec(means, vars)
+            gamma_spec = self.make_gamma_spec()
         else:
             raise ValueError("distribution %s not supported" % distribution)
 

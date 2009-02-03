@@ -5,6 +5,7 @@ named segway.bed.gz is found.
 * stop creating lots of auxiliary output files during Viterbi identify
 * there is no directory named "out" created by default
 * add segway-res-usage program to calibrate resource usage, which involved some refactoring of run.py
+* adding different methods to create initial parameters. interface will be exposed in a future version
 * fix bug: don't repeat track line multiple times in BED file
 * perforamnce: change genomedata-save-metadata
 
