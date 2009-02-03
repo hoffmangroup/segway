@@ -11,7 +11,7 @@ __version__ = "$Revision$"
 
 import sys
 
-from numpy import amin, amax, array, isnan, NINF, PINF, square, where
+from numpy import amin, amax, append, array, diff, isfinite, NINF, PINF, square
 from tables import openFile
 
 from .load_seq import MIN_GAP_LEN
@@ -21,7 +21,8 @@ from ._util import (fill_array, get_tracknames, init_num_obs, new_extrema,
 def write_metadata(chromosome):
     print >>sys.stderr, "writing metadata for %s" % chromosome.title
 
-    num_obs = len(get_tracknames(chromosome))
+    tracknames = get_tracknames(chromosome)
+    num_obs = len(tracknames)
     row_shape = (num_obs,)
     mins = fill_array(PINF, row_shape)
     maxs = fill_array(NINF, row_shape)
@@ -36,57 +37,66 @@ def write_metadata(chromosome):
         if __debug__:
             init_num_obs(num_obs, continuous) # for the assertion
 
-        ## read data
-        observations = continuous.read()
-        mask_missing = isnan(observations)
+        num_rows = continuous.shape[0]
+        mask_rows_any_present = fill_array(False, num_rows)
 
-        observations[mask_missing] = PINF
-        mins = new_extrema(amin, observations, mins)
+        # doing this column by column greatly reduces the memory
+        # footprint when you have large numbers of tracks. It also
+        # simplifies the logic for the summary stats, since you don't
+        # have to change the mask value for every operation, like in
+        # revisions <= r243
+        for col_index, trackname in enumerate(tracknames):
+            print >>sys.stderr, "  %s" % trackname
 
-        observations[mask_missing] = NINF
-        maxs = new_extrema(amax, observations, maxs)
+            ## read data
+            col = continuous[:, col_index]
 
-        observations[mask_missing] = 0.0
-        sums += observations.sum(0)
-        sums_squares += square(observations).sum(0)
+            mask_present = isfinite(col)
+            mask_rows_any_present[mask_present] = True
+            col_finite = col[mask_present]
+            # XXXopt: should be able to overwrite col, not needed anymore
 
-        # add the number of observations minus those that are missing
-        num_datapoints += observations.shape[0] - mask_missing.sum(0)
+            mins[col_index] = new_extrema(amin, col_finite, mins[col_index])
+            maxs[col_index] = new_extrema(amax, col_finite, maxs[col_index])
+            sums[col_index] += col_finite.sum(0)
+            sums_squares[col_index] += square(col_finite).sum(0)
+            num_datapoints[col_index] += len(col_finite)
 
         ## find chunks that have less than MIN_GAP_LEN missing data
         ## gaps in a row
-        rows_num_missing = mask_missing.sum(1)
-        mask_rows_any_present = rows_num_missing < num_obs
-        indices_present = where(mask_rows_any_present)[0]
 
-        starts = []
-        ends = []
+        # get all of the indices where there is any data
+        indices_present = mask_rows_any_present.nonzero()[0]
 
-        # so that index - last_index is always >= MIN_GAP_LEN
-        last_index = -MIN_GAP_LEN
-        for index in indices_present:
-            if index - last_index >= MIN_GAP_LEN:
-                if starts:
-                    # add 1 because we want slice(start, end) to
-                    # include the last_index
-                    ends.append(last_index + 1)
-
-                starts.append(index)
-            last_index = index
-
-        if last_index >= 0:
-            ends.append(last_index + 1)
-
-        assert len(starts) == len(ends)
-
-        if starts:
-            supercontig_attrs = supercontig._v_attrs
-            supercontig_attrs.chunk_starts = array(starts)
-            supercontig_attrs.chunk_ends = array(ends)
-        else:
-            # remove empty supercontigs continuous
+        if not len(indices_present):
+            # remove continuous of empty supercontigs
             continuous._f_remove()
+            continue
 
+        # make a mask of whether the difference from one index to the
+        # next is >= MIN_GAP_LEN
+        diffs_signif = diff(indices_present) >= MIN_GAP_LEN
+
+        # convert the mask back to indices of the original indices
+        indices_signif = diffs_signif.nonzero()[0]
+
+        if len(indices_signif):
+            starts = indices_present[indices_signif]
+
+            # finish with the index immediately before each start, and the
+            # last index
+            ends = indices_present[append(indices_signif[1:]-1, -1)]
+
+            # add 1 because we want slice(start, end) to include the
+            # last_index
+            ends += 1
+        else:
+            starts = array(0)
+            ends = array(num_rows)
+
+        supercontig_attrs = supercontig._v_attrs
+        supercontig_attrs.chunk_starts = starts
+        supercontig_attrs.chunk_ends = ends
 
     chromosome_attrs = chromosome.root._v_attrs
     chromosome_attrs.mins = mins

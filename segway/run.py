@@ -41,6 +41,7 @@ from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
 DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA]
+DISTRIBUTION_DEFAULT = DISTRIBUTION_NORM
 
 ## XXX: should be options
 NUM_SEGS = 2 # XXX: to change, will require CARD_SEG to be set
@@ -53,6 +54,10 @@ SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
 SWAP_ENDIAN = False
+
+## option defaults
+VERBOSITY = 0
+PRIOR_STRENGTH = 0
 
 DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
 
@@ -206,6 +211,7 @@ WIG_HEADER = 'track type=wiggle_0 name=%s ' \
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
+LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 ## functions
 
@@ -467,9 +473,10 @@ class RandomStartThread(Thread):
         Thread.__init__(self)
 
     def run(self):
-        self.result = self.runner.run_train_start(self.session,
-                                                  self.start_index,
-                                                  self.interrupt_event)
+        self.runner.session = self.session
+        self.runner.start_index = self.start_index
+        self.runner.interrupt_event = self.interrupt_event
+        self.result = self.runner.run_train_start()
 
 class Runner(object):
     def __init__(self, **kwargs):
@@ -510,11 +517,14 @@ class Runner(object):
         self.num_segs = NUM_SEGS
         self.segnames = ["seg%d" % seg_index for seg_index in xrange(NUM_SEGS)]
         self.random_starts = RANDOM_STARTS
+        self.len_seg_strength = PRIOR_STRENGTH
+        self.distribution = DISTRIBUTION_DEFAULT
 
         # flags
         self.delete_existing = False
         self.triangulate = True
         self.train = True # EM train # this should become an int for num_starts
+        self.verbosity = VERBOSITY
         self.identify = True # viterbi
         self.dry_run = False
         self.use_dinucleotide = None
@@ -774,7 +784,21 @@ class Runner(object):
 
         int_data.tofile(int_filepath)
 
-    def accum_metadata(self, chromosome):
+    def accum_metadata(self, mins, maxs, sums, sums_squares, num_datapoints):
+        if self.mins is None:
+            self.mins = mins
+            self.maxs = maxs
+            self.sums = sums
+            self.sums_squares = sums_squares
+            self.num_datapoints = num_datapoints
+        else:
+            self.mins = amin([mins, self.mins], 0)
+            self.maxs = amax([maxs, self.maxs], 0)
+            self.sums += sums
+            self.sums_squares += sums_squares
+            self.num_datapoints += num_datapoints
+
+    def accum_metadata_chromosome(self, chromosome):
         """
         accumulate metadata for a chromsome to the Runner instance
 
@@ -785,27 +809,16 @@ class Runner(object):
         chromosome_attrs = chromosome.root._v_attrs
 
         try:
-            chromosome_mins = chromosome_attrs.mins
-            chromosome_maxs = chromosome_attrs.maxs
-            chromosome_sums = chromosome_attrs.sums
-            chromosome_sums_squares = chromosome_attrs.sums_squares
-            chromosome_num_datapoints = chromosome_attrs.num_datapoints
+            mins = chromosome_attrs.mins
+            maxs = chromosome_attrs.maxs
+            sums = chromosome_attrs.sums
+            sums_squares = chromosome_attrs.sums_squares
+            num_datapoints = chromosome_attrs.num_datapoints
         except AttributeError:
             # this means there is no data for that chromosome
             return False
 
-        if self.mins is None:
-            self.mins = chromosome_mins
-            self.maxs = chromosome_maxs
-            self.sums = chromosome_sums
-            self.sums_squares = chromosome_sums_squares
-            self.num_datapoints = chromosome_num_datapoints
-        else:
-            self.mins = amin([chromosome_mins, self.mins], 0)
-            self.maxs = amax([chromosome_maxs, self.maxs], 0)
-            self.sums += chromosome_sums
-            self.sums_squares += chromosome_sums_squares
-            self.num_datapoints += chromosome_num_datapoints
+        self.accum_metadata(mins, maxs, sums, sums_squares, num_datapoints)
 
         return True
 
@@ -814,8 +827,7 @@ class Runner(object):
 
         # observations
         print_obs_filepaths_custom = partial(self.print_obs_filepaths,
-                                             float_filelist=float_filelist,
-                                             int_filelist=int_filelist)
+                                             float_filelist, int_filelist)
         save_observations_chunk = self.save_observations_chunk
         delete_existing = self.delete_existing
 
@@ -831,7 +843,7 @@ class Runner(object):
             assert not chromosome.root._v_attrs.dirty
 
             # if there is no metadata, then skip the chromosome
-            if not self.accum_metadata(chromosome):
+            if not self.accum_metadata_chromosome(chromosome):
                 continue
 
             track_indexes = self.set_tracknames(chromosome)
@@ -1326,6 +1338,10 @@ class Runner(object):
 
         return "%dM" % ceil(res / 2**20)
 
+    def make_chunk_lens(self):
+        self.chunk_lens = [end - start
+                           for chr, start, end in self.chunk_coords]
+
     def make_chunk_mem_reqs(self):
         # XXX: should probably have different mem reqs for train or viterbi
         num_tracks = self.num_tracks
@@ -1335,12 +1351,8 @@ class Runner(object):
 
         self.make_chunk_lens()
 
-        chunk_lens = [end - start for chr, start, end in self.chunk_coords]
-
-        self.chunk_lens = chunk_lens
-
         self.chunk_mem_reqs = [self.make_mem_req(chunk_len, num_tracks)
-                               for chunk_len in chunk_lens]
+                               for chunk_len in self.chunk_lens]
 
     def chunk_mem_reqs_decreasing(self):
         # sort chunks by decreasing size, so the most difficult chunks
@@ -1351,8 +1363,7 @@ class Runner(object):
         for _, chunk_index, chunk_mem_req in sorted(zipper, reverse=True):
             yield chunk_index, chunk_mem_req
 
-    def queue_gmtk(self, session, prog, kwargs, job_name, mem_req,
-                   native_specs={}):
+    def queue_gmtk(self, prog, kwargs, job_name, mem_req, native_specs={}):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         # convoluted so I don't have to deal with a lot of escaping issues
@@ -1362,11 +1373,11 @@ class Runner(object):
             print " ".join(gmtk_cmdline)
             return None
 
+        session = self.session
         job_tmpl = session.createJobTemplate()
 
         # shouldn't this be jobName? not in the Python DRMAA implementation
         # XXX: report upstream
-        print >>sys.stderr, "job_tmpl.name = %s" % job_name
         job_tmpl.name = job_name
 
         job_tmpl.remoteCommand = ENV_CMD
@@ -1383,7 +1394,7 @@ class Runner(object):
 
         return session.runJob(job_tmpl)
 
-    def queue_train(self, session, start_index, round_index,
+    def queue_train(self, start_index, round_index,
                     chunk_index, mem_req, hold_jid=None, **kwargs):
         kwargs["inputMasterFile"] = self.input_master_filename
 
@@ -1391,12 +1402,11 @@ class Runner(object):
         name = self.make_job_name_train(start_index, round_index, chunk_index)
         native_specs = dict(hold_jid=hold_jid)
 
-        return self.queue_gmtk(session, prog, kwargs, name, mem_req,
-                               native_specs)
+        return self.queue_gmtk(prog, kwargs, name, mem_req, native_specs)
 
-    def queue_train_parallel(self, session, input_params_filename, start_index,
+    def queue_train_parallel(self, input_params_filename, start_index,
                              round_index, **kwargs):
-        queue_train_custom = partial(self.queue_train, session, start_index,
+        queue_train_custom = partial(self.queue_train, start_index,
                                      round_index)
 
         kwargs["cppCommandOptions"] = make_cpp_options(input_params_filename)
@@ -1419,7 +1429,7 @@ class Runner(object):
 
         return res
 
-    def queue_train_bundle(self, session, parallel_jobids,
+    def queue_train_bundle(self, parallel_jobids,
                            input_params_filename, output_params_filename,
                            start_index, round_index, **kwargs):
         """bundle step: take parallel accumulators and combine them
@@ -1443,9 +1453,8 @@ class Runner(object):
         else:
             hold_jid = ",".join(parallel_jobids)
 
-        return self.queue_train(session, start_index,
-                                round_index, NAME_PLACEHOLDER, MEM_REQ_BUNDLE,
-                                hold_jid, **kwargs)
+        return self.queue_train(start_index, round_index, NAME_PLACEHOLDER,
+                                MEM_REQ_BUNDLE, hold_jid, **kwargs)
 
     def run_triangulate(self):
         # XXX: should specify the triangulation file
@@ -1454,89 +1463,57 @@ class Runner(object):
         prog(strFile=self.structure_filename,
              verbosity=self.verbosity)
 
-    def run_train_start(self, session, start_index, interrupt_event):
+    def run_train_round(self, start_index, round_index, **kwargs):
+        """
+        returns None: normal
+        returns not None: abort
+        """
+        last_params_filename = self.last_params_filename
+        curr_params_filename = extjoin(self.params_filename, str(round_index))
+
+        parallel_jobids = \
+            self.queue_train_parallel(last_params_filename, start_index,
+                                      round_index, **kwargs)
+
+        bundle_jobid = \
+            self.queue_train_bundle(parallel_jobids, last_params_filename,
+                                    curr_params_filename, start_index,
+                                    round_index,
+                                    llStoreFile=self.log_likelihood_filename,
+                                    **kwargs)
+
+        self.last_params_filename = curr_params_filename
+
+        if self.dry_run:
+            return False
+
+        return self.wait_bundle(parallel_jobids, bundle_jobid)
+
+    def run_train_start(self):
         # make new files if you have more than one random start
         new = self.random_starts > 1
+
+        start_index = self.start_index
 
         self.save_input_master(start_index, new)
         self.set_params_filename(start_index, new)
         self.set_log_likelihood_filename(start_index, new)
         self.set_output_dirpaths(start_index)
 
-        log_likelihood_filename = self.log_likelihood_filename
         last_log_likelihood = NINF
         log_likelihood = NINF
         round_index = 0
 
-        stem_params_filename = self.params_filename
-        last_params_filename = None
-        curr_params_filename = None
+        self.last_params_filename = None
 
         kwargs = self.train_kwargs
 
-        queue_train_parallel = self.queue_train_parallel
-        queue_train_bundle = self.queue_train_bundle
-
-        timeout_no_wait = session.TIMEOUT_NO_WAIT
-
         while (round_index < MAX_EM_ITERS and
                is_training_progressing(last_log_likelihood, log_likelihood)):
-            parallel_jobids = queue_train_parallel(session,
-                                                   last_params_filename,
-                                                   start_index, round_index,
-                                                   **kwargs)
-
-            curr_params_filename = extjoin(stem_params_filename,
-                                           str(round_index))
-
-            bundle_jobid = queue_train_bundle(session, parallel_jobids,
-                                              last_params_filename,
-                                              curr_params_filename,
-                                              start_index, round_index,
-                                              llStoreFile=\
-                                                  log_likelihood_filename,
-                                              **kwargs)
-
-            last_params_filename = curr_params_filename
-
-            if self.dry_run:
-                log_likelihood = None
-                break
-
-            # wait for bundle to finish
-            # XXXopt: polling in each thread is a bad way to do this
-            # it would be best to use session.synchronize() centrally
-            # and communicate to each thread when its job is done
-
-            # the very best thing would be to eliminate the GIL lock
-            # in the DRMAA wrapper
-            job_info = None
-            control = session.control
-            terminate = session.TERMINATE
-            while not job_info:
-                try:
-                    job_info = session.wait(bundle_jobid, timeout_no_wait)
-                except ExitTimeoutError:
-                    # ExitTimeoutError: not ready yet
-                    interrupt_event.wait(SESSION_WAIT_TIMEOUT)
-                except ValueError:
-                    # ValueError: the job terminated abnormally
-                    # so interrupt everybody
-                    if self.keep_going:
-                        return (None, None, None, None)
-                    else:
-                        interrupt_event.set()
-                        raise
-
-                if interrupt_event.isSet():
-                    for jobid in parallel_jobids + [bundle_jobid]:
-                        try:
-                            print >>sys.stderr, "killing job %s" % jobid
-                            control(jobid, terminate)
-                        except BaseException, err:
-                            print >>sys.stderr, ("ignoring exception: %r"
-                                                 % err)
-                    raise KeyboardInterrupt
+            round_res = self.run_train_round(start_index, round_index,
+                                             **kwargs)
+            if round_res is not None:
+                return (None, None, None, None)
 
             last_log_likelihood = log_likelihood
             log_likelihood = self.load_log_likelihood()
@@ -1547,7 +1524,48 @@ class Runner(object):
 
         # log_likelihood and a list of src_filenames to save
         return (log_likelihood, self.input_master_filename,
-                last_params_filename, log_likelihood_filename)
+                self.last_params_filename, self.log_likelihood_filename)
+
+    def wait_bundle(self, parallel_jobids, bundle_jobid):
+        """
+        wait for bundle to finish
+        """
+        # XXXopt: polling in each thread is a bad way to do this
+        # it would be best to use session.synchronize() centrally
+        # and communicate to each thread when its job is done
+
+        # the very best thing would be to eliminate the GIL lock
+        # in the DRMAA wrapper
+        job_info = None
+        session = self.session
+        interrupt_event = self.interrupt_event
+
+        control = session.control
+        terminate = session.TERMINATE
+        while not job_info:
+            try:
+                job_info = session.wait(bundle_jobid, session.TIMEOUT_NO_WAIT)
+            except ExitTimeoutError:
+                # ExitTimeoutError: not ready yet
+                interrupt_event.wait(SESSION_WAIT_TIMEOUT)
+            except ValueError:
+                # ValueError: the job terminated abnormally
+                # so interrupt everybody
+                if self.keep_going:
+                    return False
+                else:
+                    interrupt_event.set()
+                    raise
+
+            if interrupt_event.isSet():
+                for jobid in parallel_jobids + [bundle_jobid]:
+                    try:
+                        print >>sys.stderr, "killing job %s" % jobid
+                        control(jobid, terminate)
+                    except BaseException, err:
+                        print >>sys.stderr, ("ignoring exception: %r"
+                                             % err)
+                raise KeyboardInterrupt
 
     def run_train(self):
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
@@ -1610,19 +1628,23 @@ class Runner(object):
 
                 raise
 
-        if not self.dry_run:
-            # finds the max by log_likelihood
-            src_filenames = max(start_params)[1:]
+        self.proc_train_results(start_params, dst_filenames)
 
-            if None in src_filenames:
-                raise ValueError, "all training threads failed"
+    def proc_train_results(self, start_params, dst_filenames):
+        if self.dry_run:
+            return
 
-            assert (len(TRAIN_ATTRNAMES) == len(src_filenames)
-                    == len(dst_filenames))
+        # finds the max by log_likelihood
+        src_filenames = max(start_params)[1:]
 
-            zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
-            for name, src_filename, dst_filename in zipper:
-                self.move_results(name, src_filename, dst_filename)
+        if None in src_filenames:
+            raise ValueError, "all training threads failed"
+
+        assert LEN_TRAIN_ATTRNAMES == len(src_filenames) == len(dst_filenames)
+
+        zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
+        for name, src_filename, dst_filename in zipper:
+            self.move_results(name, src_filename, dst_filename)
 
     def run_identify(self):
         if not self.input_master_filename:
@@ -1646,7 +1668,8 @@ class Runner(object):
         # XXX: kill submitted jobs on exception
         jobids = []
         with Session() as session:
-            queue_identify = partial(self.queue_gmtk, session, prog)
+            self.session = session
+            queue_identify = partial(self.queue_gmtk, prog)
 
             for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
@@ -1668,6 +1691,8 @@ class Runner(object):
     def run(self):
         """
         main run, after dirname is specified
+
+        this is exposed so that it can be overriden in a subclass
         """
         # XXXopt: use binary I/O to gmtk rather than ascii
 
@@ -1693,13 +1718,13 @@ class Runner(object):
             if self.delete_existing or not path(dirname).isdir():
                 self.make_dir(dirname)
 
-            self._run(*args, **kwargs)
+            self.run(*args, **kwargs)
         else:
             try:
                 with NamedTemporaryDir(prefix=TEMPDIR_PREFIX) as tempdir:
                     self.dirname = tempdir.name
                     self.is_dirname_temp = True
-                    self._run()
+                    self.run()
             finally:
                 # the temporary directory has already been deleted (after
                 # unwinding of the with block), so let's stop referring to
@@ -1753,7 +1778,7 @@ def parse_options(args):
 
     with OptionGroup(parser, "Variables") as group:
         group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
-                         metavar="DIST", default=DISTRIBUTION_NORM,
+                         metavar="DIST", default=DISTRIBUTION_DEFAULT,
                          help="use DIST distribution")
 
         group.add_option("-r", "--random-starts", type=int,
@@ -1761,13 +1786,13 @@ def parse_options(args):
                          help="randomize start parameters NUM times"
                          " (default 1)")
 
-        group.add_option("--prior-strength", type=float, default=0,
-                         metavar="RATIO",
+        group.add_option("--prior-strength", type=float,
+                         default=PRIOR_STRENGTH, metavar="RATIO",
                          help="use RATIO times the number of data counts as"
                          " the number of pseudocounts for the segment length"
                          " prior (default 0)")
 
-        group.add_option("-v", "--verbosity", type=int, default=0,
+        group.add_option("-v", "--verbosity", type=int, default=VERBOSITY,
                          metavar="NUM",
                          help="show messages with verbosity NUM")
 
