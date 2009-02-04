@@ -242,6 +242,17 @@ def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
 
+class NoAdvance(str):
+    """
+    cause rewrite_strip_comments() to not consume an extra line
+    """
+
+class NewLine(NoAdvance):
+    """
+    add a line rather than replacing existing
+    """
+    # doesn't actually have any code. used slowly for class identification
+
 def rewrite_strip_comments(infile, outfile):
     for line in infile:
         inline = line.rstrip()
@@ -251,25 +262,23 @@ def rewrite_strip_comments(infile, outfile):
         else:
             outline = (yield inline)
 
-            if outline is None:
+            if isinstance(outline, NewLine):
+                print >>outfile, inline
+            elif outline is None:
                 outline = inline
 
         print >>outfile, outline
+
+        while isinstance(outline, NoAdvance):
+            outline = (yield)
+
+            if outline is not None:
+                print >>outfile, outline
 
 def consume_until(iterable, text):
     for line in iterable:
         if line.startswith(text):
             break
-
-def copy_until(infile, outfile, text):
-    for line in infile:
-        print >>outfile, line
-
-        if line.startswith(text):
-            return
-
-def is_comment(line):
-    return line.startswith("%")
 
 # XXX: suggest upstream as addition to DRMAA-python
 @contextmanager
@@ -512,21 +521,20 @@ def jitter_cell(cell):
 
 jitter = vectorize(jitter_cell)
 
-def rewrite_cliques(infile, outfile, frame):
+def rewrite_cliques(rewriter, frame):
     # method
-    print >>outfile, infile.next()
+    rewriter.next()
 
     # number of cliques
-    orig_num_cliques = int(infile.next())
-    print >>outfile, orig_num_cliques + 1
+    orig_num_cliques = int(rewriter.next())
+    rewriter.send(NoAdvance(orig_num_cliques + 1))
 
     # original cliques
-    zipper = izip(xrange(orig_num_cliques), infile)
-    for clique_index, line in zipper:
-        print >>outfile, line
+    for clique_index in xrange(orig_num_cliques):
+        rewriter.next()
 
     # new clique
-    print >>outfile, "%d 1 seg %d" % (orig_num_cliques, frame)
+    rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
