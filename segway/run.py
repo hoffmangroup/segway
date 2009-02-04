@@ -111,6 +111,7 @@ MAX_FRAMES = 1000000000 # 1 billion
 MEM_REQ_PARALLEL = "10.5G"
 MEM_REQ_BUNDLE = "500M"
 RES_REQ_IDS = ["mem_requested"]
+NUM_TRIANGULATION_FRAMES = 3
 
 # linear model for memory requests for number of data columns
 MEM_REQS = {1: [3619, 8098728],
@@ -155,6 +156,7 @@ def extjoin(*args):
 # extensions and suffixes
 EXT_BED = "bed"
 EXT_IDENTIFY = "identify.h5"
+EXT_JT = "jt"
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
 EXT_FLOAT = "float32"
@@ -162,6 +164,7 @@ EXT_INT = "int"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
 EXT_TAB = "tab"
+EXT_TRIFILE = "trifile"
 
 def make_prefix_fmt(num):
     # make sure there are sufficient leading zeros
@@ -176,6 +179,7 @@ PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)
 
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
+SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
 BED_FILEBASENAME = extjoin(PKG, EXT_BED, EXT_GZ) # "segway.bed.gz"
 
@@ -237,6 +241,35 @@ def vstack_tile(array_like, reps):
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
+
+def rewrite_strip_comments(infile, outfile):
+    for line in infile:
+        inline = line.rstrip()
+
+        if not inline or inline.startswith("%"):
+            outline = inline
+        else:
+            outline = (yield inline)
+
+            if outline is None:
+                outline = inline
+
+        print >>outfile, outline
+
+def consume_until(iterable, text):
+    for line in iterable:
+        if line.startswith(text):
+            break
+
+def copy_until(infile, outfile, text):
+    for line in infile:
+        print >>outfile, line
+
+        if line.startswith(text):
+            return
+
+def is_comment(line):
+    return line.startswith("%")
 
 # XXX: suggest upstream as addition to DRMAA-python
 @contextmanager
@@ -479,6 +512,22 @@ def jitter_cell(cell):
 
 jitter = vectorize(jitter_cell)
 
+def rewrite_cliques(infile, outfile, frame):
+    # method
+    print >>outfile, infile.next()
+
+    # number of cliques
+    orig_num_cliques = int(infile.next())
+    print >>outfile, orig_num_cliques + 1
+
+    # original cliques
+    zipper = izip(xrange(orig_num_cliques), infile)
+    for clique_index, line in zipper:
+        print >>outfile, line
+
+    # new clique
+    print >>outfile, "%d 1 seg %d" % (orig_num_cliques, frame)
+
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
         # keeps it from rewriting variables that will be used
@@ -507,6 +556,8 @@ class Runner(object):
         self.gmtk_include_filename = None
         self.input_master_filename = None
         self.structure_filename = None
+        self.triangulation_filename = None
+        self.jt_triangulation_filename = None
 
         self.params_filename = None
         self.dirname = None
@@ -1366,6 +1417,7 @@ class Runner(object):
 
     def make_gmtk_kwargs(self):
         res = dict(strFile=self.structure_filename,
+                   triFile=self.triangulation_filename,
                    verbosity=self.verbosity)
 
         assert self.int_filelistpath
@@ -1511,12 +1563,47 @@ class Runner(object):
         return self.queue_train(start_index, round_index, NAME_PLACEHOLDER,
                                 MEM_REQ_BUNDLE, hold_jid, **kwargs)
 
+    def save_jt_triangulation(self):
+        infilename = self.triangulation_filename
+
+        # either strip ".trifile" off end, or just use the whole filename
+        infilename_stem = (infilename.rpartition(SUFFIX_TRIFILE)[0]
+                           or infilename)
+
+        outfilename = extjoin(infilename_stem, EXT_JT, EXT_TRIFILE)
+
+        # XXX: this is a fairly hacky way of doing it and will not
+        # work if the triangulation file changes from what GMTK
+        # generates. probably need to key on tokens rather than lines
+        with open(infilename) as infile:
+            with open(outfilename, "w") as outfile:
+                rewriter = rewrite_strip_comments(infile, outfile)
+
+                consume_until(rewriter, "@@@!!!TRIFILE_END_OF_ID_STRING!!!@@@")
+                consume_until(rewriter, "CE_PARTITION")
+
+                for frame in xrange(NUM_TRIANGULATION_FRAMES):
+                    rewrite_cliques(rewriter, frame)
+
+                while rewriter.next():
+                    pass
+
     def run_triangulate(self):
-        # XXX: should specify the triangulation file
         prog = self.prog_factory(TRIANGULATE_PROG)
 
-        prog(strFile=self.structure_filename,
+        structure_filename = self.structure_filename
+        triangulation_filename = self.triangulation_filename
+        if not triangulation_filename:
+            triangulation_filename = extjoin(structure_filename, EXT_TRIFILE)
+            self.triangulation_filename = triangulation_filename
+
+        # XXX: need exist/delete_existing logic here
+        prog(strFile=structure_filename,
+             outputTriangulatedFile=triangulation_filename,
              verbosity=self.verbosity)
+
+        if not self.jt_triangulation_filename:
+            self.save_jt_triangulation()
 
     def run_train_round(self, start_index, round_index, **kwargs):
         """
