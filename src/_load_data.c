@@ -66,7 +66,7 @@ typedef struct {
 } supercontig_t;
 
 typedef struct {
-  hid_t h5file; /* handle to the file */
+  hid_t h5file; /* handle to the file; invalid if <0 */
   char *chrom; /* name of chromosome */
   size_t num_supercontigs;
   supercontig_t *supercontigs;
@@ -201,6 +201,10 @@ void close_file(hid_t h5file) {
 
 /** chromosome functions **/
 
+int is_valid_chromosome(chromosome_t *chromosome) {
+  return chromosome->h5file >= 0;
+}
+
 void init_chromosome(chromosome_t *chromosome) {
   chromosome->chrom = xmalloc(sizeof(char));
   *(chromosome->chrom) = '\0';
@@ -240,7 +244,7 @@ supercontig_t *last_supercontig(chromosome_t *chromosome) {
   return chromosome->supercontigs + chromosome->num_supercontigs - 1;
 }
 
-void open_chromosome(chromosome_t *chromosome, const char *h5filename) {
+int open_chromosome(chromosome_t *chromosome, const char *h5filename) {
   hid_t root = -1;
   H5G_info_t root_info;
 
@@ -250,7 +254,12 @@ void open_chromosome(chromosome_t *chromosome, const char *h5filename) {
 
   /* open the chromosome file */
   chromosome->h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
-  assert(chromosome->h5file >= 0);
+
+  /* if opening failed, then return -1 with h5file set bad */
+  if (!is_valid_chromosome(chromosome)) {
+    fprintf(stderr, " can't open chromosome\n");
+    return -1;
+  }
 
   /* open the root group */
   root = H5Gopen(chromosome->h5file, "/", H5P_DEFAULT);
@@ -266,12 +275,13 @@ void open_chromosome(chromosome_t *chromosome, const char *h5filename) {
 
   assert(H5Gclose(root) >= 0);
 
+  return 0;
 }
 
 void close_chromosome(chromosome_t *chromosome) {
   free(chromosome->chrom);
 
-  if (chromosome->h5file < 0) {
+  if (!is_valid_chromosome(chromosome)) {
     return;
   }
 
@@ -537,6 +547,10 @@ void write_buf(chromosome_t *chromosome, char *trackname,
   hsize_t mem_dataspace_dims[CARDINALITY] = {-1, 1};
   hsize_t select_start[CARDINALITY];
 
+  if (!is_valid_chromosome(chromosome)) {
+    return;
+  }
+
   /* correct for overshoot */
   if (*buf_filled_end > *buf_end) {
     *buf_filled_end = *buf_end;
@@ -632,8 +646,8 @@ void seek_chromosome(char *chrom, char *h5dirname, chromosome_t *chromosome) {
   strcpy(h5filename_suffix, SUFFIX_H5);
 
   close_chromosome(chromosome);
-  open_chromosome(chromosome, h5filename);
 
+  open_chromosome(chromosome, h5filename);
   chromosome->chrom = chrom;
 }
 
@@ -643,6 +657,10 @@ void malloc_chromosome_buf(chromosome_t *chromosome,
      last supercontig, and fill with NAN */
 
   size_t buf_len;
+
+  if (!is_valid_chromosome(chromosome)) {
+    return;
+  }
 
   /* XXX: last_supercontig(chromosome) might not return the maximum
      value; you really need to iterate through all of them */
@@ -711,6 +729,10 @@ void proc_wigfix(char *h5dirname, char *trackname, char *line,
     assert(!errno);
 
     if (*tailptr == '\n') {
+      if (!is_valid_chromosome(chromosome)) {
+        continue;
+      }
+
       if (fill_start < buf_end) {
         fill_end = fill_start + span;
         if (fill_end > buf_end) {
@@ -771,6 +793,11 @@ void proc_wigvar_header(char *line, char *h5dirname, chromosome_t *chromosome,
     /* only reseek and malloc if it is different */
     /* XXX: should probably be an assertion rather than an if */
     seek_chromosome(chrom, h5dirname, chromosome);
+
+    if (!is_valid_chromosome(chromosome)) {
+      return;
+    }
+
     malloc_chromosome_buf(chromosome, buf_start, buf_end);
 
     /* calc dimensions */
@@ -837,6 +864,10 @@ void proc_wigvar(char *h5dirname, char *trackname, char *line,
 
     /* next char must be space */
     if (tailptr != line && isblank(*tailptr)) {
+      if (!is_valid_chromosome(chromosome)) {
+        continue;
+      }
+
       assert(start >= 0);
 
       errno = 0;

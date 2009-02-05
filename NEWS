@@ -1,7 +1,9 @@
 0.1.1:
 
-* changed -b option: It now specifies a BED filename instead of a directory where a file
+* segway: changed -b option: It now specifies a BED filename instead of a directory where a file
 named segway.bed.gz is found.
+* _load_data: ignore invalid chromosome specifications instead of
+  triggering a fatal error
 * stop creating lots of auxiliary output files during Viterbi identify
 * there is no directory named "out" created by default
 * runs posterior decoding during identify. for now, results are saved
