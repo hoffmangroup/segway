@@ -28,7 +28,6 @@ download_url = "%s%s-%s.tar.gz" % (url, name, __version__)
 
 # XXX: remove these when the upstream packages are updated to fix these issues
 dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip",
-                    "http://www.pytables.org/download/preliminary/tables-2.1b3.tar.gz",
                     "http://gridengine.sunsource.net/files/documents/7/36/DRMAA-python-0.2.tar.gz"]
 
 classifiers = ["Natural Language :: English",

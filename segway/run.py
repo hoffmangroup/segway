@@ -111,7 +111,8 @@ MAX_FRAMES = 1000000000 # 1 billion
 MEM_REQ_PARALLEL = "10.5G"
 MEM_REQ_BUNDLE = "500M"
 RES_REQ_IDS = ["mem_requested"]
-NUM_TRIANGULATION_FRAMES = 3
+
+POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
 # linear model for memory requests for number of data columns
 MEM_REQS = {1: [3619, 8098728],
@@ -143,6 +144,7 @@ BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
 TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkEMtrainNew")
 VITERBI_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkViterbiNew")
+POSTERIOR_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkJT")
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
@@ -156,14 +158,15 @@ def extjoin(*args):
 # extensions and suffixes
 EXT_BED = "bed"
 EXT_IDENTIFY = "identify.h5"
-EXT_JT = "jt"
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
 EXT_FLOAT = "float32"
 EXT_INT = "int"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
+EXT_POSTERIOR = "posterior"
 EXT_TAB = "tab"
+EXT_TXT = "txt"
 EXT_TRIFILE = "trifile"
 
 def make_prefix_fmt(num):
@@ -173,6 +176,11 @@ def make_prefix_fmt(num):
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
+PREFIX_JT_INFO = "jt_info"
+
+PREFIX_JOB_NAME_TRAIN = "emt"
+PREFIX_JOB_NAME_VITERBI = "vit"
+PREFIX_JOB_NAME_POSTERIOR = "jt"
 
 # XXX: do not hardcode
 PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)
@@ -233,6 +241,9 @@ TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
+COMMENT_POSTERIOR_TRIANGULATION = \
+    "%% triangulation modified for posterior decoding by %s" % PKG
+
 ## functions
 
 def vstack_tile(array_like, reps):
@@ -254,6 +265,9 @@ class NewLine(NoAdvance):
     # doesn't actually have any code. used slowly for class identification
 
 def rewrite_strip_comments(infile, outfile):
+    """
+    strips comments, and trailing whitespace from lines
+    """
     for line in infile:
         inline = line.rstrip()
 
@@ -522,6 +536,9 @@ def jitter_cell(cell):
 jitter = vectorize(jitter_cell)
 
 def rewrite_cliques(rewriter, frame):
+    """
+    returns the index of the added clique
+    """
     # method
     rewriter.next()
 
@@ -535,6 +552,8 @@ def rewrite_cliques(rewriter, frame):
 
     # new clique
     rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
+
+    return orig_num_cliques
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
@@ -565,7 +584,8 @@ class Runner(object):
         self.input_master_filename = None
         self.structure_filename = None
         self.triangulation_filename = None
-        self.jt_triangulation_filename = None
+        self.posterior_triangulation_filename = None
+        self.jt_info_filename = None
 
         self.params_filename = None
         self.dirname = None
@@ -581,6 +601,8 @@ class Runner(object):
         self.bed_filename = None
 
         self.include_coords_filename = None
+
+        self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
         # data
         # a "chunk" is what GMTK calls a segment
@@ -694,6 +716,10 @@ class Runner(object):
             raise ValueError("all tracknames attributes must be identical")
 
         return track_indexes
+
+    def set_jt_info_filename(self):
+        if not self.jt_info_filename:
+            self.jt_info_filename = self.make_filename(PREFIX_JT_INFO, EXT_TXT)
 
     def set_params_filename(self, start_index=None, new=False):
         # if this is not run and params_filename is
@@ -1362,6 +1388,7 @@ class Runner(object):
         identify = self.identify
 
         if train or identify:
+            self.set_jt_info_filename()
             self.make_chunk_mem_reqs()
 
         if train:
@@ -1417,16 +1444,18 @@ class Runner(object):
         return self.dirpath / filebasename
 
     def make_job_name_train(self, start_index, round_index, chunk_index):
-        return "emt%d.%d.%s.%s.%s" % (start_index, round_index, chunk_index,
-                                      self.dirpath.name, getpid())
+        return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, start_index,
+                                     round_index, chunk_index,
+                                     self.dirpath.name, getpid())
 
-    def make_job_name_identify(self, chunk_index):
-        return "vit%d.%s.%s" % (chunk_index, self.dirpath.name, getpid())
+    def make_job_name_identify(self, prefix, chunk_index):
+        return "%s%d.%s.%s" % (prefix, chunk_index, self.dirpath.name,
+                               getpid())
 
     def make_gmtk_kwargs(self):
         res = dict(strFile=self.structure_filename,
-                   triFile=self.triangulation_filename,
-                   verbosity=self.verbosity)
+                   verbosity=self.verbosity,
+                   jtFile=self.jt_info_filename)
 
         assert self.int_filelistpath
         if self.int_filelistpath:
@@ -1571,30 +1600,46 @@ class Runner(object):
         return self.queue_train(start_index, round_index, NAME_PLACEHOLDER,
                                 MEM_REQ_BUNDLE, hold_jid, **kwargs)
 
-    def save_jt_triangulation(self):
+    def save_posterior_triangulation(self):
         infilename = self.triangulation_filename
 
         # either strip ".trifile" off end, or just use the whole filename
         infilename_stem = (infilename.rpartition(SUFFIX_TRIFILE)[0]
                            or infilename)
 
-        outfilename = extjoin(infilename_stem, EXT_JT, EXT_TRIFILE)
+        outfilename = extjoin(infilename_stem, EXT_POSTERIOR, EXT_TRIFILE)
+
+        clique_indices = self.posterior_clique_indices
 
         # XXX: this is a fairly hacky way of doing it and will not
         # work if the triangulation file changes from what GMTK
         # generates. probably need to key on tokens rather than lines
         with open(infilename) as infile:
             with open(outfilename, "w") as outfile:
+                print >>outfile, COMMENT_POSTERIOR_TRIANGULATION
                 rewriter = rewrite_strip_comments(infile, outfile)
 
                 consume_until(rewriter, "@@@!!!TRIFILE_END_OF_ID_STRING!!!@@@")
                 consume_until(rewriter, "CE_PARTITION")
 
-                for frame in xrange(NUM_TRIANGULATION_FRAMES):
-                    rewrite_cliques(rewriter, frame)
+                components_indexed = enumerate(POSTERIOR_CLIQUE_INDICES)
+                for component_index, component in components_indexed:
+                    clique_index = rewrite_cliques(rewriter, component_index)
+                    clique_indices[component] = clique_index
 
-                while rewriter.next():
+                for line in rewriter:
                     pass
+
+        self.posterior_triangulation_filename = outfilename
+
+    def get_posterior_clique_print_ranges(self):
+        res = {}
+
+        for clique, clique_index in self.posterior_clique_indices.iteritems():
+            range_str = "%d:%d" % (clique_index, clique_index)
+            res[clique + "CliquePrintRange"] = range_str
+
+        return res
 
     def run_triangulate(self):
         prog = self.prog_factory(TRIANGULATE_PROG)
@@ -1610,8 +1655,8 @@ class Runner(object):
              outputTriangulatedFile=triangulation_filename,
              verbosity=self.verbosity)
 
-        if not self.jt_triangulation_filename:
-            self.save_jt_triangulation()
+        if not self.posterior_triangulation_filename:
+            self.save_posterior_triangulation()
 
     def run_train_round(self, start_index, round_index, **kwargs):
         """
@@ -1725,6 +1770,7 @@ class Runner(object):
                                  island=ISLAND,
                                  componentCache=COMPONENT_CACHE,
                                  lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
+                                 triFile=self.triangulation_filename,
                                  **self.make_gmtk_kwargs())
 
         # save the destination file for input_master as we will be
@@ -1796,19 +1842,28 @@ class Runner(object):
         for name, src_filename, dst_filename in zipper:
             self.move_results(name, src_filename, dst_filename)
 
+    def _queue_identify(self, jobids, chunk_index, chunk_mem_req, kwargs_chunk,
+                        prefix_job_name, func, kwargs_func):
+        job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
+
+
+        kwargs = kwargs_chunk.copy()
+        kwargs.update(kwargs_func)
+
+        jobid = func(kwargs, job_name, chunk_mem_req)
+        jobids.append(jobid)
+
     def run_identify(self):
         if not self.input_master_filename:
             self.save_input_master()
 
         params_filename = self.params_filename
 
-        prog = self.prog_factory(VITERBI_PROG)
+        prog_viterbi = self.prog_factory(VITERBI_PROG)
+        prog_posterior = self.prog_factory(POSTERIOR_PROG)
 
         identify_kwargs = \
             dict(inputMasterFile=self.input_master_filename,
-
-                 ofilelist=self.output_filelistname,
-                 dumpNames=self.dumpnames_filename,
 
                  cppCommandOptions=make_cpp_options(params_filename),
                  **self.make_gmtk_kwargs())
@@ -1819,24 +1874,39 @@ class Runner(object):
         jobids = []
         with Session() as session:
             self.session = session
-            queue_identify = partial(self.queue_gmtk, prog)
+            queue_viterbi = partial(self.queue_gmtk, prog_viterbi)
+            viterbi_kwargs = dict(triFile=self.triangulation_filename,
+                                  ofilelist=self.output_filelistname,
+                                  dumpNames=self.dumpnames_filename)
+
+            queue_posterior = partial(self.queue_gmtk, prog_posterior)
+            posterior_kwargs = \
+                dict(triFile=self.posterior_triangulation_filename,
+                     doDistributeEvidence=True,
+                     **self.get_posterior_clique_print_ranges())
 
             for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
                                              **identify_kwargs)
-                job_name = self.make_job_name_identify(chunk_index)
+                _queue_identify = partial(self._queue_identify, jobids,
+                                          chunk_index, chunk_mem_req,
+                                          identify_kwargs_chunk)
 
-                jobid = queue_identify(identify_kwargs_chunk, job_name,
-                                       chunk_mem_req)
-                jobids.append(jobid)
+                _queue_identify(PREFIX_JOB_NAME_VITERBI, queue_viterbi,
+                                viterbi_kwargs)
+                _queue_identify(PREFIX_JOB_NAME_POSTERIOR, queue_posterior,
+                                posterior_kwargs)
 
             # XXX: search ask on DRMAA mailing list--how to allow
             # KeyboardInterrupt here?
+
+            if self.dry_run:
+                return
+
             session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER, True)
 
-        if not self.dry_run:
-            # XXXopt: could be done in parallel as well
-            self.gmtk_out2bed()
+        # XXXopt: parallelize
+        self.gmtk_out2bed()
 
     def run(self):
         """
@@ -1852,8 +1922,6 @@ class Runner(object):
         if self.triangulate:
             self.run_triangulate()
 
-        # XXX: make tempfile to specify for -jtFile for both
-        # em and viterbi
         if self.train:
             self.run_train()
 
