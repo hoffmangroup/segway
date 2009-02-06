@@ -28,6 +28,7 @@ from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
                    newaxis, NINF, outer, s_, square, tile, vectorize)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
+                      Mixin_UseFullProgPath,
                       OptionBuilder_ShortOptWithSpace,
                       OptionBuilder_ShortOptWithSpace_TF)
 from path import path
@@ -140,10 +141,14 @@ BASH_CMD = "bash"
 
 BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
 
-TRIANGULATE_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkTriangulate")
-EM_TRAIN_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkEMtrainNew")
-VITERBI_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkViterbiNew")
-POSTERIOR_PROG = OptionBuilder_ShortOptWithSpace_TF("gmtkJT")
+OptionBuilder_GMTK = (Mixin_UseFullProgPath +
+                      OptionBuilder_ShortOptWithSpace_TF)
+
+TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
+EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
+VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbiNew")
+POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
+
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
@@ -176,6 +181,7 @@ def make_prefix_fmt(num):
 PREFIX_ACC = "acc"
 PREFIX_POSTERIOR = "posterior"
 
+PREFIX_VITERBI = "viterbi"
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
@@ -194,12 +200,27 @@ SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
 BED_FILEBASENAME = extjoin(PKG, EXT_BED, EXT_GZ) # "segway.bed.gz"
 
+SUBDIRNAME_ACC = "accumulators"
+SUBDIRNAME_AUX = "auxiliary"
+SUBDIRNAME_LIKELIHOOD = "likelihood"
+SUBDIRNAME_LOG = "log"
+SUBDIRNAME_OBS = "observations"
+SUBDIRNAME_PARAMS = "params" # XXX: final params should go into main directory
+SUBDIRNAME_POSTERIOR = "posterior"
+SUBDIRNAME_VITERBI = "viterbi"
+
+SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX, SUBDIRNAME_LOG]
+SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
+                     SUBDIRNAME_PARAMS]
+SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
+
 # templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
 RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC = "seg.inc"
+RES_DUMPNAMES = "dumpnames.list"
 
 DIRICHLET_FRAG = "0 dirichlet_seg_seg 2 CARD_SEG CARD_SEG"
 
@@ -597,7 +618,7 @@ class Runner(object):
         self.dont_train_filename = None
 
         self.dumpnames_filename = None
-        self.output_filelistname = None
+        self.viterbi_filelistname = None
         self.output_filenames = None
 
         self.obs_dirname = None
@@ -662,10 +683,11 @@ class Runner(object):
                            index=num_tracks*seg_index + track_index,
                            distribution=self.distribution)
 
-    def make_filename(self, *exts):
+    def make_filename(self, *exts, **kwargs):
         filebasename = extjoin_not_none(*exts)
 
-        return self.dirpath / filebasename
+        # add subdirname if it exists
+        return self.dirpath / kwargs.get("subdirname", "") / filebasename
 
     def set_tracknames(self, chromosome):
         # XXXopt: a lot of stuff here repeated for every chromosome
@@ -722,7 +744,9 @@ class Runner(object):
 
     def set_jt_info_filename(self):
         if not self.jt_info_filename:
-            self.jt_info_filename = self.make_filename(PREFIX_JT_INFO, EXT_TXT)
+            self.jt_info_filename = \
+                self.make_filename(PREFIX_JT_INFO, EXT_TXT,
+                                   subdirname=SUBDIRNAME_LOG)
 
     def set_params_filename(self, start_index=None, new=False):
         # if this is not run and params_filename is
@@ -736,13 +760,15 @@ class Runner(object):
                 self.train = False
         else:
             self.params_filename = \
-                self.make_filename(PREFIX_PARAMS, start_index, EXT_PARAMS)
+                self.make_filename(PREFIX_PARAMS, start_index, EXT_PARAMS,
+                                   subdirname=SUBDIRNAME_PARAMS)
 
     def set_log_likelihood_filename(self, start_index=None, new=False):
         if new or not self.log_likelihood_filename:
             self.log_likelihood_filename = \
                 self.make_filename(PREFIX_LIKELIHOOD, start_index,
-                                   EXT_LIKELIHOOD)
+                                   EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
 
     def make_output_dirpath(self, dirname, start_index):
         res = self.dirpath / "output" / dirname / str(start_index)
@@ -773,23 +799,31 @@ class Runner(object):
                 dirpath.listdir()):
                 raise
 
+    def make_subdir(self, subdirname):
+        self.make_dir(self.dirpath / subdirname)
+
+    def make_subdirs(self, subdirnames):
+        for subdirname in subdirnames:
+            self.make_subdir(subdirname)
+
     def make_obs_filelistpath(self, ext):
         return self.obs_dirpath / extjoin(ext, EXT_LIST)
 
     def make_obs_dir(self):
         obs_dirname = self.obs_dirname
-        if not obs_dirname:
-            self.obs_dirname = obs_dirname = self.dirname
+        if obs_dirname:
+            obs_dirpath = path(obs_dirname)
+        else:
+            obs_dirpath = self.dirpath / SUBDIRNAME_OBS
+            self.obs_dirname = obs_dirpath
 
-        obs_dirpath = path(obs_dirname)
+        self.obs_dirpath = obs_dirpath
 
         try:
-            self.make_dir(obs_dirname)
+            self.make_dir(obs_dirpath)
         except OSError, err:
             if not (err.errno == EEXIST and obs_dirpath.isdir()):
                 raise
-
-        self.obs_dirpath = obs_dirpath
 
         self.float_filelistpath = self.make_obs_filelistpath(EXT_FLOAT)
         self.int_filelistpath = self.make_obs_filelistpath(EXT_INT)
@@ -814,20 +848,21 @@ class Runner(object):
 
         return float_filepath, int_filepath
 
-    def save_resource(self, resname):
+    def save_resource(self, resname, subdirname=""):
         orig_filename = data_filename(resname)
 
         if self.is_dirname_temp:
             return orig_filename
         else:
             orig_filepath = path(orig_filename)
-            dirpath = self.dirpath
+            dirpath = self.dirpath / subdirname
 
             orig_filepath.copy(dirpath)
             return dirpath / orig_filepath.name
 
     def save_include(self):
-        self.gmtk_include_filename = self.save_resource(RES_INC)
+        self.gmtk_include_filename = self.save_resource(RES_INC,
+                                                        SUBDIRNAME_AUX)
 
     def save_structure(self):
         observation_sub = resource_substitute("observation.tmpl")
@@ -1338,45 +1373,47 @@ class Runner(object):
         mx_spec = self.make_mx_spec()
         name_collection_spec = make_name_collection_spec(num_segs, tracknames)
 
+        params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
+
         self.input_master_filename, self.input_master_filename_new = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
-                          locals(), self.dirname, self.delete_existing,
+                          locals(), params_dirpath, self.delete_existing,
                           start_index)
 
     def save_dont_train(self):
-        self.dont_train_filename = self.save_resource(RES_DONT_TRAIN)
+        self.dont_train_filename = self.save_resource(RES_DONT_TRAIN,
+                                                      SUBDIRNAME_AUX)
 
     def save_output_master(self):
-        self.output_master_filename = self.save_resource(RES_OUTPUT_MASTER)
+        self.output_master_filename = self.save_resource(RES_OUTPUT_MASTER,
+                                                         SUBDIRNAME_PARAMS)
 
-    def save_output_filelist(self):
-        dirpath = self.dirpath
+    def save_viterbi_filelist(self):
+        dirpath = self.dirpath / SUBDIRNAME_VITERBI
         num_chunks = self.num_chunks
 
-        output_filename_fmt = "out" + make_prefix_fmt(num_chunks) + EXT_OUT
+        output_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_chunks)
+                               + EXT_OUT)
         output_filenames = [dirpath / output_filename_fmt % index
                             for index in xrange(num_chunks)]
 
-        output_filelistname = dirpath / extjoin("output", EXT_LIST)
-        self.output_filelistname = output_filelistname
+        viterbi_filelistname = dirpath / extjoin("output", EXT_LIST)
+        self.viterbi_filelistname = viterbi_filelistname
 
-        with open(output_filelistname, "w") as output_filelist:
+        with open(viterbi_filelistname, "w") as viterbi_filelist:
             for output_filename in output_filenames:
-                print >>output_filelist, output_filename
+                print >>viterbi_filelist, output_filename
 
         self.output_filenames = output_filenames
 
     def save_dumpnames(self):
-        dirpath = self.dirpath
-        dumpnames_filename = dirpath / extjoin("dumpnames", EXT_LIST)
-        self.dumpnames_filename = dumpnames_filename
-
-        with open(dumpnames_filename, "w") as dumpnames_file:
-            print >>dumpnames_file, "seg"
+        self.dumpnames_filename = self.save_resource(RES_DUMPNAMES,
+                                                     SUBDIRNAME_AUX)
 
     def save_params(self):
         self.load_include_coords()
 
+        self.make_subdirs(SUBDIRNAMES_EITHER)
         self.make_obs_dir()
 
         # do first, because it sets self.num_tracks and self.tracknames
@@ -1384,6 +1421,7 @@ class Runner(object):
 
         self.save_include()
         self.save_structure()
+        self.set_params_filename()
 
         train = self.train
         identify = self.identify
@@ -1393,15 +1431,18 @@ class Runner(object):
             self.make_chunk_mem_reqs()
 
         if train:
+            self.make_subdirs(SUBDIRNAMES_TRAIN)
+
             self.save_dont_train()
             self.save_output_master()
 
             # might turn off self.train, if the params already exist
-            self.set_params_filename()
             self.set_log_likelihood_filename()
 
         if identify:
-            self.save_output_filelist()
+            self.make_subdirs(SUBDIRNAMES_IDENTIFY)
+
+            self.save_viterbi_filelist()
             self.save_dumpnames()
 
     def move_results(self, name, src_filename, dst_filename):
@@ -1431,6 +1472,11 @@ class Runner(object):
                 load_gmtk_out_write_bed(chunk_coord, gmtk_outfilename,
                                         bed_file, tracknames)
 
+    def posterior2bed(self):
+        # XXX: will create a bed file for each state
+        # posterior.0.bed.gz, posterior.1.bed.gz
+        pass
+
     def prog_factory(self, prog):
         """
         allows dry_run
@@ -1442,10 +1488,11 @@ class Runner(object):
 
     def make_acc_filename(self, start_index, chunk_index):
         return self.make_filename(PREFIX_ACC, start_index, chunk_index,
-                                  EXT_BIN)
+                                  EXT_BIN, subdirname=SUBDIRNAME_ACC)
 
     def make_posterior_filename(self, chunk_index):
-        return self.make_filename(PREFIX_POSTERIOR, chunk_index, EXT_TXT)
+        return self.make_filename(PREFIX_POSTERIOR, chunk_index, EXT_TXT,
+                                  subdirname=SUBDIRNAME_POSTERIOR)
 
     def make_job_name_train(self, start_index, round_index, chunk_index):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, start_index,
@@ -1850,7 +1897,8 @@ class Runner(object):
             self.move_results(name, src_filename, dst_filename)
 
     def _queue_identify(self, jobids, chunk_index, chunk_mem_req, kwargs_chunk,
-                        prefix_job_name, prog, kwargs_func, output_filename):
+                        prefix_job_name, prog, kwargs_func,
+                        output_filename=None):
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
 
         kwargs = kwargs_chunk.copy()
@@ -1882,7 +1930,7 @@ class Runner(object):
         with Session() as session:
             self.session = session
             viterbi_kwargs = dict(triFile=self.triangulation_filename,
-                                  ofilelist=self.output_filelistname,
+                                  ofilelist=self.viterbi_filelistname,
                                   dumpNames=self.dumpnames_filename)
 
             posterior_kwargs = \
@@ -1917,6 +1965,7 @@ class Runner(object):
 
         # XXXopt: parallelize
         self.gmtk_out2bed()
+        self.posterior2bed()
 
     def run(self):
         """
