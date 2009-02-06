@@ -73,6 +73,11 @@ typedef struct {
   supercontig_t *supercontig_curr;
 } chromosome_t;
 
+typedef struct {
+  H5E_auto2_t old_func;
+  void *old_client_data;
+} err_state_t;
+
 /** helper functions **/
 
 /* XXX: GNU-only extension; should be wrapped */
@@ -91,6 +96,19 @@ void *xmalloc(size_t size)
 }
 
 /** general-purpose HDF5 attribute helper functions **/
+
+void disable_h5_errors(err_state_t *err_state) {
+  assert(H5Eget_auto(H5E_DEFAULT, &(err_state->old_func),
+                     &(err_state->old_client_data))
+         >= 0);
+  assert(H5Eset_auto(H5E_DEFAULT, NULL, NULL) >= 0);
+}
+
+void enable_h5_errors(err_state_t *err_state) {
+  assert(H5Eset_auto(H5E_DEFAULT, err_state->old_func,
+                     err_state->old_client_data)
+         >= 0);
+}
 
 void get_attr(hid_t loc, const char *name, hid_t mem_type_id, void *buf) {
   hid_t attr;
@@ -146,18 +164,11 @@ void set_attr_str(hid_t loc, const char *name, const char *buf) {
 hid_t open_dataset(hid_t loc, char *name, hid_t dapl) {
   hid_t dataset;
 
-  /* for error suppression */
-  H5E_auto2_t old_func;
-  void *old_client_data;
+  err_state_t err_state;
 
-  /* suppress errors */
-  assert(H5Eget_auto(H5E_DEFAULT, &old_func, &old_client_data) >= 0);
-  assert(H5Eset_auto(H5E_DEFAULT, NULL, NULL) >= 0);
-
+  disable_h5_errors(&err_state);
   dataset = H5Dopen(loc, name, dapl);
-
-  /* re-enable errors */
-  assert(H5Eset_auto(H5E_DEFAULT, old_func, old_client_data) >= 0);
+  enable_h5_errors(&err_state);
 
   return dataset;
 }
@@ -252,8 +263,12 @@ int open_chromosome(chromosome_t *chromosome, const char *h5filename) {
      resumption, but I don't use it */
   hsize_t idx = 0;
 
+  err_state_t err_state;
+
   /* open the chromosome file */
+  disable_h5_errors(&err_state);
   chromosome->h5file = H5Fopen(h5filename, H5F_ACC_RDWR, H5P_DEFAULT);
+  enable_h5_errors(&err_state);
 
   /* if opening failed, then return -1 with h5file set bad */
   if (!is_valid_chromosome(chromosome)) {
@@ -729,7 +744,7 @@ void proc_wigfix(char *h5dirname, char *trackname, char *line,
     assert(!errno);
 
     if (*tailptr == '\n') {
-      if (!is_valid_chromosome(chromosome)) {
+      if (!is_valid_chromosome(&chromosome)) {
         continue;
       }
 
@@ -864,7 +879,7 @@ void proc_wigvar(char *h5dirname, char *trackname, char *line,
 
     /* next char must be space */
     if (tailptr != line && isblank(*tailptr)) {
-      if (!is_valid_chromosome(chromosome)) {
+      if (!is_valid_chromosome(&chromosome)) {
         continue;
       }
 

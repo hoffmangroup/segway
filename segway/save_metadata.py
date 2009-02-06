@@ -18,6 +18,9 @@ from .load_seq import MIN_GAP_LEN
 from ._util import (fill_array, get_tracknames, init_num_obs, new_extrema,
                     walk_continuous_supercontigs)
 
+def update_extrema(func, extrema, data, col_index):
+    extrema[col_index] = new_extrema(func, data, extrema[col_index])
+
 def write_metadata(chromosome):
     print >>sys.stderr, "writing metadata for %s" % chromosome.title
 
@@ -56,11 +59,14 @@ def write_metadata(chromosome):
             col_finite = col[mask_present]
             # XXXopt: should be able to overwrite col, not needed anymore
 
-            mins[col_index] = new_extrema(amin, col_finite, mins[col_index])
-            maxs[col_index] = new_extrema(amax, col_finite, maxs[col_index])
-            sums[col_index] += col_finite.sum(0)
-            sums_squares[col_index] += square(col_finite).sum(0)
-            num_datapoints[col_index] += len(col_finite)
+            num_datapoints_col = len(col_finite)
+            if num_datapoints_col:
+                update_extrema(amin, mins, col_finite, col_index)
+                update_extrema(amax, maxs, col_finite, col_index)
+
+                sums[col_index] += col_finite.sum(0)
+                sums_squares[col_index] += square(col_finite).sum(0)
+                num_datapoints[col_index] += num_datapoints_col
 
         ## find chunks that have less than MIN_GAP_LEN missing data
         ## gaps in a row

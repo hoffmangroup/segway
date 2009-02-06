@@ -131,7 +131,6 @@ SENTINEL = float32(9.87654321)
 
 CPP_DIRECTIVE_FMT = "-D%s=%s"
 
-ACC_FILENAME_FMT = "acc.%s.%s.bin"
 GMTK_INDEX_PLACEHOLDER = "@D"
 NAME_PLACEHOLDER = "bundle"
 
@@ -157,6 +156,7 @@ def extjoin(*args):
 
 # extensions and suffixes
 EXT_BED = "bed"
+EXT_BIN = "bin"
 EXT_IDENTIFY = "identify.h5"
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
@@ -172,6 +172,9 @@ EXT_TRIFILE = "trifile"
 def make_prefix_fmt(num):
     # make sure there are sufficient leading zeros
     return "%%0%dd." % (int(floor(log10(num))) + 1)
+
+PREFIX_ACC = "acc"
+PREFIX_POSTERIOR = "posterior"
 
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_CHUNK = "chunk"
@@ -1009,8 +1012,6 @@ class Runner(object):
                     float_filepath, int_filepath = \
                         print_obs_filepaths_custom(chrom, chunk_index)
 
-                    print >>float_filelist, float_filepath
-                    print >>int_filelist, int_filepath
                     print >>sys.stderr, " %s (%d, %d)" % (float_filepath,
                                                           start, end)
 
@@ -1440,8 +1441,11 @@ class Runner(object):
         return prog
 
     def make_acc_filename(self, start_index, chunk_index):
-        filebasename = ACC_FILENAME_FMT % (start_index, chunk_index)
-        return self.dirpath / filebasename
+        return self.make_filename(PREFIX_ACC, start_index, chunk_index,
+                                  EXT_BIN)
+
+    def make_posterior_filename(self, chunk_index):
+        return self.make_filename(PREFIX_POSTERIOR, chunk_index, EXT_TXT)
 
     def make_job_name_train(self, start_index, round_index, chunk_index):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, start_index,
@@ -1507,7 +1511,8 @@ class Runner(object):
         for _, chunk_index, chunk_mem_req in sorted(zipper, reverse=True):
             yield chunk_index, chunk_mem_req
 
-    def queue_gmtk(self, prog, kwargs, job_name, mem_req, native_specs={}):
+    def queue_gmtk(self, prog, kwargs, job_name, mem_req, native_specs={},
+                   output_filename=None):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         # convoluted so I don't have to deal with a lot of escaping issues
@@ -1527,7 +1532,9 @@ class Runner(object):
         job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = cmdline
 
-        job_tmpl.outputPath = ":" + (self.output_dirpath / job_name)
+        if output_filename is None:
+            output_filename = self.output_dirpath / job_name
+        job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
 
         set_cwd_job_tmpl(job_tmpl)
@@ -1843,14 +1850,14 @@ class Runner(object):
             self.move_results(name, src_filename, dst_filename)
 
     def _queue_identify(self, jobids, chunk_index, chunk_mem_req, kwargs_chunk,
-                        prefix_job_name, func, kwargs_func):
+                        prefix_job_name, prog, kwargs_func, output_filename):
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
-
 
         kwargs = kwargs_chunk.copy()
         kwargs.update(kwargs_func)
 
-        jobid = func(kwargs, job_name, chunk_mem_req)
+        jobid = self.queue_gmtk(prog, kwargs, job_name, chunk_mem_req,
+                                output_filename=output_filename)
         jobids.append(jobid)
 
     def run_identify(self):
@@ -1874,17 +1881,16 @@ class Runner(object):
         jobids = []
         with Session() as session:
             self.session = session
-            queue_viterbi = partial(self.queue_gmtk, prog_viterbi)
             viterbi_kwargs = dict(triFile=self.triangulation_filename,
                                   ofilelist=self.output_filelistname,
                                   dumpNames=self.dumpnames_filename)
 
-            queue_posterior = partial(self.queue_gmtk, prog_posterior)
             posterior_kwargs = \
                 dict(triFile=self.posterior_triangulation_filename,
                      doDistributeEvidence=True,
                      **self.get_posterior_clique_print_ranges())
 
+            posterior_filenames = []
             for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
                                              **identify_kwargs)
@@ -1892,10 +1898,14 @@ class Runner(object):
                                           chunk_index, chunk_mem_req,
                                           identify_kwargs_chunk)
 
-                _queue_identify(PREFIX_JOB_NAME_VITERBI, queue_viterbi,
+                _queue_identify(PREFIX_JOB_NAME_VITERBI, prog_viterbi,
                                 viterbi_kwargs)
-                _queue_identify(PREFIX_JOB_NAME_POSTERIOR, queue_posterior,
-                                posterior_kwargs)
+
+
+                posterior_filename = self.make_posterior_filename(chunk_index)
+                posterior_filenames.append(posterior_filename)
+                _queue_identify(PREFIX_JOB_NAME_POSTERIOR, prog_posterior,
+                                posterior_kwargs, posterior_filename)
 
             # XXX: search ask on DRMAA mailing list--how to allow
             # KeyboardInterrupt here?

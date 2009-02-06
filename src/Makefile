@@ -1,4 +1,4 @@
-LDFLAGS=-lhdf5
+LDFLAGS+=-lhdf5
 CFLAGS=-std=c99 -march=nocona -pipe -fomit-frame-pointer -pedantic -Wall -g -O3
 
 # XXX: use -ggdb3 for debug
