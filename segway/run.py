@@ -170,6 +170,7 @@ EXT_INT = "int"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
 EXT_POSTERIOR = "posterior"
+EXT_SH = "sh"
 EXT_TAB = "tab"
 EXT_TXT = "txt"
 EXT_TRIFILE = "trifile"
@@ -179,6 +180,7 @@ def make_prefix_fmt(num):
     return "%%0%dd." % (int(floor(log10(num))) + 1)
 
 PREFIX_ACC = "acc"
+PREFIX_CMDLINE = "run"
 PREFIX_POSTERIOR = "posterior"
 
 PREFIX_VITERBI = "viterbi"
@@ -209,7 +211,7 @@ SUBDIRNAME_PARAMS = "params" # XXX: final params should go into main directory
 SUBDIRNAME_POSTERIOR = "posterior"
 SUBDIRNAME_VITERBI = "viterbi"
 
-SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX, SUBDIRNAME_LOG]
+SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
                      SUBDIRNAME_PARAMS]
 SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
@@ -353,12 +355,12 @@ def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
 
 def save_template(filename, resource, mapping, dirname=None,
-                  delete_existing=False, start_index=None):
+                  clobber=False, start_index=None):
     """
     creates a temporary file if filename is None or empty
     """
     if filename:
-        if not delete_existing and path(filename).exists():
+        if not clobber and path(filename).exists():
             return filename, False
     else:
         resource_part = resource.rpartition(".tmpl")
@@ -645,7 +647,7 @@ class Runner(object):
         self.distribution = DISTRIBUTION_DEFAULT
 
         # flags
-        self.delete_existing = False
+        self.clobber = False
         self.triangulate = True
         self.train = True # EM train # this should become an int for num_starts
         self.verbosity = VERBOSITY
@@ -754,7 +756,7 @@ class Runner(object):
 
         params_filename = self.params_filename
         if not new and params_filename:
-            if (not self.delete_existing
+            if (not self.clobber
                 and path(params_filename).exists()):
                 # it already exists and you don't want to force regen
                 self.train = False
@@ -783,7 +785,7 @@ class Runner(object):
     def make_dir(self, dirname):
         dirpath = path(dirname)
 
-        if self.delete_existing:
+        if self.clobber:
             # just always try to delete it
             try:
                 dirpath.rmtree()
@@ -891,7 +893,7 @@ class Runner(object):
 
         self.structure_filename, self.structure_filename_new = \
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
-                          self.dirname, self.delete_existing)
+                          self.dirname, self.clobber)
 
     def save_observations_chunk(self, float_filepath, int_filepath, float_data,
                                 seq_data):
@@ -971,7 +973,7 @@ class Runner(object):
         print_obs_filepaths_custom = partial(self.print_obs_filepaths,
                                              float_filelist, int_filelist)
         save_observations_chunk = self.save_observations_chunk
-        delete_existing = self.delete_existing
+        clobber = self.clobber
 
         num_tracks = None # this is before any subsetting
         chunk_index = 0
@@ -1102,7 +1104,7 @@ class Runner(object):
         self.chunk_coords = chunk_coords
 
     def open_writable_or_dummy(self, filepath):
-        if not filepath or (not self.delete_existing and filepath.exists()):
+        if not filepath or (not self.clobber and filepath.exists()):
             return closing(StringIO()) # dummy output
         else:
             return open(filepath, "w")
@@ -1377,7 +1379,7 @@ class Runner(object):
 
         self.input_master_filename, self.input_master_filename_new = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
-                          locals(), params_dirpath, self.delete_existing,
+                          locals(), params_dirpath, self.clobber,
                           start_index)
 
     def save_dont_train(self):
@@ -1565,8 +1567,9 @@ class Runner(object):
         # convoluted so I don't have to deal with a lot of escaping issues
         cmdline = BASH_CMDLINE + ['%s "$@"' % gmtk_cmdline[0]] + gmtk_cmdline
 
+        print >>self.cmdline_file, " ".join(gmtk_cmdline)
+
         if self.dry_run:
-            print " ".join(gmtk_cmdline)
             return None
 
         session = self.session
@@ -1704,10 +1707,16 @@ class Runner(object):
             triangulation_filename = extjoin(structure_filename, EXT_TRIFILE)
             self.triangulation_filename = triangulation_filename
 
-        # XXX: need exist/delete_existing logic here
-        prog(strFile=structure_filename,
-             outputTriangulatedFile=triangulation_filename,
-             verbosity=self.verbosity)
+        kwargs = dict(strFile=structure_filename,
+                      outputTriangulatedFile=triangulation_filename,
+                      verbosity=self.verbosity)
+
+        # XXX: need exist/clobber logic here
+        # XXX: repetitive with queue_gmtk
+        cmdline = prog.build_cmdline(options=kwargs)
+        print >>self.cmdline_file, " ".join(cmdline)
+
+        prog(**kwargs)
 
         if not self.posterior_triangulation_filename:
             self.save_posterior_triangulation()
@@ -1978,21 +1987,28 @@ class Runner(object):
         self.dirpath = path(self.dirname)
         self.save_params()
 
-        if self.triangulate:
-            self.run_triangulate()
+        self.make_subdir(SUBDIRNAME_LOG)
+        cmdline_filename = self.make_filename(PREFIX_CMDLINE, EXT_SH,
+                                              subdirname=SUBDIRNAME_LOG)
 
-        if self.train:
-            self.run_train()
+        with open(cmdline_filename, "w") as cmdline_file:
+            # XXX: works around a pyflakes bug; report
+            self.cmdline_file = cmdline_file
+            if self.triangulate:
+                self.run_triangulate()
 
-        if self.identify:
-            self.run_identify()
+            if self.train:
+                self.run_train()
+
+            if self.identify:
+                self.run_identify()
 
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
 
         dirname = self.dirname
         if dirname:
-            if self.delete_existing or not path(dirname).isdir():
+            if self.clobber or not path(dirname).isdir():
                 self.make_dir(dirname)
 
             self.run(*args, **kwargs)
@@ -2074,7 +2090,7 @@ def parse_options(args):
                          help="show messages with verbosity NUM")
 
     with OptionGroup(parser, "Flags") as group:
-        group.add_option("-f", "--force", action="store_true",
+        group.add_option("-c", "--clobber", action="store_true",
                          help="delete any preexisting files")
         group.add_option("-I", "--no-identify", action="store_true",
                          help="do not identify segments")
@@ -2116,7 +2132,7 @@ def main(args=sys.argv[1:]):
     runner.include_tracknames = options.track
     runner.verbosity = options.verbosity
 
-    runner.delete_existing = options.force
+    runner.clobber = options.clobber
     runner.train = not options.no_train
     runner.identify = not options.no_identify
     runner.dry_run = options.dry_run

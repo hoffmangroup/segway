@@ -3,6 +3,7 @@
 * Now requires optbuild 0.1.6
 * segway: changed -b option: It now specifies a BED filename instead of a directory where a file
   named segway.bed.gz is found.
+* --force/-f is now --clobber/-c
 * segway: now will use a params.params file during identify
   implicitly, if it is in the directory specified with -d
 * _load_data: ignore invalid chromosome specifications instead of
