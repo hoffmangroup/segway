@@ -10,7 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
-from contextlib import closing, contextmanager
+from contextlib import closing, contextmanager, nested
 from copy import copy
 from errno import EEXIST, ENOENT
 from functools import partial
@@ -174,6 +174,7 @@ EXT_SH = "sh"
 EXT_TAB = "tab"
 EXT_TXT = "txt"
 EXT_TRIFILE = "trifile"
+EXT_WIG = "wig"
 
 def make_prefix_fmt(num):
     # make sure there are sufficient leading zeros
@@ -258,10 +259,17 @@ NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${track}"
 TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
-# XXX: this could be specified as a dict instead
-WIG_HEADER = 'track type=wiggle_0 name=%s ' \
-    'description="%s segmentation of %%s" visibility=dense viewLimits=0:1 ' \
-    'autoScale=off' % (PKG, PKG)
+WIG_ATTRS = dict(type="wiggle_0",
+                 visibility="dense",
+                 viewLimits="0:1",
+                 autoScale="off")
+WIG_ATTRS_VITERBI = dict(name="%s" % PKG,
+                         **WIG_ATTRS)
+WIG_ATTRS_POSTERIOR = dict(name="%s_posterior" % PKG,
+                           **WIG_ATTRS)
+
+WIG_DESC_VITERBI = "%s segmentation of %%s" % PKG
+WIG_DESC_POSTERIOR = "%s posterior decoding of %%s" % PKG
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
@@ -270,7 +278,28 @@ LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % PKG
 
+FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%s step=1"
+
 ## functions
+def make_fixedstep_header(chrom, start):
+    """
+    this function expects 0-based coordinates
+    it does the conversion to 1-based coordinates for you!
+    """
+    start_1based = start+1
+    print FIXEDSTEP_HEADER % (chrom, start_1based)
+
+def make_wig_attr(key, value):
+    if " " in value:
+        value = '"%s"' % value
+
+    return "%s=%s" % (key, value)
+
+def make_wig_attrs(mapping):
+    res = " ".join(make_wig_attr(key, value)
+                   for key, value in mapping.iteritems())
+
+    return "track %s" % res
 
 def vstack_tile(array_like, reps):
     return tile(array_like, (reps, 1))
@@ -494,13 +523,42 @@ def write_bed(outfile, start_pos, labels, coords):
         row = [chrom, str(seg_start), str(seg_end), str(seg_label)]
         print >>outfile, "\t".join(row)
 
-def load_gmtk_out_write_bed((chrom, start, end), gmtk_outfilename, bed_file,
-                            tracknames):
+def load_gmtk_out_write_bed(coords, gmtk_outfilename, bed_file):
     data = load_gmtk_out(gmtk_outfilename)
 
     start_pos, labels = find_segment_starts(data)
 
-    write_bed(bed_file, start_pos, labels, (chrom, start, end))
+    write_bed(bed_file, start_pos, labels, coords)
+
+def parse_posterior(iterable):
+    # skip to first frame
+    for line in iterable:
+        if line.startswith("-"):
+            break
+
+    # skip frame header
+    iterable.next()
+
+    res = []
+    for line in iterable:
+        # return the first word, which is the posterior probability
+        res.append(line.split()[1])
+
+        # frame boundary or file end
+        if line.startswith(("-", "_")):
+            yield res
+            res = []
+
+def load_posterior_write_wig((chrom, start, end), infilename, outfiles):
+    header = make_fixedstep_header(chrom, start)
+
+    for outfile in outfiles:
+        print >>outfile, header
+
+    with open(infilename) as infile:
+        for probabilities in parse_posterior(infile):
+            for outfile, probability in zip(outfiles, probabilities):
+                print >>outfile, probability
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -621,7 +679,7 @@ class Runner(object):
 
         self.dumpnames_filename = None
         self.viterbi_filelistname = None
-        self.output_filenames = None
+        self.viterbi_filenames = None
 
         self.obs_dirname = None
         self.bed_filename = None
@@ -1394,19 +1452,19 @@ class Runner(object):
         dirpath = self.dirpath / SUBDIRNAME_VITERBI
         num_chunks = self.num_chunks
 
-        output_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_chunks)
+        viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_chunks)
                                + EXT_OUT)
-        output_filenames = [dirpath / output_filename_fmt % index
+        viterbi_filenames = [dirpath / viterbi_filename_fmt % index
                             for index in xrange(num_chunks)]
 
         viterbi_filelistname = dirpath / extjoin("output", EXT_LIST)
         self.viterbi_filelistname = viterbi_filelistname
 
         with open(viterbi_filelistname, "w") as viterbi_filelist:
-            for output_filename in output_filenames:
-                print >>viterbi_filelist, output_filename
+            for viterbi_filename in viterbi_filenames:
+                print >>viterbi_filelist, viterbi_filename
 
-        self.output_filenames = output_filenames
+        self.viterbi_filenames = viterbi_filenames
 
     def save_dumpnames(self):
         self.dumpnames_filename = self.save_resource(RES_DUMPNAMES,
@@ -1449,11 +1507,30 @@ class Runner(object):
 
     def move_results(self, name, src_filename, dst_filename):
         if dst_filename:
+            # XXX: i think this should become copy
             move(src_filename, dst_filename)
         else:
             dst_filename = src_filename
 
         setattr(self, name, dst_filename)
+
+    def make_posterior_wig_filename(self, seg):
+        seg_label = PREFIX_SEG_LEN_FMT % seg
+
+        return self.make_filename(PREFIX_POSTERIOR, seg_label, EXT_WIG, EXT_GZ)
+
+    def make_wig_desc_attrs(self, mapping, desc_tmpl):
+        attrs = mapping.copy()
+        attrs["description"] = desc_tmpl % ", ".join(self.tracknames_all)
+
+        return make_wig_attrs(attrs)
+
+    def make_wig_header_viterbi(self):
+        return self.make_wig_desc_attrs(WIG_ATTRS_VITERBI, WIG_DESC_VITERBI)
+
+    def make_wig_header_posterior(self):
+        return self.make_wig_desc_attrs(WIG_ATTRS_POSTERIOR,
+                                        WIG_DESC_POSTERIOR)
 
     def gmtk_out2bed(self):
         bed_filename = self.bed_filename
@@ -1461,23 +1538,29 @@ class Runner(object):
         if bed_filename is None:
             bed_filename = self.dirpath / BED_FILEBASENAME
 
-        tracknames = self.tracknames_all
 
         # chunk_coord = (chrom, chromStart, chromEnd)
-        zipper = izip(count(), self.output_filenames, self.chunk_coords)
+        zipper = izip(self.viterbi_filenames, self.chunk_coords)
         with gzip_open(bed_filename, "w") as bed_file:
             # XXX: add in browser track line (see SVN revisions
             # previous to 195)
-            print >>bed_file, WIG_HEADER % ", ".join(tracknames)
+            print >>bed_file, self.make_wig_header_viterbi()
 
-            for index, gmtk_outfilename, chunk_coord in zipper:
+            for gmtk_outfilename, chunk_coord in zipper:
                 load_gmtk_out_write_bed(chunk_coord, gmtk_outfilename,
-                                        bed_file, tracknames)
+                                        bed_file)
 
-    def posterior2bed(self):
-        # XXX: will create a bed file for each state
-        # posterior.0.bed.gz, posterior.1.bed.gz
-        pass
+    def posterior2bed(self, infilenames):
+        wig_filenames = map(self.make_posterior_wig_filename, self.num_segs)
+
+        # XXX: repetitive with gmtk_out2bed
+        zipper = izip(infilenames, self.chunk_coords)
+        with nested(*map(gzip_open, wig_filenames)) as wig_files:
+            for wig_file in wig_files:
+                print >>wig_file, self.make_wig_header_posterior()
+
+            for infilename, chunk_coord in zipper:
+                load_posterior_write_wig(chunk_coord, infilename, wig_files)
 
     def prog_factory(self, prog):
         """
@@ -1561,7 +1644,7 @@ class Runner(object):
             yield chunk_index, chunk_mem_req
 
     def queue_gmtk(self, prog, kwargs, job_name, mem_req, native_specs={},
-                   output_filename=None):
+                   viterbi_filename=None):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         # convoluted so I don't have to deal with a lot of escaping issues
@@ -1582,9 +1665,9 @@ class Runner(object):
         job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = cmdline
 
-        if output_filename is None:
-            output_filename = self.output_dirpath / job_name
-        job_tmpl.outputPath = ":" + output_filename
+        if viterbi_filename is None:
+            viterbi_filename = self.output_dirpath / job_name
+        job_tmpl.outputPath = ":" + viterbi_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
 
         set_cwd_job_tmpl(job_tmpl)
@@ -1907,14 +1990,14 @@ class Runner(object):
 
     def _queue_identify(self, jobids, chunk_index, chunk_mem_req, kwargs_chunk,
                         prefix_job_name, prog, kwargs_func,
-                        output_filename=None):
+                        viterbi_filename=None):
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
 
         kwargs = kwargs_chunk.copy()
         kwargs.update(kwargs_func)
 
         jobid = self.queue_gmtk(prog, kwargs, job_name, chunk_mem_req,
-                                output_filename=output_filename)
+                                viterbi_filename=viterbi_filename)
         jobids.append(jobid)
 
     def run_identify(self):
@@ -1974,7 +2057,7 @@ class Runner(object):
 
         # XXXopt: parallelize
         self.gmtk_out2bed()
-        self.posterior2bed()
+        self.posterior2bed(posterior_filenames)
 
     def run(self):
         """

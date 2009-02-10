@@ -12,8 +12,7 @@
 * stop creating lots of auxiliary output files during Viterbi identify
 * there is no directory named "out" created by default
 * segway: now arranges some working files into subdirectories, some name changes
-* runs posterior decoding during identify. for now, results are saved
-  in the output directory. will be processed in a future version
+* runs posterior decoding during identify
 * segway: figure out fully-qualified path to GMTK executables and
   queue that. This increases robustness to minor configuration
   differences on parallel nodes.
