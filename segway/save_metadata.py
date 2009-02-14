@@ -97,8 +97,8 @@ def write_metadata(chromosome):
             # last_index
             ends += 1
         else:
-            starts = array(0)
-            ends = array(num_rows)
+            starts = array([0])
+            ends = array([num_rows])
 
         supercontig_attrs = supercontig._v_attrs
         supercontig_attrs.chunk_starts = starts

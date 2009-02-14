@@ -25,7 +25,7 @@ from threading import Event, Thread
 from DRMAA import ExitTimeoutError, Session as _Session
 from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
                    empty, finfo, float32, fromfile, intc, invert, isnan,
-                   newaxis, NINF, outer, s_, square, tile, vectorize)
+                   newaxis, NINF, outer, s_, sqrt, square, tile, vectorize)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       Mixin_UseFullProgPath,
@@ -49,13 +49,19 @@ DISTRIBUTION_DEFAULT = DISTRIBUTION_NORM
 ## XXX: should be options
 MEAN_METHOD_UNIFORM = "uniform" # randomly pick from the range
 MEAN_METHOD_ML_JITTER = "ml_jitter" # maximum likelihood, then jitter
-MEAN_METHODS = [MEAN_METHOD_UNIFORM, MEAN_METHOD_ML_JITTER]
-MEAN_METHOD = MEAN_METHOD_UNIFORM
+
+# maximum likelihood, adjusted by no more than 0.2*sd
+MEAN_METHOD_ML_JITTER_STD = "ml_jitter_std"
+MEAN_METHODS = [MEAN_METHOD_UNIFORM, MEAN_METHOD_ML_JITTER,
+                MEAN_METHOD_ML_JITTER_STD]
+MEAN_METHOD = MEAN_METHOD_ML_JITTER_STD
 
 COVAR_METHOD_MAX_RANGE = "max_range" # maximum range
 COVAR_METHOD_ML_JITTER = "ml_jitter" # maximum likelihood, then jitter
-COVAR_METHODS = [COVAR_METHOD_MAX_RANGE, COVAR_METHOD_ML_JITTER]
-COVAR_METHOD = COVAR_METHOD_MAX_RANGE
+COVAR_METHOD_ML = "ml" # maximum likelihood
+COVAR_METHODS = [COVAR_METHOD_MAX_RANGE, COVAR_METHOD_ML_JITTER,
+                 COVAR_METHOD_ML]
+COVAR_METHOD = COVAR_METHOD_ML
 
 NUM_SEGS = 2 # XXX: to change, will require CARD_SEG to be set
 MAX_EM_ITERS = 100
@@ -78,6 +84,7 @@ FINFO_FLOAT32 = finfo(float32)
 MACHEP_FLOAT32 = FINFO_FLOAT32.machep
 TINY_FLOAT32 = FINFO_FLOAT32.tiny
 
+JITTER_STD_BOUND = 0.2
 FUDGE_EP = -17 # ldexp(1, -17) = ~1e-6
 assert FUDGE_EP > MACHEP_FLOAT32
 
@@ -368,7 +375,15 @@ def make_res_req(size):
 def convert_chunks(attrs, name):
     supercontig_start = attrs.start
     edges_array = getattr(attrs, name) + supercontig_start
-    return edges_array.tolist()
+    res = edges_array.tolist()
+
+    # XXX: this is a hack that was necessary due to a bugs in
+    # save_metadata.py <r295; you can remove it when all the data is
+    # reloaded
+    if isinstance(res, list):
+        return res
+    else:
+        return list(res)
 
 def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
@@ -1310,10 +1325,23 @@ class Runner(object):
                       for seg_index in xrange(num_segs)])
 
     def make_means(self):
+        num_segs = self.num_segs
+        means = self.means
+
         if MEAN_METHOD == MEAN_METHOD_UNIFORM:
             return self.rand_means()
         elif MEAN_METHOD == MEAN_METHOD_ML_JITTER:
-            return jitter(vstack_tile(self.means, self.num_segs))
+            return jitter(vstack_tile(means, num_segs))
+        elif MEAN_METHOD == MEAN_METHOD_ML_JITTER_STD:
+            stds = sqrt(self.vars)
+
+            means_tiled = vstack_tile(means, num_segs)
+            stds_tiled = vstack_tile(stds, num_segs)
+
+            noise = uniform(-JITTER_STD_BOUND, JITTER_STD_BOUND,
+                             stds_tiled.shape)
+
+            return means_tiled + (stds_tiled * noise)
 
         raise ValueError("unsupported MEAN_METHOD")
 
@@ -1328,6 +1356,8 @@ class Runner(object):
             return vstack_tile(ranges, num_segs)
         elif COVAR_METHOD == COVAR_METHOD_ML_JITTER:
             return jitter(vstack_tile(self.vars, num_segs))
+        elif COVAR_METHOD == COVAR_METHOD_ML:
+            return vstack_tile(self.vars, num_segs)
 
         raise ValueError("unsupported COVAR_METHOD")
 
