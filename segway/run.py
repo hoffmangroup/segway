@@ -383,7 +383,7 @@ def convert_chunks(attrs, name):
     if isinstance(res, list):
         return res
     else:
-        return list(res)
+        return [res]
 
 def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
