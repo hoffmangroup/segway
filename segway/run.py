@@ -720,6 +720,7 @@ class Runner(object):
         self.clobber = False
         self.triangulate = True
         self.train = True # EM train # this should become an int for num_starts
+        self.posterior = True
         self.verbosity = VERBOSITY
         self.identify = True # viterbi
         self.dry_run = False
@@ -1512,8 +1513,9 @@ class Runner(object):
 
         train = self.train
         identify = self.identify
+        posterior = self.posterior
 
-        if train or identify:
+        if train or identify or posterior:
             self.set_jt_info_filename()
             self.make_chunk_mem_reqs()
 
@@ -1526,7 +1528,7 @@ class Runner(object):
             # might turn off self.train, if the params already exist
             self.set_log_likelihood_filename()
 
-        if identify:
+        if identify or posterior:
             self.make_subdirs(SUBDIRNAMES_IDENTIFY)
 
             self.save_viterbi_filelist()
@@ -1596,6 +1598,10 @@ class Runner(object):
 
             for infilename, chunk_coord in zipper:
                 load_posterior_write_wig(chunk_coord, infilename, wig_files)
+
+        # delete original input files because they are enormous
+        for infilename in infilenames:
+            path(infilename).remove()
 
     def prog_factory(self, prog):
         """
@@ -2035,7 +2041,7 @@ class Runner(object):
                                 viterbi_filename=viterbi_filename)
         jobids.append(jobid)
 
-    def run_identify(self):
+    def run_identify_posterior(self):
         if not self.input_master_filename:
             self.save_input_master()
 
@@ -2052,13 +2058,16 @@ class Runner(object):
 
         self.set_output_dirpaths("identify")
 
+        viterbi_kwargs = dict(triFile=self.triangulation_filename,
+                              ofilelist=self.viterbi_filelistname,
+                              dumpNames=self.dumpnames_filename)
+
+        make_posterior_filename = self.make_posterior_filename
+
         # XXX: kill submitted jobs on exception
         jobids = []
         with Session() as session:
             self.session = session
-            viterbi_kwargs = dict(triFile=self.triangulation_filename,
-                                  ofilelist=self.viterbi_filelistname,
-                                  dumpNames=self.dumpnames_filename)
 
             posterior_kwargs = \
                 dict(triFile=self.posterior_triangulation_filename,
@@ -2073,14 +2082,15 @@ class Runner(object):
                                           chunk_index, chunk_mem_req,
                                           identify_kwargs_chunk)
 
-                _queue_identify(PREFIX_JOB_NAME_VITERBI, prog_viterbi,
-                                viterbi_kwargs)
+                if self.identify:
+                    _queue_identify(PREFIX_JOB_NAME_VITERBI, prog_viterbi,
+                                    viterbi_kwargs)
 
-
-                posterior_filename = self.make_posterior_filename(chunk_index)
-                posterior_filenames.append(posterior_filename)
-                _queue_identify(PREFIX_JOB_NAME_POSTERIOR, prog_posterior,
-                                posterior_kwargs, posterior_filename)
+                if self.posterior:
+                    posterior_filename = make_posterior_filename(chunk_index)
+                    posterior_filenames.append(posterior_filename)
+                    _queue_identify(PREFIX_JOB_NAME_POSTERIOR, prog_posterior,
+                                    posterior_kwargs, posterior_filename)
 
             # XXX: search ask on DRMAA mailing list--how to allow
             # KeyboardInterrupt here?
@@ -2118,8 +2128,8 @@ class Runner(object):
             if self.train:
                 self.run_train()
 
-            if self.identify:
-                self.run_identify()
+            if self.identify or self.posterior:
+                self.run_identify_posterior()
 
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
@@ -2210,10 +2220,12 @@ def parse_options(args):
     with OptionGroup(parser, "Flags") as group:
         group.add_option("-c", "--clobber", action="store_true",
                          help="delete any preexisting files")
-        group.add_option("-I", "--no-identify", action="store_true",
-                         help="do not identify segments")
         group.add_option("-T", "--no-train", action="store_true",
                          help="do not train model")
+        group.add_option("-I", "--no-identify", action="store_true",
+                         help="do not identify segments")
+        group.add_option("-P", "--no-posterior", action="store_true",
+                         help="do not identify probability of segments")
         group.add_option("-k", "--keep-going", action="store_true",
                          help="keep going in some threads even when you have"
                          " errors in another")
@@ -2253,6 +2265,7 @@ def main(args=sys.argv[1:]):
     runner.clobber = options.clobber
     runner.train = not options.no_train
     runner.identify = not options.no_identify
+    runner.posterior = not options.no_posterior
     runner.dry_run = options.dry_run
     runner.keep_going = options.keep_going
 

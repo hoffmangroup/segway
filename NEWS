@@ -13,6 +13,7 @@
 * there is no directory named "out" created by default
 * segway: now arranges some working files into subdirectories, some name changes
 * runs posterior decoding during identify
+* segway: no option --no-posterior disables posterior decoding
 * segway: figure out fully-qualified path to GMTK executables and
   queue that. This increases robustness to minor configuration
   differences on parallel nodes.
