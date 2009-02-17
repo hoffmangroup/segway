@@ -198,7 +198,7 @@ PREFIX_JOB_NAME_VITERBI = "vit"
 PREFIX_JOB_NAME_POSTERIOR = "jt"
 
 # XXX: do not hardcode
-PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)
+PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)[:-1]
 
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
@@ -268,11 +268,11 @@ WIG_ATTRS = dict(type="wiggle_0",
                  autoScale="off")
 WIG_ATTRS_VITERBI = dict(name="%s" % PKG,
                          **WIG_ATTRS)
-WIG_ATTRS_POSTERIOR = dict(name="%s_posterior" % PKG,
-                           **WIG_ATTRS)
+
+WIG_NAME_POSTERIOR = "%s segment %%s" % PKG
 
 WIG_DESC_VITERBI = "%s segmentation of %%s" % PKG
-WIG_DESC_POSTERIOR = "%s posterior decoding of %%s" % PKG
+WIG_DESC_POSTERIOR = "%s posterior decoding state %%s of %%s" % PKG
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
@@ -290,7 +290,7 @@ def make_fixedstep_header(chrom, start):
     it does the conversion to 1-based coordinates for you!
     """
     start_1based = start+1
-    print FIXEDSTEP_HEADER % (chrom, start_1based)
+    return FIXEDSTEP_HEADER % (chrom, start_1based)
 
 def make_wig_attr(key, value):
     if " " in value:
@@ -552,13 +552,14 @@ def parse_posterior(iterable):
 
     res = []
     for line in iterable:
-        # return the first word, which is the posterior probability
-        res.append(line.split()[1])
-
         # frame boundary or file end
         if line.startswith(("-", "_")):
             yield res
             res = []
+            iterable.next() # skip frame header
+        else:
+            # return the first word, which is the posterior probability
+            res.append(line.split()[1])
 
 def load_posterior_write_wig((chrom, start, end), infilename, outfiles):
     header = make_fixedstep_header(chrom, start)
@@ -1554,9 +1555,12 @@ class Runner(object):
     def make_wig_header_viterbi(self):
         return self.make_wig_desc_attrs(WIG_ATTRS_VITERBI, WIG_DESC_VITERBI)
 
-    def make_wig_header_posterior(self):
-        return self.make_wig_desc_attrs(WIG_ATTRS_POSTERIOR,
-                                        WIG_DESC_POSTERIOR)
+    def make_wig_header_posterior(self, state_name):
+        attrs = WIG_ATTRS.copy()
+        attrs["name"] = WIG_NAME_POSTERIOR % state_name
+
+        return self.make_wig_desc_attrs(attrs,
+                                        WIG_DESC_POSTERIOR % state_name)
 
     def gmtk_out2bed(self):
         bed_filename = self.bed_filename
@@ -1577,13 +1581,18 @@ class Runner(object):
                                         bed_file)
 
     def posterior2bed(self, infilenames):
-        wig_filenames = map(self.make_posterior_wig_filename, self.num_segs)
+        range_num_segs = xrange(self.num_segs)
+        wig_filenames = map(self.make_posterior_wig_filename, range_num_segs)
 
         # XXX: repetitive with gmtk_out2bed
         zipper = izip(infilenames, self.chunk_coords)
-        with nested(*map(gzip_open, wig_filenames)) as wig_files:
-            for wig_file in wig_files:
-                print >>wig_file, self.make_wig_header_posterior()
+
+        wig_files_unentered = [gzip_open(wig_filename, "w")
+                               for wig_filename in wig_filenames]
+
+        with nested(*wig_files_unentered) as wig_files:
+            for state_index, wig_file in enumerate(wig_files):
+                print >>wig_file, self.make_wig_header_posterior(state_index)
 
             for infilename, chunk_coord in zipper:
                 load_posterior_write_wig(chunk_coord, infilename, wig_files)
