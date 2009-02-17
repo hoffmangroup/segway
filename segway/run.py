@@ -272,7 +272,7 @@ WIG_ATTRS_VITERBI = dict(name="%s" % PKG,
 WIG_NAME_POSTERIOR = "%s segment %%s" % PKG
 
 WIG_DESC_VITERBI = "%s segmentation of %%s" % PKG
-WIG_DESC_POSTERIOR = "%s posterior decoding state %%s of %%s" % PKG
+WIG_DESC_POSTERIOR = "%s posterior decoding segment %%s of %%%%s" % PKG
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
