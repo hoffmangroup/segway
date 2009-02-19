@@ -73,6 +73,7 @@ SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
 SWAP_ENDIAN = False
+POSTERIOR_SCALE_FACTOR = 100.0
 
 ## option defaults
 VERBOSITY = 0
@@ -263,11 +264,14 @@ TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
 WIG_ATTRS = dict(type="wiggle_0",
-                 visibility="dense",
-                 viewLimits="0:1",
                  autoScale="off")
 WIG_ATTRS_VITERBI = dict(name="%s" % PKG,
+                         visibility="dense",
+                         viewLimits="0:1",
                          **WIG_ATTRS)
+WIG_ATTRS_POSTERIOR = dict(viewLimits="0:100",
+                           visibility="full",
+                           **WIG_ATTRS)
 
 WIG_NAME_POSTERIOR = "%s segment %%s" % PKG
 
@@ -559,7 +563,7 @@ def parse_posterior(iterable):
             iterable.next() # skip frame header
         else:
             # return the first word, which is the posterior probability
-            res.append(line.split()[1])
+            res.append(float(line.split()[1]))
 
 def load_posterior_write_wig((chrom, start, end), infilename, outfiles):
     header = make_fixedstep_header(chrom, start)
@@ -568,9 +572,9 @@ def load_posterior_write_wig((chrom, start, end), infilename, outfiles):
         print >>outfile, header
 
     with open(infilename) as infile:
-        for probabilities in parse_posterior(infile):
-            for outfile, probability in zip(outfiles, probabilities):
-                print >>outfile, probability
+        for probs in parse_posterior(infile):
+            for outfile, prob in zip(outfiles, probs):
+                print >>outfile, int(round(prob * POSTERIOR_SCALE_FACTOR))
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -1494,6 +1498,12 @@ class Runner(object):
 
         self.viterbi_filenames = viterbi_filenames
 
+    def make_posterior_filenames(self):
+        make_posterior_filename = self.make_posterior_filename
+        chunk_range = xrange(self.num_chunks)
+
+        self.posterior_filenames = map(make_posterior_filename, chunk_range)
+
     def save_dumpnames(self):
         self.dumpnames_filename = self.save_resource(RES_DUMPNAMES,
                                                      SUBDIRNAME_AUX)
@@ -1558,7 +1568,7 @@ class Runner(object):
         return self.make_wig_desc_attrs(WIG_ATTRS_VITERBI, WIG_DESC_VITERBI)
 
     def make_wig_header_posterior(self, state_name):
-        attrs = WIG_ATTRS.copy()
+        attrs = WIG_ATTRS_POSTERIOR.copy()
         attrs["name"] = WIG_NAME_POSTERIOR % state_name
 
         return self.make_wig_desc_attrs(attrs,
@@ -1569,7 +1579,6 @@ class Runner(object):
 
         if bed_filename is None:
             bed_filename = self.dirpath / BED_FILEBASENAME
-
 
         # chunk_coord = (chrom, chromStart, chromEnd)
         zipper = izip(self.viterbi_filenames, self.chunk_coords)
@@ -1582,7 +1591,9 @@ class Runner(object):
                 load_gmtk_out_write_bed(chunk_coord, gmtk_outfilename,
                                         bed_file)
 
-    def posterior2bed(self, infilenames):
+    def posterior2wig(self):
+        infilenames = self.posterior_filenames
+
         range_num_segs = xrange(self.num_segs)
         wig_filenames = map(self.make_posterior_wig_filename, range_num_segs)
 
@@ -2062,7 +2073,8 @@ class Runner(object):
                               ofilelist=self.viterbi_filelistname,
                               dumpNames=self.dumpnames_filename)
 
-        make_posterior_filename = self.make_posterior_filename
+        self.make_posterior_filenames()
+        posterior_filenames = self.posterior_filenames
 
         # XXX: kill submitted jobs on exception
         jobids = []
@@ -2074,7 +2086,6 @@ class Runner(object):
                      doDistributeEvidence=True,
                      **self.get_posterior_clique_print_ranges())
 
-            posterior_filenames = []
             for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
                                              **identify_kwargs)
@@ -2087,8 +2098,7 @@ class Runner(object):
                                     viterbi_kwargs)
 
                 if self.posterior:
-                    posterior_filename = make_posterior_filename(chunk_index)
-                    posterior_filenames.append(posterior_filename)
+                    posterior_filename = posterior_filenames[chunk_index]
                     _queue_identify(PREFIX_JOB_NAME_POSTERIOR, prog_posterior,
                                     posterior_kwargs, posterior_filename)
 
@@ -2102,7 +2112,7 @@ class Runner(object):
 
         # XXXopt: parallelize
         self.gmtk_out2bed()
-        self.posterior2bed(posterior_filenames)
+        self.posterior2wig()
 
     def run(self):
         """
