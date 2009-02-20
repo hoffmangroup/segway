@@ -2111,8 +2111,11 @@ class Runner(object):
             session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER, True)
 
         # XXXopt: parallelize
-        self.gmtk_out2bed()
-        self.posterior2wig()
+        if self.identify:
+            self.gmtk_out2bed()
+
+        if self.posterior:
+            self.posterior2wig()
 
     def run(self):
         """

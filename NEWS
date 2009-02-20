@@ -1,5 +1,9 @@
 0.1.2:
 
+* segway bugfixes: do not create segway.bed.gz or
+  posterior.seg0.wig.gz when --no-identify or --no-posterior are
+  enabled, respectively
+
 0.1.1:
 
 * Now requires optbuild 0.1.6
