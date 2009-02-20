@@ -1,27 +1,30 @@
 0.1.1:
 
 * Now requires optbuild 0.1.6
+* new segway-res-usage program calibrates memory usage
 * segway: changed -b option: It now specifies a BED filename instead of a directory where a file
   named segway.bed.gz is found.
 * --force/-f is now --clobber/-c
 * segway: now will use a params.params file during identify
   implicitly, if it is in the directory specified with -d
+* segway: method for generating starting parameters is somewhat different now
+* segway: now generates a lot of directories for workign files instead of dumping lots of stuff in one directory
 * _load_data: ignore invalid chromosome specifications instead of
   triggering a fatal error
 * genomedata-save-metadata: can now handle empty columns
 * stop creating lots of auxiliary output files during Viterbi identify
 * there is no directory named "out" created by default
 * segway: now arranges some working files into subdirectories, some name changes
-* runs posterior decoding during identify
+* runs posterior decoding during identify, creates wig files
 * segway: no option --no-posterior disables posterior decoding
 * segway: figure out fully-qualified path to GMTK executables and
   queue that. This increases robustness to minor configuration
   differences on parallel nodes.
 * add segway-res-usage program to calibrate resource usage, which involved some refactoring of run.py
-* adding different methods to create initial parameters. interface will be exposed in a future version
+* adding different methods to create initial parameters. interface may be exposed in a future version
 * jt_info.txt is now created in work directory instead of current directory
 * fix bug: don't repeat track line multiple times in BED file
-* performance: change genomedata-save-metadata
+* performance: greatly improve genomedata-save-metadata
 
 0.1.0:
 

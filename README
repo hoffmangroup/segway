@@ -25,7 +25,7 @@ the following packages or newer versions:
 - PyTables_ 2.1
 - path.py 2.2
 - setuptools 0.6c8
-- optbuild 0.1.5
+- optbuild 0.1.6
 - textinput 0.1.1
 
 XXX DRMAA is not automatically installed at the moment, you have to
