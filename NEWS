@@ -2,6 +2,7 @@
 
 * segway-res-usage: now produces a tab-delimited output file that can
   be used to specify Segway's memory management
+* segway: uses the previously mentioned file
 
 0.1.2:
 
