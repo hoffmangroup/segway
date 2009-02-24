@@ -6,6 +6,7 @@
 * segway: uses the new resource usage file
 * segway: by default, abort if an input sequence is going to take more
   than 15G of RAM to process using any of the commands being run
+* segway-res-usage: try to guess which tracks are going to be way too huge and skip them
 * segway-res-usage, segway: identify unique runs with uuid.uuid1() instead of os.getpid()
 
 0.1.2:

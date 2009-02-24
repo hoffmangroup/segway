@@ -29,6 +29,8 @@ MAX_NUM_TRACKS = 20 # XXX: should be 50 or maybe 100
 MIN_EXPONENT = 4
 MAX_EXPONENT = 6
 
+# XXX: I should replace this with a more general linear model of
+# mem_per_obs
 MAX_MEM_PER_OBS = 23644 # old gmtkViterbiNew for 20 tracks
 
 CHROM_FMT = "fake%d"
@@ -64,6 +66,7 @@ class MemUsageRunner(Runner):
     def __init__(self, *args, **kwargs):
         Runner.__init__(self, *args, **kwargs)
         self.max_em_iters = 1
+        self.skip_large_mem_usage = True
 
     def write_observations(self, float_filelist, int_filelist):
         num_tracks = self.num_tracks

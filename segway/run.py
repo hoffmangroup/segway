@@ -721,6 +721,7 @@ class Runner(object):
         self.identify = True # viterbi
         self.dry_run = False
         self.use_dinucleotide = None
+        self.skip_large_mem_usage = False
 
         # functions
         self.train_prog = None
@@ -1748,6 +1749,9 @@ class Runner(object):
     def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
                    output_filename=None):
         if mem_usage > MEM_USAGE_LIMIT:
+            if self.skip_large_mem_usage:
+                return
+
             msg = "queuing %s with a request of %d memory, which is greater" \
                 " than MEM_USAGE_LIMIT" % (prog.prog, mem_usage)
             raise ValueError(msg)
@@ -1787,6 +1791,11 @@ class Runner(object):
 
     def queue_train(self, start_index, round_index,
                     chunk_index, mem_usage, hold_jid=None, **kwargs):
+        """
+        this calls Runner.queue_gmtk() and returns None if the
+        mem_usage is too large, and self.skip_large_mem_usage is True.
+        If it is False, a ValueError is raised.
+        """
         kwargs["inputMasterFile"] = self.input_master_filename
 
         prog = self.train_prog
@@ -1816,7 +1825,8 @@ class Runner(object):
 
             jobid = queue_train_custom(chunk_index, chunk_mem_usage,
                                        **kwargs_chunk)
-            res.append(jobid)
+            if jobid is not None:
+                res.append(jobid)
 
         return res
 
@@ -1924,6 +1934,8 @@ class Runner(object):
             self.queue_train_parallel(last_params_filename, start_index,
                                       round_index, **kwargs)
 
+        # will be None if mem_usage > MEM_USAGE_LIMIT and
+        # self.skip_large_mem_usage
         bundle_jobid = \
             self.queue_train_bundle(parallel_jobids, last_params_filename,
                                     curr_params_filename, start_index,
@@ -2096,8 +2108,8 @@ class Runner(object):
         for name, src_filename, dst_filename in zipper:
             self.move_results(name, src_filename, dst_filename)
 
-    def _queue_identify(self, jobids, chunk_index, kwargs_chunk, chunk_mem_usage,
-                        prefix_job_name, prog, kwargs_func,
+    def _queue_identify(self, jobids, chunk_index, kwargs_chunk,
+                        chunk_mem_usage, prefix_job_name, prog, kwargs_func,
                         output_filename=None):
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
 
@@ -2106,7 +2118,8 @@ class Runner(object):
 
         jobid = self.queue_gmtk(prog, kwargs, job_name, chunk_mem_usage,
                                 output_filename=output_filename)
-        jobids.append(jobid)
+        if jobid is not None:
+            jobids.append(jobid)
 
     def run_identify_posterior(self):
         if not self.input_master_filename:
