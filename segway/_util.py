@@ -40,6 +40,10 @@ DTYPE_IDENTIFY = intc
 DTYPE_OBS_INT = intc
 DTYPE_SEG_LEN = intc
 
+# sentinel values
+ISLAND_BASE_NA = 0
+ISLAND_LST_NA = 0
+
 data_filename = partial(resource_filename, PKG_DATA)
 data_string = partial(resource_string, PKG_DATA)
 

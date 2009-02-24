@@ -13,6 +13,7 @@ import sys
 sys.path
 
 from cStringIO import StringIO
+from collections import defaultdict
 from contextlib import closing, nested
 from copy import copy
 from errno import EEXIST, ENOENT
@@ -35,12 +36,13 @@ from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
                       OptionBuilder_ShortOptWithSpace_TF)
 from path import path
+from tabdelim import DictReader
 
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
                     EXT_GZ, fill_array, find_segment_starts, get_tracknames,
-                    gzip_open, iter_chroms_coords, load_coords,
-                    NamedTemporaryDir, PKG, Session,
-                    walk_continuous_supercontigs, walk_supercontigs)
+                    gzip_open, ISLAND_BASE_NA, ISLAND_LST_NA,
+                    iter_chroms_coords, load_coords, NamedTemporaryDir, PKG,
+                    Session, walk_continuous_supercontigs, walk_supercontigs)
 
 # XXX: I should really get some sort of Enum for this, I think Peter
 # Norvig has one
@@ -220,6 +222,7 @@ RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC = "seg.inc"
 RES_DUMPNAMES = "dumpnames.list"
+RES_RES_USAGE = "res_usage.tab"
 
 DIRICHLET_FRAG = "0 dirichlet_seg_seg 2 CARD_SEG CARD_SEG"
 
@@ -665,6 +668,7 @@ class Runner(object):
         self.triangulation_filename = None
         self.posterior_triangulation_filename = None
         self.jt_info_filename = None
+        self.res_usage_filename = data_filename(RES_RES_USAGE) # XXX: allow specification
 
         self.params_filename = None
         self.dirname = None
@@ -1641,10 +1645,44 @@ class Runner(object):
 
         return res
 
-    def make_mem_req(self, chunk_len, num_tracks):
+    def parse_res_usage(self):
+        # dict
+        # key: (program, num_tracks)
+        # val: dict
+        #      key: (island_base, island_lst)
+        #      val: (mem_per_obs, cpu_per_obs)
+        res_usage = defaultdict(dict)
+
+        with open(self.res_usage_filename) as infile:
+            reader = DictReader(infile)
+            for row in reader:
+                program = reader["program"]
+                num_tracks = int(reader["num_tracks"])
+                island_base = int(reader["island_base"])
+                island_lst = int(reader["island_lst"])
+                mem_per_obs = int(reader["mem_per_obs"])
+                cpu_per_obs = float(reader["mem_per_obs"])
+
+                top_specifier = (program, num_tracks)
+                island_specifier = (island_base, island_lst)
+                data = (mem_per_obs, cpu_per_obs)
+
+                res_usage[top_specifier][island_specifier] = data
+
+        self.res_usage = res_usage
+
+    def make_mem_req(self, chunk_len, num_tracks, program="gmtkEMtrainNew"):
+        # XXX: program should be specified elsewhere
+
+        # XXX: allow other island values
+        assert not ISLAND
+        island_specifier = (ISLAND_BASE_NA, ISLAND_LST_NA)
+
         # will fail if it's not pre-defined
-        slope, intercept = MEM_REQS[num_tracks] XXXXXXXXXXXXXXXX
-        res = slope * chunk_len + intercept
+        res_usage = self.res_usage[(program, num_tracks)][island_specifier]
+        mem_per_obs = res_usage[0]
+
+        res = chunk_len * mem_per_obs
 
         return "%dM" % ceil(res / 2**20)
 
@@ -2104,6 +2142,7 @@ class Runner(object):
         # XXXopt: use binary I/O to gmtk rather than ascii
 
         self.dirpath = path(self.dirname)
+        self.parse_res_usage()
         self.save_params()
 
         self.make_subdir(SUBDIRNAME_LOG)

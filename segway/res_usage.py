@@ -21,7 +21,7 @@ from optbuild import OptionBuilder_ShortOptWithSpace
 from tabdelim import DictWriter
 
 from .run import Runner
-from ._util import fill_array
+from ._util import fill_array, ISLAND_BASE_NA, ISLAND_LST_NA
 
 MAX_NUM_TRACKS = 20
 MIN_EXPONENT = 4
@@ -39,10 +39,6 @@ FIELDNAMES = ["program", "num_tracks", "island_base", "island_lst",
               "mem_per_obs", "cpu_per_obs"]
 
 QACCT_PROG = OptionBuilder_ShortOptWithSpace("qacct")
-
-# sentinel values
-ISLAND_BASE_NA = 0
-ISLAND_LST_NA = 0
 
 # N1 Grid Engine User's Guide chapter 3 page 71
 SGE_MEM_SIZE_SUFFIXES = dict(K=2**10, M=2**20, G=2**30,
