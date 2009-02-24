@@ -12,7 +12,7 @@ __version__ = "$Revision$"
 from collections import defaultdict
 from math import ceil
 from operator import itemgetter
-from os import getpid
+from uuid import uuid1
 import sys
 
 from numpy import arange, float32, square
@@ -25,15 +25,16 @@ from .run import (EM_TRAIN_PROG, VITERBI_PROG, POSTERIOR_PROG,
                   NAME_BUNDLE_PLACEHOLDER, Runner)
 from ._util import fill_array, ISLAND_BASE_NA, ISLAND_LST_NA
 
-MAX_NUM_TRACKS = 1 # XXX: should be 20 (or even 50/100)
+MAX_NUM_TRACKS = 20 # XXX: should be 50 or maybe 100
 MIN_EXPONENT = 4
 MAX_EXPONENT = 6
+
+MAX_MEM_PER_OBS = 23644 # old gmtkViterbiNew for 20 tracks
 
 CHROM_FMT = "fake%d"
 
 DIR_FMT = "res_usage_%d"
 TRACKNAME_FMT = "obs%d"
-HUGE_MEM_REQ = "5G" # 4G will fit 1e6*20 cells
 
 FIELDNAMES = ["program", "num_tracks", "island_base", "island_lst",
               "mem_per_obs", "cpu_per_obs"]
@@ -47,11 +48,14 @@ PREFIX2PROG = {PREFIX_JOB_NAME_VITERBI: VITERBI_PROG,
 SGE_MEM_SIZE_SUFFIXES = dict(K=2**10, M=2**20, G=2**30,
                              k=1e3, m=1e6, g=1e9)
 
-def make_job_name_stem(pid):
-    return "ru%s" % pid
+# set once per file run
+UUID = uuid1().hex
 
-def make_job_name_stem_pid():
-    return make_job_name_stem(getpid())
+def make_job_name_stem(uuid):
+    return "ru%s" % uuid
+
+def make_job_name_stem_uuid():
+    return make_job_name_stem(UUID)
 
 class MemUsageRunner(Runner):
     """
@@ -113,13 +117,12 @@ class MemUsageRunner(Runner):
         self.num_bases = num_bases
         self.chunk_coords = chunk_coords
 
-    @staticmethod
-    def make_mem_req(*args, **kwargs):
-        # always use a fixed memory requirement
-        return HUGE_MEM_REQ
+    def get_mem_per_obs(self, prog, num_tracks):
+        # always return the largest number imaginable
+        return MAX_MEM_PER_OBS
 
     def make_job_name_res_usage(self, prog, chunk_name):
-        return ".".join([make_job_name_stem_pid(), prog.prog,
+        return ".".join([make_job_name_stem_uuid(), prog.prog,
                          str(self.num_tracks), str(chunk_name)])
 
     def make_job_name_train(self, start_index, round_index, chunk_index):
@@ -133,7 +136,9 @@ class MemUsageRunner(Runner):
     def make_job_name_identify(self, prefix, chunk_index):
         prog = PREFIX2PROG[prefix]
 
-        return self.make_job_name_res_usage(prog, chunk_index)
+        chunk_name = self.chunk_lens[chunk_index]
+
+        return self.make_job_name_res_usage(prog, chunk_name)
 
     def gmtk_out2bed(self, *args, **kwargs):
         pass
@@ -165,13 +170,18 @@ def parse_sge_qacct(text):
     yield res
 
 def convert_sge_mem_size(text):
-    significand = float(text[:-1])
-    multiplier = SGE_MEM_SIZE_SUFFIXES[text[-1]]
+    try:
+        multiplier = SGE_MEM_SIZE_SUFFIXES[text[-1]]
+        significand = float(text[:-1])
 
-    return int(ceil(significand * multiplier))
+        res = significand * multiplier
+    except KeyError:
+        res = float(text)
 
-def parse_res_usage(pid):
-    jobname = ".".join([make_job_name_stem(pid), "*"])
+    return int(ceil(res))
+
+def parse_res_usage(uuid):
+    jobname = ".".join([make_job_name_stem(uuid), "*"])
     acct_text = QACCT_PROG.getoutput(j=jobname)
 
     # dict:
@@ -215,7 +225,7 @@ def parse_res_usage(pid):
 
 def res_usage():
     run_res_usage()
-    parse_res_usage(getpid())
+    parse_res_usage(UUID)
 
 def parse_options(args):
     from optparse import OptionParser

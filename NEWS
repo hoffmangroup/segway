@@ -3,7 +3,10 @@
 * segway-res-usage: now produces a tab-delimited output file that can
   be used to specify Segway's memory management
 * segway-res-usage: calibrates resource usage of training bundle step, posterior, identify
-* segway: uses the previously mentioned file
+* segway: uses the new resource usage file
+* segway: by default, abort if an input sequence is going to take more
+  than 15G of RAM to process using any of the commands being run
+* segway-res-usage, segway: identify unique runs with uuid.uuid1() instead of os.getpid()
 
 0.1.2:
 

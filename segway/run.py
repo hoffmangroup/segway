@@ -20,11 +20,12 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip
 from math import ceil, floor, frexp, ldexp, log10
-from os import extsep, getpid
+from os import extsep
 from shutil import move
 from string import Template
 import sys
 from threading import Event, Thread
+from uuid import uuid1
 
 from DRMAA import ExitTimeoutError
 from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
@@ -116,7 +117,8 @@ COMPONENT_CACHE = True
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 MAX_FRAMES = 1000000000 # 1 billion
-MEM_REQ_BUNDLE = "500M" # XXX: should be included in calibration
+MEM_USAGE_LIMIT = 15000000000 # 15 GB
+MEM_USAGE_BUNDLE = 200000000 # 200M; XXX: should be included in calibration
 RES_REQ_IDS = ["mem_requested"]
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
@@ -281,6 +283,9 @@ COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % PKG
 
 FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%s step=1"
+
+# set once per file run
+UUID = uuid1().hex
 
 ## functions
 def make_fixedstep_header(chrom, start):
@@ -637,6 +642,9 @@ def rewrite_cliques(rewriter, frame):
 
     return orig_num_cliques
 
+def make_mem_req(mem_usage):
+    return "%dM" % ceil(mem_usage / 2**20)
+
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
         # keeps it from rewriting variables that will be used
@@ -693,7 +701,7 @@ class Runner(object):
         self.chunk_coords = None
         self.mins = None
         self.maxs = None
-        self.chunk_train_mem_reqs = None
+        self.chunk_train_mem_usages = None
         self.tracknames = None
 
         # variables
@@ -783,7 +791,7 @@ class Runner(object):
                 missing_tracknames = include_tracknames.difference(tracknames)
                 missing_tracknames_text = ", ".join(missing_tracknames)
                 msg = "could not find tracknames: %s" % missing_tracknames_text
-                raise ValueError, msg
+                raise ValueError(msg)
 
         elif include_tracknames_all:
             # there are special tracknames only
@@ -1048,6 +1056,15 @@ class Runner(object):
 
         use_dinucleotide = "dinucleotide" in self.include_tracknames
 
+        # XXX: refactor into a different func
+        progs_used = []
+        if self.train:
+            progs_used.append(EM_TRAIN_PROG)
+        if self.identify:
+            progs_used.append(VITERBI_PROG)
+        if self.posterior:
+            progs_used.append(POSTERIOR_PROG)
+
         chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
         for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
             assert not chromosome.root._v_attrs.dirty
@@ -1104,6 +1121,16 @@ class Runner(object):
                         text = " skipping segment of length %d" % num_frames
                         print >>sys.stderr, text
                         continue
+
+                    # check that this sequence can fit into all of the
+                    # programs that will be used
+                    max_mem_usage = max(self.get_mem_usage(num_frames, prog)
+                                        for prog in progs_used)
+                    if max_mem_usage > MEM_USAGE_LIMIT:
+                        msg = "segment of length %d will take %d memory," \
+                            " which is greater than" \
+                            " MEM_USAGE_LIMIT" % (num_frames, max_mem_usage)
+                        raise ValueError(msg)
 
                     # start: relative to beginning of chromosome
                     # chunk_start: relative to the beginning of
@@ -1518,7 +1545,7 @@ class Runner(object):
 
         if train or identify or posterior:
             self.set_jt_info_filename()
-            self.make_chunk_train_mem_reqs()
+            self.make_chunk_train_mem_usages()
 
         if train:
             self.make_subdirs(SUBDIRNAMES_TRAIN)
@@ -1625,11 +1652,11 @@ class Runner(object):
     def make_job_name_train(self, start_index, round_index, chunk_index):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, start_index,
                                      round_index, chunk_index,
-                                     self.dirpath.name, getpid())
+                                     self.dirpath.name, UUID)
 
     def make_job_name_identify(self, prefix, chunk_index):
         return "%s%d.%s.%s" % (prefix, chunk_index, self.dirpath.name,
-                               getpid())
+                               UUID)
 
     def make_gmtk_kwargs(self):
         res = dict(strFile=self.structure_filename,
@@ -1679,50 +1706,52 @@ class Runner(object):
 
         self.res_usage = res_usage
 
-    def make_mem_req(self, chunk_len, num_tracks, prog=EM_TRAIN_PROG):
-        # XXX: program should be specified elsewhere
+    def get_mem_per_obs(self, prog, num_tracks):
+        program = prog.prog
 
         # XXX: allow other island values
         assert not ISLAND
         island_specifier = (ISLAND_BASE_NA, ISLAND_LST_NA)
 
-        program = prog.prog
-
         # will fail if the tuple is not a key three
         res_usage = self.res_usage[program, num_tracks][island_specifier]
-        mem_per_obs = res_usage[0]
+        return res_usage[0]
 
-        res = chunk_len * mem_per_obs
+    def get_mem_usage(self, chunk_len, prog=EM_TRAIN_PROG):
+        """
+        returns an int
+        """
+        num_tracks = self.num_tracks
+        if self.use_dinucleotide:
+            num_tracks += 1
 
-        return "%dM" % ceil(res / 2**20)
+        return chunk_len * self.get_mem_per_obs(prog, num_tracks)
 
     def make_chunk_lens(self):
         self.chunk_lens = [end - start
                            for chr, start, end in self.chunk_coords]
 
-    def make_chunk_train_mem_reqs(self):
-        # XXX: should probably have different mem reqs for train or viterbi
-        num_tracks = self.num_tracks
-
-        if self.use_dinucleotide:
-            num_tracks += 1
-
+    def make_chunk_train_mem_usages(self):
         self.make_chunk_lens()
 
-        self.chunk_train_mem_reqs = [self.make_mem_req(chunk_len, num_tracks)
-                                     for chunk_len in self.chunk_lens]
+        self.chunk_train_mem_usages = map(self.get_mem_usage, self.chunk_lens)
 
-    def chunk_train_mem_reqs_decreasing(self):
+    def chunk_train_mem_usages_decreasing(self):
         # sort chunks by decreasing size, so the most difficult chunks
         # are dropped in the queue first
-        zipper = izip(self.chunk_lens, count(), self.chunk_train_mem_reqs)
+        zipper = izip(self.chunk_train_mem_usages, count())
 
         # XXX: use itertools instead of a generator
-        for _, chunk_index, chunk_mem_req in sorted(zipper, reverse=True):
-            yield chunk_index, chunk_mem_req
+        for chunk_mem_usage, chunk_index in sorted(zipper, reverse=True):
+            yield chunk_index, chunk_mem_usage
 
-    def queue_gmtk(self, prog, kwargs, job_name, mem_req, native_specs={},
+    def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
                    output_filename=None):
+        if mem_usage > MEM_USAGE_LIMIT:
+            msg = "queuing %s with a request of %d memory, which is greater" \
+                " than MEM_USAGE_LIMIT" % (prog.prog, mem_usage)
+            raise ValueError(msg)
+
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         # convoluted so I don't have to deal with a lot of escaping issues
@@ -1750,21 +1779,21 @@ class Runner(object):
 
         set_cwd_job_tmpl(job_tmpl)
 
-        res_req = make_res_req(mem_req)
+        res_req = make_res_req(make_mem_req(mem_usage))
         job_tmpl.nativeSpecification = make_native_spec(l=res_req,
                                                         **native_specs)
 
         return session.runJob(job_tmpl)
 
     def queue_train(self, start_index, round_index,
-                    chunk_index, mem_req, hold_jid=None, **kwargs):
+                    chunk_index, mem_usage, hold_jid=None, **kwargs):
         kwargs["inputMasterFile"] = self.input_master_filename
 
         prog = self.train_prog
         name = self.make_job_name_train(start_index, round_index, chunk_index)
         native_specs = dict(hold_jid=hold_jid)
 
-        return self.queue_gmtk(prog, kwargs, name, mem_req, native_specs)
+        return self.queue_gmtk(prog, kwargs, name, mem_usage, native_specs)
 
     def queue_train_parallel(self, input_params_filename, start_index,
                              round_index, **kwargs):
@@ -1775,9 +1804,9 @@ class Runner(object):
 
         res = [] # task ids
 
-        chunk_train_mem_reqs = list(self.chunk_train_mem_reqs_decreasing())
-        last_chunk_index = chunk_train_mem_reqs[-1][0]
-        for chunk_index, chunk_mem_req in chunk_train_mem_reqs:
+        chunk_train_mem_usages = list(self.chunk_train_mem_usages_decreasing())
+        last_chunk_index = chunk_train_mem_usages[-1][0]
+        for chunk_index, chunk_mem_usage in chunk_train_mem_usages:
             acc_filename = self.make_acc_filename(start_index, chunk_index)
             kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
@@ -1785,7 +1814,7 @@ class Runner(object):
             # -dirichletPriors T only on the last (smallest) chunk
             kwargs_chunk["dirichletPriors"] = (chunk_index == last_chunk_index)
 
-            jobid = queue_train_custom(chunk_index, chunk_mem_req,
+            jobid = queue_train_custom(chunk_index, chunk_mem_usage,
                                        **kwargs_chunk)
             res.append(jobid)
 
@@ -1816,7 +1845,7 @@ class Runner(object):
             hold_jid = ",".join(parallel_jobids)
 
         return self.queue_train(start_index, round_index,
-                                NAME_BUNDLE_PLACEHOLDER, MEM_REQ_BUNDLE,
+                                NAME_BUNDLE_PLACEHOLDER, MEM_USAGE_BUNDLE,
                                 hold_jid, **kwargs)
 
     def save_posterior_triangulation(self):
@@ -2067,7 +2096,7 @@ class Runner(object):
         for name, src_filename, dst_filename in zipper:
             self.move_results(name, src_filename, dst_filename)
 
-    def _queue_identify(self, jobids, chunk_index, kwargs_chunk, chunk_mem_req,
+    def _queue_identify(self, jobids, chunk_index, kwargs_chunk, chunk_mem_usage,
                         prefix_job_name, prog, kwargs_func,
                         output_filename=None):
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
@@ -2075,7 +2104,7 @@ class Runner(object):
         kwargs = kwargs_chunk.copy()
         kwargs.update(kwargs_func)
 
-        jobid = self.queue_gmtk(prog, kwargs, job_name, chunk_mem_req,
+        jobid = self.queue_gmtk(prog, kwargs, job_name, chunk_mem_usage,
                                 output_filename=output_filename)
         jobids.append(jobid)
 
@@ -2103,13 +2132,7 @@ class Runner(object):
         self.make_posterior_filenames()
         posterior_filenames = self.posterior_filenames
 
-        # XXX: repetitive, need a different num_tracks variable for
-        # this use case
-        num_tracks = self.num_tracks
-        if self.use_dinucleotide:
-            num_tracks += 1
-
-        make_mem_req = self.make_mem_req
+        get_mem_usage = self.get_mem_usage
 
         chunk_lens = self.chunk_lens
 
@@ -2124,9 +2147,9 @@ class Runner(object):
                      **self.get_posterior_clique_print_ranges())
 
             # we can still do this in the order of
-            # self.chunk_train_mem_reqs but we are going to ignore the
+            # self.chunk_train_mem_usages but we are going to ignore the
             # memory requirement there and substitute our own
-            for chunk_index, _ in self.chunk_train_mem_reqs_decreasing():
+            for chunk_index, _ in self.chunk_train_mem_usages_decreasing():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
                                              **identify_kwargs)
                 _queue_identify = partial(self._queue_identify, jobids,
@@ -2135,15 +2158,14 @@ class Runner(object):
                 chunk_len = chunk_lens[chunk_index]
 
                 if self.identify:
-                    mem_req = make_mem_req(chunk_len, num_tracks, VITERBI_PROG)
-                    _queue_identify(mem_req, PREFIX_JOB_NAME_VITERBI,
+                    mem_usage = get_mem_usage(chunk_len, VITERBI_PROG)
+                    _queue_identify(mem_usage, PREFIX_JOB_NAME_VITERBI,
                                     prog_viterbi, viterbi_kwargs)
 
                 if self.posterior:
-                    mem_req = make_mem_req(chunk_len, num_tracks,
-                                           POSTERIOR_PROG)
+                    mem_usage = get_mem_usage(chunk_len, POSTERIOR_PROG)
                     posterior_filename = posterior_filenames[chunk_index]
-                    _queue_identify(mem_req, PREFIX_JOB_NAME_POSTERIOR,
+                    _queue_identify(mem_usage, PREFIX_JOB_NAME_POSTERIOR,
                                     prog_posterior, posterior_kwargs,
                                     posterior_filename)
 
