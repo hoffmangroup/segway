@@ -1679,15 +1679,17 @@ class Runner(object):
 
         self.res_usage = res_usage
 
-    def make_mem_req(self, chunk_len, num_tracks, program="gmtkEMtrainNew"):
+    def make_mem_req(self, chunk_len, num_tracks, prog=EM_TRAIN_PROG):
         # XXX: program should be specified elsewhere
 
         # XXX: allow other island values
         assert not ISLAND
         island_specifier = (ISLAND_BASE_NA, ISLAND_LST_NA)
 
-        # will fail if it's not pre-defined
-        res_usage = self.res_usage[(program, num_tracks)][island_specifier]
+        program = prog.prog
+
+        # will fail if the tuple is not a key three
+        res_usage = self.res_usage[program, num_tracks][island_specifier]
         mem_per_obs = res_usage[0]
 
         res = chunk_len * mem_per_obs
@@ -1708,7 +1710,7 @@ class Runner(object):
         self.make_chunk_lens()
 
         self.chunk_train_mem_reqs = [self.make_mem_req(chunk_len, num_tracks)
-                               for chunk_len in self.chunk_lens]
+                                     for chunk_len in self.chunk_lens]
 
     def chunk_train_mem_reqs_decreasing(self):
         # sort chunks by decreasing size, so the most difficult chunks
@@ -2101,6 +2103,16 @@ class Runner(object):
         self.make_posterior_filenames()
         posterior_filenames = self.posterior_filenames
 
+        # XXX: repetitive, need a different num_tracks variable for
+        # this use case
+        num_tracks = self.num_tracks
+        if self.use_dinucleotide:
+            num_tracks += 1
+
+        make_mem_req = self.make_mem_req
+
+        chunk_lens = self.chunk_lens
+
         # XXX: kill submitted jobs on exception
         jobids = []
         with Session() as session:
@@ -2120,19 +2132,22 @@ class Runner(object):
                 _queue_identify = partial(self._queue_identify, jobids,
                                           chunk_index, identify_kwargs_chunk)
 
+                chunk_len = chunk_lens[chunk_index]
+
                 if self.identify:
-                    XXX set chunk_mem_req and add to call
-                    _queue_identify(chunk_mem_req, PREFIX_JOB_NAME_VITERBI,
+                    mem_req = make_mem_req(chunk_len, num_tracks, VITERBI_PROG)
+                    _queue_identify(mem_req, PREFIX_JOB_NAME_VITERBI,
                                     prog_viterbi, viterbi_kwargs)
 
                 if self.posterior:
-                    XXX set chunk_mem_req and add to call
+                    mem_req = make_mem_req(chunk_len, num_tracks,
+                                           POSTERIOR_PROG)
                     posterior_filename = posterior_filenames[chunk_index]
-                    _queue_identify(chunk_mem_req, PREFIX_JOB_NAME_POSTERIOR,
+                    _queue_identify(mem_req, PREFIX_JOB_NAME_POSTERIOR,
                                     prog_posterior, posterior_kwargs,
                                     posterior_filename)
 
-            # XXX: search ask on DRMAA mailing list--how to allow
+            # XXX: ask on DRMAA mailing list--how to allow
             # KeyboardInterrupt here?
 
             if self.dry_run:

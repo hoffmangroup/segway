@@ -114,7 +114,7 @@ class MemUsageRunner(Runner):
         self.chunk_coords = chunk_coords
 
     @staticmethod
-    def make_mem_req(chunk_len, num_tracks):
+    def make_mem_req(*args, **kwargs):
         # always use a fixed memory requirement
         return HUGE_MEM_REQ
 
@@ -184,11 +184,17 @@ def parse_res_usage(pid):
         jobname_words = jobname.split(".")
 
         program = jobname_words[1]
-        num_tracks = jobname_words[2] # this might also be "bundle"
-        num_observations = int(jobname_words[3])
+        num_tracks = int(jobname_words[2])
+        num_observations = jobname_words[3] # this might also be "bundle"
 
         cpu = int(record["cpu"])
         maxvmem = convert_sge_mem_size(record["maxvmem"])
+
+        if num_observations == NAME_BUNDLE_PLACEHOLDER:
+            program = ".".join([program, NAME_BUNDLE_PLACEHOLDER])
+            num_observations = 1 # do not divide
+        else:
+            num_observations = int(num_observations)
 
         mem_per_obs = maxvmem / num_observations
         cpu_per_obs = cpu / num_observations
