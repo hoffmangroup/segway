@@ -20,10 +20,12 @@ from numpy.random import standard_normal
 from optbuild import OptionBuilder_ShortOptWithSpace
 from tabdelim import DictWriter
 
-from .run import Runner
+from .run import (EM_TRAIN_PROG, VITERBI_PROG, POSTERIOR_PROG,
+                  PREFIX_JOB_NAME_VITERBI, PREFIX_JOB_NAME_POSTERIOR,
+                  NAME_BUNDLE_PLACEHOLDER, Runner)
 from ._util import fill_array, ISLAND_BASE_NA, ISLAND_LST_NA
 
-MAX_NUM_TRACKS = 20
+MAX_NUM_TRACKS = 1 # XXX: should be 20 (or even 50/100)
 MIN_EXPONENT = 4
 MAX_EXPONENT = 6
 
@@ -33,12 +35,13 @@ DIR_FMT = "res_usage_%d"
 TRACKNAME_FMT = "obs%d"
 HUGE_MEM_REQ = "5G" # 4G will fit 1e6*20 cells
 
-GMTK_PROGNAME = "gmtkEMtrainNew"
-
 FIELDNAMES = ["program", "num_tracks", "island_base", "island_lst",
               "mem_per_obs", "cpu_per_obs"]
 
 QACCT_PROG = OptionBuilder_ShortOptWithSpace("qacct")
+
+PREFIX2PROG = {PREFIX_JOB_NAME_VITERBI: VITERBI_PROG,
+               PREFIX_JOB_NAME_POSTERIOR: POSTERIOR_PROG}
 
 # N1 Grid Engine User's Guide chapter 3 page 71
 SGE_MEM_SIZE_SUFFIXES = dict(K=2**10, M=2**20, G=2**30,
@@ -47,13 +50,16 @@ SGE_MEM_SIZE_SUFFIXES = dict(K=2**10, M=2**20, G=2**30,
 def make_job_name_stem(pid):
     return "ru%s" % pid
 
+def make_job_name_stem_pid():
+    return make_job_name_stem(getpid())
+
 class MemUsageRunner(Runner):
     """
     finds memory usage instead of using real data
     """
     def __init__(self, *args, **kwargs):
         Runner.__init__(self, *args, **kwargs)
-        self.identify = False
+        self.max_em_iters = 1
 
     def write_observations(self, float_filelist, int_filelist):
         num_tracks = self.num_tracks
@@ -103,31 +109,37 @@ class MemUsageRunner(Runner):
             num_bases += num_observations
             chunk_coords.append((chrom, 0, num_observations))
 
-        self.num_chunks = chunk_index
+        self.num_chunks = chunk_index + 1
         self.num_bases = num_bases
         self.chunk_coords = chunk_coords
 
     @staticmethod
     def make_mem_req(chunk_len, num_tracks):
+        # always use a fixed memory requirement
         return HUGE_MEM_REQ
 
+    def make_job_name_res_usage(self, prog, chunk_name):
+        return ".".join([make_job_name_stem_pid(), prog.prog,
+                         str(self.num_tracks), str(chunk_name)])
+
     def make_job_name_train(self, start_index, round_index, chunk_index):
-        chunk_len = self.chunk_lens[chunk_index]
+        if chunk_index == NAME_BUNDLE_PLACEHOLDER:
+            chunk_name = chunk_index
+        else:
+            chunk_name = self.chunk_lens[chunk_index]
 
-        return ".".join([make_job_name_stem(getpid()), str(self.num_tracks),
-                         str(chunk_len)])
+        return self.make_job_name_res_usage(EM_TRAIN_PROG, chunk_name)
 
-    def run_train_round(self, start_index, round_index, **kwargs):
-        # just run all the parallel jobs, no bundle
-        self.queue_train_parallel(self.last_params_filename, start_index,
-                                  round_index, **kwargs)
+    def make_job_name_identify(self, prefix, chunk_index):
+        prog = PREFIX2PROG[prefix]
 
-        # cause loop to abort
-        return False
+        return self.make_job_name_res_usage(prog, chunk_index)
 
-    def proc_train_results(self, start_params, dst_filenames):
-        # don't do any processing
-        return
+    def gmtk_out2bed(self, *args, **kwargs):
+        pass
+
+    def posterior2wig(self, *args, **kwargs):
+        pass
 
 def run_res_usage():
     for num_tracks in xrange(MAX_NUM_TRACKS, 0, -1):
@@ -171,22 +183,24 @@ def parse_res_usage(pid):
         jobname = record["jobname"]
         jobname_words = jobname.split(".")
 
-        num_tracks = int(jobname_words[1])
-        num_observations = int(jobname_words[2])
+        program = jobname_words[1]
+        num_tracks = jobname_words[2] # this might also be "bundle"
+        num_observations = int(jobname_words[3])
+
         cpu = int(record["cpu"])
         maxvmem = convert_sge_mem_size(record["maxvmem"])
 
         mem_per_obs = maxvmem / num_observations
         cpu_per_obs = cpu / num_observations
 
-        data[num_tracks].append((mem_per_obs, cpu_per_obs))
+        data[program, num_tracks].append((mem_per_obs, cpu_per_obs))
 
     writer = DictWriter(sys.stdout, FIELDNAMES)
-    for num_tracks, num_tracks_values in data.iteritems():
+    for (program, num_tracks), num_tracks_values in data.iteritems():
         mem_per_obs = int(ceil(max(num_tracks_values)[0]))
         cpu_per_obs = max(num_tracks_values, key=itemgetter(1))[1]
 
-        writer.writerow(dict(program=GMTK_PROGNAME,
+        writer.writerow(dict(program=program,
                              num_tracks=str(num_tracks),
                              island_base=ISLAND_BASE_NA, # means no island
                              island_lst=ISLAND_LST_NA,

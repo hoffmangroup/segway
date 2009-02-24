@@ -131,7 +131,7 @@ SENTINEL = float32(9.87654321)
 CPP_DIRECTIVE_FMT = "-D%s=%s"
 
 GMTK_INDEX_PLACEHOLDER = "@D"
-NAME_PLACEHOLDER = "bundle"
+NAME_BUNDLE_PLACEHOLDER = "bundle"
 
 # programs
 ENV_CMD = "/usr/bin/env"
@@ -693,7 +693,7 @@ class Runner(object):
         self.chunk_coords = None
         self.mins = None
         self.maxs = None
-        self.chunk_mem_reqs = None
+        self.chunk_train_mem_reqs = None
         self.tracknames = None
 
         # variables
@@ -702,6 +702,7 @@ class Runner(object):
         self.random_starts = RANDOM_STARTS
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
+        self.max_em_iters = MAX_EM_ITERS
 
         # flags
         self.clobber = False
@@ -776,7 +777,14 @@ class Runner(object):
             track_indexes = array(track_indexes)
 
             # check that there aren't any missing tracks
-            assert len(tracknames) == len(include_tracknames)
+            # XXX: a more informative error message would be better
+            # here, telling us the missing tracks
+            if len(tracknames) != len(include_tracknames):
+                missing_tracknames = include_tracknames.difference(tracknames)
+                missing_tracknames_text = ", ".join(missing_tracknames)
+                msg = "could not find tracknames: %s" % missing_tracknames_text
+                raise ValueError, msg
+
         elif include_tracknames_all:
             # there are special tracknames only
             tracknames = []
@@ -1157,7 +1165,7 @@ class Runner(object):
         else:
             self.num_int_cols = num_tracks
 
-        self.num_chunks = chunk_index
+        self.num_chunks = chunk_index # already has +1 added to it
         self.num_bases = num_bases
         self.chunk_coords = chunk_coords
 
@@ -1510,7 +1518,7 @@ class Runner(object):
 
         if train or identify or posterior:
             self.set_jt_info_filename()
-            self.make_chunk_mem_reqs()
+            self.make_chunk_train_mem_reqs()
 
         if train:
             self.make_subdirs(SUBDIRNAMES_TRAIN)
@@ -1656,12 +1664,12 @@ class Runner(object):
         with open(self.res_usage_filename) as infile:
             reader = DictReader(infile)
             for row in reader:
-                program = reader["program"]
-                num_tracks = int(reader["num_tracks"])
-                island_base = int(reader["island_base"])
-                island_lst = int(reader["island_lst"])
-                mem_per_obs = int(reader["mem_per_obs"])
-                cpu_per_obs = float(reader["mem_per_obs"])
+                program = row["program"]
+                num_tracks = int(row["num_tracks"])
+                island_base = int(row["island_base"])
+                island_lst = int(row["island_lst"])
+                mem_per_obs = int(row["mem_per_obs"])
+                cpu_per_obs = float(row["mem_per_obs"])
 
                 top_specifier = (program, num_tracks)
                 island_specifier = (island_base, island_lst)
@@ -1690,7 +1698,7 @@ class Runner(object):
         self.chunk_lens = [end - start
                            for chr, start, end in self.chunk_coords]
 
-    def make_chunk_mem_reqs(self):
+    def make_chunk_train_mem_reqs(self):
         # XXX: should probably have different mem reqs for train or viterbi
         num_tracks = self.num_tracks
 
@@ -1699,20 +1707,20 @@ class Runner(object):
 
         self.make_chunk_lens()
 
-        self.chunk_mem_reqs = [self.make_mem_req(chunk_len, num_tracks)
+        self.chunk_train_mem_reqs = [self.make_mem_req(chunk_len, num_tracks)
                                for chunk_len in self.chunk_lens]
 
-    def chunk_mem_reqs_decreasing(self):
+    def chunk_train_mem_reqs_decreasing(self):
         # sort chunks by decreasing size, so the most difficult chunks
         # are dropped in the queue first
-        zipper = izip(self.chunk_lens, count(), self.chunk_mem_reqs)
+        zipper = izip(self.chunk_lens, count(), self.chunk_train_mem_reqs)
 
         # XXX: use itertools instead of a generator
         for _, chunk_index, chunk_mem_req in sorted(zipper, reverse=True):
             yield chunk_index, chunk_mem_req
 
     def queue_gmtk(self, prog, kwargs, job_name, mem_req, native_specs={},
-                   viterbi_filename=None):
+                   output_filename=None):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         # convoluted so I don't have to deal with a lot of escaping issues
@@ -1733,9 +1741,9 @@ class Runner(object):
         job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = cmdline
 
-        if viterbi_filename is None:
-            viterbi_filename = self.output_dirpath / job_name
-        job_tmpl.outputPath = ":" + viterbi_filename
+        if output_filename is None:
+            output_filename = self.output_dirpath / job_name
+        job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
 
         set_cwd_job_tmpl(job_tmpl)
@@ -1765,9 +1773,9 @@ class Runner(object):
 
         res = [] # task ids
 
-        chunk_mem_reqs = list(self.chunk_mem_reqs_decreasing())
-        last_chunk_index = chunk_mem_reqs[-1][0]
-        for chunk_index, chunk_mem_req in chunk_mem_reqs:
+        chunk_train_mem_reqs = list(self.chunk_train_mem_reqs_decreasing())
+        last_chunk_index = chunk_train_mem_reqs[-1][0]
+        for chunk_index, chunk_mem_req in chunk_train_mem_reqs:
             acc_filename = self.make_acc_filename(start_index, chunk_index)
             kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
@@ -1805,8 +1813,9 @@ class Runner(object):
         else:
             hold_jid = ",".join(parallel_jobids)
 
-        return self.queue_train(start_index, round_index, NAME_PLACEHOLDER,
-                                MEM_REQ_BUNDLE, hold_jid, **kwargs)
+        return self.queue_train(start_index, round_index,
+                                NAME_BUNDLE_PLACEHOLDER, MEM_REQ_BUNDLE,
+                                hold_jid, **kwargs)
 
     def save_posterior_triangulation(self):
         infilename = self.triangulation_filename
@@ -1917,7 +1926,7 @@ class Runner(object):
 
         kwargs = self.train_kwargs
 
-        while (round_index < MAX_EM_ITERS and
+        while (round_index < self.max_em_iters and
                is_training_progressing(last_log_likelihood, log_likelihood)):
             round_res = self.run_train_round(start_index, round_index,
                                              **kwargs)
@@ -2056,16 +2065,16 @@ class Runner(object):
         for name, src_filename, dst_filename in zipper:
             self.move_results(name, src_filename, dst_filename)
 
-    def _queue_identify(self, jobids, chunk_index, chunk_mem_req, kwargs_chunk,
+    def _queue_identify(self, jobids, chunk_index, kwargs_chunk, chunk_mem_req,
                         prefix_job_name, prog, kwargs_func,
-                        viterbi_filename=None):
+                        output_filename=None):
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
 
         kwargs = kwargs_chunk.copy()
         kwargs.update(kwargs_func)
 
         jobid = self.queue_gmtk(prog, kwargs, job_name, chunk_mem_req,
-                                viterbi_filename=viterbi_filename)
+                                output_filename=output_filename)
         jobids.append(jobid)
 
     def run_identify_posterior(self):
@@ -2102,21 +2111,26 @@ class Runner(object):
                      doDistributeEvidence=True,
                      **self.get_posterior_clique_print_ranges())
 
-            for chunk_index, chunk_mem_req in self.chunk_mem_reqs_decreasing():
+            # we can still do this in the order of
+            # self.chunk_train_mem_reqs but we are going to ignore the
+            # memory requirement there and substitute our own
+            for chunk_index, _ in self.chunk_train_mem_reqs_decreasing():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
                                              **identify_kwargs)
                 _queue_identify = partial(self._queue_identify, jobids,
-                                          chunk_index, chunk_mem_req,
-                                          identify_kwargs_chunk)
+                                          chunk_index, identify_kwargs_chunk)
 
                 if self.identify:
-                    _queue_identify(PREFIX_JOB_NAME_VITERBI, prog_viterbi,
-                                    viterbi_kwargs)
+                    XXX set chunk_mem_req and add to call
+                    _queue_identify(chunk_mem_req, PREFIX_JOB_NAME_VITERBI,
+                                    prog_viterbi, viterbi_kwargs)
 
                 if self.posterior:
+                    XXX set chunk_mem_req and add to call
                     posterior_filename = posterior_filenames[chunk_index]
-                    _queue_identify(PREFIX_JOB_NAME_POSTERIOR, prog_posterior,
-                                    posterior_kwargs, posterior_filename)
+                    _queue_identify(chunk_mem_req, PREFIX_JOB_NAME_POSTERIOR,
+                                    prog_posterior, posterior_kwargs,
+                                    posterior_filename)
 
             # XXX: search ask on DRMAA mailing list--how to allow
             # KeyboardInterrupt here?
