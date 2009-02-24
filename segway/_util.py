@@ -6,7 +6,7 @@ __version__ = "$Revision$"
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
-from contextlib import closing
+from contextlib import closing, contextmanager
 from functools import partial
 from gzip import open as _gzip_open
 from optparse import OptionGroup as _OptionGroup
@@ -15,6 +15,7 @@ import shutil
 import sys
 from tempfile import mkdtemp
 
+from DRMAA import Session as _Session
 from numpy import append, array, diff, empty, insert, intc
 from path import path
 from pkg_resources import resource_filename, resource_string
@@ -25,6 +26,8 @@ try:
     PKG = __package__
 except NameError:
     PKG = "segway"
+
+DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
 
 PKG_DATA = ".".join([PKG, "data"])
 
@@ -109,6 +112,19 @@ class OptionGroup(_OptionGroup):
 
     def __exit__(self, *exc_info):
         self.parser.add_option_group(self)
+
+# XXX: suggest upstream as addition to DRMAA-python
+@contextmanager
+def Session(*args, **kwargs):
+    res = _Session()
+    res.init(*args, **kwargs)
+
+    assert res.DRMSInfo.startswith(DRMSINFO_PREFIX)
+
+    try:
+        yield res
+    finally:
+        res.exit()
 
 # XXX: replace with iter(genomedata.Chromosome)
 def walk_supercontigs(h5file):

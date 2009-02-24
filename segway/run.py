@@ -9,8 +9,11 @@ __version__ = "$Revision$"
 
 # Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
 
+import sys
+sys.path
+
 from cStringIO import StringIO
-from contextlib import closing, contextmanager, nested
+from contextlib import closing, nested
 from copy import copy
 from errno import EEXIST, ENOENT
 from functools import partial
@@ -22,7 +25,7 @@ from string import Template
 import sys
 from threading import Event, Thread
 
-from DRMAA import ExitTimeoutError, Session as _Session
+from DRMAA import ExitTimeoutError
 from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
                    empty, finfo, float32, fromfile, intc, invert, isnan,
                    newaxis, NINF, outer, s_, sqrt, square, tile, vectorize)
@@ -36,8 +39,8 @@ from path import path
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
                     EXT_GZ, fill_array, find_segment_starts, get_tracknames,
                     gzip_open, iter_chroms_coords, load_coords,
-                    NamedTemporaryDir, PKG, walk_continuous_supercontigs,
-                    walk_supercontigs)
+                    NamedTemporaryDir, PKG, Session,
+                    walk_continuous_supercontigs, walk_supercontigs)
 
 # XXX: I should really get some sort of Enum for this, I think Peter
 # Norvig has one
@@ -79,8 +82,6 @@ POSTERIOR_SCALE_FACTOR = 100.0
 VERBOSITY = 0
 PRIOR_STRENGTH = 0
 
-DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
-
 FINFO_FLOAT32 = finfo(float32)
 MACHEP_FLOAT32 = FINFO_FLOAT32.machep
 TINY_FLOAT32 = FINFO_FLOAT32.tiny
@@ -113,19 +114,10 @@ COMPONENT_CACHE = True
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 MAX_FRAMES = 1000000000 # 1 billion
-MEM_REQ_PARALLEL = "10.5G"
-MEM_REQ_BUNDLE = "500M"
+MEM_REQ_BUNDLE = "500M" # XXX: should be included in calibration
 RES_REQ_IDS = ["mem_requested"]
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
-
-# linear model for memory requests for number of data columns
-MEM_REQS = {1: [3619, 8098728],
-            2: [3619, 8098728],
-            3: [1553, 16121352],
-            4: [5768, 14442884],
-            5: [5768, 14442884], # XXX: must correct
-            6: [5768, 14442884]}
 
 ## defaults
 RANDOM_STARTS = 1
@@ -355,19 +347,6 @@ def consume_until(iterable, text):
     for line in iterable:
         if line.startswith(text):
             break
-
-# XXX: suggest upstream as addition to DRMAA-python
-@contextmanager
-def Session(*args, **kwargs):
-    res = _Session()
-    res.init(*args, **kwargs)
-
-    assert res.DRMSInfo.startswith(DRMSINFO_PREFIX)
-
-    try:
-        yield res
-    finally:
-        res.exit()
 
 def make_res_req(size):
     res = []
@@ -1662,10 +1641,9 @@ class Runner(object):
 
         return res
 
-    @staticmethod
-    def make_mem_req(chunk_len, num_tracks):
+    def make_mem_req(self, chunk_len, num_tracks):
         # will fail if it's not pre-defined
-        slope, intercept = MEM_REQS[num_tracks]
+        slope, intercept = MEM_REQS[num_tracks] XXXXXXXXXXXXXXXX
         res = slope * chunk_len + intercept
 
         return "%dM" % ceil(res / 2**20)

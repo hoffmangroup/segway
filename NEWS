@@ -1,5 +1,8 @@
 0.1.3:
 
+* segway-res-usage: now produces a tab-delimited output file that can
+  be used to specify Segway's memory management
+
 0.1.2:
 
 * segway bugfixes: do not create segway.bed.gz or

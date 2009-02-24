@@ -9,11 +9,16 @@ __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
 
+from collections import defaultdict
+from math import ceil
+from operator import itemgetter
 from os import getpid
 import sys
 
 from numpy import arange, float32, square
 from numpy.random import standard_normal
+from optbuild import OptionBuilder_ShortOptWithSpace
+from tabdelim import DictWriter
 
 from .run import Runner
 from ._util import fill_array
@@ -27,6 +32,24 @@ CHROM_FMT = "fake%d"
 DIR_FMT = "res_usage_%d"
 TRACKNAME_FMT = "obs%d"
 HUGE_MEM_REQ = "5G" # 4G will fit 1e6*20 cells
+
+GMTK_PROGNAME = "gmtkEMtrainNew"
+
+FIELDNAMES = ["program", "num_tracks", "island_base", "island_lst",
+              "mem_per_obs", "cpu_per_obs"]
+
+QACCT_PROG = OptionBuilder_ShortOptWithSpace("qacct")
+
+# sentinel values
+ISLAND_BASE_NA = 0
+ISLAND_LST_NA = 0
+
+# N1 Grid Engine User's Guide chapter 3 page 71
+SGE_MEM_SIZE_SUFFIXES = dict(K=2**10, M=2**20, G=2**30,
+                             k=1e3, m=1e6, g=1e9)
+
+def make_job_name_stem(pid):
+    return "ru%s" % pid
 
 class MemUsageRunner(Runner):
     """
@@ -95,7 +118,8 @@ class MemUsageRunner(Runner):
     def make_job_name_train(self, start_index, round_index, chunk_index):
         chunk_len = self.chunk_lens[chunk_index]
 
-        return "ru%s.%d.%d" % (getpid(), self.num_tracks, chunk_len)
+        return ".".join([make_job_name_stem(getpid()), str(self.num_tracks),
+                         str(chunk_len)])
 
     def run_train_round(self, start_index, round_index, **kwargs):
         # just run all the parallel jobs, no bundle
@@ -109,7 +133,7 @@ class MemUsageRunner(Runner):
         # don't do any processing
         return
 
-def res_usage():
+def run_res_usage():
     for num_tracks in xrange(MAX_NUM_TRACKS, 0, -1):
         runner = MemUsageRunner()
         runner.dirname = DIR_FMT % num_tracks
@@ -118,10 +142,64 @@ def res_usage():
 
         runner()
 
-    print "PID: %s" % getpid()
-    # XXX: need something like this after everything is done:
-    # with Session(), etc.
-    # qsub -sync y -b y -hold_jid "ru18914.*" -cwd -o ru18914.txt $(which qacct) -j "\"ru18914.*\""
+def parse_sge_qacct(text):
+    res = {}
+
+    for line in text.rstrip().split("\n"):
+        if line.startswith("="):
+            if res:
+                yield res
+            continue
+
+        key, space, val = line.partition(" ")
+        res[key] = val.strip()
+
+    yield res
+
+def convert_sge_mem_size(text):
+    significand = float(text[:-1])
+    multiplier = SGE_MEM_SIZE_SUFFIXES[text[-1]]
+
+    return int(ceil(significand * multiplier))
+
+def parse_res_usage(pid):
+    jobname = ".".join([make_job_name_stem(pid), "*"])
+    acct_text = QACCT_PROG.getoutput(j=jobname)
+
+    # dict:
+    # key: num_tracks
+    # val: list of tuples of (mem_per_obs, cpu_per_obs)
+    data = defaultdict(list)
+
+    for record in parse_sge_qacct(acct_text):
+        jobname = record["jobname"]
+        jobname_words = jobname.split(".")
+
+        num_tracks = int(jobname_words[1])
+        num_observations = int(jobname_words[2])
+        cpu = int(record["cpu"])
+        maxvmem = convert_sge_mem_size(record["maxvmem"])
+
+        mem_per_obs = maxvmem / num_observations
+        cpu_per_obs = cpu / num_observations
+
+        data[num_tracks].append((mem_per_obs, cpu_per_obs))
+
+    writer = DictWriter(sys.stdout, FIELDNAMES)
+    for num_tracks, num_tracks_values in data.iteritems():
+        mem_per_obs = int(ceil(max(num_tracks_values)[0]))
+        cpu_per_obs = max(num_tracks_values, key=itemgetter(1))[1]
+
+        writer.writerow(dict(program=GMTK_PROGNAME,
+                             num_tracks=str(num_tracks),
+                             island_base=ISLAND_BASE_NA, # means no island
+                             island_lst=ISLAND_LST_NA,
+                             mem_per_obs=mem_per_obs,
+                             cpu_per_obs=cpu_per_obs))
+
+def res_usage():
+    run_res_usage()
+    parse_res_usage(getpid())
 
 def parse_options(args):
     from optparse import OptionParser
