@@ -30,8 +30,12 @@ MIN_EXPONENT = 4
 MAX_EXPONENT = 6
 
 # XXX: I should replace this with a more general linear model of
-# mem_per_obs
-MAX_MEM_PER_OBS = 23644 # old gmtkViterbiNew for 20 tracks
+# mem_per_obs, these values are for 20 tracks
+# XXX: this model should be bootstrapped by res_usage.py and printed
+# out with num_tracks = 0
+MAX_MEM_PER_OBS = dict(gmtkEMtrainNew=6233,
+                       gmtkJT=4034,
+                       gmtkViterbiNew=23644)
 
 CHROM_FMT = "fake%d"
 
@@ -122,7 +126,7 @@ class MemUsageRunner(Runner):
 
     def get_mem_per_obs(self, prog, num_tracks):
         # always return the largest number imaginable
-        return MAX_MEM_PER_OBS
+        return MAX_MEM_PER_OBS[prog.prog]
 
     def make_job_name_res_usage(self, prog, chunk_name):
         return ".".join([make_job_name_stem_uuid(), prog.prog,

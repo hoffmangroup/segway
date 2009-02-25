@@ -722,6 +722,7 @@ class Runner(object):
         self.dry_run = False
         self.use_dinucleotide = None
         self.skip_large_mem_usage = False
+        self.split_sequences = False
 
         # functions
         self.train_prog = None
@@ -950,7 +951,8 @@ class Runner(object):
         observation_items = []
         for track_index, track in enumerate(tracknames):
             item = observation_sub(track=track, track_index=track_index,
-                                   presence_index=num_tracks+track_index)
+                                   presence_index=num_tracks+track_index,
+                                   weight_scale=1)
             observation_items.append(item)
 
         if self.use_dinucleotide:
@@ -1128,10 +1130,33 @@ class Runner(object):
                     max_mem_usage = max(self.get_mem_usage(num_frames, prog)
                                         for prog in progs_used)
                     if max_mem_usage > MEM_USAGE_LIMIT:
-                        msg = "segment of length %d will take %d memory," \
-                            " which is greater than" \
-                            " MEM_USAGE_LIMIT" % (num_frames, max_mem_usage)
-                        raise ValueError(msg)
+                        if not self.split_sequences:
+                            msg = "segment of length %d will take %d memory," \
+                                " which is greater than" \
+                                " MEM_USAGE_LIMIT" % (num_frames,
+                                                      max_mem_usage)
+                            raise ValueError(msg)
+
+                        # XXX: I really ought to check that this is
+                        # going to always work even for corner cases,
+                        # but if it doesn't I am saved by another
+                        # split later on
+
+                        # split_sequences was True, so split them
+                        num_new_starts = int(ceil(max_mem_usage
+                                                  / MEM_USAGE_LIMIT))
+
+                        # // means floor division
+                        offset = (num_frames // num_new_starts)
+                        new_offsets = arange(num_new_starts) * offset
+                        new_starts = start + new_offsets
+                        new_ends = append(new_starts[1:], end)
+
+                        starts.extend(new_starts)
+                        ends.extend(new_ends)
+
+                        # consider the newly split sequences later
+                        continue
 
                     # start: relative to beginning of chromosome
                     # chunk_start: relative to the beginning of
@@ -1749,12 +1774,14 @@ class Runner(object):
     def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
                    output_filename=None):
         if mem_usage > MEM_USAGE_LIMIT:
+            msg = "%s with a request of %d memory, which is greater" \
+                " than MEM_USAGE_LIMIT" % (prog.prog, mem_usage)
+
             if self.skip_large_mem_usage:
+                print >>sys.stderr, "skipping " + msg
                 return
 
-            msg = "queuing %s with a request of %d memory, which is greater" \
-                " than MEM_USAGE_LIMIT" % (prog.prog, mem_usage)
-            raise ValueError(msg)
+            raise ValueError("won't queue " + msg)
 
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
@@ -2326,6 +2353,9 @@ def parse_options(args):
         group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
                          " executables")
+        group.add_option("-S", "--split-sequences", action="store_true",
+                         help="split up sequences that are too large to fit" \
+                         " into memory")
 
     options, args = parser.parse_args(args)
 
@@ -2362,6 +2392,7 @@ def main(args=sys.argv[1:]):
     runner.posterior = not options.no_posterior
     runner.dry_run = options.dry_run
     runner.keep_going = options.keep_going
+    runner.split_sequences = options.split_sequences
 
     return runner()
 

@@ -1,5 +1,8 @@
 0.1.3:
 
+* segway: weights probability from different tracks by the number of
+  datapoints in each track. useful for dealing with data on
+  heterogeneous scales
 * segway-res-usage: now produces a tab-delimited output file that can
   be used to specify Segway's memory management
 * segway-res-usage: calibrates resource usage of training bundle step, posterior, identify
