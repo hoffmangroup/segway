@@ -948,11 +948,21 @@ class Runner(object):
         tracknames = self.tracknames
         num_tracks = self.num_tracks
 
+        total_data_len = sum(self.chunk_lens)
+
         observation_items = []
-        for track_index, track in enumerate(tracknames):
+        zipper = izip(count(), tracknames, self.num_datapoints)
+        for track_index, track, num_datapoints in zipper:
+            # relates current num_datapoints to total number of
+            # possible positions. This is better than making the
+            # highest num_datapoints equivalent to 1, because it
+            # becomes easier to mix and match different tracks without
+            # changing the weights of any of them
+            weight_scale = num_datapoints / total_data_len
+
             item = observation_sub(track=track, track_index=track_index,
                                    presence_index=num_tracks+track_index,
-                                   weight_scale=1)
+                                   weight_scale=weight_scale)
             observation_items.append(item)
 
         if self.use_dinucleotide:
@@ -1561,6 +1571,9 @@ class Runner(object):
         # do first, because it sets self.num_tracks and self.tracknames
         self.save_observations()
 
+        # sets self.chunk_lens, needed for save_structure()
+        self.make_chunk_lens()
+
         self.save_include()
         self.save_structure()
         self.set_params_filename()
@@ -1758,8 +1771,6 @@ class Runner(object):
                            for chr, start, end in self.chunk_coords]
 
     def make_chunk_train_mem_usages(self):
-        self.make_chunk_lens()
-
         self.chunk_train_mem_usages = map(self.get_mem_usage, self.chunk_lens)
 
     def chunk_train_mem_usages_decreasing(self):
