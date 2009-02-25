@@ -219,7 +219,10 @@ def parse_res_usage(uuid):
         data[program, num_tracks].append((mem_per_obs, cpu_per_obs))
 
     writer = DictWriter(sys.stdout, FIELDNAMES)
-    for (program, num_tracks), num_tracks_values in data.iteritems():
+    for key in sorted(data):
+        program, num_tracks = key
+        num_tracks_values = data[key]
+
         mem_per_obs = int(ceil(max(num_tracks_values)[0]))
         cpu_per_obs = max(num_tracks_values, key=itemgetter(1))[1]
 
@@ -231,6 +234,7 @@ def parse_res_usage(uuid):
                              cpu_per_obs=cpu_per_obs))
 
 def res_usage():
+    print >>sys.stderr, "UUID: %s" % UUID
     run_res_usage()
     parse_res_usage(UUID)
 

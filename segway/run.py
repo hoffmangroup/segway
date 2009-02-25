@@ -7,7 +7,7 @@ run: DESCRIPTION
 
 __version__ = "$Revision$"
 
-# Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 sys.path
@@ -118,7 +118,7 @@ COMPONENT_CACHE = True
 MIN_FRAMES = 2
 MAX_FRAMES = 1000000000 # 1 billion
 MEM_USAGE_LIMIT = 15000000000 # 15 GB
-MEM_USAGE_BUNDLE = 200000000 # 200M; XXX: should be included in calibration
+MEM_USAGE_BUNDLE = 100000000 # 100M; XXX: should be included in calibration
 RES_REQ_IDS = ["mem_requested"]
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
@@ -947,18 +947,22 @@ class Runner(object):
 
         tracknames = self.tracknames
         num_tracks = self.num_tracks
+        num_datapoints = self.num_datapoints
 
-        total_data_len = sum(self.chunk_lens)
+        if self.use_dinucleotide:
+            max_num_datapoints_track = sum(self.chunk_lens)
+        else:
+            max_num_datapoints_track = num_datapoints.max()
 
         observation_items = []
-        zipper = izip(count(), tracknames, self.num_datapoints)
-        for track_index, track, num_datapoints in zipper:
+        zipper = izip(count(), tracknames, num_datapoints)
+        for track_index, track, num_datapoints_track in zipper:
             # relates current num_datapoints to total number of
             # possible positions. This is better than making the
             # highest num_datapoints equivalent to 1, because it
             # becomes easier to mix and match different tracks without
             # changing the weights of any of them
-            weight_scale = num_datapoints / total_data_len
+            weight_scale = max_num_datapoints_track / num_datapoints_track
 
             item = observation_sub(track=track, track_index=track_index,
                                    presence_index=num_tracks+track_index,
