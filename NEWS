@@ -3,10 +3,13 @@
 * segway: weights probability from different tracks by the number of
   datapoints in each track. useful for dealing with data on
   heterogeneous scales
+* seg.inc is now segway.inc
+* seg.str is now segway.str
 * segway-res-usage: now produces a tab-delimited output file that can
   be used to specify Segway's memory management
 * segway-res-usage: calibrates resource usage of training bundle step, posterior, identify
-* segway: uses the new resource usage file
+* segway: uses the new resource usage file by default
+* segway: new --resource-profile option to use another resource usage file
 * segway: by default, abort if an input sequence is going to take more
   than 15G of RAM to process using any of the commands being run
 * segway-res-usage: try to guess which tracks are going to be way too huge and skip them

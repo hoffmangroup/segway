@@ -221,11 +221,11 @@ SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
 FLOAT_TAB_FIELDNAMES = ["filename", "chunk_index", "chrom", "start", "end"]
 
 # templates and formats
-RES_STR_TMPL = "seg.str.tmpl"
+RES_STR_TMPL = "segway.str.tmpl"
 RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
-RES_INC = "seg.inc"
+RES_INC = "segway.inc"
 RES_DUMPNAMES = "dumpnames.list"
 RES_RES_USAGE = "res_usage.tab"
 
