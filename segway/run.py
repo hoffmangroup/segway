@@ -37,7 +37,7 @@ from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
                       OptionBuilder_ShortOptWithSpace_TF)
 from path import path
-from tabdelim import DictReader
+from tabdelim import DictReader, ListWriter
 
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
                     EXT_GZ, fill_array, find_segment_starts, get_tracknames,
@@ -202,6 +202,7 @@ SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
 BED_FILEBASENAME = extjoin(PKG, EXT_BED, EXT_GZ) # "segway.bed.gz"
+FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 
 SUBDIRNAME_ACC = "accumulators"
 SUBDIRNAME_AUX = "auxiliary"
@@ -216,6 +217,8 @@ SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
                      SUBDIRNAME_PARAMS]
 SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
+
+FLOAT_TAB_FIELDNAMES = ["filename", "chunk_index", "chrom", "start", "end"]
 
 # templates and formats
 RES_STR_TMPL = "seg.str.tmpl"
@@ -645,6 +648,12 @@ def rewrite_cliques(rewriter, frame):
 def make_mem_req(mem_usage):
     return "%dM" % ceil(mem_usage / 2**20)
 
+def update_starts(starts, ends, new_starts, new_ends, start_index):
+    next_index = start_index + 1
+
+    starts[next_index:next_index] = new_starts
+    ends[next_index:next_index] = new_ends
+
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, interrupt_event):
         # keeps it from rewriting variables that will be used
@@ -905,6 +914,7 @@ class Runner(object):
 
         self.float_filelistpath = self.make_obs_filelistpath(EXT_FLOAT)
         self.int_filelistpath = self.make_obs_filelistpath(EXT_INT)
+        self.float_tabfilepath = obs_dirpath / FLOAT_TABFILEBASENAME
 
     def make_obs_filepath(self, prefix, suffix):
         return self.obs_dirpath / (prefix + suffix)
@@ -964,6 +974,8 @@ class Runner(object):
             # changing the weights of any of them
             weight_scale = max_num_datapoints_track / num_datapoints_track
 
+            # XXX: should avoid a weight line at all when weight_scale == 1.0
+            # might avoid some extra multiplication in GMTK
             item = observation_sub(track=track, track_index=track_index,
                                    presence_index=num_tracks+track_index,
                                    weight_scale=weight_scale)
@@ -1019,6 +1031,22 @@ class Runner(object):
 
         int_data.tofile(int_filepath)
 
+    def subset_metadata_attr(self, name):
+        subset_array = getattr(self, name)[self.track_indexes]
+
+        setattr(self, name, subset_array)
+
+    def subset_metadata(self):
+        """
+        limits all the metadata attributes to only tracks that are used
+        """
+        subset_metadata_attr = self.subset_metadata_attr
+        subset_metadata_attr("mins")
+        subset_metadata_attr("maxs")
+        subset_metadata_attr("sums")
+        subset_metadata_attr("sums_squares")
+        subset_metadata_attr("num_datapoints")
+
     def accum_metadata(self, mins, maxs, sums, sums_squares, num_datapoints):
         if self.mins is None:
             self.mins = mins
@@ -1057,7 +1085,7 @@ class Runner(object):
 
         return True
 
-    def write_observations(self, float_filelist, int_filelist):
+    def write_observations(self, float_filelist, int_filelist, float_tabfile):
         include_coords = self.include_coords
 
         # observations
@@ -1082,6 +1110,9 @@ class Runner(object):
         if self.posterior:
             progs_used.append(POSTERIOR_PROG)
 
+        float_tabwriter = ListWriter(float_tabfile)
+        float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
+
         chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
         for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
             assert not chromosome.root._v_attrs.dirty
@@ -1092,6 +1123,8 @@ class Runner(object):
 
             track_indexes = self.set_tracknames(chromosome)
             num_tracks = len(track_indexes)
+
+            self.set_num_tracks(num_tracks, use_dinucleotide)
 
             # observations
             if num_tracks:
@@ -1117,7 +1150,7 @@ class Runner(object):
 
                 ## iterate through chunks and write
                 ## izip so it can be modified in place
-                for start, end in izip(starts, ends):
+                for start_index, start, end in izip(count(), starts, ends):
                     if include_coords:
                         overlaps = find_overlaps(start, end,
                                                  chr_include_coords)
@@ -1128,10 +1161,10 @@ class Runner(object):
                         elif len_overlaps == 1:
                             start, end = overlaps[0]
                         else:
-                            for overlap in overlaps:
-                                starts.append(overlap[0])
-                                ends.append(overlap[1])
-                            continue
+                            new_starts, new_ends = zip(*overlaps)
+                            update_starts(starts, ends, new_starts, new_ends,
+                                          start_index)
+                            continue # consider the newly split sequences next
 
                     num_frames = end - start
                     if not MIN_FRAMES <= num_frames <= MAX_FRAMES:
@@ -1166,10 +1199,8 @@ class Runner(object):
                         new_starts = start + new_offsets
                         new_ends = append(new_starts[1:], end)
 
-                        starts.extend(new_starts)
-                        ends.extend(new_ends)
-
-                        # consider the newly split sequences later
+                        update_starts(starts, ends, new_starts, new_ends,
+                                      start_index)
                         continue
 
                     # start: relative to beginning of chromosome
@@ -1182,6 +1213,9 @@ class Runner(object):
                     float_filepath, int_filepath = \
                         print_obs_filepaths_custom(chrom, chunk_index)
 
+                    row = [float_filepath, str(chunk_index), chrom, str(start),
+                           str(end)]
+                    float_tabwriter.writerow(row)
                     print >>sys.stderr, " %s (%d, %d)" % (float_filepath,
                                                           start, end)
 
@@ -1224,6 +1258,13 @@ class Runner(object):
 
                     chunk_index += 1
 
+        self.subset_metadata()
+
+        self.num_chunks = chunk_index # already has +1 added to it
+        self.num_bases = num_bases
+        self.chunk_coords = chunk_coords
+
+    def set_num_tracks(self, num_tracks, use_dinucleotide):
         self.num_tracks = num_tracks
 
         self.use_dinucleotide = use_dinucleotide
@@ -1231,10 +1272,6 @@ class Runner(object):
             self.num_int_cols = num_tracks + NUM_SEQ_COLS
         else:
             self.num_int_cols = num_tracks
-
-        self.num_chunks = chunk_index # already has +1 added to it
-        self.num_bases = num_bases
-        self.chunk_coords = chunk_coords
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
@@ -1247,7 +1284,10 @@ class Runner(object):
 
         with open_writable_or_dummy(self.float_filelistpath) as float_filelist:
             with open_writable_or_dummy(self.int_filelistpath) as int_filelist:
-                self.write_observations(float_filelist, int_filelist)
+                with open_writable_or_dummy(self.float_tabfilepath) as \
+                        float_tabfile:
+                    self.write_observations(float_filelist, int_filelist,
+                                            float_tabfile)
 
     def calc_means_vars(self):
         num_datapoints = self.num_datapoints

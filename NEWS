@@ -10,7 +10,14 @@
 * segway: by default, abort if an input sequence is going to take more
   than 15G of RAM to process using any of the commands being run
 * segway-res-usage: try to guess which tracks are going to be way too huge and skip them
+* segway: write observations/observations.tab which gives information
+  about what exactly is in each observation file
 * segway-res-usage, segway: identify unique runs with uuid.uuid1() instead of os.getpid()
+* segway: fixed a bug regarding the setting of initial parameter
+  values with the --track/-t option
+* segway: when rewriting regions due to --include-region or
+  --split-sequences, ensure that the coordinates are in a monotonically
+  increasing order
 
 0.1.2:
 
@@ -23,12 +30,12 @@
 * Now requires optbuild 0.1.6
 * new segway-res-usage program calibrates memory usage
 * segway: changed -b option: It now specifies a BED filename instead of a directory where a file
-  named segway.bed.gz is found.
+  named segway.bed.gz is found
 * --force/-f is now --clobber/-c
 * segway: now will use a params.params file during identify
   implicitly, if it is in the directory specified with -d
 * segway: method for generating starting parameters is somewhat different now
-* segway: now generates a lot of directories for workign files instead of dumping lots of stuff in one directory
+* segway: now generates a lot of directories for working files instead of dumping lots of stuff in one directory
 * _load_data: ignore invalid chromosome specifications instead of
   triggering a fatal error
 * genomedata-save-metadata: can now handle empty columns
