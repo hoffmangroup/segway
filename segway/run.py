@@ -685,7 +685,7 @@ class Runner(object):
         self.triangulation_filename = None
         self.posterior_triangulation_filename = None
         self.jt_info_filename = None
-        self.res_usage_filename = data_filename(RES_RES_USAGE) # XXX: allow specification
+        self.res_usage_filename = data_filename(RES_RES_USAGE)
 
         self.params_filename = None
         self.dirname = None
@@ -2346,17 +2346,20 @@ def parse_options(args):
         # This is a 0-based file.
         # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
         group.add_option("--include-coords", metavar="FILE",
-                          help="limit to genomic coordinates in FILE")
+                         help="limit to genomic coordinates in FILE")
 
     with OptionGroup(parser, "Model files") as group:
         group.add_option("-i", "--input-master", metavar="FILE",
-                          help="use or create input master in FILE")
+                         help="use or create input master in FILE")
 
         group.add_option("-s", "--structure", metavar="FILE",
-                          help="use or create structure in FILE")
+                         help="use or create structure in FILE")
 
         group.add_option("-p", "--trainable-params", metavar="FILE",
-                          help="use or create trainable parameters in FILE")
+                         help="use or create trainable parameters in FILE")
+
+        group.add_option("--resource-profile", metavar="FILE",
+                         help="load segway-res-usage profile from FILE")
 
     with OptionGroup(parser, "Output files") as group:
         group.add_option("-b", "--bed", metavar="FILE",
@@ -2434,6 +2437,7 @@ def main(args=sys.argv[1:]):
     runner.structure_filename = options.structure
     runner.params_filename = options.trainable_params
     runner.include_coords_filename = options.include_coords
+    runner.res_usage_filename = options.resource_profile
 
     runner.distribution = options.distribution
     runner.random_starts = options.random_starts
