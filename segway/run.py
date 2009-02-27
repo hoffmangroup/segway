@@ -480,17 +480,6 @@ def make_table_spec(frag, table):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
 #                             for index in xrange(num_tracks)])
 
-def make_normalized_random_table(num_rows, num_cols):
-    random_vals = uniform(size=(num_rows, num_cols))
-    random_vals_sums = random_vals.sum(1)[..., newaxis]
-
-    return random_vals / random_vals_sums
-
-def make_random_spec(frag, *args, **kwargs):
-    table = make_normalized_random_table(*args, **kwargs)
-
-    return make_table_spec(frag, table)
-
 def prob_transition_from_expected_len(length):
     # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
     return length / (1 + length)
