@@ -80,6 +80,7 @@ JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
 SWAP_ENDIAN = False
 POSTERIOR_SCALE_FACTOR = 100.0
+MIN_SEG_LEN = 10
 
 ## option defaults
 VERBOSITY = 0
@@ -225,7 +226,7 @@ RES_STR_TMPL = "segway.str.tmpl"
 RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
-RES_INC = "segway.inc"
+RES_INC_TMPL = "segway.inc.tmpl"
 RES_DUMPNAMES = "dumpnames.list"
 RES_RES_USAGE = "res_usage.tab"
 
@@ -949,11 +950,19 @@ class Runner(object):
             return dirpath / orig_filepath.name
 
     def save_include(self):
-        self.gmtk_include_filename = self.save_resource(RES_INC,
-                                                        SUBDIRNAME_AUX)
+        num_states = NUM_SEGS * MIN_SEG_LEN
+        self.num_states = num_states
+
+        mapping = dict(card_seg=num_states)
+
+        aux_dirpath = self.dirpath / SUBDIRNAME_AUX
+
+        self.gmtk_include_filename, self.gmtk_include_filename_is_new = \
+            save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
+                          aux_dirpath, self.clobber)
 
     def save_structure(self):
-        observation_sub = resource_substitute("observation.tmpl")
+        observation_sub = resource_substitute("observation.tmpl") # XXX: make this a variable
 
         tracknames = self.tracknames
         num_tracks = self.num_tracks
@@ -994,7 +1003,7 @@ class Runner(object):
         mapping = dict(include_filename=self.gmtk_include_filename,
                        observations=observations)
 
-        self.structure_filename, self.structure_filename_new = \
+        self.structure_filename, self.structure_filename_is_new = \
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.dirname, self.clobber)
 
@@ -1347,18 +1356,59 @@ class Runner(object):
     def make_spec_multiseg(self, name, *args, **kwargs):
         return make_spec(name, self.make_items_multiseg(*args, **kwargs))
 
+    def make_empty_cpt(self):
+        num_states = self.num_states
+
+        return zeros((num_states, num_states))
+
+    def make_linked_cpt(self):
+        """
+        has all of the seg0_0 -> seg0_1 links, etc.
+
+        also has a seg 0_f -> seg1_0 link which must be overwritten,
+        such as by add_cpt()
+        """
+        return diagflat(ones(self.num_states-1), 1)
+
+    def get_first_state_indexes(self):
+        return arange(0, self.num_states, SEG_MIN_LEN)
+
+    def add_final_probs_to_cpt(self, cpt):
+        """
+        modifies original
+        """
+        num_states = self.num_states
+        num_segs = self.num_segs
+
+        prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
+        prob_self_other = (1.0 - prob_diag) / (num_segs - 1)
+
+        final_state_indexes = arange(SEG_MIN_LEN - 1, num_states, SEG_MIN_LEN)
+        first_state_indexes = self.get_first_state_indexes()
+
+        self_self_coords = [final_state_indexes, final_state_indexes]
+
+        # XXX: this is not extensible to more than 2 segs
+        assert num_segs == 2
+        self_other_coords = [final_state_indexes, first_state_indexes[::-1]]
+
+        cpt[self_self_coords] = prob_self_self
+        cpt[self_other_coords] = prob_self_other
+
+        return cpt
+
     def make_dirichlet_table(self):
         num_segs = self.num_segs
 
-        prob_diag = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
-        prob_nondiag = (1.0 - prob_diag) / (num_segs - 1)
+        probs = self.add_final_probs_to_cpt(self.make_empty_cpt())
 
-        probs = diag(fill_array(prob_diag, num_segs))
-        probs[probs == 0.0] = prob_nondiag
-
-        # astype(int) means flooring the floats
+        # XXX: the ratio is not exact as num_bases is not the same as
+        # the number of base-base transitions. It is surely close
+        # enough, though
         total_pseudocounts = self.len_seg_strength * self.num_bases
         pseudocounts_per_row = total_pseudocounts / num_segs
+
+        # astype(int) means flooring the floats
         pseudocounts = (probs * pseudocounts_per_row).astype(int)
 
         return pseudocounts
@@ -1370,6 +1420,10 @@ class Runner(object):
         return make_spec("DIRICHLET_TAB", items)
 
     def make_dense_cpt_start_seg_spec(self):
+        cpt = zeros((1, self.num_states))
+
+        cpt[0, self.get_first_state_indexes()] = XXX
+        XXXXXXXXXXXXXXXX needs extension
         return make_random_spec(DENSE_CPT_START_SEG_FRAG, 1, self.num_segs)
 
     def make_dense_cpt_seg_seg_spec(self):
@@ -1380,7 +1434,8 @@ class Runner(object):
         else:
             frag = DENSE_CPT_SEG_SEG_FRAG
 
-        return make_random_spec(frag, num_segs, num_segs)
+        table = self.add_final_probs_to_cpt(self.make_linked_cpt())
+        return make_table_spec(frag, table)
 
     def make_dinucleotide_table_row(self):
         # simple one-parameter model
@@ -1398,6 +1453,9 @@ class Runner(object):
         return outer(acgt, acgt).ravel()
 
     def make_dense_cpt_seg_dinucleotide_spec(self):
+        raise NotImplementedError
+
+        # XXX: need to make this work for a bigger min_seg_len, appropriately tied
         table = [self.make_dinucleotide_table_row()
                  for seg_index in xrange(self.num_segs)]
 
@@ -1565,7 +1623,7 @@ class Runner(object):
 
         params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
 
-        self.input_master_filename, self.input_master_filename_new = \
+        self.input_master_filename, self.input_master_filename_is_new = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
                           locals(), params_dirpath, self.clobber,
                           start_index)
@@ -2001,7 +2059,7 @@ class Runner(object):
 
         prog(**kwargs)
 
-        if not self.posterior_triangulation_filename:
+        if not self.posterior_triangulation_filename and not self.dry_run:
             self.save_posterior_triangulation()
 
     def run_train_round(self, start_index, round_index, **kwargs):
@@ -2133,7 +2191,7 @@ class Runner(object):
         # XXX: why did I have "if random_starts == 1:" preceding this line?
         self.save_input_master()
 
-        if self.input_master_filename_new:
+        if self.input_master_filename_is_new:
             input_master_filename = self.input_master_filename
         else:
             input_master_filename = None
@@ -2437,7 +2495,9 @@ def main(args=sys.argv[1:]):
     runner.structure_filename = options.structure
     runner.params_filename = options.trainable_params
     runner.include_coords_filename = options.include_coords
-    runner.res_usage_filename = options.resource_profile
+
+    if options.resource_profile:
+        runner.res_usage_filename = options.resource_profile
 
     runner.distribution = options.distribution
     runner.random_starts = options.random_starts
