@@ -1,11 +1,18 @@
 #include "${include_filename}"
 
 DT_IN_FILE inline
-1
+2
 
 0 map_parent
-1
+1              % num parents
     -1 { p0 }
+
+% XXX: hardcoded for MIN_SEG_LEN == 10, NUM_SEGS = 2
+1 map_seg_mixture
+1
+    0 2 0:9 default
+        -1 { 0 }
+        -1 { 1 }
 
 $name_collection_spec
 $dirichlet_spec

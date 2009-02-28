@@ -29,8 +29,9 @@ from uuid import uuid1
 
 from DRMAA import ExitTimeoutError
 from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
-                   empty, finfo, float32, fromfile, intc, invert, isnan,
-                   newaxis, NINF, outer, s_, sqrt, square, tile, vectorize)
+                   diagflat, empty, finfo, float32, fromfile, intc, invert,
+                   isnan, newaxis, NINF, ones, outer, s_, sqrt, square, tile,
+                   vectorize, zeros)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
                       Mixin_UseFullProgPath,
@@ -272,6 +273,9 @@ WIG_ATTRS_VITERBI = dict(name="%s" % PKG,
                          **WIG_ATTRS)
 WIG_ATTRS_POSTERIOR = dict(viewLimits="0:100",
                            visibility="full",
+                           yLineMark="50",
+                           maxHeightPixels="101:101:11",
+                           windowingFunction="mean",
                            **WIG_ATTRS)
 
 WIG_NAME_POSTERIOR = "%s segment %%s" % PKG
@@ -1360,7 +1364,7 @@ class Runner(object):
         return diagflat(ones(self.num_states-1), 1)
 
     def get_first_state_indexes(self):
-        return arange(0, self.num_states, SEG_MIN_LEN)
+        return arange(0, self.num_states, MIN_SEG_LEN)
 
     def add_final_probs_to_cpt(self, cpt):
         """
@@ -1370,9 +1374,9 @@ class Runner(object):
         num_segs = self.num_segs
 
         prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
-        prob_self_other = (1.0 - prob_diag) / (num_segs - 1)
+        prob_self_other = (1.0 - prob_self_self) / (num_segs - 1)
 
-        final_state_indexes = arange(SEG_MIN_LEN - 1, num_states, SEG_MIN_LEN)
+        final_state_indexes = arange(MIN_SEG_LEN - 1, num_states, MIN_SEG_LEN)
         first_state_indexes = self.get_first_state_indexes()
 
         self_self_coords = [final_state_indexes, final_state_indexes]
@@ -1411,9 +1415,9 @@ class Runner(object):
     def make_dense_cpt_start_seg_spec(self):
         cpt = zeros((1, self.num_states))
 
-        cpt[0, self.get_first_state_indexes()] = XXX
-        XXXXXXXXXXXXXXXX needs extension
-        return make_random_spec(DENSE_CPT_START_SEG_FRAG, 1, self.num_segs)
+        cpt[0, self.get_first_state_indexes()] = 1.0 / self.num_segs
+
+        return make_table_spec(DENSE_CPT_START_SEG_FRAG, cpt)
 
     def make_dense_cpt_seg_seg_spec(self):
         num_segs = self.num_segs
@@ -1423,8 +1427,8 @@ class Runner(object):
         else:
             frag = DENSE_CPT_SEG_SEG_FRAG
 
-        table = self.add_final_probs_to_cpt(self.make_linked_cpt())
-        return make_table_spec(frag, table)
+        cpt = self.add_final_probs_to_cpt(self.make_linked_cpt())
+        return make_table_spec(frag, cpt)
 
     def make_dinucleotide_table_row(self):
         # simple one-parameter model
