@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+%#!/usr/bin/env python
 from __future__ import division, with_statement
 
 """
@@ -28,9 +28,9 @@ from threading import Event, Thread
 from uuid import uuid1
 
 from DRMAA import ExitTimeoutError
-from numpy import (add, amin, amax, append, arange, array, column_stack, diag,
+from numpy import (add, amin, amax, append, arange, array, column_stack,
                    diagflat, empty, finfo, float32, fromfile, intc, invert,
-                   isnan, newaxis, NINF, ones, outer, s_, sqrt, square, tile,
+                   isnan, NINF, ones, outer, s_, sqrt, square, tile,
                    vectorize, zeros)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
@@ -41,7 +41,7 @@ from path import path
 from tabdelim import DictReader, ListWriter
 
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
-                    EXT_GZ, fill_array, find_segment_starts, get_tracknames,
+                    EXT_GZ, find_segment_starts, get_tracknames,
                     gzip_open, ISLAND_BASE_NA, ISLAND_LST_NA,
                     iter_chroms_coords, load_coords, NamedTemporaryDir, PKG,
                     Session, walk_continuous_supercontigs, walk_supercontigs)
@@ -71,6 +71,7 @@ COVAR_METHODS = [COVAR_METHOD_MAX_RANGE, COVAR_METHOD_ML_JITTER,
 COVAR_METHOD = COVAR_METHOD_ML
 
 NUM_SEGS = 2 # XXX: to change, will require CARD_SEG to be set
+MIN_SEG_LEN = 1
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
@@ -81,7 +82,6 @@ JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
 SWAP_ENDIAN = False
 POSTERIOR_SCALE_FACTOR = 100.0
-MIN_SEG_LEN = 10
 
 ## option defaults
 VERBOSITY = 0
@@ -169,6 +169,7 @@ EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
 EXT_FLOAT = "float32"
 EXT_INT = "int"
+EXT_LOG = "log"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
 EXT_POSTERIOR = "posterior"
@@ -685,6 +686,7 @@ class Runner(object):
         self.dirname = None
         self.is_dirname_temp = False
         self.log_likelihood_filename = None
+        self.log_likelihood_log_filename = None
         self.dont_train_filename = None
 
         self.dumpnames_filename = None
@@ -709,11 +711,13 @@ class Runner(object):
 
         # variables
         self.num_segs = NUM_SEGS
+        # XXX: needs to be done later, not during init
         self.segnames = ["seg%d" % seg_index for seg_index in xrange(NUM_SEGS)]
         self.random_starts = RANDOM_STARTS
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
+        self.min_seg_len = MIN_SEG_LEN
 
         # flags
         self.clobber = False
@@ -734,7 +738,12 @@ class Runner(object):
 
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
-            return float(infile.read().strip())
+            res = infile.read().strip()
+
+        with open(self.log_likelihood_log_filename, "a") as logfile:
+            print >>logfile, res
+
+        return float(res)
 
     def load_include_coords(self):
         filename = self.include_coords_filename
@@ -846,10 +855,16 @@ class Runner(object):
 
     def set_log_likelihood_filename(self, start_index=None, new=False):
         if new or not self.log_likelihood_filename:
-            self.log_likelihood_filename = \
+            log_likelihood_filename = \
                 self.make_filename(PREFIX_LIKELIHOOD, start_index,
                                    EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.log_likelihood_filename = log_likelihood_filename
+
+            self.log_likelihood_log_filename = \
+                self.make_filename(PREFIX_LIKELIHOOD, start_index, EXT_TXT,
+                                   subdirname=SUBDIRNAME_LOG)
 
     def make_output_dirpath(self, dirname, start_index):
         res = self.dirpath / "output" / dirname / str(start_index)
@@ -943,10 +958,11 @@ class Runner(object):
             return dirpath / orig_filepath.name
 
     def save_include(self):
-        num_states = NUM_SEGS * MIN_SEG_LEN
+        num_segs = self.num_segs
+        num_states = num_segs * self.min_seg_len
         self.num_states = num_states
 
-        mapping = dict(card_seg=num_states)
+        mapping = dict(card_seg=num_segs, card_state=num_states)
 
         aux_dirpath = self.dirpath / SUBDIRNAME_AUX
 
@@ -1364,7 +1380,7 @@ class Runner(object):
         return diagflat(ones(self.num_states-1), 1)
 
     def get_first_state_indexes(self):
-        return arange(0, self.num_states, MIN_SEG_LEN)
+        return arange(0, self.num_states, self.min_seg_len)
 
     def add_final_probs_to_cpt(self, cpt):
         """
@@ -1372,11 +1388,12 @@ class Runner(object):
         """
         num_states = self.num_states
         num_segs = self.num_segs
+        min_seg_len = self.min_seg_len
 
         prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
         prob_self_other = (1.0 - prob_self_self) / (num_segs - 1)
 
-        final_state_indexes = arange(MIN_SEG_LEN - 1, num_states, MIN_SEG_LEN)
+        final_state_indexes = arange(min_seg_len - 1, num_states, min_seg_len)
         first_state_indexes = self.get_first_state_indexes()
 
         self_self_coords = [final_state_indexes, final_state_indexes]
@@ -1744,6 +1761,7 @@ class Runner(object):
                                         bed_file)
 
     def posterior2wig(self):
+        raise NotImplementedError, "XXX: need to fix for >2 states, remapping"
         infilenames = self.posterior_filenames
 
         range_num_segs = xrange(self.num_segs)
@@ -2435,13 +2453,18 @@ def parse_options(args):
         group.add_option("-r", "--random-starts", type=int,
                          default=RANDOM_STARTS, metavar="NUM",
                          help="randomize start parameters NUM times"
-                         " (default 1)")
+                         " (default %d)" % RANDOM_STARTS)
+
+        group.add_option("--min-seg-length", type=int,
+                         default=MIN_SEG_LEN, metavar="NUM",
+                         help="enforce minimum segment length of NUM"
+                         " (default %d)" % MIN_SEG_LEN)
 
         group.add_option("--prior-strength", type=float,
                          default=PRIOR_STRENGTH, metavar="RATIO",
                          help="use RATIO times the number of data counts as"
                          " the number of pseudocounts for the segment length"
-                         " prior (default 0)")
+                         " prior (default %d)" % PRIOR_STRENGTH)
 
         group.add_option("-v", "--verbosity", type=int, default=VERBOSITY,
                          metavar="NUM",
@@ -2497,6 +2520,7 @@ def main(args=sys.argv[1:]):
     runner.len_seg_strength = options.prior_strength
     runner.include_tracknames = options.track
     runner.verbosity = options.verbosity
+    runner.min_seg_len = options.min_seg_length
 
     runner.clobber = options.clobber
     runner.train = not options.no_train

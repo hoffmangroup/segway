@@ -11,6 +11,7 @@
 #define CARD_PRESENCE 2
 
 % which segment?
+#define CARD_STATE $card_state
 #define CARD_SEG $card_seg
 
 % AA .. TT
@@ -18,10 +19,12 @@
 
 %% types
 
+#define TYPE_STATE discrete hidden cardinality CARD_STATE
 #define TYPE_SEG discrete hidden cardinality CARD_SEG
 
 %% conditionalparents
 
 #define CONDITIONALPARENTS_PRESENCE nil using DenseCPT("internal:UnityScore")
+#define CONDITIONALPARENTS_SEG state(0) using XXX
 
 #endif

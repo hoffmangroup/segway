@@ -7,12 +7,10 @@ DT_IN_FILE inline
 1              % num parents
     -1 { p0 }
 
-% XXX: hardcoded for MIN_SEG_LEN == 10, NUM_SEGS = 2
-1 map_seg_mixture
+1 map_state_seg
 1
-    0 2 0:9 default
-        -1 { 0 }
-        -1 { 1 }
+% floor divide by the number of states per seg
+    -1 { floor_divide(p0, CARD_STATE / CARD_SEG) }
 
 $name_collection_spec
 $dirichlet_spec

@@ -3,17 +3,27 @@
 GRAPHICAL_MODEL model_seg
 
 frame: 0 {
+   variable: state {
+     type: TYPE_STATE;
+     conditionalparents: nil using DenseCPG("start_state");
+   }
+
    variable: seg {
      type: TYPE_SEG;
-     conditionalparents: nil using DenseCPT("start_seg");
+     conditionalparents: CONDITIONALPARENTS_SEG;
    }
 
 ${observations}}
 
 frame: 1 {
+   variable: state {
+     type: TYPE_SEG;
+     conditionalparents: state(-1) using DenseCPT("state_state");
+   }
+
    variable: seg {
      type: TYPE_SEG;
-     conditionalparents: seg(-1) using DenseCPT("seg_seg");
+     conditionalparents: CONDITIONALPARENTS_SEG;
    }
 
 ${observations}}
