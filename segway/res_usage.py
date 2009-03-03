@@ -20,12 +20,13 @@ from numpy.random import standard_normal
 from optbuild import OptionBuilder_ShortOptWithSpace
 from tabdelim import DictWriter
 
-from .run import (EM_TRAIN_PROG, VITERBI_PROG, POSTERIOR_PROG,
-                  PREFIX_JOB_NAME_VITERBI, PREFIX_JOB_NAME_POSTERIOR,
-                  NAME_BUNDLE_PLACEHOLDER, Runner)
+from .run import (EM_TRAIN_PROG, ISLAND, MIN_NUM_SEGS, VITERBI_PROG,
+                  POSTERIOR_PROG, PREFIX_JOB_NAME_VITERBI,
+                  PREFIX_JOB_NAME_POSTERIOR, NAME_BUNDLE_PLACEHOLDER, Runner)
 from ._util import fill_array, ISLAND_BASE_NA, ISLAND_LST_NA
 
 MAX_NUM_TRACKS = 20 # XXX: should be 50 or maybe 100
+MAX_NUM_SEGS = 20 # XXX: should be 50 or maybe 100
 MIN_EXPONENT = 4
 MAX_EXPONENT = 6
 
@@ -42,7 +43,7 @@ CHROM_FMT = "fake%d"
 DIR_FMT = "res_usage_%d"
 TRACKNAME_FMT = "obs%d"
 
-FIELDNAMES = ["program", "num_tracks", "island_base", "island_lst",
+FIELDNAMES = ["program", "num_tracks", "num_segs", "island_base", "island_lst",
               "mem_per_obs", "cpu_per_obs"]
 
 QACCT_PROG = OptionBuilder_ShortOptWithSpace("qacct")
@@ -130,7 +131,8 @@ class MemUsageRunner(Runner):
 
     def make_job_name_res_usage(self, prog, chunk_name):
         return ".".join([make_job_name_stem_uuid(), prog.prog,
-                         str(self.num_tracks), str(chunk_name)])
+                         str(self.num_tracks), str(self.num_segs),
+                         str(chunk_name)])
 
     def make_job_name_train(self, start_index, round_index, chunk_index):
         if chunk_index == NAME_BUNDLE_PLACEHOLDER:
@@ -155,12 +157,14 @@ class MemUsageRunner(Runner):
 
 def run_res_usage():
     for num_tracks in xrange(MAX_NUM_TRACKS, 0, -1):
-        runner = MemUsageRunner()
-        runner.dirname = DIR_FMT % num_tracks
-        runner.num_tracks = num_tracks
-        runner.delete_existing = True
+        for num_segs in xrange(MAX_NUM_SEGS, MIN_NUM_SEGS-1, -1):
+            runner = MemUsageRunner()
+            runner.dirname = DIR_FMT % num_tracks
+            runner.num_tracks = num_tracks
+            runner.num_segs = num_segs
+            runner.delete_existing = True
 
-        runner()
+            runner()
 
 def parse_sge_qacct(text):
     res = {}
@@ -202,7 +206,8 @@ def parse_res_usage(uuid):
 
         program = jobname_words[1]
         num_tracks = int(jobname_words[2])
-        num_observations = jobname_words[3] # this might also be "bundle"
+        num_segs = int(jobname_words[3])
+        num_observations = jobname_words[4] # this might also be "bundle"
 
         cpu = int(record["cpu"])
         maxvmem = convert_sge_mem_size(record["maxvmem"])
@@ -216,11 +221,14 @@ def parse_res_usage(uuid):
         mem_per_obs = maxvmem / num_observations
         cpu_per_obs = cpu / num_observations
 
-        data[program, num_tracks].append((mem_per_obs, cpu_per_obs))
+        data[program, num_tracks, num_segs].append((mem_per_obs, cpu_per_obs))
+
+    # XXX: island search
+    assert not ISLAND
 
     writer = DictWriter(sys.stdout, FIELDNAMES)
     for key in sorted(data):
-        program, num_tracks = key
+        program, num_tracks, num_segs = key
         num_tracks_values = data[key]
 
         mem_per_obs = int(ceil(max(num_tracks_values)[0]))
@@ -228,6 +236,7 @@ def parse_res_usage(uuid):
 
         writer.writerow(dict(program=program,
                              num_tracks=str(num_tracks),
+                             num_segs=str(num_segs),
                              island_base=ISLAND_BASE_NA, # means no island
                              island_lst=ISLAND_LST_NA,
                              mem_per_obs=mem_per_obs,

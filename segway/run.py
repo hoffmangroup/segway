@@ -1,4 +1,4 @@
-%#!/usr/bin/env python
+#!/usr/bin/env python
 from __future__ import division, with_statement
 
 """
@@ -70,7 +70,8 @@ COVAR_METHODS = [COVAR_METHOD_MAX_RANGE, COVAR_METHOD_ML_JITTER,
                  COVAR_METHOD_ML]
 COVAR_METHOD = COVAR_METHOD_ML
 
-NUM_SEGS = 2 # XXX: to change, will require CARD_SEG to be set
+MIN_NUM_SEGS = 2
+NUM_SEGS = MIN_NUM_SEGS
 MIN_SEG_LEN = 1
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
@@ -197,9 +198,6 @@ PREFIX_JOB_NAME_TRAIN = "emt"
 PREFIX_JOB_NAME_VITERBI = "vit"
 PREFIX_JOB_NAME_POSTERIOR = "jt"
 
-# XXX: do not hardcode
-PREFIX_SEG_LEN_FMT = "seg%s" % make_prefix_fmt(NUM_SEGS)[:-1]
-
 SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
@@ -232,14 +230,15 @@ RES_INC_TMPL = "segway.inc.tmpl"
 RES_DUMPNAMES = "dumpnames.list"
 RES_RES_USAGE = "res_usage.tab"
 
-DIRICHLET_FRAG = "0 dirichlet_seg_seg 2 CARD_SEG CARD_SEG"
+DIRICHLET_FRAG = "0 dirichlet_state_state 2 CARD_STATE CARD_STATE"
 
 # XXX: manually indexing these things is silly
-DENSE_CPT_START_SEG_FRAG = "0 start_seg 0 CARD_SEG"
-DENSE_CPT_SEG_SEG_FRAG = "1 seg_seg 1 CARD_SEG CARD_SEG"
+DENSE_CPT_START_STATE_FRAG = "0 start_state 0 CARD_STATE"
+DENSE_CPT_STATE_STATE_FRAG = "1 state_state 1 CARD_STATE CARD_STATE"
+DIRICHLET_STATE_STATE_FRAG = "DirichletTable dirichlet_state_state"
+
 DENSE_CPT_SEG_DINUCLEOTIDE_FRAG = \
     "2 seg_dinucleotide 1 CARD_SEG CARD_DINUCLEOTIDE"
-DIRICHLET_SEG_SEG_FRAG = "DirichletTable dirichlet_seg_seg"
 
 MEAN_TMPL = "$index mean_${seg}_${track} 1 ${rand}"
 
@@ -711,8 +710,6 @@ class Runner(object):
 
         # variables
         self.num_segs = NUM_SEGS
-        # XXX: needs to be done later, not during init
-        self.segnames = ["seg%d" % seg_index for seg_index in xrange(NUM_SEGS)]
         self.random_starts = RANDOM_STARTS
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
@@ -752,7 +749,8 @@ class Runner(object):
 
     def generate_tmpl_mappings(self, segnames=None, tracknames=None):
         if segnames is None:
-            segnames = self.segnames
+            segnames = ["seg%d" % seg_index
+                        for seg_index in xrange(self.num_segs)]
 
         if tracknames is None:
             tracknames = self.tracknames
@@ -1429,20 +1427,20 @@ class Runner(object):
 
         return make_spec("DIRICHLET_TAB", items)
 
-    def make_dense_cpt_start_seg_spec(self):
+    def make_dense_cpt_start_state_spec(self):
         cpt = zeros((1, self.num_states))
 
         cpt[0, self.get_first_state_indexes()] = 1.0 / self.num_segs
 
-        return make_table_spec(DENSE_CPT_START_SEG_FRAG, cpt)
+        return make_table_spec(DENSE_CPT_START_STATE_FRAG, cpt)
 
-    def make_dense_cpt_seg_seg_spec(self):
+    def make_dense_cpt_state_state_spec(self):
         num_segs = self.num_segs
 
         if self.len_seg_strength > 0:
-            frag = "\n".join([DENSE_CPT_SEG_SEG_FRAG, DIRICHLET_SEG_SEG_FRAG])
+            frag = "\n".join([DENSE_CPT_STATE_STATE_FRAG, DIRICHLET_STATE_STATE_FRAG])
         else:
-            frag = DENSE_CPT_SEG_SEG_FRAG
+            frag = DENSE_CPT_STATE_STATE_FRAG
 
         cpt = self.add_final_probs_to_cpt(self.make_linked_cpt())
         return make_table_spec(frag, cpt)
@@ -1463,8 +1461,6 @@ class Runner(object):
         return outer(acgt, acgt).ravel()
 
     def make_dense_cpt_seg_dinucleotide_spec(self):
-        raise NotImplementedError
-
         # XXX: need to make this work for a bigger min_seg_len, appropriately tied
         table = [self.make_dinucleotide_table_row()
                  for seg_index in xrange(self.num_segs)]
@@ -1474,8 +1470,8 @@ class Runner(object):
     def make_dense_cpt_spec(self):
         num_segs = self.num_segs
 
-        items = [self.make_dense_cpt_start_seg_spec(),
-                 self.make_dense_cpt_seg_seg_spec()]
+        items = [self.make_dense_cpt_start_state_spec(),
+                 self.make_dense_cpt_state_state_spec()]
 
         if self.use_dinucleotide:
             items.append(self.make_dense_cpt_seg_dinucleotide_spec())
@@ -1723,7 +1719,7 @@ class Runner(object):
         setattr(self, name, dst_filename)
 
     def make_posterior_wig_filename(self, seg):
-        seg_label = PREFIX_SEG_LEN_FMT % seg
+        seg_label = ("seg%s" % make_prefix_fmt(self.num_segs)[:-1]) % seg
 
         return self.make_filename(PREFIX_POSTERIOR, seg_label, EXT_WIG, EXT_GZ)
 
@@ -1761,7 +1757,6 @@ class Runner(object):
                                         bed_file)
 
     def posterior2wig(self):
-        raise NotImplementedError, "XXX: need to fix for >2 states, remapping"
         infilenames = self.posterior_filenames
 
         range_num_segs = xrange(self.num_segs)
@@ -2455,6 +2450,11 @@ def parse_options(args):
                          help="randomize start parameters NUM times"
                          " (default %d)" % RANDOM_STARTS)
 
+        group.add_option("-N", "--num-segs", type=int,
+                         default=NUM_SEGS, metavar="NUM",
+                         help="make NUM segment classes"
+                         " (default %d)" % NUM_SEGS)
+
         group.add_option("--min-seg-length", type=int,
                          default=MIN_SEG_LEN, metavar="NUM",
                          help="enforce minimum segment length of NUM"
@@ -2521,6 +2521,7 @@ def main(args=sys.argv[1:]):
     runner.include_tracknames = options.track
     runner.verbosity = options.verbosity
     runner.min_seg_len = options.min_seg_length
+    runner.num_segs = options.num_segs
 
     runner.clobber = options.clobber
     runner.train = not options.no_train
