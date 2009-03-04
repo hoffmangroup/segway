@@ -37,11 +37,6 @@ classifiers = ["Natural Language :: English",
 # correctly to fallback when it's not there
 entry_points = """
 [console_scripts]
-genomedata-load-seq = segway.load_seq:main
-genomedata-name-tracks = segway.name_tracks:main
-genomedata-load-data = segway.load_data:main
-genomedata-save-metadata = segway.save_metadata:main
-
 segway = segway.run:main [parallel]
 segway-res-usage = segway.res_usage:main [parallel]
 segway-calc-distance = segway.calc_distance:main
@@ -57,8 +52,8 @@ gtf2bed = segway.gtf2bed:main
 # need optbuild>0.1.5 for Mixin_UseFullProgPath
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
-install_requires = ["textinput", "optbuild>0.1.5", "tables>2.0.4", "numpy",
-                    "path"] # XXX: add "genomedata"
+install_requires = ["genomedata", "textinput", "optbuild>0.1.5",
+                    "tables>2.0.4", "numpy", "path"]
 
 # XXX: ask if there is a way to specify this at the command-line
 extras_require = dict(parallel=["DRMAA-python"])

@@ -1,5 +1,7 @@
 0.1.4:
 
+* genomedata package is now a prereq
+* genomedata-load-data, genomedata-load-seq, genomedata-name-tracks, genomedata-save-metadata: moved to genomedata package
 * segway: added extra discrete variable called "state" to the default
   model. seg is now a child of this. transitions all occur state to
   state rather than seg to seg

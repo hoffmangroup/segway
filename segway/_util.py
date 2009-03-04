@@ -3,12 +3,11 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
-from contextlib import closing, contextmanager
+from contextlib import contextmanager
 from functools import partial
-from gzip import open as _gzip_open
 from optparse import OptionGroup as _OptionGroup
 from os import extsep
 import shutil
@@ -16,10 +15,16 @@ import sys
 from tempfile import mkdtemp
 
 from DRMAA import Session as _Session
-from numpy import append, array, diff, empty, insert, intc
+from numpy import append, array, diff, insert, intc
 from path import path
 from pkg_resources import resource_filename, resource_string
-from tables import openFile, Filters, NoSuchNodeError
+from tables import openFile
+
+# these are loaded by other modules indirectly
+# XXX: check that they are all in use
+from genomedata._util import (EXT_GZ, fill_array, FILTERS_GZIP, get_tracknames,
+                              gzip_open, init_num_obs, LightIterator,
+                              new_extrema)
 
 try:
     # Python 2.6
@@ -31,9 +36,6 @@ DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
 
 PKG_DATA = ".".join([PKG, "data"])
 
-FILTERS_GZIP = Filters(complevel=1)
-
-EXT_GZ = "gz"
 SUFFIX_GZ = extsep + EXT_GZ
 
 DTYPE_IDENTIFY = intc
@@ -56,7 +58,7 @@ data_string = partial(resource_string, PKG_DATA)
 # License at http://www.python.org/download/releases/2.5.2/license/
 
 # XXX: submit for inclusion in core
-
+# XXX: is this still in use?
 class NamedTemporaryDir(object):
     def __init__(self, *args, **kwargs):
         self.name = mkdtemp(*args, **kwargs)
@@ -77,39 +79,6 @@ class NamedTemporaryDir(object):
     def __exit__(self, exc, value, tb):
         self.close()
 
-class LightIterator(object):
-    def __init__(self, handle):
-        self._handle = handle
-        self._defline = None
-
-    def __iter__(self):
-        return self
-
-    def next(self):
-        lines = []
-        defline_old = self._defline
-
-        for line in self._handle:
-            if not line:
-                if not defline_old and not lines:
-                    raise StopIteration
-                if defline_old:
-                    self._defline = None
-                    break
-            elif line.startswith(">"):
-                self._defline = line[1:].rstrip()
-                if defline_old or lines:
-                    break
-                else:
-                    defline_old = self._defline
-            else:
-                lines.append(line.rstrip())
-
-        if not lines:
-            raise StopIteration
-
-        return defline_old, ''.join(lines)
-
 class OptionGroup(_OptionGroup):
     def __enter__(self):
         return self
@@ -129,53 +98,6 @@ def Session(*args, **kwargs):
         yield res
     finally:
         res.exit()
-
-# XXX: replace with iter(genomedata.Chromosome)
-def walk_supercontigs(h5file):
-    root = h5file.root
-
-    for supercontig in h5file.walkGroups():
-        if supercontig == root:
-            continue
-
-        yield supercontig
-
-# XXX: replace with genomedata.Chromosome.itercontinuous
-def walk_continuous_supercontigs(h5file):
-    for supercontig in walk_supercontigs(h5file):
-        try:
-            yield supercontig, supercontig.continuous
-        except NoSuchNodeError:
-            continue
-
-# XXX: replace with genomedata.fill_array
-def fill_array(scalar, shape, dtype=None, *args, **kwargs):
-    if dtype is None:
-        dtype = array(scalar).dtype
-
-    res = empty(shape, dtype, *args, **kwargs)
-    res.fill(scalar)
-
-    return res
-
-def new_extrema(func, data, extrema):
-    curr_extrema = func(data, 0)
-
-    return func([extrema, curr_extrema], 0)
-
-def init_num_obs(num_obs, continuous):
-    curr_num_obs = continuous.shape[1]
-    assert num_obs is None or num_obs == curr_num_obs
-
-    return curr_num_obs
-
-# XXX: suggest as default
-def gzip_open(*args, **kwargs):
-    return closing(_gzip_open(*args, **kwargs))
-
-# XXX: replace with genomedata.Chromosome.tracknames_continuous
-def get_tracknames(chromosome):
-    return chromosome.root._v_attrs.tracknames.tolist()
 
 def get_col_index(chromosome, trackname):
     return get_tracknames(chromosome).index(trackname)
