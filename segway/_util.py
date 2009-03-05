@@ -8,7 +8,6 @@ __version__ = "$Revision$"
 from collections import defaultdict
 from contextlib import contextmanager
 from functools import partial
-from optparse import OptionGroup as _OptionGroup
 from os import extsep
 import shutil
 import sys
@@ -24,7 +23,8 @@ from tables import openFile
 # XXX: check that they are all in use
 from genomedata._util import (EXT_GZ, fill_array, FILTERS_GZIP, get_tracknames,
                               gzip_open, init_num_obs, LightIterator,
-                              new_extrema)
+                              new_extrema, walk_supercontigs,
+                              walk_continuous_supercontigs)
 
 try:
     # Python 2.6
@@ -78,13 +78,6 @@ class NamedTemporaryDir(object):
 
     def __exit__(self, exc, value, tb):
         self.close()
-
-class OptionGroup(_OptionGroup):
-    def __enter__(self):
-        return self
-
-    def __exit__(self, *exc_info):
-        self.parser.add_option_group(self)
 
 # XXX: suggest upstream as addition to DRMAA-python
 @contextmanager

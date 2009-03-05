@@ -364,6 +364,25 @@ def consume_until(iterable, text):
         if line.startswith(text):
             break
 
+def slice2range(s):
+    if isinstance(s, int):
+        return [s]
+
+    start = s.start
+    stop = s.stop
+    step = s.step
+
+    # need to know the length of the sequence to work with stop == None
+    assert stop is not None
+
+    if start is None:
+        start = 0
+
+    if step is None:
+        step = 1
+
+    return xrange(start, stop, step)
+
 def make_res_req(size):
     res = []
     for res_req_id in RES_REQ_IDS:
@@ -649,7 +668,8 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
     ends[next_index:next_index] = new_ends
 
 class RandomStartThread(Thread):
-    def __init__(self, runner, session, start_index, interrupt_event):
+    def __init__(self, runner, session, start_index, num_segs,
+                 interrupt_event):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
         self.runner = copy(runner)
@@ -662,6 +682,7 @@ class RandomStartThread(Thread):
 
     def run(self):
         self.runner.session = self.session
+        self.runner.num_segs = self.num_segs
         self.runner.start_index = self.start_index
         self.runner.interrupt_event = self.interrupt_event
         self.result = self.runner.run_train_start()
@@ -2098,7 +2119,7 @@ class Runner(object):
 
     def run_train_start(self):
         # make new files if you have more than one random start
-        new = self.random_starts > 1
+        new = self.make_new_params
 
         start_index = self.start_index
 
@@ -2197,6 +2218,10 @@ class Runner(object):
         # XXX: why did I have "if random_starts == 1:" preceding this line?
         self.save_input_master()
 
+        # should I make new parameters in each thread?
+        self.make_new_params = (self.random_starts > 1
+                                or isinstance(self.num_segs, slice))
+
         if self.input_master_filename_is_new:
             input_master_filename = self.input_master_filename
         else:
@@ -2208,12 +2233,19 @@ class Runner(object):
 
         interrupt_event = Event()
 
+        num_segs_range = slice2range(self.num_segs)
+
+        # XXX: Python 2.6 use itertools.product()
+        enumerator = enumerate((num_seg, seg_start_index)
+                               for num_seg in num_segs_range
+                               for seg_start_index in xrange(random_starts))
+
         threads = []
         with Session() as session:
             try:
-                for start_index in xrange(random_starts):
+                for start_index, (num_seg, seg_start_index) in enumerator:
                     thread = RandomStartThread(self, session, start_index,
-                                               interrupt_event)
+                                               num_seg, interrupt_event)
                     thread.start()
                     threads.append(thread)
 
@@ -2394,8 +2426,7 @@ class Runner(object):
                 self.is_dirname_temp = False
 
 def parse_options(args):
-    from optparse import OptionParser
-    from ._util import OptionGroup
+    from optplus import OptionParser, OptionGroup
 
     usage = "%prog [OPTION]... H5FILE..."
     version = "%%prog %s" % __version__
@@ -2450,9 +2481,9 @@ def parse_options(args):
                          help="randomize start parameters NUM times"
                          " (default %d)" % RANDOM_STARTS)
 
-        group.add_option("-N", "--num-segs", type=int,
-                         default=NUM_SEGS, metavar="NUM",
-                         help="make NUM segment classes"
+        group.add_option("-N", "--num-segs", type=slice,
+                         default=NUM_SEGS, metavar="SLICE",
+                         help="make SLICE segment classes"
                          " (default %d)" % NUM_SEGS)
 
         group.add_option("--min-seg-length", type=int,

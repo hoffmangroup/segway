@@ -1,6 +1,7 @@
 0.1.4:
 
-* genomedata package is now a prereq
+* genomedata package is now a prerequisite
+* optplus package is now a prerequisite
 * genomedata-load-data, genomedata-load-seq, genomedata-name-tracks, genomedata-save-metadata: moved to genomedata package
 * segway: added extra discrete variable called "state" to the default
   model. seg is now a child of this. transitions all occur state to
@@ -12,7 +13,7 @@
 * segway: seg_seg -> start_state is no longer generated randomly, instead starting
   probability defaults to 1/NUM_SEGS for each segment
 * segway: forces a hard minimum segment limit of 10
-* segway: new --num-segs option: allows more than 2 segment labels
+* segway: new --num-segs option: allows more than 2 segment labels. even allows a range of number of segments
 * segway: change some visual formatting of posterior track
 * segway: bugfix: actually use default res usage file by default
 * segway: don't create a posterior triangulation when --dry-run used

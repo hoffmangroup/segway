@@ -52,8 +52,8 @@ gtf2bed = segway.gtf2bed:main
 # need optbuild>0.1.5 for Mixin_UseFullProgPath
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
-install_requires = ["genomedata", "textinput", "optbuild>0.1.5",
-                    "tables>2.0.4", "numpy", "path"]
+install_requires = ["genomedata>0.1.0", "textinput", "optbuild>0.1.5",
+                    "optplus", "tables>2.0.4", "numpy", "path"]
 
 # XXX: ask if there is a way to specify this at the command-line
 extras_require = dict(parallel=["DRMAA-python"])
