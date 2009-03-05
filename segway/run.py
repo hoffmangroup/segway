@@ -77,7 +77,20 @@ MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
+
 ISLAND = False
+
+# XXX: temporary code to allow easy switching
+if ISLAND:
+    ISLAND_BASE = 3
+    ISLAND_LST = 100000
+else:
+    ISLAND_BASE = ISLAND_BASE_NA
+    ISLAND_LST = ISLAND_LST_NA
+
+ISLAND = ISLAND_BASE != ISLAND_BASE_NA
+assert ISLAND or ISLAND_LST == ISLAND_LST_NA
+
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
@@ -120,9 +133,10 @@ COMPONENT_CACHE = True
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 MAX_FRAMES = 1000000000 # 1 billion
-MEM_USAGE_LIMIT = 15000000000 # 15 GB
+MEM_USAGE_LIMIT = 15*2**30 # 15 GB
 MEM_USAGE_BUNDLE = 100000000 # 100M; XXX: should be included in calibration
-RES_REQ_IDS = ["mem_requested"]
+RES_REQ_IDS = ["mem_requested", "h_vmem"] # h_vmem: hard ulimit
+ALWAYS_MAX_MEM_USAGE = True
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -659,7 +673,7 @@ def rewrite_cliques(rewriter, frame):
     return orig_num_cliques
 
 def make_mem_req(mem_usage):
-    return "%dM" % ceil(mem_usage / 2**20)
+    return "%dG" % ceil(mem_usage / 2**30)
 
 def update_starts(starts, ends, new_starts, new_ends, start_index):
     next_index = start_index + 1
@@ -675,6 +689,7 @@ class RandomStartThread(Thread):
         self.runner = copy(runner)
 
         self.session = session
+        self.num_segs = num_segs
         self.start_index = start_index
         self.interrupt_event = interrupt_event
 
@@ -995,6 +1010,7 @@ class Runner(object):
         tracknames = self.tracknames
         num_tracks = self.num_tracks
         num_datapoints = self.num_datapoints
+        min_seg_len = self.min_seg_len
 
         if self.use_dinucleotide:
             max_num_datapoints_track = sum(self.chunk_lens)
@@ -1009,7 +1025,11 @@ class Runner(object):
             # highest num_datapoints equivalent to 1, because it
             # becomes easier to mix and match different tracks without
             # changing the weights of any of them
-            weight_scale = max_num_datapoints_track / num_datapoints_track
+
+            # weight scale cannot be more than min_seg_len to avoid
+            # artifactual problems
+            weight_scale = min(max_num_datapoints_track / num_datapoints_track,
+                               min_seg_len)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
@@ -1859,6 +1879,7 @@ class Runner(object):
         with open(self.res_usage_filename) as infile:
             reader = DictReader(infile)
             for row in reader:
+                # XXX: need to add num_segs
                 program = row["program"]
                 num_tracks = int(row["num_tracks"])
                 island_base = int(row["island_base"])
@@ -1866,6 +1887,7 @@ class Runner(object):
                 mem_per_obs = int(row["mem_per_obs"])
                 cpu_per_obs = float(row["mem_per_obs"])
 
+                # XXX: need to add num_segs
                 top_specifier = (program, num_tracks)
                 island_specifier = (island_base, island_lst)
                 data = (mem_per_obs, cpu_per_obs)
@@ -1877,9 +1899,7 @@ class Runner(object):
     def get_mem_per_obs(self, prog, num_tracks):
         program = prog.prog
 
-        # XXX: allow other island values
-        assert not ISLAND
-        island_specifier = (ISLAND_BASE_NA, ISLAND_LST_NA)
+        island_specifier = (ISLAND_BASE, ISLAND_LST)
 
         # will fail if the tuple is not a key three
         res_usage = self.res_usage[program, num_tracks][island_specifier]
@@ -1889,6 +1909,9 @@ class Runner(object):
         """
         returns an int
         """
+        if ALWAYS_MAX_MEM_USAGE:
+            return MEM_USAGE_LIMIT
+
         num_tracks = self.num_tracks
         if self.use_dinucleotide:
             num_tracks += 1
@@ -2205,6 +2228,9 @@ class Runner(object):
                                  lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
                                  triFile=self.triangulation_filename,
                                  **self.make_gmtk_kwargs())
+        if ISLAND:
+            self.train_kwargs["base"] = ISLAND_BASE
+            self.train_kwargs["lst"] = ISLAND_LST
 
         # save the destination file for input_master as we will be
         # generating new input masters for each start

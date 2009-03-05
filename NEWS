@@ -17,6 +17,7 @@
 * segway: change some visual formatting of posterior track
 * segway: bugfix: actually use default res usage file by default
 * segway: don't create a posterior triangulation when --dry-run used
+* segway: memory usage new requested in 1G increments instead of 1M
 
 0.1.3:
 
