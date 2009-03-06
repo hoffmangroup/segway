@@ -9,9 +9,6 @@ __version__ = "$Revision$"
 
 # Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
 
-import sys
-sys.path
-
 from cStringIO import StringIO
 from collections import defaultdict
 from contextlib import closing, nested
@@ -19,8 +16,9 @@ from copy import copy
 from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip
-from math import ceil, floor, frexp, ldexp, log10
+from math import ceil, floor, frexp, ldexp, log, log10
 from os import extsep
+import re
 from shutil import move
 from string import Template
 import sys
@@ -40,6 +38,7 @@ from optbuild import (Mixin_NoConvertUnderscore,
 from path import path
 from tabdelim import DictReader, ListWriter
 
+from .res_usage import convert_sge_mem_size, fetch_sge_qacct_records
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
                     EXT_GZ, find_segment_starts, get_tracknames,
                     gzip_open, ISLAND_BASE_NA, ISLAND_LST_NA,
@@ -78,7 +77,7 @@ TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
 
-ISLAND = False
+ISLAND = True
 
 # XXX: temporary code to allow easy switching
 if ISLAND:
@@ -127,9 +126,6 @@ ORD_g = ord("g")
 ORD_t = ord("t")
 NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 
-# for extra memory savings, set to (False) or (not ISLAND)
-COMPONENT_CACHE = True
-
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 MAX_FRAMES = 1000000000 # 1 billion
@@ -163,7 +159,7 @@ OptionBuilder_GMTK = (Mixin_UseFullProgPath +
 
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
-VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbiNew")
+VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
@@ -241,7 +237,7 @@ RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
-RES_DUMPNAMES = "dumpnames.list"
+RES_DUMPNAMES = "dumpnames.list" # XXX: remove all dumpnames stuff from code
 RES_RES_USAGE = "res_usage.tab"
 
 DIRICHLET_FRAG = "0 dirichlet_state_state 2 CARD_STATE CARD_STATE"
@@ -306,10 +302,21 @@ COMMENT_POSTERIOR_TRIANGULATION = \
 
 FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%s step=1"
 
+MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
+
 # set once per file run
 UUID = uuid1().hex
 
 ## functions
+def _constant(constant):
+    """
+    constant values for defaultdict
+    """
+    def _constant_inner():
+        return constant
+
+    return _constant_inner
+
 def make_fixedstep_header(chrom, start):
     """
     this function expects 0-based coordinates
@@ -541,9 +548,45 @@ def make_name_collection_spec(num_segs, tracknames):
 
     return make_spec("NAME_COLLECTION", items)
 
+re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 def load_gmtk_out(filename):
-    # gmtkViterbiNew.cc writes things with C sizeof(int) == numpy.intc
-    return fromfile(filename, dtype=DTYPE_IDENTIFY)
+    with open(filename) as infile:
+        infile_lines = iter(infile)
+
+        assert infile_lines.next().startswith("Segment ")
+        assert infile_lines.next().startswith("========")
+
+        line = infile_lines.next()
+        assert line.startswith("Segment ")
+
+        num_frames_text = line.split(", ")[1].partition(" = ")
+        assert num_frames_text[0] == "number of frames"
+        assert num_frames_text[1] == " = "
+
+        num_frames = int(num_frames_text[2])
+
+        line = infile_lines.next()
+        assert line.startswith("Printing random variables from (P,C,E)")
+
+        res = zeros(num_frames, DTYPE_IDENTIFY)
+
+        for line in infile_lines:
+            if line.startswith(MSG_SUCCESS):
+                return res
+            assert line.rstrip().endswith(" partition")
+
+            line = infile_lines.next()
+            for pair in line.split(","):
+                match = re_seg.match(pair)
+                if not match:
+                    continue
+
+                index = int(match.group(0))
+                val = int(match.group(1))
+
+                res[index] = val
+
+    raise ValueError("%s did not complete successfully" % VITERBI_PROG.prog)
 
 def write_bed(outfile, start_pos, labels, coords):
     (chrom, region_start, region_end) = coords
@@ -681,6 +724,16 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
     starts[next_index:next_index] = new_starts
     ends[next_index:next_index] = new_ends
 
+def fetch_sge_qacct_single_record(jobname):
+    records = list(fetch_sge_qacct_records(jobname))
+    assert len(records) == 1
+
+    return records[0]
+
+def get_sge_qacct_maxvmem(jobname):
+    record = fetch_sge_qacct_single_record(jobname)
+    return convert_sge_mem_size(record["maxvmem"])
+
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, num_segs,
                  interrupt_event):
@@ -725,7 +778,7 @@ class Runner(object):
         self.dont_train_filename = None
 
         self.dumpnames_filename = None
-        self.viterbi_filelistname = None
+        self.viterbi_filelistname = None # XXX: remove from code everywhere
         self.viterbi_filenames = None
 
         self.obs_dirname = None
@@ -741,8 +794,8 @@ class Runner(object):
         self.chunk_coords = None
         self.mins = None
         self.maxs = None
-        self.chunk_train_mem_usages = None
         self.tracknames = None
+        self.mem_per_obs = defaultdict(_constant(None))
 
         # variables
         self.num_segs = NUM_SEGS
@@ -768,6 +821,18 @@ class Runner(object):
         self.train_prog = None
 
         self.__dict__.update(kwargs)
+
+    def set_mem_per_obs(self, jobname, chunk_len, prog):
+        maxvmem = get_sge_qacct_maxvmem(jobname)
+
+        if ISLAND:
+            chunk_len = log(chunk_len)
+
+        mem_per_obs = maxvmem / chunk_len
+
+        print >>sys.stderr, "mem_per_obs = %d / %d = %d" % (maxvmem, chunk_len,
+                                                            mem_per_obs)
+        self.mem_per_obs[prog] = mem_per_obs
 
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
@@ -1142,7 +1207,22 @@ class Runner(object):
 
         return True
 
+    def get_progs_used(self):
+        res = []
+
+        if self.train:
+            res.append(EM_TRAIN_PROG)
+        if self.identify:
+            res.append(VITERBI_PROG)
+        if self.posterior:
+            res.append(POSTERIOR_PROG)
+
+        return res
+
     def write_observations(self, float_filelist, int_filelist, float_tabfile):
+        # XXX: unsupported until order of things is fixed
+        assert not self.split_sequences
+
         include_coords = self.include_coords
 
         # observations
@@ -1158,14 +1238,7 @@ class Runner(object):
 
         use_dinucleotide = "dinucleotide" in self.include_tracknames
 
-        # XXX: refactor into a different func
-        progs_used = []
-        if self.train:
-            progs_used.append(EM_TRAIN_PROG)
-        if self.identify:
-            progs_used.append(VITERBI_PROG)
-        if self.posterior:
-            progs_used.append(POSTERIOR_PROG)
+        progs_used = self.get_progs_used()
 
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
@@ -1733,7 +1806,6 @@ class Runner(object):
 
         if train or identify or posterior:
             self.set_jt_info_filename()
-            self.make_chunk_train_mem_usages()
 
         if train:
             self.make_subdirs(SUBDIRNAMES_TRAIN)
@@ -1909,30 +1981,38 @@ class Runner(object):
         """
         returns an int
         """
-        if ALWAYS_MAX_MEM_USAGE:
+        mem_per_obs = self.mem_per_obs[prog.prog]
+
+        # assume maximum memory usage until returned results say otherwise
+        if mem_per_obs is None:
             return MEM_USAGE_LIMIT
 
-        num_tracks = self.num_tracks
-        if self.use_dinucleotide:
-            num_tracks += 1
+        res = chunk_len * mem_per_obs
+        if res > MEM_USAGE_LIMIT:
+            msg = "segment of length %d will take %d memory," \
+                " which is greater than MEM_USAGE_LIMIT" % (chunk_len, res)
 
-        return chunk_len * self.get_mem_per_obs(prog, num_tracks)
+            raise ValueError(msg)
+
+        return res
 
     def make_chunk_lens(self):
         self.chunk_lens = [end - start
                            for chr, start, end in self.chunk_coords]
 
-    def make_chunk_train_mem_usages(self):
-        self.chunk_train_mem_usages = map(self.get_mem_usage, self.chunk_lens)
+    def chunk_lens_sorted(self, reverse=False):
+        """
+        yields (chunk_index, chunk_mem_usage)
 
-    def chunk_train_mem_usages_decreasing(self):
-        # sort chunks by decreasing size, so the most difficult chunks
-        # are dropped in the queue first
-        zipper = izip(self.chunk_train_mem_usages, count())
+        if reverse: sort chunks by decreasing size, so the most
+        difficult chunks are dropped in the queue first
+        """
+        chunk_lens = self.chunk_lens
+        zipper = sorted(izip(chunk_lens, count()), reverse=reverse)
 
         # XXX: use itertools instead of a generator
-        for chunk_mem_usage, chunk_index in sorted(zipper, reverse=True):
-            yield chunk_index, chunk_mem_usage
+        for chunk_len, chunk_index in zipper:
+            yield chunk_index, chunk_len
 
     def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
                    output_filename=None):
@@ -2003,19 +2083,34 @@ class Runner(object):
 
         res = [] # task ids
 
-        chunk_train_mem_usages = list(self.chunk_train_mem_usages_decreasing())
-        last_chunk_index = chunk_train_mem_usages[-1][0]
-        for chunk_index, chunk_mem_usage in chunk_train_mem_usages:
+        prog = EM_TRAIN_PROG.prog
+
+        # first round is done smallest chunk first
+        reverse = self.mem_per_obs[prog] is not None
+
+        for chunk_index, chunk_len in self.chunk_lens_sorted(reverse):
             acc_filename = self.make_acc_filename(start_index, chunk_index)
             kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
 
-            # -dirichletPriors T only on the last (smallest) chunk
-            kwargs_chunk["dirichletPriors"] = (chunk_index == last_chunk_index)
+            # -dirichletPriors T only on the first chunk
+            kwargs_chunk["dirichletPriors"] = (chunk_index == 0)
 
-            jobid = queue_train_custom(chunk_index, chunk_mem_usage,
-                                       **kwargs_chunk)
-            if jobid is not None:
+            # reread it here so that it can be reset in the middle of
+            # the stream
+            mem_usage = self.get_mem_usage(chunk_len)
+            jobid = queue_train_custom(chunk_index, mem_usage, **kwargs_chunk)
+
+            assert jobid is not None
+
+            if self.mem_per_obs[prog] is None:
+                self.wait_job(jobid)
+
+                self.set_mem_per_obs(jobid, chunk_len, prog)
+
+                # don't need to wait for this jobid again, so it's not
+                # appended to res
+            else:
                 res.append(jobid)
 
         return res
@@ -2138,7 +2233,7 @@ class Runner(object):
         if self.dry_run:
             return False
 
-        return self.wait_bundle(parallel_jobids, bundle_jobid)
+        return self.wait_job(bundle_jobid, parallel_jobids)
 
     def run_train_start(self):
         # make new files if you have more than one random start
@@ -2177,7 +2272,7 @@ class Runner(object):
         return (log_likelihood, self.input_master_filename,
                 self.last_params_filename, self.log_likelihood_filename)
 
-    def wait_bundle(self, parallel_jobids, bundle_jobid):
+    def wait_job(self, jobid, kill_jobids=[]):
         """
         wait for bundle to finish
         """
@@ -2195,7 +2290,7 @@ class Runner(object):
         terminate = session.TERMINATE
         while not job_info:
             try:
-                job_info = session.wait(bundle_jobid, session.TIMEOUT_NO_WAIT)
+                job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
             except ExitTimeoutError:
                 # ExitTimeoutError: not ready yet
                 interrupt_event.wait(SESSION_WAIT_TIMEOUT)
@@ -2209,7 +2304,7 @@ class Runner(object):
                     raise
 
             if interrupt_event.isSet():
-                for jobid in parallel_jobids + [bundle_jobid]:
+                for jobid in kill_jobids + [jobid]:
                     try:
                         print >>sys.stderr, "killing job %s" % jobid
                         control(jobid, terminate)
@@ -2224,7 +2319,6 @@ class Runner(object):
         self.train_kwargs = dict(objsNotToTrain=self.dont_train_filename,
                                  maxEmIters=1,
                                  island=ISLAND,
-                                 componentCache=COMPONENT_CACHE,
                                  lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
                                  triFile=self.triangulation_filename,
                                  **self.make_gmtk_kwargs())
@@ -2325,6 +2419,8 @@ class Runner(object):
         if jobid is not None:
             jobids.append(jobid)
 
+        return jobid
+
     def run_identify_posterior(self):
         if not self.input_master_filename:
             self.save_input_master()
@@ -2342,11 +2438,14 @@ class Runner(object):
 
         self.set_output_dirpaths("identify")
 
+        # XXXopt: might be inefficient to write to standard output and
+        # save via redirection
         viterbi_kwargs = dict(triFile=self.triangulation_filename,
-                              ofilelist=self.viterbi_filelistname,
-                              dumpNames=self.dumpnames_filename)
+                              vitValsFile="-") # standard output, saved by SGE
 
         self.make_posterior_filenames()
+
+        viterbi_filenames = self.viterbi_filenames
         posterior_filenames = self.posterior_filenames
 
         get_mem_usage = self.get_mem_usage
@@ -2363,28 +2462,36 @@ class Runner(object):
                      doDistributeEvidence=True,
                      **self.get_posterior_clique_print_ranges())
 
-            # we can still do this in the order of
-            # self.chunk_train_mem_usages but we are going to ignore the
-            # memory requirement there and substitute our own
-            for chunk_index, _ in self.chunk_train_mem_usages_decreasing():
+            for chunk_index, chunk_len in self.chunk_lens_sorted():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
                                              **identify_kwargs)
                 _queue_identify = partial(self._queue_identify, jobids,
                                           chunk_index, identify_kwargs_chunk)
 
-                chunk_len = chunk_lens[chunk_index]
-
+                # XXX: next two segments are highly duplicative!
                 if self.identify:
                     mem_usage = get_mem_usage(chunk_len, VITERBI_PROG)
-                    _queue_identify(mem_usage, PREFIX_JOB_NAME_VITERBI,
-                                    prog_viterbi, viterbi_kwargs)
+                    viterbi_filename = viterbi_filenames[chunk_index]
+                    jobid = _queue_identify(mem_usage, PREFIX_JOB_NAME_VITERBI,
+                                            prog_viterbi, viterbi_kwargs,
+                                            viterbi_filename)
+                    prog = VITERBI_PROG.prog
+                    if self.mem_per_obs[prog] is None:
+                        self.wait_job(jobid)
+                        self.set_mem_per_obs(jobid, chunk_len, prog)
 
                 if self.posterior:
                     mem_usage = get_mem_usage(chunk_len, POSTERIOR_PROG)
                     posterior_filename = posterior_filenames[chunk_index]
-                    _queue_identify(mem_usage, PREFIX_JOB_NAME_POSTERIOR,
-                                    prog_posterior, posterior_kwargs,
-                                    posterior_filename)
+                    jobid = _queue_identify(mem_usage,
+                                            PREFIX_JOB_NAME_POSTERIOR,
+                                            prog_posterior, posterior_kwargs,
+                                            posterior_filename)
+                    prog = POSTERIOR_PROG.prog
+                    if self.mem_per_obs[prog] is None:
+                        self.wait_job(jobid)
+                        self.set_mem_per_obs(jobid, chunk_len, prog)
+
 
             # XXX: ask on DRMAA mailing list--how to allow
             # KeyboardInterrupt here?

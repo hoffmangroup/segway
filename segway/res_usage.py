@@ -191,16 +191,20 @@ def convert_sge_mem_size(text):
 
     return int(ceil(res))
 
+def fetch_sge_qacct_records(jobname):
+    acct_text = QACCT_PROG.getoutput(j=jobname)
+
+    return parse_sge_qacct(acct_text)
+
 def parse_res_usage(uuid):
     jobname = ".".join([make_job_name_stem(uuid), "*"])
-    acct_text = QACCT_PROG.getoutput(j=jobname)
 
     # dict:
     # key: num_tracks
     # val: list of tuples of (mem_per_obs, cpu_per_obs)
     data = defaultdict(list)
 
-    for record in parse_sge_qacct(acct_text):
+    for record in fetch_sge_qacct_records(jobname):
         jobname = record["jobname"]
         jobname_words = jobname.split(".")
 
