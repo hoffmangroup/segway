@@ -27,7 +27,7 @@ from uuid import uuid1
 
 from DRMAA import ExitTimeoutError
 from numpy import (add, amin, amax, append, arange, array, column_stack,
-                   diagflat, empty, finfo, float32, fromfile, intc, invert,
+                   diagflat, empty, finfo, float32, intc, invert,
                    isnan, NINF, ones, outer, s_, sqrt, square, tile,
                    vectorize, zeros)
 from numpy.random import uniform
@@ -36,7 +36,7 @@ from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace,
                       OptionBuilder_ShortOptWithSpace_TF)
 from path import path
-from tabdelim import DictReader, ListWriter
+from tabdelim import ListWriter
 
 from .res_usage import convert_sge_mem_size, fetch_sge_qacct_records
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
@@ -82,10 +82,17 @@ ISLAND = True
 # XXX: temporary code to allow easy switching
 if ISLAND:
     ISLAND_BASE = 3
-    ISLAND_LST = 100000
+    # XXXopt: should be 100000, or really test some values, but Xiaoyu
+    # has a smaller sequence
+    ISLAND_LST = 50000
+    HASH_LOAD_FACTOR = 0.98
 else:
     ISLAND_BASE = ISLAND_BASE_NA
     ISLAND_LST = ISLAND_LST_NA
+    HASH_LOAD_FACTOR = None
+
+COMPONENT_CACHE = not ISLAND
+DETERMINISTIC_CHILDREN_STORE = not ISLAND
 
 ISLAND = ISLAND_BASE != ISLAND_BASE_NA
 assert ISLAND or ISLAND_LST == ISLAND_LST_NA
@@ -826,6 +833,8 @@ class Runner(object):
         maxvmem = get_sge_qacct_maxvmem(jobname)
 
         if ISLAND:
+            # XXX: otherwise, we really do linear inference
+            assert chunk_len > ISLAND_LST
             chunk_len = log(chunk_len)
 
         mem_per_obs = maxvmem / chunk_len
@@ -1921,7 +1930,12 @@ class Runner(object):
     def make_gmtk_kwargs(self):
         res = dict(strFile=self.structure_filename,
                    verbosity=self.verbosity,
+                   componentCache=COMPONENT_CACHE,
+                   deterministicChildrenStore=DETERMINISTIC_CHILDREN_STORE,
                    jtFile=self.jt_info_filename)
+
+        if HASH_LOAD_FACTOR is not None:
+            res["hashLoadFactor"] = HASH_LOAD_FACTOR
 
         assert self.int_filelistpath
         if self.int_filelistpath:
@@ -1940,43 +1954,6 @@ class Runner(object):
 
         return res
 
-    def parse_res_usage(self):
-        # dict
-        # key: (program, num_tracks)
-        # val: dict
-        #      key: (island_base, island_lst)
-        #      val: (mem_per_obs, cpu_per_obs)
-        res_usage = defaultdict(dict)
-
-        with open(self.res_usage_filename) as infile:
-            reader = DictReader(infile)
-            for row in reader:
-                # XXX: need to add num_segs
-                program = row["program"]
-                num_tracks = int(row["num_tracks"])
-                island_base = int(row["island_base"])
-                island_lst = int(row["island_lst"])
-                mem_per_obs = int(row["mem_per_obs"])
-                cpu_per_obs = float(row["mem_per_obs"])
-
-                # XXX: need to add num_segs
-                top_specifier = (program, num_tracks)
-                island_specifier = (island_base, island_lst)
-                data = (mem_per_obs, cpu_per_obs)
-
-                res_usage[top_specifier][island_specifier] = data
-
-        self.res_usage = res_usage
-
-    def get_mem_per_obs(self, prog, num_tracks):
-        program = prog.prog
-
-        island_specifier = (ISLAND_BASE, ISLAND_LST)
-
-        # will fail if the tuple is not a key three
-        res_usage = self.res_usage[program, num_tracks][island_specifier]
-        return res_usage[0]
-
     def get_mem_usage(self, chunk_len, prog=EM_TRAIN_PROG):
         """
         returns an int
@@ -1986,6 +1963,9 @@ class Runner(object):
         # assume maximum memory usage until returned results say otherwise
         if mem_per_obs is None:
             return MEM_USAGE_LIMIT
+
+        if ISLAND:
+            chunk_len = log(chunk_len)
 
         res = chunk_len * mem_per_obs
         if res > MEM_USAGE_LIMIT:
@@ -2517,7 +2497,6 @@ class Runner(object):
         # XXXopt: use binary I/O to gmtk rather than ascii
 
         self.dirpath = path(self.dirname)
-        self.parse_res_usage()
         self.save_params()
 
         self.make_subdir(SUBDIRNAME_LOG)
