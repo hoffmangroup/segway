@@ -13,9 +13,10 @@ from cStringIO import StringIO
 from collections import defaultdict
 from contextlib import closing, nested
 from copy import copy
+from datetime import datetime
 from errno import EEXIST, ENOENT
 from functools import partial
-from itertools import count, izip
+from itertools import count, izip, repeat
 from math import ceil, floor, frexp, ldexp, log, log10
 from os import extsep
 import re
@@ -26,6 +27,7 @@ from threading import Event, Thread
 from uuid import uuid1
 
 from DRMAA import ExitTimeoutError
+from genomedata import Genome
 from numpy import (add, amin, amax, append, arange, array, column_stack,
                    diagflat, empty, finfo, float32, intc, invert,
                    isnan, NINF, ones, outer, s_, sqrt, square, tile,
@@ -38,12 +40,11 @@ from optbuild import (Mixin_NoConvertUnderscore,
 from path import path
 from tabdelim import ListWriter
 
-from .res_usage import convert_sge_mem_size, fetch_sge_qacct_records
+from sge import get_sge_qacct_maxvmem
 from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
-                    EXT_GZ, find_segment_starts, get_tracknames,
-                    gzip_open, ISLAND_BASE_NA, ISLAND_LST_NA,
-                    iter_chroms_coords, load_coords, NamedTemporaryDir, PKG,
-                    Session, walk_continuous_supercontigs, walk_supercontigs)
+                    EXT_GZ, find_segment_starts, get_chrom_coords, gzip_open,
+                    is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
+                    NamedTemporaryDir, PKG, Session)
 
 # XXX: I should really get some sort of Enum for this, I think Peter
 # Norvig has one
@@ -314,15 +315,17 @@ MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 # set once per file run
 UUID = uuid1().hex
 
+## exceptions
+
+class ChunkOverMemUsageLimit(Exception):
+    pass
+
 ## functions
 def _constant(constant):
     """
     constant values for defaultdict
     """
-    def _constant_inner():
-        return constant
-
-    return _constant_inner
+    return repeat(constant).next
 
 def make_fixedstep_header(chrom, start):
     """
@@ -588,8 +591,8 @@ def load_gmtk_out(filename):
                 if not match:
                     continue
 
-                index = int(match.group(0))
-                val = int(match.group(1))
+                index = int(match.group(1))
+                val = int(match.group(2))
 
                 res[index] = val
 
@@ -612,36 +615,55 @@ def load_gmtk_out_write_bed(coords, gmtk_outfilename, bed_file):
 
     write_bed(bed_file, start_pos, labels, coords)
 
+re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
 def parse_posterior(iterable):
-    # skip to first frame
+    """
+    a generator.
+    yields tuples (index, label, prob)
+
+    index: (int) frame index
+    label: (int) segment label
+    prob: (float) prob value
+    """
+    # ignores non-matching lines
     for line in iterable:
-        if line.startswith("-"):
-            break
+        m_posterior_entry = re_posterior_entry.match(line.rstrip())
 
-    # skip frame header
-    iterable.next()
+        if m_posterior_entry:
+            group = m_posterior_entry.group
+            yield (int(group(2)), int(group(3)), float(group(1)))
 
-    res = []
-    for line in iterable:
-        # frame boundary or file end
-        if line.startswith(("-", "_")):
-            yield res
-            res = []
-            iterable.next() # skip frame header
-        else:
-            # return the first word, which is the posterior probability
-            res.append(float(line.split()[1]))
+def read_posterior(infile, num_frames, num_labels):
+    """
+    returns an array (num_frames, num_labels)
+    """
+    # XXX: should these be single precision?
+    res = zeros((num_frames, num_labels))
 
-def load_posterior_write_wig((chrom, start, end), infilename, outfiles):
+    for frame_index, label, prob in parse_posterior(infile):
+        res[frame_index, label] = prob
+
+    return res
+
+def load_posterior_write_wig((chrom, start, end), num_labels,
+                             infilename, outfiles):
     header = make_fixedstep_header(chrom, start)
+    num_frames = end - start
 
     for outfile in outfiles:
         print >>outfile, header
 
     with open(infilename) as infile:
-        for probs in parse_posterior(infile):
-            for outfile, prob in zip(outfiles, probs):
-                print >>outfile, int(round(prob * POSTERIOR_SCALE_FACTOR))
+        probs = read_posterior(infile, num_frames, num_labels)
+
+    probs_rounded = empty(probs.shape, int)
+
+    # scale, round, and cast to int
+    (probs * POSTERIOR_SCALE_FACTOR).round(out = probs_rounded)
+
+    # print array columns as text to each outfile
+    for outfile, probs_rounded_label in zip(outfiles, probs_rounded.T):
+        probs_rounded_label.tofile(outfile, "\n")
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -682,13 +704,6 @@ def make_dinucleotide_int_data(seq):
     # XXXopt: set these up properly in the first place instead of
     # column_stacking at the end
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
-
-def walk_all_supercontigs(h5file):
-    """
-    shares interface with walk_continuous_supercontigs()
-    """
-    for supercontig in walk_supercontigs(h5file):
-        yield supercontig, None
 
 def jitter_cell(cell):
     """
@@ -731,16 +746,6 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
     starts[next_index:next_index] = new_starts
     ends[next_index:next_index] = new_ends
 
-def fetch_sge_qacct_single_record(jobname):
-    records = list(fetch_sge_qacct_records(jobname))
-    assert len(records) == 1
-
-    return records[0]
-
-def get_sge_qacct_maxvmem(jobname):
-    record = fetch_sge_qacct_single_record(jobname)
-    return convert_sge_mem_size(record["maxvmem"])
-
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, num_segs,
                  interrupt_event):
@@ -751,7 +756,6 @@ class RandomStartThread(Thread):
         self.session = session
         self.num_segs = num_segs
         self.start_index = start_index
-        self.interrupt_event = interrupt_event
 
         Thread.__init__(self)
 
@@ -759,13 +763,11 @@ class RandomStartThread(Thread):
         self.runner.session = self.session
         self.runner.num_segs = self.num_segs
         self.runner.start_index = self.start_index
-        self.runner.interrupt_event = self.interrupt_event
         self.result = self.runner.run_train_start()
 
 class Runner(object):
     def __init__(self, **kwargs):
         # filenames
-        self.h5filenames = None
         self.float_filelistpath = None
         self.int_filelistpath = None
 
@@ -794,6 +796,8 @@ class Runner(object):
         self.include_coords_filename = None
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
+
+        self.metadata_done = False
 
         # data
         # a "chunk" is what GMTK calls a segment
@@ -839,7 +843,9 @@ class Runner(object):
 
         mem_per_obs = maxvmem / chunk_len
 
-        print >>sys.stderr, "mem_per_obs = %d / %d = %d" % (maxvmem, chunk_len,
+        assert mem_per_obs > 0
+
+        print >>sys.stderr, "mem_per_obs = %s / %s = %s" % (maxvmem, chunk_len,
                                                             mem_per_obs)
         self.mem_per_obs[prog] = mem_per_obs
 
@@ -883,9 +889,9 @@ class Runner(object):
     def set_tracknames(self, chromosome):
         # XXXopt: a lot of stuff here repeated for every chromosome
         # unnecessarily
-        tracknames = get_tracknames(chromosome)
+        tracknames = chromosome.tracknames_continuous
 
-        # includes specials
+        # includes special tracks (like dinucleotide)
         include_tracknames_all = self.include_tracknames
 
         # XXX: some repetition in next two assignments
@@ -1171,12 +1177,17 @@ class Runner(object):
         """
         limits all the metadata attributes to only tracks that are used
         """
+        if self.metadata_done:
+            return
+
         subset_metadata_attr = self.subset_metadata_attr
         subset_metadata_attr("mins")
         subset_metadata_attr("maxs")
         subset_metadata_attr("sums")
         subset_metadata_attr("sums_squares")
         subset_metadata_attr("num_datapoints")
+
+        self.metadata_done = True # avoid repetition
 
     def accum_metadata(self, mins, maxs, sums, sums_squares, num_datapoints):
         if self.mins is None:
@@ -1200,19 +1211,18 @@ class Runner(object):
         returns False if there is not
         """
 
-        chromosome_attrs = chromosome.root._v_attrs
-
         try:
-            mins = chromosome_attrs.mins
-            maxs = chromosome_attrs.maxs
-            sums = chromosome_attrs.sums
-            sums_squares = chromosome_attrs.sums_squares
-            num_datapoints = chromosome_attrs.num_datapoints
+            mins = chromosome.mins
+            maxs = chromosome.maxs
+            sums = chromosome.sums
+            sums_squares = chromosome.sums_squares
+            num_datapoints = chromosome.num_datapoints
         except AttributeError:
             # this means there is no data for that chromosome
             return False
 
-        self.accum_metadata(mins, maxs, sums, sums_squares, num_datapoints)
+        if not self.metadata_done:
+            self.accum_metadata(mins, maxs, sums, sums_squares, num_datapoints)
 
         return True
 
@@ -1229,32 +1239,102 @@ class Runner(object):
         return res
 
     def write_observations(self, float_filelist, int_filelist, float_tabfile):
-        # XXX: unsupported until order of things is fixed
-        assert not self.split_sequences
-
-        include_coords = self.include_coords
-
         # observations
         print_obs_filepaths_custom = partial(self.print_obs_filepaths,
                                              float_filelist, int_filelist)
         save_observations_chunk = self.save_observations_chunk
         clobber = self.clobber
 
+        float_tabwriter = ListWriter(float_tabfile)
+        float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
+
+        track_indexes = self.track_indexes
+
+        # col_slice: the largest contiguous subset of the dataset
+        # tracks that is still a superset of the tracks that are used
+        min_col = track_indexes.min()
+        max_col = track_indexes.max() + 1
+        col_slice = s_[min_col:max_col]
+
+        zipper = izip(count(), self.used_supercontigs, self.chunk_coords)
+        for chunk_index, supercontig, (chrom, start, end) in zipper:
+            float_filepath, int_filepath = \
+                print_obs_filepaths_custom(chrom, chunk_index)
+
+            row = [float_filepath, str(chunk_index), chrom, str(start),
+                   str(end)]
+            float_tabwriter.writerow(row)
+            print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
+
+            # if they don't both exist
+            if not (float_filepath.exists() and int_filepath.exists()):
+                # read rows first into a numpy.array because you can't
+                # do complex imports on a numpy.Array
+
+                # chunk_start: relative to the beginning of the
+                # supercontig
+                chunk_start = start - supercontig.start
+                chunk_end = end - supercontig.start
+
+                continuous = supercontig.continuous
+                if continuous is None:
+                    cells = None
+                else:
+                    # first, extract a contiguous subset of the tracks in
+                    # the dataset, which is a superset of the tracks that
+                    # are used
+                    rows = continuous[chunk_start:chunk_end, col_slice]
+
+                    # extract only the tracks that are used
+                    # correct for min_col offset
+                    cells = rows[..., track_indexes - min_col]
+
+            if self.use_dinucleotide:
+                seq = supercontig.seq
+                len_seq = len(seq)
+
+                if chunk_end < len_seq:
+                    seq_cells = seq[chunk_start:chunk_end+1]
+                elif chunk_end == len(seq):
+                    seq_chunk = seq[chunk_start:chunk_end]
+                    seq_cells = append(seq_chunk, ord("N"))
+                else:
+                    raise ValueError("sequence too short for supercontig")
+            else:
+                seq_cells = None
+
+            save_observations_chunk(float_filepath, int_filepath, cells,
+                                    seq_cells)
+
+    def prep_observations(self):
+        # XXX: this function is way too long, try to get it to fit
+        # inside a screen on your enormous monitor
+
+        # this function is repeatable after max_mem_usage is discovered
+        include_coords = self.include_coords
+
         num_tracks = None # this is before any subsetting
         chunk_index = 0
         chunk_coords = []
         num_bases = 0
+        used_supercontigs = [] # continuous objects
 
         use_dinucleotide = "dinucleotide" in self.include_tracknames
+        self.use_dinucleotide = use_dinucleotide
 
-        progs_used = self.get_progs_used()
+        # XXX: move this outside this function so self.genome can be reused
 
-        float_tabwriter = ListWriter(float_tabfile)
-        float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
+        # XXX: use groupby(include_coords) and then access chromosomes
+        # randomly rather than iterating through them all
+        self.genome = Genome(self.genomedata_dirname)
+        for chromosome in self.genome:
+            chrom = chromosome.name
 
-        chrom_iterator = iter_chroms_coords(self.h5filenames, include_coords)
-        for chrom, filename, chromosome, chr_include_coords in chrom_iterator:
-            assert not chromosome.root._v_attrs.dirty
+            chr_include_coords = get_chrom_coords(include_coords, chrom)
+
+            if (chr_include_coords is not None
+                and is_empty_array(chr_include_coords)):
+                continue
 
             # if there is no metadata, then skip the chromosome
             if not self.accum_metadata_chromosome(chromosome):
@@ -1263,26 +1343,22 @@ class Runner(object):
             track_indexes = self.set_tracknames(chromosome)
             num_tracks = len(track_indexes)
 
-            self.set_num_tracks(num_tracks, use_dinucleotide)
+            self.set_num_tracks(num_tracks)
 
-            # observations
             if num_tracks:
-                supercontig_walker = walk_continuous_supercontigs(chromosome)
+                supercontigs = chromosome.itercontinuous()
             else:
-                supercontig_walker = walk_all_supercontigs(chromosome)
+                supercontigs = izip(chromosome, repeat(None))
 
-            for supercontig, continuous in supercontig_walker:
+            for supercontig, continuous in supercontigs:
                 assert continuous is None or continuous.shape[1] >= num_tracks
 
-                supercontig_attrs = supercontig._v_attrs
-                supercontig_start = supercontig_attrs.start
-
                 convert_chunks_custom = partial(convert_chunks,
-                                                supercontig_attrs)
+                                                supercontig.attrs)
 
                 if continuous is None:
-                    starts = [supercontig_start]
-                    ends = [supercontig_attrs.end]
+                    starts = [supercontig.start]
+                    ends = [supercontig.end]
                 else:
                     starts = convert_chunks_custom("chunk_starts")
                     ends = convert_chunks_custom("chunk_ends")
@@ -1313,8 +1389,7 @@ class Runner(object):
 
                     # check that this sequence can fit into all of the
                     # programs that will be used
-                    max_mem_usage = max(self.get_mem_usage(num_frames, prog)
-                                        for prog in progs_used)
+                    max_mem_usage = self.get_max_mem_usage(num_frames)
                     if max_mem_usage > MEM_USAGE_LIMIT:
                         if not self.split_sequences:
                             msg = "segment of length %d will take %d memory," \
@@ -1343,57 +1418,10 @@ class Runner(object):
                         continue
 
                     # start: relative to beginning of chromosome
-                    # chunk_start: relative to the beginning of
-                    # the supercontig
-                    chunk_start = start - supercontig_start
-                    chunk_end = end - supercontig_start
                     chunk_coords.append((chrom, start, end))
-
-                    float_filepath, int_filepath = \
-                        print_obs_filepaths_custom(chrom, chunk_index)
-
-                    row = [float_filepath, str(chunk_index), chrom, str(start),
-                           str(end)]
-                    float_tabwriter.writerow(row)
-                    print >>sys.stderr, " %s (%d, %d)" % (float_filepath,
-                                                          start, end)
+                    used_supercontigs.append(supercontig)
 
                     num_bases += end - start
-
-                    # if they don't both exist
-                    if not (float_filepath.exists() and int_filepath.exists()):
-                        # read rows first into a numpy.array because
-                        # you can't do complex imports on a
-                        # numpy.Array
-                        if continuous is None:
-                            cells = None
-                        else:
-                            min_col = track_indexes.min()
-                            max_col = track_indexes.max() + 1
-                            col_slice = s_[min_col:max_col]
-
-                            rows = continuous[chunk_start:chunk_end, col_slice]
-
-                            # correct for min_col offset
-                            cells = rows[..., track_indexes - min_col]
-
-                        if use_dinucleotide:
-                            seq = supercontig.seq
-                            len_seq = len(seq)
-
-                            if chunk_end < len_seq:
-                                seq_cells = seq[chunk_start:chunk_end+1]
-                            elif chunk_end == len(seq):
-                                seq_chunk = seq[chunk_start:chunk_end]
-                                seq_cells = append(seq_chunk, ord("N"))
-                            else:
-                                raise ValueError("sequence too short for"
-                                                 " supercontig")
-                        else:
-                            seq_cells = None
-
-                        save_observations_chunk(float_filepath, int_filepath,
-                                                cells, seq_cells)
 
                     chunk_index += 1
 
@@ -1403,11 +1431,12 @@ class Runner(object):
         self.num_bases = num_bases
         self.chunk_coords = chunk_coords
 
-    def set_num_tracks(self, num_tracks, use_dinucleotide):
+        self.used_supercontigs = used_supercontigs
+
+    def set_num_tracks(self, num_tracks):
         self.num_tracks = num_tracks
 
-        self.use_dinucleotide = use_dinucleotide
-        if use_dinucleotide:
+        if self.use_dinucleotide:
             self.num_int_cols = num_tracks + NUM_SEQ_COLS
         else:
             self.num_int_cols = num_tracks
@@ -1423,8 +1452,8 @@ class Runner(object):
 
         with open_writable_or_dummy(self.float_filelistpath) as float_filelist:
             with open_writable_or_dummy(self.int_filelistpath) as int_filelist:
-                with open_writable_or_dummy(self.float_tabfilepath) as \
-                        float_tabfile:
+                with open_writable_or_dummy(self.float_tabfilepath) \
+                        as float_tabfile:
                     self.write_observations(float_filelist, int_filelist,
                                             float_tabfile)
 
@@ -1800,9 +1829,10 @@ class Runner(object):
         self.make_obs_dir()
 
         # do first, because it sets self.num_tracks and self.tracknames
-        self.save_observations()
+        self.prep_observations()
 
-        # sets self.chunk_lens, needed for save_structure()
+        # sets self.chunk_lens, needed for save_structure() to do
+        # Dirichlet stuff (but rewriting structure is unnecessary)
         self.make_chunk_lens()
 
         self.save_include()
@@ -1812,6 +1842,8 @@ class Runner(object):
         train = self.train
         identify = self.identify
         posterior = self.posterior
+
+        assert not posterior or self.num_segs == 2
 
         if train or identify or posterior:
             self.set_jt_info_filename()
@@ -1825,11 +1857,27 @@ class Runner(object):
             # might turn off self.train, if the params already exist
             self.set_log_likelihood_filename()
 
+        # XXX: if self.split_sequences we should only save the smallest chunk
+        self.save_observations()
+
         if identify or posterior:
             self.make_subdirs(SUBDIRNAMES_IDENTIFY)
-
-            self.save_viterbi_filelist()
             self.save_dumpnames()
+
+            # this requires the number of observations
+            self.save_viterbi_filelist()
+
+    def resave_params(self):
+        """
+        repeats necessary parts after an adjustment to self.mem_per_obs
+        """
+        self.prep_observations()
+        self.make_chunk_lens()
+        self.save_observations()
+
+        if self.identify or self.posterior:
+            # overwrite previous
+            self.save_viterbi_filelist()
 
     def move_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -1895,7 +1943,8 @@ class Runner(object):
                 print >>wig_file, self.make_wig_header_posterior(state_index)
 
             for infilename, chunk_coord in zipper:
-                load_posterior_write_wig(chunk_coord, infilename, wig_files)
+                load_posterior_write_wig(chunk_coord, self.num_segs,
+                                         infilename, wig_files)
 
         # delete original input files because they are enormous
         for infilename in infilenames:
@@ -1930,9 +1979,14 @@ class Runner(object):
     def make_gmtk_kwargs(self):
         res = dict(strFile=self.structure_filename,
                    verbosity=self.verbosity,
+                   island=ISLAND,
                    componentCache=COMPONENT_CACHE,
                    deterministicChildrenStore=DETERMINISTIC_CHILDREN_STORE,
                    jtFile=self.jt_info_filename)
+
+        if ISLAND:
+            res["base"] = ISLAND_BASE
+            res["lst"] = ISLAND_LST
 
         if HASH_LOAD_FACTOR is not None:
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
@@ -1975,6 +2029,10 @@ class Runner(object):
             raise ValueError(msg)
 
         return res
+
+    def get_max_mem_usage(self, num_frames):
+        return max(self.get_mem_usage(num_frames, prog)
+                   for prog in self.get_progs_used())
 
     def make_chunk_lens(self):
         self.chunk_lens = [end - start
@@ -2298,13 +2356,9 @@ class Runner(object):
 
         self.train_kwargs = dict(objsNotToTrain=self.dont_train_filename,
                                  maxEmIters=1,
-                                 island=ISLAND,
                                  lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
                                  triFile=self.triangulation_filename,
                                  **self.make_gmtk_kwargs())
-        if ISLAND:
-            self.train_kwargs["base"] = ISLAND_BASE
-            self.train_kwargs["lst"] = ISLAND_LST
 
         # save the destination file for input_master as we will be
         # generating new input masters for each start
@@ -2331,8 +2385,6 @@ class Runner(object):
                          self.params_filename,
                          self.log_likelihood_filename]
 
-        interrupt_event = Event()
-
         num_segs_range = slice2range(self.num_segs)
 
         # XXX: Python 2.6 use itertools.product()
@@ -2345,7 +2397,7 @@ class Runner(object):
             try:
                 for start_index, (num_seg, seg_start_index) in enumerator:
                     thread = RandomStartThread(self, session, start_index,
-                                               num_seg, interrupt_event)
+                                               num_seg)
                     thread.start()
                     threads.append(thread)
 
@@ -2362,7 +2414,7 @@ class Runner(object):
                     # therefore did not set thread.result
                     start_params.append(thread.result)
             except KeyboardInterrupt:
-                interrupt_event.set()
+                self.interrupt_event.set()
                 for thread in threads:
                     thread.join()
 
@@ -2401,6 +2453,23 @@ class Runner(object):
 
         return jobid
 
+    def run_identify_or_posterior(self, chunk_index, chunk_len, prog,
+                                  filenames, queue_identify_func,
+                                  prefix_job_name, kwargs):
+        mem_usage = self.get_mem_usage(chunk_len, prog)
+        filename = filenames[chunk_index]
+
+        jobid = queue_identify_func(mem_usage, prefix_job_name,
+                                    self.prog_factory(prog), kwargs, filename)
+
+        progname = prog.prog
+        if self.mem_per_obs[progname] is None:
+            self.wait_job(jobid)
+            self.set_mem_per_obs(jobid, chunk_len, progname)
+            return True
+
+        return False
+
     def run_identify_posterior(self):
         if not self.input_master_filename:
             self.save_input_master()
@@ -2423,24 +2492,20 @@ class Runner(object):
         viterbi_kwargs = dict(triFile=self.triangulation_filename,
                               vitValsFile="-") # standard output, saved by SGE
 
+        posterior_kwargs = dict(triFile=self.posterior_triangulation_filename,
+                                doDistributeEvidence=True,
+                                **self.get_posterior_clique_print_ranges())
         self.make_posterior_filenames()
 
         viterbi_filenames = self.viterbi_filenames
         posterior_filenames = self.posterior_filenames
 
-        get_mem_usage = self.get_mem_usage
-
-        chunk_lens = self.chunk_lens
+        changing_mem_per_obs = False
 
         # XXX: kill submitted jobs on exception
         jobids = []
         with Session() as session:
             self.session = session
-
-            posterior_kwargs = \
-                dict(triFile=self.posterior_triangulation_filename,
-                     doDistributeEvidence=True,
-                     **self.get_posterior_clique_print_ranges())
 
             for chunk_index, chunk_len in self.chunk_lens_sorted():
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
@@ -2448,30 +2513,31 @@ class Runner(object):
                 _queue_identify = partial(self._queue_identify, jobids,
                                           chunk_index, identify_kwargs_chunk)
 
-                # XXX: next two segments are highly duplicative!
                 if self.identify:
-                    mem_usage = get_mem_usage(chunk_len, VITERBI_PROG)
-                    viterbi_filename = viterbi_filenames[chunk_index]
-                    jobid = _queue_identify(mem_usage, PREFIX_JOB_NAME_VITERBI,
-                                            prog_viterbi, viterbi_kwargs,
-                                            viterbi_filename)
-                    prog = VITERBI_PROG.prog
-                    if self.mem_per_obs[prog] is None:
-                        self.wait_job(jobid)
-                        self.set_mem_per_obs(jobid, chunk_len, prog)
+                    if self.run_identify_or_posterior(chunk_index, chunk_len,
+                                                      VITERBI_PROG,
+                                                      viterbi_filenames,
+                                                      _queue_identify,
+                                                      PREFIX_JOB_NAME_VITERBI,
+                                                      viterbi_kwargs):
+                        changing_mem_per_obs = True
 
                 if self.posterior:
-                    mem_usage = get_mem_usage(chunk_len, POSTERIOR_PROG)
-                    posterior_filename = posterior_filenames[chunk_index]
-                    jobid = _queue_identify(mem_usage,
-                                            PREFIX_JOB_NAME_POSTERIOR,
-                                            prog_posterior, posterior_kwargs,
-                                            posterior_filename)
-                    prog = POSTERIOR_PROG.prog
-                    if self.mem_per_obs[prog] is None:
-                        self.wait_job(jobid)
-                        self.set_mem_per_obs(jobid, chunk_len, prog)
+                    if self.run_identify_or_posterior(chunk_index, chunk_len,
+                                                      POSTERIOR_PROG,
+                                                      posterior_filenames,
+                                                      _queue_identify,
+                                                      PREFIX_JOB_NAME_POSTERIOR,
+                                                      posterior_kwargs):
+                        changing_mem_per_obs = True
 
+                if changing_mem_per_obs:
+                    max_chunk_len = max(self.chunk_lens)
+                    max_mem_usage = self.get_max_mem_usage(max_chunk_len)
+                    if max_mem_usage > MEM_USAGE_LIMIT:
+                        raise ChunkOverMemUsageLimit # unwind a couple of levels and start over
+
+                    changing_mem_per_obs = False
 
             # XXX: ask on DRMAA mailing list--how to allow
             # KeyboardInterrupt here?
@@ -2495,17 +2561,30 @@ class Runner(object):
         this is exposed so that it can be overriden in a subclass
         """
         # XXXopt: use binary I/O to gmtk rather than ascii
+        if self.train and self.split_sequences:
+            msg = "can't use --split-sequences in training"
+            raise NotImplementedError(msg)
 
         self.dirpath = path(self.dirname)
-        self.save_params()
 
         self.make_subdir(SUBDIRNAME_LOG)
         cmdline_filename = self.make_filename(PREFIX_CMDLINE, EXT_SH,
                                               subdirname=SUBDIRNAME_LOG)
 
+        self.interrupt_event = Event()
+
+        self.save_params()
+
+        # XXX: need to fix parser for weird new output
+        assert not self.posterior
+
         with open(cmdline_filename, "w") as cmdline_file:
             # XXX: works around a pyflakes bug; report
             self.cmdline_file = cmdline_file
+
+            now = datetime.now()
+            print >>self.cmdline_file, "## %s run %s at %s" % (PKG, UUID, now)
+
             if self.triangulate:
                 self.run_triangulate()
 
@@ -2513,7 +2592,11 @@ class Runner(object):
                 self.run_train()
 
             if self.identify or self.posterior:
-                self.run_identify_posterior()
+                try:
+                    self.run_identify_posterior()
+                except ChunkOverMemUsageLimit:
+                    self.resave_params()
+                    self.run_identify_posterior()
 
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
@@ -2540,7 +2623,7 @@ class Runner(object):
 def parse_options(args):
     from optplus import OptionParser, OptionGroup
 
-    usage = "%prog [OPTION]... H5FILE..."
+    usage = "%prog [OPTION]... GENOMEDATADIR"
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
 
@@ -2634,7 +2717,7 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
-    if not len(args) >= 1:
+    if not len(args) == 1:
         parser.print_usage()
         sys.exit(1)
 
@@ -2645,7 +2728,7 @@ def main(args=sys.argv[1:]):
 
     runner = Runner()
 
-    runner.h5filenames = args
+    runner.genomedata_dirname = args[0]
     runner.dirname = options.directory
     runner.obs_dirname = options.observations
     runner.bed_filename = options.bed

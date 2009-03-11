@@ -17,12 +17,12 @@ import sys
 
 from numpy import arange, float32, square
 from numpy.random import standard_normal
-from optbuild import OptionBuilder_ShortOptWithSpace
 from tabdelim import DictWriter
 
 from .run import (EM_TRAIN_PROG, ISLAND, MIN_NUM_SEGS, VITERBI_PROG,
                   POSTERIOR_PROG, PREFIX_JOB_NAME_VITERBI,
                   PREFIX_JOB_NAME_POSTERIOR, NAME_BUNDLE_PLACEHOLDER, Runner)
+from .sge import fetch_sge_qacct_records, convert_sge_mem_size
 from ._util import fill_array, ISLAND_BASE_NA, ISLAND_LST_NA
 
 MAX_NUM_TRACKS = 20 # XXX: should be 50 or maybe 100
@@ -46,14 +46,8 @@ TRACKNAME_FMT = "obs%d"
 FIELDNAMES = ["program", "num_tracks", "num_segs", "island_base", "island_lst",
               "mem_per_obs", "cpu_per_obs"]
 
-QACCT_PROG = OptionBuilder_ShortOptWithSpace("qacct")
-
 PREFIX2PROG = {PREFIX_JOB_NAME_VITERBI: VITERBI_PROG,
                PREFIX_JOB_NAME_POSTERIOR: POSTERIOR_PROG}
-
-# N1 Grid Engine User's Guide chapter 3 page 71
-SGE_MEM_SIZE_SUFFIXES = dict(K=2**10, M=2**20, G=2**30,
-                             k=1e3, m=1e6, g=1e9)
 
 # set once per file run
 UUID = uuid1().hex
@@ -165,36 +159,6 @@ def run_res_usage():
             runner.delete_existing = True
 
             runner()
-
-def parse_sge_qacct(text):
-    res = {}
-
-    for line in text.rstrip().split("\n"):
-        if line.startswith("="):
-            if res:
-                yield res
-            continue
-
-        key, space, val = line.partition(" ")
-        res[key] = val.strip()
-
-    yield res
-
-def convert_sge_mem_size(text):
-    try:
-        multiplier = SGE_MEM_SIZE_SUFFIXES[text[-1]]
-        significand = float(text[:-1])
-
-        res = significand * multiplier
-    except KeyError:
-        res = float(text)
-
-    return int(ceil(res))
-
-def fetch_sge_qacct_records(jobname):
-    acct_text = QACCT_PROG.getoutput(j=jobname)
-
-    return parse_sge_qacct(acct_text)
 
 def parse_res_usage(uuid):
     jobname = ".".join([make_job_name_stem(uuid), "*"])

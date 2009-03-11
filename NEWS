@@ -1,8 +1,10 @@
 0.1.4:
 
-* genomedata package is now a prerequisite
+* genomedata>0.1.1 package is now a prerequisite
 * optplus package is now a prerequisite
+* 20090302 version of GMTK is now a prerequisite
 * genomedata-load-data, genomedata-load-seq, genomedata-name-tracks, genomedata-save-metadata: moved to genomedata package
+* segway: changed args from a number of h5filenames to a single genomedata directory 
 * segway: added extra discrete variable called "state" to the default
   model. seg is now a child of this. transitions all occur state to
   state rather than seg to seg
@@ -18,6 +20,7 @@
 * segway: bugfix: actually use default res usage file by default
 * segway: don't create a posterior triangulation when --dry-run used
 * segway: memory usage new requested in 1G increments instead of 1M
+* segway: always uses island mode to save memory (at the cost of speed)
 
 0.1.3:
 

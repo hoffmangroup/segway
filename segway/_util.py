@@ -121,7 +121,7 @@ def load_coords(filename):
 
 def get_chrom_coords(coords, chrom):
     """
-    returns False if there are no coords on that chromosome
+    returns empty array if there are no coords on that chromosome
     returns None if there are no coords whatsoever
     """
     if coords:
@@ -140,6 +140,7 @@ def is_empty_array(arr):
 def chrom_name(filename):
     return path(filename).namebase
 
+# XXX: replace with stuff from prep_observations()
 def iter_chroms_coords(filenames, coords):
     for filename in filenames:
         print >>sys.stderr, filename
