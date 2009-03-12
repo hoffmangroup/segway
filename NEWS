@@ -21,6 +21,7 @@
 * segway: don't create a posterior triangulation when --dry-run used
 * segway: memory usage new requested in 1G increments instead of 1M
 * segway: always uses island mode to save memory (at the cost of speed)
+* segway: use ulimit to make a hard max on memory consumption
 
 0.1.3:
 

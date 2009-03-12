@@ -85,7 +85,7 @@ if ISLAND:
     ISLAND_BASE = 3
     # XXXopt: should be 100000, or really test some values, but Xiaoyu
     # has a smaller sequence
-    ISLAND_LST = 50000
+    ISLAND_LST = 100000
     HASH_LOAD_FACTOR = 0.98
 else:
     ISLAND_BASE = ISLAND_BASE_NA
@@ -663,7 +663,10 @@ def load_posterior_write_wig((chrom, start, end), num_labels,
 
     # print array columns as text to each outfile
     for outfile, probs_rounded_label in zip(outfiles, probs_rounded.T):
-        probs_rounded_label.tofile(outfile, "\n")
+
+        # can't use array.tofile() because outfile is a GzipFile
+        for prob in probs_rounded_label:
+            print >>outfile, prob
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -838,7 +841,7 @@ class Runner(object):
 
         if ISLAND:
             # XXX: otherwise, we really do linear inference
-            assert chunk_len > ISLAND_LST
+            assert chunk_len > self.island_lst
             chunk_len = log(chunk_len)
 
         mem_per_obs = maxvmem / chunk_len
@@ -1986,7 +1989,7 @@ class Runner(object):
 
         if ISLAND:
             res["base"] = ISLAND_BASE
-            res["lst"] = ISLAND_LST
+            res["lst"] = self.island_lst
 
         if HASH_LOAD_FACTOR is not None:
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
@@ -2575,8 +2578,19 @@ class Runner(object):
 
         self.save_params()
 
-        # XXX: need to fix parser for weird new output
-        assert not self.posterior
+        # XXX: gmtkViterbi only works with island
+        # XXX: gmtkJT/20090302 has a bug in non-island mode: does not
+        # produce frame indexes correctly
+        assert ISLAND or (not self.identify and not self.posterior)
+
+        # XXX: I'm not so sure about all of this, it may react badly
+        # when you split a sequence and it is smaller than
+        # self.island_lst again
+        min_chunk_len = min(self.chunk_lens)
+        if min_chunk_len > ISLAND_LST:
+            self.island_lst = ISLAND_LST
+        else:
+            self.island_lst = min_chunk_len - 1
 
         with open(cmdline_filename, "w") as cmdline_file:
             # XXX: works around a pyflakes bug; report
