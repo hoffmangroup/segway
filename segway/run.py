@@ -18,9 +18,10 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, repeat
 from math import ceil, floor, frexp, ldexp, log, log10
+from operator import neg
 from os import extsep
 import re
-from shutil import move
+from shutil import copy2
 from string import Template
 import sys
 from threading import Event, Thread
@@ -111,6 +112,10 @@ PRIOR_STRENGTH = 0
 FINFO_FLOAT32 = finfo(float32)
 MACHEP_FLOAT32 = FINFO_FLOAT32.machep
 TINY_FLOAT32 = FINFO_FLOAT32.tiny
+
+SIZEOF_FLOAT32 = float32().nbytes
+SIZEOF_DTYPE_OBS_INT = DTYPE_OBS_INT().nbytes
+SIZEOF_INTC = intc().nbytes
 
 JITTER_STD_BOUND = 0.2
 FUDGE_EP = -17 # ldexp(1, -17) = ~1e-6
@@ -316,11 +321,40 @@ MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 UUID = uuid1().hex
 
 ## exceptions
-
 class ChunkOverMemUsageLimit(Exception):
     pass
 
 ## functions
+try:
+    from itertools import permutations
+except ImportError:
+    # copied from
+    # http://docs.python.org/library/itertools.html#itertools.permutations
+    def permutations(iterable, r=None):
+        # permutations('ABCD', 2) --> AB AC AD BA BC BD CA CB CD DA DB DC
+        # permutations(range(3)) --> 012 021 102 120 201 210
+        pool = tuple(iterable)
+        n = len(pool)
+        r = n if r is None else r
+        if r > n:
+            return
+        indices = range(n)
+        cycles = range(n, n-r, -1)
+        yield tuple(pool[i] for i in indices[:r])
+        while n:
+            for i in reversed(range(r)):
+                cycles[i] -= 1
+                if cycles[i] == 0:
+                    indices[i:] = indices[i+1:] + indices[i:i+1]
+                    cycles[i] = n - i
+                else:
+                    j = cycles[i]
+                    indices[i], indices[-j] = indices[-j], indices[i]
+                    yield tuple(pool[i] for i in indices[:r])
+                    break
+            else:
+                return
+
 def _constant(constant):
     """
     constant values for defaultdict
@@ -750,8 +784,7 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
     ends[next_index:next_index] = new_ends
 
 class RandomStartThread(Thread):
-    def __init__(self, runner, session, start_index, num_segs,
-                 interrupt_event):
+    def __init__(self, runner, session, start_index, num_segs):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
         self.runner = copy(runner)
@@ -768,6 +801,8 @@ class RandomStartThread(Thread):
         self.runner.start_index = self.start_index
         self.result = self.runner.run_train_start()
 
+re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
+re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
 class Runner(object):
     def __init__(self, **kwargs):
         # filenames
@@ -810,6 +845,7 @@ class Runner(object):
         self.maxs = None
         self.tracknames = None
         self.mem_per_obs = defaultdict(_constant(None))
+        self.num_free_params = None
 
         # variables
         self.num_segs = NUM_SEGS
@@ -836,15 +872,55 @@ class Runner(object):
 
         self.__dict__.update(kwargs)
 
+    def set_bytes_per_viterbi_frame(self):
+        num_words = []
+
+        with open(self.jt_info_filename) as infile:
+            for line in infile:
+                line = line.rstrip()
+
+                m_num_cliques = re_num_cliques.match(line)
+                if m_num_cliques:
+                    # will need to do addition if there's more than one
+                    assert m_num_cliques.group(1) == "1"
+
+                m_clique_info = re_clique_info.match(line)
+                if m_clique_info:
+                    num_words.append(int(m_clique_info.group(1)))
+
+        self.bytes_per_viterbi_frame = SIZEOF_INTC * max(num_words)
+
+    def get_observation_size(self, chunk_len):
+        float_rowsize = self.num_tracks * SIZEOF_FLOAT32
+        int_rowsize = self.num_int_cols * SIZEOF_DTYPE_OBS_INT
+
+        return (float_rowsize + int_rowsize) * chunk_len
+
+    def get_viterbi_size(self, chunk_len, prog):
+        if prog == VITERBI_PROG.prog:
+            return self.bytes_per_viterbi_frame * chunk_len
+        else:
+            return 0
+
+    def get_linear_size(self, chunk_len, prog):
+        observation_size = self.get_observation_size(chunk_len)
+        viterbi_size = self.get_viterbi_size(chunk_len, prog)
+
+        return observation_size + viterbi_size
+
     def set_mem_per_obs(self, jobname, chunk_len, prog):
         maxvmem = get_sge_qacct_maxvmem(jobname)
 
         if ISLAND:
             # XXX: otherwise, we really do linear inference
             assert chunk_len > self.island_lst
-            chunk_len = log(chunk_len)
 
-        mem_per_obs = maxvmem / chunk_len
+            linear_size = self.get_linear_size(chunk_len, prog)
+
+            inference_size = maxvmem - linear_size
+            mem_per_obs = inference_size / log(chunk_len)
+        else:
+            mem_per_obs = maxvmem / chunk_len
 
         assert mem_per_obs > 0
 
@@ -854,12 +930,15 @@ class Runner(object):
 
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
-            res = infile.read().strip()
+            log_likelihood = float(infile.read().strip())
+
+        info_criterion = self.calc_info_criterion(log_likelihood)
 
         with open(self.log_likelihood_log_filename, "a") as logfile:
-            print >>logfile, res
+            row = map(str, [log_likelihood, info_criterion])
+            print >>logfile, "\t".join(row)
 
-        return float(res)
+        return log_likelihood, info_criterion
 
     def load_include_coords(self):
         filename = self.include_coords_filename
@@ -980,7 +1059,7 @@ class Runner(object):
             self.log_likelihood_filename = log_likelihood_filename
 
             self.log_likelihood_log_filename = \
-                self.make_filename(PREFIX_LIKELIHOOD, start_index, EXT_TXT,
+                self.make_filename(PREFIX_LIKELIHOOD, start_index, EXT_TAB,
                                    subdirname=SUBDIRNAME_LOG)
 
     def make_output_dirpath(self, dirname, start_index):
@@ -1533,7 +1612,15 @@ class Runner(object):
         return diagflat(ones(self.num_states-1), 1)
 
     def get_first_state_indexes(self):
+        # min_seg_len = 2, num_segs = 3
+        # => array([1, 3, 5])
         return arange(0, self.num_states, self.min_seg_len)
+
+    def get_final_state_indexes(self):
+        # => array([0, 2, 4])
+        min_seg_len = self.min_seg_len
+
+        return arange(min_seg_len - 1, self.num_states, min_seg_len)
 
     def add_final_probs_to_cpt(self, cpt):
         """
@@ -1546,14 +1633,27 @@ class Runner(object):
         prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
         prob_self_other = (1.0 - prob_self_self) / (num_segs - 1)
 
-        final_state_indexes = arange(min_seg_len - 1, num_states, min_seg_len)
         first_state_indexes = self.get_first_state_indexes()
+        final_state_indexes = self.get_final_state_indexes()
 
         self_self_coords = [final_state_indexes, final_state_indexes]
 
-        # XXX: this is not extensible to more than 2 segs
-        assert num_segs == 2
-        self_other_coords = [final_state_indexes, first_state_indexes[::-1]]
+        # => [(1, 2), (1, 4), (3, 0), (3, 4), (5, 0), (5, 4)]
+
+        # these are indexes of state indexes
+        # [(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)]
+        index_indexes_both = permutations(range(num_segs), min_seg_len)
+
+        # (0, 0, 1, 1, 2, 2), (1, 2, 0, 2, 0, 1)
+        index_indexes_either = map(list, zip(*index_indexes_both))
+        index_indexes_first, index_indexes_final = index_indexes_either
+
+        self_other_final_indexes = final_state_indexes[index_indexes_final]
+        self_other_first_indexes = first_state_indexes[index_indexes_first]
+
+        self_other_coords = [self_other_final_indexes,
+                             self_other_first_indexes]
+        assert len(self_other_coords) == num_segs * (num_segs - 1)
 
         cpt[self_self_coords] = prob_self_self
         cpt[self_other_coords] = prob_self_other
@@ -1743,8 +1843,11 @@ class Runner(object):
         return self.make_spec_multiseg("MX", MX_TMPL)
 
     def save_input_master(self, start_index=None, new=False):
+        num_free_params = 0
+
         tracknames = self.tracknames
         num_segs = self.num_segs
+        num_tracks = self.num_tracks
 
         include_filename = self.gmtk_include_filename
 
@@ -1760,6 +1863,8 @@ class Runner(object):
 
         dense_cpt_spec = self.make_dense_cpt_spec()
 
+        num_free_params += num_segs * (num_segs - 1)
+
         self.calc_means_vars()
 
         distribution = self.distribution
@@ -1767,6 +1872,11 @@ class Runner(object):
             mean_spec = self.make_mean_spec()
             covar_spec = self.make_covar_spec(COVAR_TIED)
             gamma_spec = ""
+
+            if COVAR_TIED:
+                num_free_params += (num_segs + 1) * num_tracks
+            else:
+                num_free_params += (num_segs * 2) * num_tracks
         elif distribution == DISTRIBUTION_GAMMA:
             mean_spec = ""
             covar_spec = ""
@@ -1775,6 +1885,8 @@ class Runner(object):
             # the gamma distribution rather than the ML estimate for the
             # mean and converting
             gamma_spec = self.make_gamma_spec()
+
+            num_free_params += (num_segs * 2) * num_tracks
         else:
             raise ValueError("distribution %s not supported" % distribution)
 
@@ -1784,10 +1896,16 @@ class Runner(object):
 
         params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
 
-        self.input_master_filename, self.input_master_filename_is_new = \
+        self.input_master_filename, input_master_filename_is_new = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
                           locals(), params_dirpath, self.clobber,
                           start_index)
+
+        # only use num_free_params if a new input.master was created
+        if input_master_filename_is_new:
+            self.num_free_params = num_free_params
+
+        self.input_master_filename_is_new = input_master_filename_is_new
 
     def save_dont_train(self):
         self.dont_train_filename = self.save_resource(RES_DONT_TRAIN,
@@ -1846,8 +1964,6 @@ class Runner(object):
         identify = self.identify
         posterior = self.posterior
 
-        assert not posterior or self.num_segs == 2
-
         if train or identify or posterior:
             self.set_jt_info_filename()
 
@@ -1882,10 +1998,9 @@ class Runner(object):
             # overwrite previous
             self.save_viterbi_filelist()
 
-    def move_results(self, name, src_filename, dst_filename):
+    def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
-            # XXX: i think this should become copy
-            move(src_filename, dst_filename)
+            copy2(src_filename, dst_filename)
         else:
             dst_filename = src_filename
 
@@ -2022,12 +2137,17 @@ class Runner(object):
             return MEM_USAGE_LIMIT
 
         if ISLAND:
-            chunk_len = log(chunk_len)
+            linear_size = self.get_linear_size(chunk_len, prog.prog)
+            inference_size = mem_per_obs * log(chunk_len)
 
-        res = chunk_len * mem_per_obs
+            res = linear_size + inference_size
+        else:
+            res = mem_per_obs * chunk_len
+
         if res > MEM_USAGE_LIMIT:
             msg = "segment of length %d will take %d memory," \
-                " which is greater than MEM_USAGE_LIMIT" % (chunk_len, res)
+                " which is greater than MEM_USAGE_LIMIT of %d" \
+                % (chunk_len, res, MEM_USAGE_LIMIT)
 
             raise ValueError(msg)
 
@@ -2054,6 +2174,13 @@ class Runner(object):
         # XXX: use itertools instead of a generator
         for chunk_len, chunk_index in zipper:
             yield chunk_index, chunk_len
+
+    def calc_bayesian_info_criterion(self, log_likelihood):
+        """
+        this is BIC = -2 ln L + k ln N
+        """
+        model_penalty = (self.num_free_params * log(self.num_bases))
+        return model_penalty - 2 * log_likelihood
 
     def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
                    output_filename=None):
@@ -2276,6 +2403,14 @@ class Runner(object):
 
         return self.wait_job(bundle_jobid, parallel_jobids)
 
+    def set_calc_info_criterion(self):
+        if self.num_free_params is None:
+            # IC = -L
+            self.calc_info_criterion = neg
+        else:
+            # IC = BIC
+            self.calc_info_criterion = self.calc_bayesian_info_criterion
+
     def run_train_start(self):
         # make new files if you have more than one random start
         new = self.make_new_params
@@ -2293,6 +2428,8 @@ class Runner(object):
 
         self.last_params_filename = None
 
+        self.set_calc_info_criterion()
+
         kwargs = self.train_kwargs
 
         while (round_index < self.max_em_iters and
@@ -2303,14 +2440,15 @@ class Runner(object):
                 return (None, None, None, None)
 
             last_log_likelihood = log_likelihood
-            log_likelihood = self.load_log_likelihood()
+            log_likelihood, info_criterion = self.load_log_likelihood()
 
             print >>sys.stderr, "log likelihood = %s" % log_likelihood
+            print >>sys.stderr, "info criterion = %s" % info_criterion
 
             round_index += 1
 
         # log_likelihood and a list of src_filenames to save
-        return (log_likelihood, self.input_master_filename,
+        return (info_criterion, self.input_master_filename,
                 self.last_params_filename, self.log_likelihood_filename)
 
     def wait_job(self, jobid, kill_jobids=[]):
@@ -2429,8 +2567,8 @@ class Runner(object):
         if self.dry_run:
             return
 
-        # finds the max by log_likelihood
-        src_filenames = max(start_params)[1:]
+        # finds the min by info_criterion (minimize -log_likelihood)
+        src_filenames = min(start_params)[1:]
 
         if None in src_filenames:
             raise ValueError, "all training threads failed"
@@ -2439,7 +2577,7 @@ class Runner(object):
 
         zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
         for name, src_filename, dst_filename in zipper:
-            self.move_results(name, src_filename, dst_filename)
+            self.copy_results(name, src_filename, dst_filename)
 
     def _queue_identify(self, jobids, chunk_index, kwargs_chunk,
                         chunk_mem_usage, prefix_job_name, prog, kwargs_func,
@@ -2523,6 +2661,7 @@ class Runner(object):
                                                       _queue_identify,
                                                       PREFIX_JOB_NAME_VITERBI,
                                                       viterbi_kwargs):
+                        self.set_bytes_per_viterbi_frame()
                         changing_mem_per_obs = True
 
                 if self.posterior:
@@ -2538,7 +2677,8 @@ class Runner(object):
                     max_chunk_len = max(self.chunk_lens)
                     max_mem_usage = self.get_max_mem_usage(max_chunk_len)
                     if max_mem_usage > MEM_USAGE_LIMIT:
-                        raise ChunkOverMemUsageLimit # unwind a couple of levels and start over
+                        ## unwind a couple of levels and start over
+                        raise ChunkOverMemUsageLimit
 
                     changing_mem_per_obs = False
 

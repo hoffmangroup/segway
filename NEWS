@@ -1,8 +1,19 @@
 0.1.5:
 
+Currently broken
+* segway: --num-segs for a range does not work
+
+New features/bugfixes
+* segway: allow posterior with --num-segs greater than 2
+* segway: if --num-segs was used and segway generated the input.master
+  file, then use the Bayesian Information Criterion instead of likelihood to optimize parameters
+* segway: now copies selected params.params and input.master rather than moving
+* segway: bugfix to allow training to run
+* segway: enhancement of the memory prediction algorithm
+
 0.1.4:
 
-* genomedata>0.1.1 package is now a prerequisite
+* genomedata>0.1.0 package is now a prerequisite
 * optplus package is now a prerequisite
 * 20090302 version of GMTK is now a prerequisite
 * genomedata-load-data, genomedata-load-seq, genomedata-name-tracks, genomedata-save-metadata: moved to genomedata package
