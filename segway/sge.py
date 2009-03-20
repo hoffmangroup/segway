@@ -7,8 +7,9 @@ __version__ = "$Revision$"
 
 from math import ceil
 import sys
+from time import sleep
 
-from optbuild import OptionBuilder_ShortOptWithSpace
+from optbuild import OptionBuilder_ShortOptWithSpace, ReturncodeError
 
 # XXX: remove _sge_ from names
 
@@ -17,6 +18,8 @@ SGE_MEM_SIZE_SUFFIXES = dict(K=2**10, M=2**20, G=2**30,
                              k=1e3, m=1e6, g=1e9)
 
 QACCT_PROG = OptionBuilder_ShortOptWithSpace("qacct")
+
+SLEEP_TIME = 10
 
 def parse_sge_qacct(text):
     res = {}
@@ -44,7 +47,14 @@ def convert_sge_mem_size(text):
     return int(ceil(res))
 
 def fetch_sge_qacct_records(jobname):
-    acct_text = QACCT_PROG.getoutput(j=jobname)
+    try:
+        acct_text = QACCT_PROG.getoutput(j=jobname)
+    except ReturncodeError:
+        print >>sys.stderr, "qacct may not be ready yet"
+        sleep(SLEEP_TIME)
+
+        # try one more time
+        acct_text = QACCT_PROG.getoutput(j=jobname)
 
     return parse_sge_qacct(acct_text)
 

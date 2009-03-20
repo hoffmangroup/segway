@@ -99,6 +99,8 @@ DETERMINISTIC_CHILDREN_STORE = not ISLAND
 ISLAND = ISLAND_BASE != ISLAND_BASE_NA
 assert ISLAND or ISLAND_LST == ISLAND_LST_NA
 
+LINEAR_MEM_USAGE_MULTIPLIER = 2
+
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
@@ -141,7 +143,7 @@ NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
-MAX_FRAMES = 1000000000 # 1 billion
+MAX_FRAMES = 5000000 # 5 million
 MEM_USAGE_LIMIT = 15*2**30 # 15 GB
 MEM_USAGE_BUNDLE = 100000000 # 100M; XXX: should be included in calibration
 RES_REQ_IDS = ["mem_requested", "h_vmem"] # h_vmem: hard ulimit
@@ -170,6 +172,7 @@ BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
 OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
 
+# XXX: need to differentiate this (prog) from prog.prog == progname throughout
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
 VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
@@ -896,37 +899,43 @@ class Runner(object):
 
         return (float_rowsize + int_rowsize) * chunk_len
 
-    def get_viterbi_size(self, chunk_len, prog):
-        if prog == VITERBI_PROG.prog:
+    def get_viterbi_size(self, chunk_len, progname):
+        if progname == VITERBI_PROG.prog:
             return self.bytes_per_viterbi_frame * chunk_len
         else:
             return 0
 
-    def get_linear_size(self, chunk_len, prog):
+    def get_linear_size(self, chunk_len, progname):
         observation_size = self.get_observation_size(chunk_len)
-        viterbi_size = self.get_viterbi_size(chunk_len, prog)
+        viterbi_size = self.get_viterbi_size(chunk_len, progname)
+
+        print >>sys.stderr, "observation_size: %s" % observation_size
+        print >>sys.stderr, "viterbi_size: %s" % viterbi_size
 
         return observation_size + viterbi_size
 
-    def set_mem_per_obs(self, jobname, chunk_len, prog):
+    def set_mem_per_obs(self, jobname, chunk_len, progname):
         maxvmem = get_sge_qacct_maxvmem(jobname)
 
         if ISLAND:
             # XXX: otherwise, we really do linear inference
             assert chunk_len > self.island_lst
 
-            linear_size = self.get_linear_size(chunk_len, prog)
+            linear_size = self.get_linear_size(chunk_len, progname)
 
             inference_size = maxvmem - linear_size
             mem_per_obs = inference_size / log(chunk_len)
         else:
             mem_per_obs = maxvmem / chunk_len
 
-        assert mem_per_obs > 0
+        if mem_per_obs <= 0:
+            msg = ("%s did not use any memory. Check log files in output/e"
+                   % progname)
+            raise ValueError(msg)
 
         print >>sys.stderr, "mem_per_obs = %s / %s = %s" % (maxvmem, chunk_len,
                                                             mem_per_obs)
-        self.mem_per_obs[prog] = mem_per_obs
+        self.mem_per_obs[progname] = mem_per_obs
 
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
@@ -1062,20 +1071,23 @@ class Runner(object):
                 self.make_filename(PREFIX_LIKELIHOOD, start_index, EXT_TAB,
                                    subdirname=SUBDIRNAME_LOG)
 
-    def make_output_dirpath(self, dirname, start_index):
+    def make_output_dirpath(self, dirname, start_index, clobber=None):
         res = self.dirpath / "output" / dirname / str(start_index)
-        self.make_dir(res)
+        self.make_dir(res, clobber)
 
         return res
 
-    def set_output_dirpaths(self, start_index):
-        self.output_dirpath = self.make_output_dirpath("o", start_index)
-        self.error_dirpath = self.make_output_dirpath("e", start_index)
+    def set_output_dirpaths(self, start_index, clobber=None):
+        self.output_dirpath = self.make_output_dirpath("o", start_index, clobber)
+        self.error_dirpath = self.make_output_dirpath("e", start_index, clobber)
 
-    def make_dir(self, dirname):
+    def make_dir(self, dirname, clobber=None):
+        if clobber is None:
+            clobber = self.clobber
+
         dirpath = path(dirname)
 
-        if self.clobber:
+        if clobber:
             # just always try to delete it
             try:
                 dirpath.rmtree()
@@ -1338,10 +1350,21 @@ class Runner(object):
         max_col = track_indexes.max() + 1
         col_slice = s_[min_col:max_col]
 
+        mem_per_obs_undefined = None in (self.mem_per_obs[prog.prog]
+                                         for prog in self.get_progs_used())
+        calibrating_mem_usage = self.split_sequences and mem_per_obs_undefined
+        shortest_chunk_index = min(izip(self.chunk_lens, count()))[1]
+
         zipper = izip(count(), self.used_supercontigs, self.chunk_coords)
+
         for chunk_index, supercontig, (chrom, start, end) in zipper:
             float_filepath, int_filepath = \
                 print_obs_filepaths_custom(chrom, chunk_index)
+
+            if calibrating_mem_usage and chunk_index != shortest_chunk_index:
+                # other chunk names are already written to index file,
+                # but sequence is not saved
+                continue
 
             row = [float_filepath, str(chunk_index), chrom, str(start),
                    str(end)]
@@ -1464,20 +1487,29 @@ class Runner(object):
                             continue # consider the newly split sequences next
 
                     num_frames = end - start
-                    if not MIN_FRAMES <= num_frames <= MAX_FRAMES:
-                        text = " skipping segment of length %d" % num_frames
+                    if not MIN_FRAMES <= num_frames:
+                        text = " skipping short segment of length %d" % num_frames
                         print >>sys.stderr, text
                         continue
 
                     # check that this sequence can fit into all of the
                     # programs that will be used
                     max_mem_usage = self.get_max_mem_usage(num_frames)
-                    if max_mem_usage > MEM_USAGE_LIMIT:
+
+                    too_much_mem = max_mem_usage > MEM_USAGE_LIMIT
+                    too_many_frames = num_frames > MAX_FRAMES
+
+                    if too_much_mem or too_many_frames:
                         if not self.split_sequences:
-                            msg = "segment of length %d will take %d memory," \
-                                " which is greater than" \
-                                " MEM_USAGE_LIMIT" % (num_frames,
-                                                      max_mem_usage)
+                            if too_much_mem:
+                                msg = "chunk of length %d will take %d" \
+                                    " memory, which is greater than" \
+                                    " MEM_USAGE_LIMIT" % (num_frames,
+                                                          max_mem_usage)
+                            else:
+                                msg = "chunk of length %d greater than" \
+                                    " MAX_FRAMES" % num_frames
+
                             raise ValueError(msg)
 
                         # XXX: I really ought to check that this is
@@ -1486,8 +1518,10 @@ class Runner(object):
                         # split later on
 
                         # split_sequences was True, so split them
-                        num_new_starts = int(ceil(max_mem_usage
-                                                  / MEM_USAGE_LIMIT))
+                        num_new_starts_mem = max_mem_usage / MEM_USAGE_LIMIT
+                        num_new_starts_frames = num_frames / MAX_FRAMES
+                        num_new_starts = int(ceil(max(num_new_starts_mem,
+                                                      num_new_starts_frames)))
 
                         # // means floor division
                         offset = (num_frames // num_new_starts)
@@ -1523,19 +1557,21 @@ class Runner(object):
         else:
             self.num_int_cols = num_tracks
 
-    def open_writable_or_dummy(self, filepath):
-        if not filepath or (not self.clobber and filepath.exists()):
+    def open_writable_or_dummy(self, filepath, clobber=None):
+        if clobber is None:
+            clobber = self.clobber
+
+        if not filepath or (not clobber and filepath.exists()):
             return closing(StringIO()) # dummy output
         else:
             return open(filepath, "w")
 
-    def save_observations(self):
-        open_writable_or_dummy = self.open_writable_or_dummy
+    def save_observations(self, clobber=None):
+        open_writable = partial(self.open_writable_or_dummy, clobber=clobber)
 
-        with open_writable_or_dummy(self.float_filelistpath) as float_filelist:
-            with open_writable_or_dummy(self.int_filelistpath) as int_filelist:
-                with open_writable_or_dummy(self.float_tabfilepath) \
-                        as float_tabfile:
+        with open_writable(self.float_filelistpath) as float_filelist:
+            with open_writable(self.int_filelistpath) as int_filelist:
+                with open_writable(self.float_tabfilepath) as float_tabfile:
                     self.write_observations(float_filelist, int_filelist,
                                             float_tabfile)
 
@@ -1992,7 +2028,7 @@ class Runner(object):
         """
         self.prep_observations()
         self.make_chunk_lens()
-        self.save_observations()
+        self.save_observations(clobber=True)
 
         if self.identify or self.posterior:
             # overwrite previous
@@ -2126,26 +2162,39 @@ class Runner(object):
 
         return res
 
-    def get_mem_usage(self, chunk_len, prog=EM_TRAIN_PROG):
+    def _get_mem_usage(self, chunk_len, prog=EM_TRAIN_PROG):
         """
         returns an int
         """
+        print >>sys.stderr, "estimating mem usage for size %s..." % chunk_len
         mem_per_obs = self.mem_per_obs[prog.prog]
 
         # assume maximum memory usage until returned results say otherwise
         if mem_per_obs is None:
+            print >>sys.stderr, "MEM_USAGE_LIMIT = %s" % MEM_USAGE_LIMIT
             return MEM_USAGE_LIMIT
 
         if ISLAND:
             linear_size = self.get_linear_size(chunk_len, prog.prog)
+
             inference_size = mem_per_obs * log(chunk_len)
 
-            res = linear_size + inference_size
+            print >>sys.stderr, "inference_size: %s" % inference_size
+
+            res = (linear_size * LINEAR_MEM_USAGE_MULTIPLIER) + inference_size
         else:
             res = mem_per_obs * chunk_len
 
+        print >>sys.stderr, "mem_usage(%s, %s): %s" % (chunk_len, prog.prog,
+                                                       res)
+
+        return res
+
+    def get_mem_usage(self, chunk_len, *args, **kwargs):
+        res = self._get_mem_usage(chunk_len, *args, **kwargs)
+
         if res > MEM_USAGE_LIMIT:
-            msg = "segment of length %d will take %d memory," \
+            msg = "chunk of length %d will take %d memory," \
                 " which is greater than MEM_USAGE_LIMIT of %d" \
                 % (chunk_len, res, MEM_USAGE_LIMIT)
 
@@ -2154,7 +2203,7 @@ class Runner(object):
         return res
 
     def get_max_mem_usage(self, num_frames):
-        return max(self.get_mem_usage(num_frames, prog)
+        return max(self._get_mem_usage(num_frames, prog)
                    for prog in self.get_progs_used())
 
     def make_chunk_lens(self):
@@ -2606,12 +2655,16 @@ class Runner(object):
         progname = prog.prog
         if self.mem_per_obs[progname] is None:
             self.wait_job(jobid)
+
+            if prog == VITERBI_PROG:
+                self.set_bytes_per_viterbi_frame()
+
             self.set_mem_per_obs(jobid, chunk_len, progname)
             return True
 
         return False
 
-    def run_identify_posterior(self):
+    def run_identify_posterior(self, clobber=None):
         if not self.input_master_filename:
             self.save_input_master()
 
@@ -2626,7 +2679,7 @@ class Runner(object):
                  cppCommandOptions=make_cpp_options(params_filename),
                  **self.make_gmtk_kwargs())
 
-        self.set_output_dirpaths("identify")
+        self.set_output_dirpaths("identify", clobber)
 
         # XXXopt: might be inefficient to write to standard output and
         # save via redirection
@@ -2661,7 +2714,6 @@ class Runner(object):
                                                       _queue_identify,
                                                       PREFIX_JOB_NAME_VITERBI,
                                                       viterbi_kwargs):
-                        self.set_bytes_per_viterbi_frame()
                         changing_mem_per_obs = True
 
                 if self.posterior:
@@ -2676,8 +2728,10 @@ class Runner(object):
                 if changing_mem_per_obs:
                     max_chunk_len = max(self.chunk_lens)
                     max_mem_usage = self.get_max_mem_usage(max_chunk_len)
-                    if max_mem_usage > MEM_USAGE_LIMIT:
+
+                    if self.split_sequences or max_mem_usage > MEM_USAGE_LIMIT:
                         ## unwind a couple of levels and start over
+                        ## always happens in the split_sequences case
                         raise ChunkOverMemUsageLimit
 
                     changing_mem_per_obs = False
@@ -2739,6 +2793,9 @@ class Runner(object):
             now = datetime.now()
             print >>self.cmdline_file, "## %s run %s at %s" % (PKG, UUID, now)
 
+            # so that we can immediately out the UUID if we want it
+            self.cmdline_file.flush()
+
             if self.triangulate:
                 self.run_triangulate()
 
@@ -2749,8 +2806,13 @@ class Runner(object):
                 try:
                     self.run_identify_posterior()
                 except ChunkOverMemUsageLimit:
+                    if not self.split_sequences:
+                        raise
+
                     self.resave_params()
-                    self.run_identify_posterior()
+
+                    # erase old output
+                    self.run_identify_posterior(clobber=True)
 
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources

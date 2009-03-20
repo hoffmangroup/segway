@@ -5,6 +5,8 @@ Currently broken
 
 New features/bugfixes
 * segway: allow posterior with --num-segs greater than 2
+* segway: hard maximum of 5,000,000 for sequence length.
+* segway: --split-sequences will split sequences below 5,000,000
 * segway: if --num-segs was used and segway generated the input.master
   file, then use the Bayesian Information Criterion instead of likelihood to optimize parameters
 * segway: now copies selected params.params and input.master rather than moving
