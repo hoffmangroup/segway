@@ -783,9 +783,15 @@ def rewrite_cliques(rewriter, frame):
     return orig_num_cliques
 
 def make_mem_req(mem_usage):
+    # don't double the usage during calibration
+    if mem_usage == MEM_USAGE_LIMIT:
+        mem_usage_multiplier = 1
+    else:
+        mem_usage_multiplier = MEM_USAGE_MULTIPLIER
+
     # double usage at this point
     mem_usage_gibibytes = ceil(mem_usage / 2**30)
-    mem_usage_gibibytes_adjusted = MEM_USAGE_MULTIPLIER * mem_usage_gibibytes
+    mem_usage_gibibytes_adjusted = mem_usage_multiplier * mem_usage_gibibytes
 
     return "%dG" % mem_usage_gibibytes_adjusted
 
