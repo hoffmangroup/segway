@@ -99,7 +99,7 @@ DETERMINISTIC_CHILDREN_STORE = not ISLAND
 ISLAND = ISLAND_BASE != ISLAND_BASE_NA
 assert ISLAND or ISLAND_LST == ISLAND_LST_NA
 
-LINEAR_MEM_USAGE_MULTIPLIER = 2
+LINEAR_MEM_USAGE_MULTIPLIER = 1
 
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
@@ -143,6 +143,10 @@ NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
+
+# minimum number of frames to test memory usage, must be sufficiently
+# long to get an accurate count
+MIN_FRAMES_MEM_USAGE = 500000 # 500,000
 MAX_FRAMES = 5000000 # 5 million
 MEM_USAGE_LIMIT = 15*2**30 # 15 GB
 MEM_USAGE_BUNDLE = 100000000 # 100M; XXX: should be included in calibration
@@ -285,7 +289,7 @@ MC_TMPLS = dict(norm=MC_NORM_TMPL,
 MX_TMPL = "$index 1 mx_${seg}_${track} 1 dpmf_always" \
     " mc_${distribution}_${seg}_${track}"
 
-NAME_COLLECTION_TMPL = "$track_index collection_seg_${track} 2"
+NAME_COLLECTION_TMPL = "$track_index collection_seg_${track} ${num_segs}"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${track}"
 
 TRACK_FMT = "browser position %s:%s-%s"
@@ -582,7 +586,7 @@ def make_name_collection_spec(num_segs, tracknames):
     items = []
 
     for track_index, track in enumerate(tracknames):
-        mapping = dict(track=track, track_index=track_index)
+        mapping = dict(track=track, track_index=track_index, num_segs=num_segs)
 
         contents = [substitute(mapping)]
         for seg_index in xrange(num_segs):
@@ -1353,7 +1357,8 @@ class Runner(object):
         mem_per_obs_undefined = None in (self.mem_per_obs[prog.prog]
                                          for prog in self.get_progs_used())
         calibrating_mem_usage = self.split_sequences and mem_per_obs_undefined
-        shortest_chunk_index = min(izip(self.chunk_lens, count()))[1]
+        chunk_index_for_calibration = \
+            self.get_chunk_index_for_calibration()
 
         zipper = izip(count(), self.used_supercontigs, self.chunk_coords)
 
@@ -1361,7 +1366,8 @@ class Runner(object):
             float_filepath, int_filepath = \
                 print_obs_filepaths_custom(chrom, chunk_index)
 
-            if calibrating_mem_usage and chunk_index != shortest_chunk_index:
+            if (calibrating_mem_usage
+                and chunk_index != chunk_index_for_calibration):
                 # other chunk names are already written to index file,
                 # but sequence is not saved
                 continue
@@ -1678,7 +1684,7 @@ class Runner(object):
 
         # these are indexes of state indexes
         # [(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)]
-        index_indexes_both = permutations(range(num_segs), min_seg_len)
+        index_indexes_both = permutations(range(num_segs), 2)
 
         # (0, 0, 1, 1, 2, 2), (1, 2, 0, 2, 0, 1)
         index_indexes_either = map(list, zip(*index_indexes_both))
@@ -1689,7 +1695,10 @@ class Runner(object):
 
         self_other_coords = [self_other_final_indexes,
                              self_other_first_indexes]
-        assert len(self_other_coords) == num_segs * (num_segs - 1)
+
+        len_self_other_coords = num_segs * (num_segs - 1)
+        assert len(self_other_coords[0]) == len_self_other_coords
+        assert len(self_other_coords[1]) == len_self_other_coords
 
         cpt[self_self_coords] = prob_self_self
         cpt[self_other_coords] = prob_self_other
@@ -2218,6 +2227,8 @@ class Runner(object):
         difficult chunks are dropped in the queue first
         """
         chunk_lens = self.chunk_lens
+
+        # XXX: use key=itemgetter(2) and enumerate instead of this silliness
         zipper = sorted(izip(chunk_lens, count()), reverse=reverse)
 
         # XXX: use itertools instead of a generator
@@ -2287,7 +2298,10 @@ class Runner(object):
 
         prog = self.train_prog
         name = self.make_job_name_train(start_index, round_index, chunk_index)
-        native_specs = dict(hold_jid=hold_jid)
+
+        native_specs = {}
+        if hold_jid:
+            native_specs["hold_jid"] = hold_jid
 
         return self.queue_gmtk(prog, kwargs, name, mem_usage, native_specs)
 
@@ -2402,6 +2416,7 @@ class Runner(object):
         return res
 
     def run_triangulate(self):
+        print >>sys.stderr, "running triangulation"
         prog = self.prog_factory(TRIANGULATE_PROG)
 
         structure_filename = self.structure_filename
@@ -2664,6 +2679,14 @@ class Runner(object):
 
         return False
 
+    def get_chunk_index_for_calibration(self):
+        for chunk_index, chunk_len in self.chunk_lens_sorted():
+            if chunk_len >= MIN_FRAMES_MEM_USAGE:
+                return chunk_index
+        else:
+            raise ValueError("no chunks are smaller than MIN_FRAMES_MEM_USAGE"
+                             " of %d" % MIN_FRAMES_MEM_USAGE)
+
     def run_identify_posterior(self, clobber=None):
         if not self.input_master_filename:
             self.save_input_master()
@@ -2701,7 +2724,20 @@ class Runner(object):
         with Session() as session:
             self.session = session
 
-            for chunk_index, chunk_len in self.chunk_lens_sorted():
+            chunk_indexes_lens = list(self.chunk_lens_sorted(reverse=True))
+            chunk_index_for_calibration = \
+                self.get_chunk_index_for_calibration()
+
+            chunk_len_for_calibration = \
+                self.chunk_lens[chunk_index_for_calibration]
+
+            chunk_index_len_for_calibration = (chunk_index_for_calibration,
+                                               chunk_len_for_calibration)
+
+            chunk_indexes_lens.remove(chunk_index_len_for_calibration)
+            chunk_indexes_lens.insert(0, chunk_index_len_for_calibration)
+
+            for chunk_index, chunk_len in chunk_indexes_lens:
                 identify_kwargs_chunk = dict(dcdrng=chunk_index,
                                              **identify_kwargs)
                 _queue_identify = partial(self._queue_identify, jobids,
