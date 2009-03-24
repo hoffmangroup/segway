@@ -100,6 +100,7 @@ ISLAND = ISLAND_BASE != ISLAND_BASE_NA
 assert ISLAND or ISLAND_LST == ISLAND_LST_NA
 
 LINEAR_MEM_USAGE_MULTIPLIER = 1
+MEM_USAGE_MULTIPLIER = 2
 
 SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
@@ -782,7 +783,11 @@ def rewrite_cliques(rewriter, frame):
     return orig_num_cliques
 
 def make_mem_req(mem_usage):
-    return "%dG" % ceil(mem_usage / 2**30)
+    # double usage at this point
+    mem_usage_gibibytes = ceil(mem_usage / 2**30)
+    mem_usage_gibibytes_adjusted = MEM_USAGE_MULTIPLIER * mem_usage_gibibytes
+
+    return "%dG" % mem_usage_gibibytes_adjusted
 
 def update_starts(starts, ends, new_starts, new_ends, start_index):
     next_index = start_index + 1
