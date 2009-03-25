@@ -148,7 +148,7 @@ MIN_FRAMES = 2
 # minimum number of frames to test memory usage, must be sufficiently
 # long to get an accurate count
 MIN_FRAMES_MEM_USAGE = 500000 # 500,000
-MAX_FRAMES = 5000000 # 5 million
+MAX_FRAMES = 2000000 # 2 million
 MEM_USAGE_LIMIT = 15*2**30 # 15 GB
 MEM_USAGE_BUNDLE = 100000000 # 100M; XXX: should be included in calibration
 RES_REQ_IDS = ["mem_requested", "h_vmem"] # h_vmem: hard ulimit
