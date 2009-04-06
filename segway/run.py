@@ -578,6 +578,8 @@ def make_table_spec(frag, table):
 
 def prob_transition_from_expected_len(length):
     # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
+    # see also Reynolds SM et al. PLoS Comput Biol 4:e1000213
+    # ("duration modeling")
     return length / (1 + length)
 
 def make_name_collection_spec(num_segs, tracknames):
@@ -784,6 +786,7 @@ def rewrite_cliques(rewriter, frame):
 
 def make_mem_req(mem_usage):
     # don't double the usage during calibration
+    # XXX: this doesn't work, I think the linear stuff is adde
     if mem_usage == MEM_USAGE_LIMIT:
         mem_usage_multiplier = 1
     else:

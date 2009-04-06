@@ -1,3 +1,8 @@
+0.1.6:
+
+* there is now some documentation in doc/segway.rst (in
+  reStructuredText format, a lightweight markup format)
+
 0.1.5:
 
 Currently broken
