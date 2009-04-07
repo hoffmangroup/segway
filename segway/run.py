@@ -603,7 +603,7 @@ def make_name_collection_spec(num_segs, tracknames):
     return make_spec("NAME_COLLECTION", items)
 
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
-def load_gmtk_out(filename):
+def load_viterbi(filename):
     with open(filename) as infile:
         infile_lines = iter(infile)
 
@@ -652,8 +652,8 @@ def write_bed(outfile, start_pos, labels, coords):
         row = [chrom, str(seg_start), str(seg_end), str(seg_label)]
         print >>outfile, "\t".join(row)
 
-def load_gmtk_out_write_bed(coords, gmtk_outfilename, bed_file):
-    data = load_gmtk_out(gmtk_outfilename)
+def load_viterbi_write_bed(coords, viterbi_filename, bed_file):
+    data = load_viterbi(viterbi_filename)
 
     start_pos, labels = find_segment_starts(data)
 
@@ -2086,7 +2086,7 @@ class Runner(object):
         return self.make_wig_desc_attrs(attrs,
                                         WIG_DESC_POSTERIOR % state_name)
 
-    def gmtk_out2bed(self):
+    def viterbi2bed(self):
         bed_filename = self.bed_filename
 
         if bed_filename is None:
@@ -2099,9 +2099,9 @@ class Runner(object):
             # previous to 195)
             print >>bed_file, self.make_wig_header_viterbi()
 
-            for gmtk_outfilename, chunk_coord in zipper:
-                load_gmtk_out_write_bed(chunk_coord, gmtk_outfilename,
-                                        bed_file)
+            for viterbi_filename, chunk_coord in zipper:
+                load_viterbi_write_bed(chunk_coord, viterbi_filename,
+                                       bed_file)
 
     def posterior2wig(self):
         infilenames = self.posterior_filenames
@@ -2109,7 +2109,7 @@ class Runner(object):
         range_num_segs = xrange(self.num_segs)
         wig_filenames = map(self.make_posterior_wig_filename, range_num_segs)
 
-        # XXX: repetitive with gmtk_out2bed
+        # XXX: repetitive with viterbi2bed
         zipper = izip(infilenames, self.chunk_coords)
 
         wig_files_unentered = [gzip_open(wig_filename, "w")
@@ -2796,7 +2796,7 @@ class Runner(object):
 
         # XXXopt: parallelize
         if self.identify:
-            self.gmtk_out2bed()
+            self.viterbi2bed()
 
         if self.posterior:
             self.posterior2wig()
