@@ -2698,7 +2698,7 @@ class Runner(object):
             if chunk_len >= MIN_FRAMES_MEM_USAGE:
                 return chunk_index
         else:
-            raise ValueError("no chunks are smaller than MIN_FRAMES_MEM_USAGE"
+            raise ValueError("no chunks are larger than MIN_FRAMES_MEM_USAGE"
                              " of %d" % MIN_FRAMES_MEM_USAGE)
 
     def run_identify_posterior(self, clobber=None):
