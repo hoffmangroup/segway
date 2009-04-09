@@ -13,14 +13,17 @@ import shutil
 import sys
 from tempfile import mkdtemp
 
-from DRMAA import Session as _Session
 from numpy import append, array, diff, insert, intc
+from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
 from pkg_resources import resource_filename, resource_string
 from tables import openFile
 
+# XXX: check that these are all in use
+# XXX: should not use underscore imports from other packages
+
 # these are loaded by other modules indirectly
-# XXX: check that they are all in use
+# ignore PyFlakes warnings here
 from genomedata._util import (EXT_GZ, fill_array, FILTERS_GZIP, get_tracknames,
                               gzip_open, init_num_obs, LightIterator,
                               new_extrema, walk_supercontigs,
@@ -48,6 +51,11 @@ ISLAND_LST_NA = 0
 
 data_filename = partial(resource_filename, PKG_DATA)
 data_string = partial(resource_string, PKG_DATA)
+
+OptionBuilder_GMTK = (Mixin_UseFullProgPath +
+                      OptionBuilder_ShortOptWithSpace_TF)
+
+VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
 
 # NamedTemporaryDir is based somewhat on Python 2.5.2
 # tempfile._TemporaryFileWrapper
@@ -82,6 +90,9 @@ class NamedTemporaryDir(object):
 # XXX: suggest upstream as addition to DRMAA-python
 @contextmanager
 def Session(*args, **kwargs):
+    # here so that other modules will not fail on lack of DRMAA
+    from DRMAA import Session as _Session
+
     res = _Session()
     res.init(*args, **kwargs)
 
@@ -156,7 +167,9 @@ def iter_chroms_coords(filenames, coords):
 
 def find_segment_starts(data):
     """
-    find segment starts and the data at those positions
+    finds the start of each segment
+
+    returns the start positions, and the labels at each position
 
     returns lists of len num_segments+1, num_segments
     """

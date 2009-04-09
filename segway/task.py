@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import division, with_statement
 
 """
 task: wraps a GMTK subtask to reduce size of output
@@ -9,25 +9,110 @@ __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
 
+import re
 import sys
 
-from segway.run import VITERBI_PROG
+from numpy import zeros
 
-def viterbi_task(chrom, start, end, *args):
+from ._util import DTYPE_IDENTIFY, find_segment_starts, VITERBI_PROG
+
+MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
+
+re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
+def parse_viterbi(lines):
+    lines = iter(lines)
+
+    assert lines.next().startswith("Segment ")
+    assert lines.next().startswith("========")
+
+    line = lines.next()
+    assert line.startswith("Segment ")
+
+    num_frames_text = line.split(", ")[1].partition(" = ")
+    assert num_frames_text[0] == "number of frames"
+    assert num_frames_text[1] == " = "
+
+    num_frames = int(num_frames_text[2])
+
+    line = lines.next()
+    assert line.startswith("Printing random variables from (P,C,E)")
+
+    res = zeros(num_frames, DTYPE_IDENTIFY)
+
+    for line in lines:
+        if line.startswith(MSG_SUCCESS):
+            return res
+
+        assert line.rstrip().endswith(" partition")
+
+        line = lines.next()
+        for pair in line.split(","):
+            match = re_seg.match(pair)
+            if not match:
+                continue
+
+            index = int(match.group(1))
+            val = int(match.group(2))
+
+            res[index] = val
+
+    # shouldn't get to this point
+    raise ValueError("%s did not complete successfully" % VITERBI_PROG.prog)
+
+def save_bed(outfilename, start_pos, labels, coord):
+    (chrom, region_start, region_end) = coord
+
+    start_pos += region_start
+
+    zipper = zip(start_pos[:-1], start_pos[1:], labels)
+
+    with open(outfilename, "w") as outfile:
+        # this is easily concatenated since it has no context
+        for seg_start, seg_end, seg_label in zipper:
+            row = [chrom, str(seg_start), str(seg_end), str(seg_label)]
+            print >>outfile, "\t".join(row)
+
+    # assert that the whole region is mapped
+    # seg_end here means the last seg_end in the loop
+    assert seg_end == region_end
+
+def parse_viterbi_save_bed(coord, viterbi_lines, bed_filename):
+    data = parse_viterbi(viterbi_lines)
+
+    start_pos, labels = find_segment_starts(data)
+
+    save_bed(bed_filename, start_pos, labels, coord)
+
+def load_viterbi_save_bed(coord, outfilename, infilename):
+    with open(infilename) as infile:
+        lines = infile.readlines()
+
+    return parse_viterbi_save_bed(coord, lines, outfilename)
+
+def run_viterbi_save_bed(coord, outfilename, *args):
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
 
-    output = VITERBI_PROG.getouput(*args)
+    output = VITERBI_PROG.getoutput(*args)
+    lines = output.splitlines()
 
-def task(chrom, start, end, progname, *args):
-    assert progname == VITERBI_PROG.prog
+    return parse_viterbi_save_bed(coord, lines, outfilename)
 
+TASKS = {("run", "viterbi"): run_viterbi_save_bed,
+         ("load", "viterbi"): load_viterbi_save_bed}
+
+def task(verb, kind, outfilename, chrom, start, end, *args):
     start = int(start)
     end = int(end)
 
-    viterbi_task(chrom, start, end, *args)
+    TASKS[verb, kind]((chrom, start, end), outfilename, *args)
 
 def main(args=sys.argv[1:]):
+    if len(args) < 6:
+        print >>sys.stderr, \
+            "args: VERB KIND OUTFILE CHROM START END [ARGS...]"
+        sys.exit(2)
+
     return task(*args)
 
 if __name__ == "__main__":

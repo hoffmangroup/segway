@@ -35,17 +35,16 @@ from numpy import (add, amin, amax, append, arange, array, column_stack,
                    vectorize, zeros)
 from numpy.random import uniform
 from optbuild import (Mixin_NoConvertUnderscore,
-                      Mixin_UseFullProgPath,
-                      OptionBuilder_ShortOptWithSpace,
-                      OptionBuilder_ShortOptWithSpace_TF)
+                      OptionBuilder_ShortOptWithSpace)
 from path import path
 from tabdelim import ListWriter
 
 from sge import get_sge_qacct_maxvmem
-from ._util import (data_filename, data_string, DTYPE_IDENTIFY, DTYPE_OBS_INT,
-                    EXT_GZ, find_segment_starts, get_chrom_coords, gzip_open,
+from ._util import (data_filename, data_string, DTYPE_OBS_INT,
+                    EXT_GZ, get_chrom_coords, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
-                    NamedTemporaryDir, PKG, Session)
+                    NamedTemporaryDir, OptionBuilder_GMTK, PKG, Session,
+                    VITERBI_PROG)
 
 # XXX: I should really get some sort of Enum for this, I think Peter
 # Norvig has one
@@ -174,13 +173,9 @@ BASH_CMD = "bash"
 
 BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
 
-OptionBuilder_GMTK = (Mixin_UseFullProgPath +
-                      OptionBuilder_ShortOptWithSpace_TF)
-
 # XXX: need to differentiate this (prog) from prog.prog == progname throughout
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
-VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
@@ -323,8 +318,6 @@ COMMENT_POSTERIOR_TRIANGULATION = \
 
 FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%s step=1"
 
-MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
-
 # set once per file run
 UUID = uuid1().hex
 
@@ -369,10 +362,13 @@ def _constant(constant):
     """
     return repeat(constant).next
 
+def make_bash_cmdline(cmd, args):
+    return BASH_CMDLINE + ['%s "$@"' % cmd, cmd] + map(str, args)
+
 def make_fixedstep_header(chrom, start):
     """
     this function expects 0-based coordinates
-    it does the conversion to 1-based coordinates for you!
+    it does the conversion to 1-based coordinates for you
     """
     start_1based = start+1
     return FIXEDSTEP_HEADER % (chrom, start_1based)
@@ -602,63 +598,6 @@ def make_name_collection_spec(num_segs, tracknames):
 
     return make_spec("NAME_COLLECTION", items)
 
-re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
-def load_viterbi(filename):
-    with open(filename) as infile:
-        infile_lines = iter(infile)
-
-        assert infile_lines.next().startswith("Segment ")
-        assert infile_lines.next().startswith("========")
-
-        line = infile_lines.next()
-        assert line.startswith("Segment ")
-
-        num_frames_text = line.split(", ")[1].partition(" = ")
-        assert num_frames_text[0] == "number of frames"
-        assert num_frames_text[1] == " = "
-
-        num_frames = int(num_frames_text[2])
-
-        line = infile_lines.next()
-        assert line.startswith("Printing random variables from (P,C,E)")
-
-        res = zeros(num_frames, DTYPE_IDENTIFY)
-
-        for line in infile_lines:
-            if line.startswith(MSG_SUCCESS):
-                return res
-            assert line.rstrip().endswith(" partition")
-
-            line = infile_lines.next()
-            for pair in line.split(","):
-                match = re_seg.match(pair)
-                if not match:
-                    continue
-
-                index = int(match.group(1))
-                val = int(match.group(2))
-
-                res[index] = val
-
-    raise ValueError("%s did not complete successfully" % VITERBI_PROG.prog)
-
-def write_bed(outfile, start_pos, labels, coords):
-    (chrom, region_start, region_end) = coords
-
-    start_pos += region_start
-
-    zipper = zip(start_pos[:-1], start_pos[1:], labels)
-    for seg_start, seg_end, seg_label in zipper:
-        row = [chrom, str(seg_start), str(seg_end), str(seg_label)]
-        print >>outfile, "\t".join(row)
-
-def load_viterbi_write_bed(coords, viterbi_filename, bed_file):
-    data = load_viterbi(viterbi_filename)
-
-    start_pos, labels = find_segment_starts(data)
-
-    write_bed(bed_file, start_pos, labels, coords)
-
 re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
 def parse_posterior(iterable):
     """
@@ -846,7 +785,6 @@ class Runner(object):
         self.dont_train_filename = None
 
         self.dumpnames_filename = None
-        self.viterbi_filelistname = None # XXX: remove from code everywhere
         self.viterbi_filenames = None
 
         self.obs_dirname = None
@@ -1974,21 +1912,14 @@ class Runner(object):
         self.output_master_filename = self.save_resource(RES_OUTPUT_MASTER,
                                                          SUBDIRNAME_PARAMS)
 
-    def save_viterbi_filelist(self):
+    def make_viterbi_filenames(self):
         dirpath = self.dirpath / SUBDIRNAME_VITERBI
         num_chunks = self.num_chunks
 
         viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_chunks)
-                               + EXT_OUT)
+                                + EXT_BED)
         viterbi_filenames = [dirpath / viterbi_filename_fmt % index
-                            for index in xrange(num_chunks)]
-
-        viterbi_filelistname = dirpath / extjoin("output", EXT_LIST)
-        self.viterbi_filelistname = viterbi_filelistname
-
-        with open(viterbi_filelistname, "w") as viterbi_filelist:
-            for viterbi_filename in viterbi_filenames:
-                print >>viterbi_filelist, viterbi_filename
+                             for index in xrange(num_chunks)]
 
         self.viterbi_filenames = viterbi_filenames
 
@@ -2043,7 +1974,7 @@ class Runner(object):
             self.save_dumpnames()
 
             # this requires the number of observations
-            self.save_viterbi_filelist()
+            self.make_viterbi_filenames()
 
     def resave_params(self):
         """
@@ -2055,7 +1986,7 @@ class Runner(object):
 
         if self.identify or self.posterior:
             # overwrite previous
-            self.save_viterbi_filelist()
+            self.make_viterbi_filenames()
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -2086,22 +2017,21 @@ class Runner(object):
         return self.make_wig_desc_attrs(attrs,
                                         WIG_DESC_POSTERIOR % state_name)
 
-    def viterbi2bed(self):
+    def concatenate_bed(self):
+        # the final bed filename, not the individual viterbi_filenames
         bed_filename = self.bed_filename
 
         if bed_filename is None:
             bed_filename = self.dirpath / BED_FILEBASENAME
 
-        # chunk_coord = (chrom, chromStart, chromEnd)
-        zipper = izip(self.viterbi_filenames, self.chunk_coords)
         with gzip_open(bed_filename, "w") as bed_file:
             # XXX: add in browser track line (see SVN revisions
             # previous to 195)
             print >>bed_file, self.make_wig_header_viterbi()
 
-            for viterbi_filename, chunk_coord in zipper:
-                load_viterbi_write_bed(chunk_coord, viterbi_filename,
-                                       bed_file)
+            for viterbi_filename in self.viterbi_filenames:
+                with open(viterbi_filename) as viterbi_file:
+                    bed_file.write(viterbi_file.read())
 
     def posterior2wig(self):
         infilenames = self.posterior_filenames
@@ -2109,7 +2039,6 @@ class Runner(object):
         range_num_segs = xrange(self.num_segs)
         wig_filenames = map(self.make_posterior_wig_filename, range_num_segs)
 
-        # XXX: repetitive with viterbi2bed
         zipper = izip(infilenames, self.chunk_coords)
 
         wig_files_unentered = [gzip_open(wig_filename, "w")
@@ -2257,7 +2186,7 @@ class Runner(object):
         return model_penalty - 2 * log_likelihood
 
     def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
-                   output_filename=None):
+                   output_filename=None, prefix_args=[]):
         if mem_usage > MEM_USAGE_LIMIT:
             msg = "%s with a request of %d memory, which is greater" \
                 " than MEM_USAGE_LIMIT" % (prog.prog, mem_usage)
@@ -2271,7 +2200,14 @@ class Runner(object):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         # convoluted so I don't have to deal with a lot of escaping issues
-        cmdline = BASH_CMDLINE + ['%s "$@"' % gmtk_cmdline[0]] + gmtk_cmdline
+        if prefix_args:
+            cmd = prefix_args[0]
+            args = prefix_args[1:] + gmtk_cmdline[1:]
+        else:
+            cmd = gmtk_cmdline[0]
+            args = gmtk_cmdline[1:]
+
+        cmdline = make_bash_cmdline(cmd, args)
 
         print >>self.cmdline_file, " ".join(gmtk_cmdline)
 
@@ -2665,8 +2601,18 @@ class Runner(object):
         kwargs = kwargs_chunk.copy()
         kwargs.update(kwargs_func)
 
+        if prog == VITERBI_PROG:
+            chunk_coord = self.chunk_coords[chunk_index]
+            chunk_chrom, chunk_start, chunk_end = chunk_coord
+            prefix_args = ["segway-task", "run", "viterbi", output_filename,
+                           chunk_chrom, chunk_start, chunk_end]
+            output_filename = None
+        else:
+            prefix_args = []
+
         jobid = self.queue_gmtk(prog, kwargs, job_name, chunk_mem_usage,
-                                output_filename=output_filename)
+                                output_filename=output_filename,
+                                prefix_args=prefix_args)
         if jobid is not None:
             jobids.append(jobid)
 
@@ -2794,10 +2740,10 @@ class Runner(object):
 
             session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER, True)
 
-        # XXXopt: parallelize
         if self.identify:
-            self.viterbi2bed()
+            self.concatenate_bed()
 
+        # XXXopt: parallelize
         if self.posterior:
             self.posterior2wig()
 

@@ -5,7 +5,7 @@
 LONG_DESCRIPTION
 """
 
-__version__ = "0.1.5"
+__version__ = "0.1.6"
 
 # Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
 
@@ -40,6 +40,7 @@ entry_points = """
 segway = segway.run:main [parallel]
 segway-res-usage = segway.res_usage:main [parallel]
 segway-calc-distance = segway.calc_distance:main
+segway-task = segway.task:main
 
 h5histogram = segway.h5histogram:main
 h5values = segway.h5values:main
