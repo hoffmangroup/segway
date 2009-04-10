@@ -1,3 +1,7 @@
+0.1.8:
+
+
+
 0.1.7:
 
 * segway: add --dont-train option to allow specification of a file with list of variables not to train
