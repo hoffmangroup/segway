@@ -1960,7 +1960,9 @@ class Runner(object):
         if train:
             self.make_subdirs(SUBDIRNAMES_TRAIN)
 
-            self.save_dont_train()
+            if not self.dont_train_filename:
+                self.save_dont_train()
+
             self.save_output_master()
 
             # might turn off self.train, if the params already exist
@@ -2860,6 +2862,9 @@ def parse_options(args):
         group.add_option("-p", "--trainable-params", metavar="FILE",
                          help="use or create trainable parameters in FILE")
 
+        group.add_option("--dont-train", metavar="FILE",
+                         help="use FILE as list of parameters not to train")
+
         group.add_option("--resource-profile", metavar="FILE",
                          help="load segway-res-usage profile from FILE")
 
@@ -2948,6 +2953,7 @@ def main(args=sys.argv[1:]):
     runner.input_master_filename = options.input_master
     runner.structure_filename = options.structure
     runner.params_filename = options.trainable_params
+    runner.dont_train_filename = options.dont_train
     runner.include_coords_filename = options.include_coords
 
     if options.resource_profile:
