@@ -7,6 +7,8 @@
   State University.)
 * segway: fixed error when attempting to copy likelihood files in the
   case of only one random start
+* segway: make error more explicit if you forget to set --num-segs=N
+  if N is greater than 3 in the supplied model file
 * packaging: will not install as zipped egg as a temporary measure to enhance debugging
 
 0.1.7:
