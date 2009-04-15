@@ -54,7 +54,7 @@ gtf2bed = segway.gtf2bed:main
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
 install_requires = ["genomedata>0.1.0", "textinput", "optbuild>0.1.5",
-                    "optplus", "tables>2.0.4", "numpy", "path"]
+                    "optplus", "tables>2.0.4", "numpy", "path", "colorbrewer"]
 
 # XXX: ask if there is a way to specify this at the command-line
 extras_require = dict(parallel=["DRMAA-python"])
@@ -72,7 +72,7 @@ if __name__ == "__main__":
           dependency_links=dependency_links,
           install_requires=install_requires,
           extras_require=extras_require,
-          zip_safe=True,
+          zip_safe=False, # XXX: change back, this is just for better tracebacks
 
           # XXX: this should be based off of __file__ instead
           packages=find_packages("."),

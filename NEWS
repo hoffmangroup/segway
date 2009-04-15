@@ -1,6 +1,13 @@
 0.1.8:
 
-
+* colorbrewer package is now a prerequisite
+* segway: now produces BED9 output instead of BED4 output, with RGB
+  colors from the ColorBrewer Dark2 scheme (Colors from
+  www.ColorBrewer.org by Cynthia A. Brewer, Geography, Pennsylvania
+  State University.)
+* segway: fixed error when attempting to copy likelihood files in the
+  case of only one random start
+* packaging: will not install as zipped egg as a temporary measure to enhance debugging
 
 0.1.7:
 

@@ -41,7 +41,7 @@ from tabdelim import ListWriter
 
 from sge import get_sge_qacct_maxvmem
 from ._util import (data_filename, data_string, DTYPE_OBS_INT,
-                    EXT_GZ, get_chrom_coords, gzip_open,
+                    EXT_GZ, get_chrom_coords, get_label_color, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     NamedTemporaryDir, OptionBuilder_GMTK, PKG, Session,
                     VITERBI_PROG)
@@ -291,13 +291,14 @@ NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${track}"
 TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
-WIG_ATTRS = dict(type="wiggle_0",
-                 autoScale="off")
+WIG_ATTRS = dict(autoScale="off")
 WIG_ATTRS_VITERBI = dict(name="%s" % PKG,
                          visibility="dense",
                          viewLimits="0:1",
+                         itemRgb="on",
                          **WIG_ATTRS)
-WIG_ATTRS_POSTERIOR = dict(viewLimits="0:100",
+WIG_ATTRS_POSTERIOR = dict(type="wiggle_0",
+                           viewLimits="0:100",
                            visibility="full",
                            yLineMark="50",
                            maxHeightPixels="101:101:11",
@@ -624,6 +625,10 @@ def read_posterior(infile, num_frames, num_labels):
     res = zeros((num_frames, num_labels))
 
     for frame_index, label, prob in parse_posterior(infile):
+        if label >= num_labels:
+            raise ValueError("saw label %s but num_labels is only %s"
+                             % (label, num_labels))
+
         res[frame_index, label] = prob
 
     return res
@@ -2012,12 +2017,13 @@ class Runner(object):
     def make_wig_header_viterbi(self):
         return self.make_wig_desc_attrs(WIG_ATTRS_VITERBI, WIG_DESC_VITERBI)
 
-    def make_wig_header_posterior(self, state_name):
+    def make_wig_header_posterior(self, seg_label):
         attrs = WIG_ATTRS_POSTERIOR.copy()
-        attrs["name"] = WIG_NAME_POSTERIOR % state_name
+        attrs["name"] = WIG_NAME_POSTERIOR % seg_label
+        attrs["color"] = get_label_color(seg_label)
 
         return self.make_wig_desc_attrs(attrs,
-                                        WIG_DESC_POSTERIOR % state_name)
+                                        WIG_DESC_POSTERIOR % seg_label)
 
     def concatenate_bed(self):
         # the final bed filename, not the individual viterbi_filenames
@@ -2577,7 +2583,8 @@ class Runner(object):
 
                 raise
 
-        self.proc_train_results(start_params, dst_filenames)
+        if self.make_new_params:
+            self.proc_train_results(start_params, dst_filenames)
 
     def proc_train_results(self, start_params, dst_filenames):
         if self.dry_run:

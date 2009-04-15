@@ -27,6 +27,7 @@ the following packages or newer versions:
 - setuptools 0.6c8
 - optbuild 0.1.6
 - textinput 0.1.1
+- colorbrewer 0.1.0
 
 XXX DRMAA is not automatically installed at the moment, you have to
 install it yourself. The URL is in the source to setup.py

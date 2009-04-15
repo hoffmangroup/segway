@@ -13,6 +13,7 @@ import shutil
 import sys
 from tempfile import mkdtemp
 
+import colorbrewer
 from numpy import append, array, diff, insert, intc
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
@@ -51,6 +52,9 @@ ISLAND_LST_NA = 0
 
 data_filename = partial(resource_filename, PKG_DATA)
 data_string = partial(resource_string, PKG_DATA)
+
+NUM_COLORS = 8
+SCHEME = colorbrewer.Dark2[NUM_COLORS]
 
 OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
@@ -105,6 +109,11 @@ def Session(*args, **kwargs):
 
 def get_col_index(chromosome, trackname):
     return get_tracknames(chromosome).index(trackname)
+
+def get_label_color(label):
+    color = SCHEME[label % NUM_COLORS]
+
+    return ",".join(map(str, color))
 
 def maybe_gzip_open(filename, *args, **kwargs):
     if filename.endswith(SUFFIX_GZ):

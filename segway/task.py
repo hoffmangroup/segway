@@ -14,9 +14,13 @@ import sys
 
 from numpy import zeros
 
-from ._util import DTYPE_IDENTIFY, find_segment_starts, VITERBI_PROG
+from ._util import (DTYPE_IDENTIFY, find_segment_starts, get_label_color,
+                    VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
+
+BED_SCORE = "1000"
+BED_STRAND = "+"
 
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 def parse_viterbi(lines):
@@ -69,7 +73,14 @@ def save_bed(outfilename, start_pos, labels, coord):
     with open(outfilename, "w") as outfile:
         # this is easily concatenated since it has no context
         for seg_start, seg_end, seg_label in zipper:
-            row = [chrom, str(seg_start), str(seg_end), str(seg_label)]
+            chrom_start = str(seg_start)
+            chrom_end = str(seg_end)
+            name = str(seg_label)
+            item_rgb = get_label_color(seg_label)
+
+            row = [chrom, chrom_start, chrom_end, name,
+                   BED_SCORE, BED_STRAND, chrom_start, chrom_end, item_rgb]
+
             print >>outfile, "\t".join(row)
 
     # assert that the whole region is mapped
