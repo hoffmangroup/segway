@@ -1,6 +1,10 @@
 ======================
  Segway documentation
 ======================
+:Author: Michael M. Hoffman <mmh1 at washington dot edu>
+:Organization: University of Washington
+:Address: Department of Genome Sciences, PO Box 355065, Seattle, WA 98195-5065, United States of America
+:Copyright: 2009 Michael M. Hoffman
 
 For a conceptual overview see the paper:
 
