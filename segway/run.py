@@ -72,7 +72,7 @@ COVAR_METHOD = COVAR_METHOD_ML
 
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
-MIN_SEG_LEN = 1
+MIN_SEG_LEN = 0
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
@@ -2735,8 +2735,10 @@ class Runner(object):
         if self.make_new_params:
             self.proc_train_results(start_params, dst_filenames)
         else:
+            # only one random start
             # you're always going to overwrite params.params
-            copy2(start_params[OFFSET_PARAMS_FILENAME], self.params_filename)
+            assert len(start_params) == 1
+            copy2(start_params[0][OFFSET_PARAMS_FILENAME], self.params_filename)
 
     def proc_train_results(self, start_params, dst_filenames):
         if self.dry_run:

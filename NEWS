@@ -19,6 +19,7 @@
 * triangulation filenames now go into triangulation/ directory
 * fixed a regression in 0.1.8: now copies final params file to
   params.params again
+* segway now implements supports for a range argument to --num-segs
 
 0.1.8:
 

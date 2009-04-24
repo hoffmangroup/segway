@@ -27,7 +27,8 @@ url = "http://noble.gs.washington.edu/~mmh1/software/%s/" % name.lower()
 download_url = "%s%s-%s.tar.gz" % (url, name, __version__)
 
 # XXX: remove these when the upstream packages are updated to fix these issues
-dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip"]
+dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip",
+                    "http://gridengine.sunsource.net/files/documents/7/36/DRMAA-python-0.2.tar.gz"]
 
 classifiers = ["Natural Language :: English",
                "Programming Language :: Python"]
@@ -56,7 +57,7 @@ install_requires = ["genomedata>0.1.0", "textinput", "optbuild>0.1.5",
                     "optplus", "tables>2.0.4", "numpy", "path", "colorbrewer"]
 
 # XXX: ask if there is a way to specify this at the command-line
-extras_require = dict(parallel=["drmaa"])
+extras_require = dict(parallel=["DRMAA-python"])
 
 if __name__ == "__main__":
     setup(name=name,
