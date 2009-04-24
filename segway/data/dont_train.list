@@ -1,3 +1,3 @@
 DPMF dpmf_always
 DENSECPT start_state
-DETERMINISTICCPT state_seg
+DETERMINISTICCPT *

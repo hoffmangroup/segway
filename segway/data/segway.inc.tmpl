@@ -10,21 +10,43 @@
 % data exists or is missing?
 #define CARD_PRESENCE 2
 
-% which segment?
-#define CARD_STATE $card_state
+% transition or not?
+#define CARD_SEGTRANSITION 2
+
+% maximum number of frames
+#define CARD_FRAMEINDEX $card_frameIndex
+
+% allow transition or not?
+#define CARD_RULER 2
+
+% others
+#ifndef CARD_SEGCOUNTDOWN
+#define CARD_SEGCOUNTDOWN $card_segCountDown
+#endif
+
+% want to allow overriding this
+#ifndef CARD_SEG
 #define CARD_SEG $card_seg
+#endif
+
+#define CARD_STATE CARD_SEG
 
 % AA .. TT
 #define CARD_DINUCLEOTIDE 16
 
 %% types
 
+#define TYPE_SEGCOUNTDOWN discrete hidden cardinality CARD_SEGCOUNTDOWN
 #define TYPE_STATE discrete hidden cardinality CARD_STATE
 #define TYPE_SEG discrete hidden cardinality CARD_SEG
 
 %% conditionalparents
 
-#define CONDITIONALPARENTS_PRESENCE nil using DenseCPT("internal:UnityScore")
+#define CONDITIONALPARENTS_NIL nil using DenseCPT("internal:UnityScore")
+#define CONDITIONALPARENTS_PRESENCE CONDITIONALPARENTS_NIL
 #define CONDITIONALPARENTS_SEG state(0) using DeterministicCPT("state_seg")
+
+%% misc
+#define RULER_SCALE $ruler_scale
 
 #endif

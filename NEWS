@@ -1,6 +1,24 @@
+0.1.10:
+
+* switch from old DRMAA module to new drmaa module
+
 0.1.9:
 
-
+* replace state min seg len regime with one based on a ruler and segCountDown
+* default: don't train any deterministic CPT
+* stop creating input.master file before training when you have
+  multiple random starts, and are going to be creating input.0.master,
+  etc.
+* segway.inc is changed so that CARD_SEG is now overridable. If you
+  have an old segway.inc you must replace the CARD_SEG bits with
+  the #ifndef CARD_SEG segment of a new segway.inc
+* new classmethod segway.run.Runner.fromoptions() to make it easier to
+  subclass while keeping the same command-line interface.
+* fix bug in calculating BIC, reported in log likelihood logs
+* default triangulation filenames now include the number of labels in the filename
+* triangulation filenames now go into triangulation/ directory
+* fixed a regression in 0.1.8: now copies final params file to
+  params.params again
 
 0.1.8:
 

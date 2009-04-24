@@ -1,7 +1,11 @@
 #include "${include_filename}"
 
+#if CARD_SEG != $card_seg
+#error CARD_SEG must be defined to be $card_seg for this input master file
+#endif
+
 DT_IN_FILE inline
-2
+5
 
 0 map_parent
 1              % num parents
@@ -12,6 +16,34 @@ DT_IN_FILE inline
 % floor divide by the number of states per seg
     -1 { floor_divide(p0, CARD_STATE / CARD_SEG) }
 
+2 map_state_segCountDown
+1
+% default is to always start at the maximum value
+% this is only used at the beginning of an observation track
+    -1 { CARD_SEGCOUNTDOWN-1 }
+
+3 map_frameIndex_ruler
+1
+% is the frameIndex divisible by RULER_SCALE
+    -1 { mod(p0, RULER_SCALE) == 0 }
+
+4 map_segTransition_ruler_state_segCountDown_segCountDown
+4
+% current state (p2) is unused for now but will be eventually once
+% heterogeneous mappings of state to initial segCountDown value are
+% allowed
+    0 2 0 default
+      % segTransition(0) == 0:
+      1 2 0 default
+            % ruler(0) == 0:
+            -1 { p3 } % not at ruler mark -> copy previous value
+
+            % ruler(0) == 1:
+            -1 { max(p3-1, 0) } % subtract 1 from previous value, or 0
+
+      % segTransition(0) == 1:
+      -1 { CARD_SEGCOUNTDOWN-1 } % maximum value
+
 $name_collection_spec
 $dirichlet_spec
 
@@ -21,12 +53,32 @@ DPMF_IN_FILE inline
 0 dpmf_always 1 1.0
 
 DETERMINISTIC_CPT_IN_FILE inline
-1
+5
 
 0 state_seg
 1
 CARD_STATE CARD_SEG
 map_state_seg
+
+1 state_segCountDown
+1
+CARD_STATE CARD_SEGCOUNTDOWN
+map_state_segCountDown
+
+2 frameIndex_ruler
+1
+CARD_FRAMEINDEX CARD_RULER
+map_frameIndex_ruler
+
+3 segTransition_ruler_state_segCountDown_segCountDown
+4
+CARD_RULER CARD_SEGTRANSITION CARD_STATE CARD_SEGCOUNTDOWN CARD_SEGCOUNTDOWN
+map_segTransition_ruler_state_segCountDown_segCountDown
+
+4 state_state_copy
+1
+CARD_STATE CARD_STATE
+map_parent
 
 #ifndef INPUT_PARAMS_FILENAME
 

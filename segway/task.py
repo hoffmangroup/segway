@@ -22,6 +22,9 @@ MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 BED_SCORE = "1000"
 BED_STRAND = "+"
 
+SCORE_MIN = 100
+SCORE_MAX = 1000
+
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 def parse_viterbi(lines):
     lines = iter(lines)
@@ -63,23 +66,26 @@ def parse_viterbi(lines):
     # shouldn't get to this point
     raise ValueError("%s did not complete successfully" % VITERBI_PROG.prog)
 
-def save_bed(outfilename, start_pos, labels, coord):
+def save_bed(outfilename, start_pos, labels, coord, num_labels):
     (chrom, region_start, region_end) = coord
 
     start_pos += region_start
+
+    score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels)
 
     with open(outfilename, "w") as outfile:
         # this is easily concatenated since it has no context
         for seg_start, seg_end, seg_label in zipper:
+            name = str(seg_label)
+            score = SCORE_MIN + (seg_label * score_step)
             chrom_start = str(seg_start)
             chrom_end = str(seg_end)
-            name = str(seg_label)
             item_rgb = get_label_color(seg_label)
 
             row = [chrom, chrom_start, chrom_end, name,
-                   BED_SCORE, BED_STRAND, chrom_start, chrom_end, item_rgb]
+                   score, BED_STRAND, chrom_start, chrom_end, item_rgb]
 
             print >>outfile, "\t".join(row)
 
@@ -87,27 +93,27 @@ def save_bed(outfilename, start_pos, labels, coord):
     # seg_end here means the last seg_end in the loop
     assert seg_end == region_end
 
-def parse_viterbi_save_bed(coord, viterbi_lines, bed_filename):
+def parse_viterbi_save_bed(coord, viterbi_lines, bed_filename, num_labels):
     data = parse_viterbi(viterbi_lines)
 
     start_pos, labels = find_segment_starts(data)
 
-    save_bed(bed_filename, start_pos, labels, coord)
+    save_bed(bed_filename, start_pos, labels, coord, int(num_labels))
 
-def load_viterbi_save_bed(coord, outfilename, infilename):
+def load_viterbi_save_bed(coord, outfilename, num_labels, infilename):
     with open(infilename) as infile:
         lines = infile.readlines()
 
-    return parse_viterbi_save_bed(coord, lines, outfilename)
+    return parse_viterbi_save_bed(coord, lines, outfilename, num_labels)
 
-def run_viterbi_save_bed(coord, outfilename, *args):
+def run_viterbi_save_bed(coord, outfilename, num_labels, *args):
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
 
     output = VITERBI_PROG.getoutput(*args)
     lines = output.splitlines()
 
-    return parse_viterbi_save_bed(coord, lines, outfilename)
+    return parse_viterbi_save_bed(coord, lines, outfilename, num_labels)
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed}

@@ -73,6 +73,7 @@ COVAR_METHOD = COVAR_METHOD_ML
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 MIN_SEG_LEN = 1
+RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
@@ -256,36 +257,41 @@ RES_INC_TMPL = "segway.inc.tmpl"
 RES_DUMPNAMES = "dumpnames.list" # XXX: remove all dumpnames stuff from code
 RES_RES_USAGE = "res_usage.tab"
 
-DIRICHLET_FRAG = "0 dirichlet_state_state 2 CARD_STATE CARD_STATE"
+DIRICHLET_FRAG = "dirichlet_segCountDown_state_segTransition" \
+    " 3 CARD_SEGCOUNTDOWN CARD_STATE CARD_SEGTRANSITION"
 
-# XXX: manually indexing these things is silly
-DENSE_CPT_START_STATE_FRAG = "0 start_state 0 CARD_STATE"
-DENSE_CPT_STATE_STATE_FRAG = "1 state_state 1 CARD_STATE CARD_STATE"
-DIRICHLET_STATE_STATE_FRAG = "DirichletTable dirichlet_state_state"
+DENSE_CPT_START_STATE_FRAG = "start_state 0 CARD_STATE"
+DENSE_CPT_STATE_STATE_FRAG = "state_state 1 CARD_STATE CARD_STATE"
+DIRICHLET_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG = \
+    "DirichletTable dirichlet_segCountDown_state_segTransition"
+
+DENSE_CPT_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG = \
+    "segCountDown_state_segTransition" \
+    " 2 CARD_SEGCOUNTDOWN CARD_STATE CARD_SEGTRANSITION"
 
 DENSE_CPT_SEG_DINUCLEOTIDE_FRAG = \
-    "2 seg_dinucleotide 1 CARD_SEG CARD_DINUCLEOTIDE"
+    "seg_dinucleotide 1 CARD_SEG CARD_DINUCLEOTIDE"
 
-MEAN_TMPL = "$index mean_${seg}_${track} 1 ${rand}"
+MEAN_TMPL = "mean_${seg}_${track} 1 ${rand}"
 
-COVAR_TMPL_TIED = "$index covar_${track} 1 ${rand}"
+COVAR_TMPL_TIED = "covar_${track} 1 ${rand}"
 # XXX: unused
-COVAR_TMPL_UNTIED = "$index covar_${seg}_${track} 1 ${rand}"
+COVAR_TMPL_UNTIED = "covar_${seg}_${track} 1 ${rand}"
 
-GAMMASCALE_TMPL = "$index gammascale_${seg}_${track} 1 1 ${rand}"
-GAMMASHAPE_TMPL = "$index gammashape_${seg}_${track} 1 1 ${rand}"
+GAMMASCALE_TMPL = "gammascale_${seg}_${track} 1 1 ${rand}"
+GAMMASHAPE_TMPL = "gammashape_${seg}_${track} 1 1 ${rand}"
 
-MC_NORM_TMPL = "$index 1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
+MC_NORM_TMPL = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
     " mc_norm_${seg}_${track} mean_${seg}_${track} covar_${track}"
-MC_GAMMA_TMPL = "$index 1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${track}" \
+MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${track}" \
     " ${min_track} gammascale_${seg}_${track} gammashape_${seg}_${track}"
 MC_TMPLS = dict(norm=MC_NORM_TMPL,
                 gamma=MC_GAMMA_TMPL)
 
-MX_TMPL = "$index 1 mx_${seg}_${track} 1 dpmf_always" \
+MX_TMPL = "1 mx_${seg}_${track} 1 dpmf_always" \
     " mc_${distribution}_${seg}_${track}"
 
-NAME_COLLECTION_TMPL = "$track_index collection_seg_${track} ${num_segs}"
+NAME_COLLECTION_TMPL = "collection_seg_${track} ${num_segs}"
 NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${track}"
 
 TRACK_FMT = "browser position %s:%s-%s"
@@ -318,6 +324,14 @@ COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % PKG
 
 FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%s step=1"
+
+CARD_SEGTRANSITION = 2
+
+# training results
+# XXX: this should really be a namedtuple, yuck
+OFFSET_NUM_SEGS = 1
+OFFSET_FILENAMES = 2 # where the filenames begin in the results
+OFFSET_PARAMS_FILENAME = 3
 
 # set once per file run
 UUID = uuid1().hex
@@ -482,14 +496,15 @@ def is_training_progressing(last_ll, curr_ll,
 def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
 
-def save_template(filename, resource, mapping, dirname=None,
-                  clobber=False, start_index=None):
+def make_template_filename(filename, resource, dirname=None, clobber=False,
+                           start_index=None):
     """
-    creates a temporary file if filename is None or empty
+    returns (filename, is_new)
     """
     if filename:
         if not clobber and path(filename).exists():
             return filename, False
+        # else filename is unchanged
     else:
         resource_part = resource.rpartition(".tmpl")
         stem = resource_part[0] or resource_part[2]
@@ -501,13 +516,24 @@ def save_template(filename, resource, mapping, dirname=None,
 
         filename = path(dirname) / filebasename
 
-    with open(filename, "w+") as outfile:
-        tmpl = Template(data_string(resource))
-        text = tmpl.substitute(mapping)
-
-        outfile.write(text)
-
     return filename, True
+
+def save_template(filename, resource, mapping, dirname=None,
+                  clobber=False, start_index=None):
+    """
+    creates a temporary file if filename is None or empty
+    """
+    filename, is_new = make_template_filename(filename, resource, dirname,
+                                              clobber, start_index)
+
+    if is_new:
+        with open(filename, "w+") as outfile:
+            tmpl = Template(data_string(resource))
+            text = tmpl.substitute(mapping)
+
+            outfile.write(text)
+
+    return filename, is_new
 
 def find_overlaps(start, end, coords):
     """
@@ -536,7 +562,8 @@ def find_overlaps(start, end, coords):
 
     return res
 
-def make_cpp_options(input_params_filename, output_params_filename=None):
+def make_cpp_options(input_params_filename=None, output_params_filename=None,
+                     card_seg=None):
     directives = {}
 
     if input_params_filename:
@@ -544,6 +571,9 @@ def make_cpp_options(input_params_filename, output_params_filename=None):
 
     if output_params_filename:
         directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
+
+    if card_seg is not None:
+        directives["CARD_SEG"] = card_seg
 
     res = " ".join(CPP_DIRECTIVE_FMT % item for item in directives.iteritems())
 
@@ -561,13 +591,26 @@ def make_native_spec(**kwargs):
     return res
 
 def make_spec(name, items):
-    items[:0] = ["%s_IN_FILE inline" % name, str(len(items)), ""]
+    header_lines = ["%s_IN_FILE inline" % name, str(len(items)), ""]
 
-    return "\n".join(items) + "\n"
+    indexed_items = ["%d %s" % indexed_item
+                     for indexed_item in enumerate(items)]
 
+    all_lines = header_lines + indexed_items
+
+    return "\n".join(all_lines) + "\n"
+
+def array2text(a):
+    ndim = a.ndim
+    if ndim == 1:
+        return " ".join(map(str, a))
+    else:
+        delimiter = "\n" * (ndim-1)
+        return delimiter.join(array2text(row) for row in a)
+
+# XXX: consider making much of frag automatic
 def make_table_spec(frag, table):
-    items = [frag] + [" ".join(map(str, row)) for row in table]
-    return "\n".join(items) + "\n"
+    return "\n".join([frag, array2text(table), ""])
 
 # def make_dt_spec(num_tracks):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
@@ -586,13 +629,12 @@ def make_name_collection_spec(num_segs, tracknames):
     items = []
 
     for track_index, track in enumerate(tracknames):
-        mapping = dict(track=track, track_index=track_index, num_segs=num_segs)
+        mapping = dict(track=track, num_segs=num_segs)
 
         contents = [substitute(mapping)]
         for seg_index in xrange(num_segs):
             seg = "seg%d" % seg_index
-            mapping = dict(seg=seg, track=track,
-                           seg_index=seg_index, track_index=track_index)
+            mapping = dict(seg=seg, track=track)
 
             contents.append(substitute_contents(mapping))
         items.append("\n".join(contents))
@@ -763,6 +805,7 @@ class RandomStartThread(Thread):
     def run(self):
         self.runner.session = self.session
         self.runner.num_segs = self.num_segs
+        self.runner.num_states = self.num_segs
         self.runner.start_index = self.start_index
         self.result = self.runner.run_train_start()
 
@@ -801,6 +844,8 @@ class Runner(object):
 
         self.metadata_done = False
 
+        self.triangulation_filename_is_new = None
+
         # data
         # a "chunk" is what GMTK calls a segment
         self.num_chunks = None
@@ -835,6 +880,42 @@ class Runner(object):
         self.train_prog = None
 
         self.__dict__.update(kwargs)
+
+    @classmethod
+    def fromoptions(cls, args, options):
+        res = cls()
+
+        res.genomedata_dirname = args[0]
+        res.dirname = options.directory
+        res.obs_dirname = options.observations
+        res.bed_filename = options.bed
+
+        res.input_master_filename = options.input_master
+        res.structure_filename = options.structure
+        res.params_filename = options.trainable_params
+        res.dont_train_filename = options.dont_train
+        res.include_coords_filename = options.include_coords
+
+        if options.resource_profile:
+            res.res_usage_filename = options.resource_profile
+
+        res.distribution = options.distribution
+        res.random_starts = options.random_starts
+        res.len_seg_strength = options.prior_strength
+        res.include_tracknames = options.track
+        res.verbosity = options.verbosity
+        res.min_seg_len = options.min_seg_length
+        res.num_segs = options.num_segs
+
+        res.clobber = options.clobber
+        res.train = not options.no_train
+        res.identify = not options.no_identify
+        res.posterior = not options.no_posterior
+        res.dry_run = options.dry_run
+        res.keep_going = options.keep_going
+        res.split_sequences = options.split_sequences
+
+        return res
 
     def set_bytes_per_viterbi_frame(self):
         num_words = []
@@ -1032,6 +1113,12 @@ class Runner(object):
                 self.make_filename(PREFIX_LIKELIHOOD, start_index, EXT_TAB,
                                    subdirname=SUBDIRNAME_LOG)
 
+    def make_triangulation_dirpath(self):
+        res = self.dirpath / "triangulation"
+        self.make_dir(res)
+
+        self.triangulation_dirpath = res
+
     def make_output_dirpath(self, dirname, start_index, clobber=None):
         res = self.dirpath / "output" / dirname / str(start_index)
         self.make_dir(res, clobber)
@@ -1039,8 +1126,12 @@ class Runner(object):
         return res
 
     def set_output_dirpaths(self, start_index, clobber=None):
-        self.output_dirpath = self.make_output_dirpath("o", start_index, clobber)
-        self.error_dirpath = self.make_output_dirpath("e", start_index, clobber)
+        make_output_dirpath_custom = partial(self.make_output_dirpath,
+                                             start_index=start_index,
+                                             clobber=clobber)
+
+        self.output_dirpath = make_output_dirpath_custom("o")
+        self.error_dirpath = make_output_dirpath_custom("e")
 
     def make_dir(self, dirname, clobber=None):
         if clobber is None:
@@ -1128,10 +1219,24 @@ class Runner(object):
 
     def save_include(self):
         num_segs = self.num_segs
-        num_states = num_segs * self.min_seg_len
-        self.num_states = num_states
 
-        mapping = dict(card_seg=num_segs, card_state=num_states)
+        # disable the old state mapping stuff
+        self.num_states = num_segs
+
+        min_seg_len = self.min_seg_len
+
+        # XXX: should allow shifting of the ruler scale variable
+        assert min_seg_len % RULER_SCALE == 0
+        card_seg_countdown = min_seg_len // RULER_SCALE
+        self.card_seg_countdown = card_seg_countdown
+
+        if isinstance(num_segs, slice):
+            num_segs = "undefined\n#error must define CARD_SEG"
+
+        mapping = dict(card_seg=num_segs,
+                       card_segCountDown=card_seg_countdown,
+                       card_frameIndex=MAX_FRAMES,
+                       ruler_scale=RULER_SCALE)
 
         aux_dirpath = self.dirpath / SUBDIRNAME_AUX
 
@@ -1623,55 +1728,33 @@ class Runner(object):
 
     def add_final_probs_to_cpt(self, cpt):
         """
-        modifies original
+        modifies original input
         """
-        num_states = self.num_states
         num_segs = self.num_segs
-        min_seg_len = self.min_seg_len
 
-        prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
-        prob_self_other = (1.0 - prob_self_self) / (num_segs - 1)
+        prob_self_self = 0.0
+        prob_self_other = 1.0 / (num_segs - 1)
 
-        first_state_indexes = self.get_first_state_indexes()
-        final_state_indexes = self.get_final_state_indexes()
+        # set everywhere (including diagonals to be rewritten)
+        cpt[...] = prob_self_other
 
-        self_self_coords = [final_state_indexes, final_state_indexes]
-
-        # => [(1, 2), (1, 4), (3, 0), (3, 4), (5, 0), (5, 4)]
-
-        # these are indexes of state indexes
-        # [(0, 1), (0, 2), (1, 0), (1, 2), (2, 0), (2, 1)]
-        index_indexes_both = permutations(range(num_segs), 2)
-
-        # (0, 0, 1, 1, 2, 2), (1, 2, 0, 2, 0, 1)
-        index_indexes_either = map(list, zip(*index_indexes_both))
-        index_indexes_first, index_indexes_final = index_indexes_either
-
-        self_other_final_indexes = final_state_indexes[index_indexes_final]
-        self_other_first_indexes = first_state_indexes[index_indexes_first]
-
-        self_other_coords = [self_other_final_indexes,
-                             self_other_first_indexes]
-
-        len_self_other_coords = num_segs * (num_segs - 1)
-        assert len(self_other_coords[0]) == len_self_other_coords
-        assert len(self_other_coords[1]) == len_self_other_coords
-
-        cpt[self_self_coords] = prob_self_self
-        cpt[self_other_coords] = prob_self_other
+        # set diagonal
+        range_cpt = xrange(num_segs)
+        cpt[range_cpt, range_cpt] = prob_self_self
 
         return cpt
 
     def make_dirichlet_table(self):
         num_segs = self.num_segs
 
-        probs = self.add_final_probs_to_cpt(self.make_empty_cpt())
+        probs = self.make_dense_cpt_segCountDown_state_segTransition()
 
         # XXX: the ratio is not exact as num_bases is not the same as
         # the number of base-base transitions. It is surely close
         # enough, though
         total_pseudocounts = self.len_seg_strength * self.num_bases
-        pseudocounts_per_row = total_pseudocounts / num_segs
+        divisor = self.card_seg_countdown * self.num_states
+        pseudocounts_per_row = total_pseudocounts / divisor
 
         # astype(int) means flooring the floats
         pseudocounts = (probs * pseudocounts_per_row).astype(int)
@@ -1685,22 +1768,17 @@ class Runner(object):
         return make_spec("DIRICHLET_TAB", items)
 
     def make_dense_cpt_start_state_spec(self):
-        cpt = zeros((1, self.num_states))
+        cpt = zeros((1, self.num_segs))
 
-        cpt[0, self.get_first_state_indexes()] = 1.0 / self.num_segs
+        cpt[0, :] = 1.0 / self.num_segs
 
         return make_table_spec(DENSE_CPT_START_STATE_FRAG, cpt)
 
     def make_dense_cpt_state_state_spec(self):
         num_segs = self.num_segs
 
-        if self.len_seg_strength > 0:
-            frag = "\n".join([DENSE_CPT_STATE_STATE_FRAG, DIRICHLET_STATE_STATE_FRAG])
-        else:
-            frag = DENSE_CPT_STATE_STATE_FRAG
-
         cpt = self.add_final_probs_to_cpt(self.make_linked_cpt())
-        return make_table_spec(frag, cpt)
+        return make_table_spec(DENSE_CPT_STATE_STATE_FRAG, cpt)
 
     def make_dinucleotide_table_row(self):
         # simple one-parameter model
@@ -1724,11 +1802,40 @@ class Runner(object):
 
         return make_table_spec(DENSE_CPT_SEG_DINUCLEOTIDE_FRAG, table)
 
+    def make_dense_cpt_segCountDown_state_segTransition(self):
+        card_seg_countdown = self.card_seg_countdown
+
+        res = zeros((card_seg_countdown, self.num_states, CARD_SEGTRANSITION))
+
+        prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
+        prob_self_other = 1.0 - prob_self_self
+
+        # when segCountDown == 0, allow the possibility of transition
+        res[0, :, 0] = prob_self_self
+        res[0, :, 1] = prob_self_other
+
+        # when segCountDown != 0, never transition
+        res[1:, :, 0] = 1.0
+
+        return res
+
+    def make_dense_cpt_segCountDown_state_segTransition_spec(self):
+        cpt = self.make_dense_cpt_segCountDown_state_segTransition()
+
+        if self.len_seg_strength > 0:
+            frag = "\n".join([DENSE_CPT_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG,
+                              DIRICHLET_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG])
+        else:
+            frag = DENSE_CPT_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG
+
+        return make_table_spec(frag, cpt)
+
     def make_dense_cpt_spec(self):
         num_segs = self.num_segs
 
         items = [self.make_dense_cpt_start_state_spec(),
-                 self.make_dense_cpt_state_state_spec()]
+                 self.make_dense_cpt_state_state_spec(),
+                 self.make_dense_cpt_segCountDown_state_segTransition_spec()]
 
         if self.use_dinucleotide:
             items.append(self.make_dense_cpt_seg_dinucleotide_spec())
@@ -1865,7 +1972,11 @@ class Runner(object):
 
         dense_cpt_spec = self.make_dense_cpt_spec()
 
+        # state_state
         num_free_params += num_segs * (num_segs - 1)
+
+        # segCountDown_state_segTransition
+        num_free_params += num_segs
 
         self.calc_means_vars()
 
@@ -1895,6 +2006,7 @@ class Runner(object):
         mc_spec = self.make_mc_spec()
         mx_spec = self.make_mx_spec()
         name_collection_spec = make_name_collection_spec(num_segs, tracknames)
+        card_seg = num_segs
 
         params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
 
@@ -1903,11 +2015,13 @@ class Runner(object):
                           locals(), params_dirpath, self.clobber,
                           start_index)
 
+        print >>sys.stderr, "input_master_filename = %s; is_new = %s" \
+            % (self.input_master_filename, input_master_filename_is_new)
+
         # only use num_free_params if a new input.master was created
         if input_master_filename_is_new:
+            print >>sys.stderr, "num_free_params = %d" % num_free_params
             self.num_free_params = num_free_params
-
-        self.input_master_filename_is_new = input_master_filename_is_new
 
     def save_dont_train(self):
         self.dont_train_filename = self.save_resource(RES_DONT_TRAIN,
@@ -2191,7 +2305,10 @@ class Runner(object):
         this is BIC = -2 ln L + k ln N
         """
         model_penalty = (self.num_free_params * log(self.num_bases))
-        return model_penalty - 2 * log_likelihood
+        print >>sys.stderr, "num_free_params = %s; num_bases = %s; model_penalty = %s" \
+            % (self.num_free_params, self.num_bases, model_penalty)
+
+        return model_penalty - (2 * log_likelihood)
 
     def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
                    output_filename=None, prefix_args=[]):
@@ -2268,7 +2385,8 @@ class Runner(object):
         queue_train_custom = partial(self.queue_train, start_index,
                                      round_index)
 
-        kwargs["cppCommandOptions"] = make_cpp_options(input_params_filename)
+        kwargs["cppCommandOptions"] = \
+            make_cpp_options(input_params_filename, card_seg=self.num_segs)
 
         res = [] # task ids
 
@@ -2313,7 +2431,8 @@ class Runner(object):
                                               GMTK_INDEX_PLACEHOLDER)
 
         cpp_options = make_cpp_options(input_params_filename,
-                                       output_params_filename)
+                                       output_params_filename,
+                                       card_seg=self.num_segs)
 
         kwargs = \
             dict(outputMasterFile=self.output_master_filename,
@@ -2373,18 +2492,34 @@ class Runner(object):
 
         return res
 
-    def run_triangulate(self):
+    def set_triangulation_filename(self, num_segs=None):
+        if num_segs is None:
+            num_segs = self.num_segs
+
+        if (self.triangulation_filename_is_new
+            or not self.triangulation_filename):
+            self.triangulation_filename_is_new = True
+
+            structure_filebasename = path(self.structure_filename).name
+            triangulation_filebasename = extjoin(structure_filebasename,
+                                                 str(num_segs), EXT_TRIFILE)
+
+            self.triangulation_filename = (self.triangulation_dirpath
+                                           / triangulation_filebasename)
+
+        print >>sys.stderr, ("setting triangulation_filename = %s"
+                             % self.triangulation_filename)
+
+    def run_triangulate_single(self, num_segs):
         print >>sys.stderr, "running triangulation"
         prog = self.prog_factory(TRIANGULATE_PROG)
 
-        structure_filename = self.structure_filename
-        triangulation_filename = self.triangulation_filename
-        if not triangulation_filename:
-            triangulation_filename = extjoin(structure_filename, EXT_TRIFILE)
-            self.triangulation_filename = triangulation_filename
+        self.set_triangulation_filename(num_segs)
 
-        kwargs = dict(strFile=structure_filename,
-                      outputTriangulatedFile=triangulation_filename,
+        cpp_options = make_cpp_options(card_seg=num_segs)
+        kwargs = dict(strFile=self.structure_filename,
+                      cppCommandOptions=cpp_options,
+                      outputTriangulatedFile=self.triangulation_filename,
                       verbosity=self.verbosity)
 
         # XXX: need exist/clobber logic here
@@ -2394,8 +2529,12 @@ class Runner(object):
 
         prog(**kwargs)
 
-        if not self.posterior_triangulation_filename and not self.dry_run:
-            self.save_posterior_triangulation()
+    def run_triangulate(self):
+        self.make_triangulation_dirpath()
+
+        num_segs_range = slice2range(self.num_segs)
+        for num_segs in num_segs_range:
+            self.run_triangulate_single(num_segs)
 
     def run_train_round(self, start_index, round_index, **kwargs):
         """
@@ -2435,6 +2574,8 @@ class Runner(object):
 
     def run_train_start(self):
         # make new files if you have more than one random start
+        self.set_triangulation_filename()
+
         new = self.make_new_params
 
         start_index = self.start_index
@@ -2452,7 +2593,11 @@ class Runner(object):
 
         self.set_calc_info_criterion()
 
-        kwargs = self.train_kwargs
+        kwargs = dict(objsNotToTrain=self.dont_train_filename,
+                      maxEmIters=1,
+                      lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
+                      triFile=self.triangulation_filename,
+                      **self.make_gmtk_kwargs())
 
         while (round_index < self.max_em_iters and
                is_training_progressing(last_log_likelihood, log_likelihood)):
@@ -2469,8 +2614,8 @@ class Runner(object):
 
             round_index += 1
 
-        # log_likelihood and a list of src_filenames to save
-        return (info_criterion, self.input_master_filename,
+        # log_likelihood, num_segs and a list of src_filenames to save
+        return (info_criterion, self.num_segs, self.input_master_filename,
                 self.last_params_filename, self.log_likelihood_filename)
 
     def wait_job(self, jobid, kill_jobids=[]):
@@ -2517,12 +2662,6 @@ class Runner(object):
     def run_train(self):
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
 
-        self.train_kwargs = dict(objsNotToTrain=self.dont_train_filename,
-                                 maxEmIters=1,
-                                 lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
-                                 triFile=self.triangulation_filename,
-                                 **self.make_gmtk_kwargs())
-
         # save the destination file for input_master as we will be
         # generating new input masters for each start
         #
@@ -2532,16 +2671,25 @@ class Runner(object):
         random_starts = self.random_starts
         assert random_starts >= 1
 
-        # XXX: why did I have "if random_starts == 1:" preceding this line?
-        self.save_input_master()
+        # XXX: duplicative
+        params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
+
+        # must be before file creation. Otherwise the newness value
+        # will be wrong
+        input_master_filename, input_master_filename_is_new = \
+            make_template_filename(self.input_master_filename,
+                                   RES_INPUT_MASTER_TMPL, params_dirpath,
+                                   self.clobber)
 
         # should I make new parameters in each thread?
-        self.make_new_params = (self.random_starts > 1
-                                or isinstance(self.num_segs, slice))
+        make_new_params = (self.random_starts > 1
+                           or isinstance(self.num_segs, slice))
+        self.make_new_params = make_new_params
+        if not make_new_params:
+            self.save_input_master()
 
-        if self.input_master_filename_is_new:
-            input_master_filename = self.input_master_filename
-        else:
+        if not input_master_filename_is_new:
+            # do not overwrite existing file
             input_master_filename = None
 
         dst_filenames = [input_master_filename,
@@ -2559,6 +2707,7 @@ class Runner(object):
         with Session() as session:
             try:
                 for start_index, (num_seg, seg_start_index) in enumerator:
+                    print >>sys.stderr, "start_index %s, num_seg %s, seg_start_index %s" % (start_index, num_seg, seg_start_index)
                     thread = RandomStartThread(self, session, start_index,
                                                num_seg)
                     thread.start()
@@ -2585,13 +2734,21 @@ class Runner(object):
 
         if self.make_new_params:
             self.proc_train_results(start_params, dst_filenames)
+        else:
+            # you're always going to overwrite params.params
+            copy2(start_params[OFFSET_PARAMS_FILENAME], self.params_filename)
 
     def proc_train_results(self, start_params, dst_filenames):
         if self.dry_run:
             return
 
         # finds the min by info_criterion (minimize -log_likelihood)
-        src_filenames = min(start_params)[1:]
+        min_params = min(start_params)
+
+        self.num_segs = min_params[OFFSET_NUM_SEGS]
+        self.set_triangulation_filename()
+
+        src_filenames = min_params[OFFSET_FILENAMES:]
 
         if None in src_filenames:
             raise ValueError, "all training threads failed"
@@ -2614,7 +2771,7 @@ class Runner(object):
             chunk_coord = self.chunk_coords[chunk_index]
             chunk_chrom, chunk_start, chunk_end = chunk_coord
             prefix_args = ["segway-task", "run", "viterbi", output_filename,
-                           chunk_chrom, chunk_start, chunk_end]
+                           chunk_chrom, chunk_start, chunk_end, self.num_segs]
             output_filename = None
         else:
             prefix_args = []
@@ -2668,7 +2825,8 @@ class Runner(object):
         identify_kwargs = \
             dict(inputMasterFile=self.input_master_filename,
 
-                 cppCommandOptions=make_cpp_options(params_filename),
+                 cppCommandOptions=make_cpp_options(params_filename,
+                                                    card_seg=self.num_segs),
                  **self.make_gmtk_kwargs())
 
         self.set_output_dirpaths("identify", clobber)
@@ -2808,6 +2966,10 @@ class Runner(object):
                 self.run_train()
 
             if self.identify or self.posterior:
+                if (not self.posterior_triangulation_filename
+                    and not self.dry_run):
+                    self.save_posterior_triangulation()
+
                 try:
                     self.run_identify_posterior()
                 except ChunkOverMemUsageLimit:
@@ -2950,37 +3112,7 @@ def parse_options(args):
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
-    runner = Runner()
-
-    runner.genomedata_dirname = args[0]
-    runner.dirname = options.directory
-    runner.obs_dirname = options.observations
-    runner.bed_filename = options.bed
-
-    runner.input_master_filename = options.input_master
-    runner.structure_filename = options.structure
-    runner.params_filename = options.trainable_params
-    runner.dont_train_filename = options.dont_train
-    runner.include_coords_filename = options.include_coords
-
-    if options.resource_profile:
-        runner.res_usage_filename = options.resource_profile
-
-    runner.distribution = options.distribution
-    runner.random_starts = options.random_starts
-    runner.len_seg_strength = options.prior_strength
-    runner.include_tracknames = options.track
-    runner.verbosity = options.verbosity
-    runner.min_seg_len = options.min_seg_length
-    runner.num_segs = options.num_segs
-
-    runner.clobber = options.clobber
-    runner.train = not options.no_train
-    runner.identify = not options.no_identify
-    runner.posterior = not options.no_posterior
-    runner.dry_run = options.dry_run
-    runner.keep_going = options.keep_going
-    runner.split_sequences = options.split_sequences
+    runner = Runner.fromoptions(args, options)
 
     return runner()
 
