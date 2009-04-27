@@ -79,14 +79,13 @@ def save_bed(outfilename, start_pos, labels, coord, num_labels):
         # this is easily concatenated since it has no context
         for seg_start, seg_end, seg_label in zipper:
             name = str(seg_label)
-            score = str(SCORE_MIN + int(seg_label * score_step))
-            assert 0 <= score <= 1000
+
             chrom_start = str(seg_start)
             chrom_end = str(seg_end)
             item_rgb = get_label_color(seg_label)
 
             row = [chrom, chrom_start, chrom_end, name,
-                   score, BED_STRAND, chrom_start, chrom_end, item_rgb]
+                   BED_SCORE, BED_STRAND, chrom_start, chrom_end, item_rgb]
 
             print >>outfile, "\t".join(row)
 
