@@ -1227,7 +1227,7 @@ class Runner(object):
 
         # XXX: should allow shifting of the ruler scale variable
         assert min_seg_len % RULER_SCALE == 0
-        card_seg_countdown = min_seg_len // RULER_SCALE
+        card_seg_countdown = (min_seg_len // RULER_SCALE) + 1
         self.card_seg_countdown = card_seg_countdown
 
         if isinstance(num_segs, slice):
@@ -1815,7 +1815,8 @@ class Runner(object):
         res[0, :, 1] = prob_self_other
 
         # when segCountDown != 0, never transition
-        res[1:, :, 0] = 1.0
+        if card_seg_countdown > 1:
+            res[1:, :, 0] = 1.0
 
         return res
 

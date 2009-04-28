@@ -1,6 +1,10 @@
-0.1.10:
+0.1.11:
 
 * switch from old DRMAA module to new drmaa module
+
+0.1.10:
+
+* fix off-by-one error in declaring CARD_SEGCOUNTDOWN
 
 0.1.9:
 
