@@ -6,8 +6,8 @@ __version__ = "$Revision$"
 # Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
-from contextlib import contextmanager
 from functools import partial
+from itertools import repeat
 from os import extsep
 import shutil
 import sys
@@ -91,21 +91,15 @@ class NamedTemporaryDir(object):
     def __exit__(self, exc, value, tb):
         self.close()
 
-# XXX: suggest upstream as addition to DRMAA-python
-@contextmanager
 def Session(*args, **kwargs):
     # here so that other modules will not fail on lack of DRMAA
-    from DRMAA import Session as _Session
+    from drmaa import Session as _Session
 
     res = _Session()
-    res.init(*args, **kwargs)
 
     assert res.DRMSInfo.startswith(DRMSINFO_PREFIX)
 
-    try:
-        yield res
-    finally:
-        res.exit()
+    return res
 
 def get_col_index(chromosome, trackname):
     return get_tracknames(chromosome).index(trackname)
@@ -196,6 +190,12 @@ def find_segment_starts(data):
     start_pos = append(start_pos, len_data)
 
     return start_pos, labels
+
+def constant(val):
+    """
+    constant values for defaultdict
+    """
+    return repeat(val).next
 
 def main(args=sys.argv[1:]):
     pass

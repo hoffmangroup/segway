@@ -44,6 +44,16 @@ def read(iterator, datum_cls=Datum):
 def read_native(*args, **kwargs):
     return read(datum_cls=NativeDatum, *args, **kwargs)
 
+def get_trackline_and_reader(iterator, datum_cls=Datum):
+    line = iterator.next()
+
+    assert line.startswith("track")
+
+    return line.split(), read(iterator, datum_cls)
+
+def get_trackline_and_reader_native(*args, **kwargs):
+    return get_trackline_and_reader(datum_cls=NativeDatum, *args, **kwargs)
+
 def main(args=sys.argv[1:]):
     pass
 

@@ -20,7 +20,7 @@ from ._util import (DTYPE_IDENTIFY, find_segment_starts, get_label_color,
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
 BED_SCORE = "1000"
-BED_STRAND = "+"
+BED_STRAND = "."
 
 SCORE_MIN = 100
 SCORE_MAX = 1000

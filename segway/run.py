@@ -27,7 +27,7 @@ import sys
 from threading import Event, Thread
 from uuid import uuid1
 
-from DRMAA import ExitTimeoutError
+from drmaa import JobControlAction
 from genomedata import Genome
 from numpy import (add, amin, amax, append, arange, array, column_stack,
                    diagflat, empty, finfo, float32, intc, invert,
@@ -40,7 +40,7 @@ from path import path
 from tabdelim import ListWriter
 
 from sge import get_sge_qacct_maxvmem
-from ._util import (data_filename, data_string, DTYPE_OBS_INT,
+from ._util import (constant, data_filename, data_string, DTYPE_OBS_INT,
                     EXT_GZ, get_chrom_coords, get_label_color, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     NamedTemporaryDir, OptionBuilder_GMTK, PKG, Session,
@@ -102,7 +102,6 @@ assert ISLAND or ISLAND_LST == ISLAND_LST_NA
 LINEAR_MEM_USAGE_MULTIPLIER = 1
 MEM_USAGE_MULTIPLIER = 2
 
-SESSION_WAIT_TIMEOUT = 60 # seconds
 JOIN_TIMEOUT = finfo(float).max
 LEN_SEG_EXPECTED = 10000
 SWAP_ENDIAN = False
@@ -336,6 +335,8 @@ OFFSET_PARAMS_FILENAME = 3
 # set once per file run
 UUID = uuid1().hex
 
+TERMINATE = JobControlAction.TERMINATE
+
 ## exceptions
 class ChunkOverMemUsageLimit(Exception):
     pass
@@ -370,12 +371,6 @@ except ImportError:
                     break
             else:
                 return
-
-def _constant(constant):
-    """
-    constant values for defaultdict
-    """
-    return repeat(constant).next
 
 def make_bash_cmdline(cmd, args):
     return BASH_CMDLINE + ['%s "$@"' % cmd, cmd] + map(str, args)
@@ -853,7 +848,7 @@ class Runner(object):
         self.mins = None
         self.maxs = None
         self.tracknames = None
-        self.mem_per_obs = defaultdict(_constant(None))
+        self.mem_per_obs = defaultdict(constant(None))
         self.num_free_params = None
 
         # variables
@@ -2303,13 +2298,17 @@ class Runner(object):
 
     def calc_bayesian_info_criterion(self, log_likelihood):
         """
-        this is BIC = -2 ln L + k ln N
+        BIC = -2 ln L + k ln n
+        this is a modified BIC = -(2/n) ln L + k ln N
+
+        n: # of bases
+        N: # of sequences
         """
-        model_penalty = (self.num_free_params * log(self.num_bases))
+        model_penalty = (self.num_free_params * log(self.num_chunks))
         print >>sys.stderr, "num_free_params = %s; num_bases = %s; model_penalty = %s" \
             % (self.num_free_params, self.num_bases, model_penalty)
 
-        return model_penalty - (2 * log_likelihood)
+        return model_penalty - (2/self.num_bases * log_likelihood)
 
     def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
                    output_filename=None, prefix_args=[]):
@@ -2343,10 +2342,7 @@ class Runner(object):
         session = self.session
         job_tmpl = session.createJobTemplate()
 
-        # shouldn't this be jobName? not in the Python DRMAA implementation
-        # XXX: report upstream
-        job_tmpl.name = job_name
-
+        job_tmpl.jobName = job_name
         job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = cmdline
 
@@ -2623,41 +2619,31 @@ class Runner(object):
         """
         wait for bundle to finish
         """
-        # XXXopt: polling in each thread is a bad way to do this
-        # it would be best to use session.synchronize() centrally
-        # and communicate to each thread when its job is done
-
-        # the very best thing would be to eliminate the GIL lock
-        # in the DRMAA wrapper
         job_info = None
         session = self.session
         interrupt_event = self.interrupt_event
 
-        control = session.control
-        terminate = session.TERMINATE
         while not job_info:
-            try:
-                job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
-            except ExitTimeoutError:
-                # ExitTimeoutError: not ready yet
-                interrupt_event.wait(SESSION_WAIT_TIMEOUT)
-            except ValueError:
-                # ValueError: the job terminated abnormally
-                # so interrupt everybody
+            job_info = session.wait(jobid, session.TIMEOUT_WAIT_FOREVER)
+
+            # if there is a nonzero exit status
+
+            # XXX: Change after drmaa is fixed:
+            # http://code.google.com/p/drmaa-python/issues/detail?id=4
+            if int(float(job_info.resourceUsage["exit_status"])):
                 if self.keep_going:
                     return False
                 else:
                     interrupt_event.set()
-                    raise
+                    raise ValueError("job failed")
 
             if interrupt_event.isSet():
                 for jobid in kill_jobids + [jobid]:
                     try:
                         print >>sys.stderr, "killing job %s" % jobid
-                        control(jobid, terminate)
+                        session.control(jobid, TERMINATE)
                     except BaseException, err:
-                        print >>sys.stderr, ("ignoring exception: %r"
-                                             % err)
+                        print >>sys.stderr, ("ignoring exception: %r" % err)
                 raise KeyboardInterrupt
 
     def run_train(self):
