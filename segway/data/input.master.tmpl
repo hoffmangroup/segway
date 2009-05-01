@@ -4,41 +4,7 @@
 #error CARD_SEG must be defined to be $card_seg for this input master file
 #endif
 
-DT_IN_FILE inline
-4
-
-0 map_parent
-1              % num parents
-    -1 { p0 }
-
-1 map_seg_segCountDown
-1
-% default is to always start at the maximum value
-% this is only used at the beginning of an observation track
-    -1 { CARD_SEGCOUNTDOWN-1 }
-
-2 map_frameIndex_ruler
-1
-% is the frameIndex divisible by RULER_SCALE
-    -1 { mod(p0, RULER_SCALE) == 0 }
-
-3 map_segTransition_ruler_seg_segCountDown_segCountDown
-4
-% current seg (p2) is unused for now but will be eventually once
-% heterogeneous mappings of seg to initial segCountDown value are
-% allowed
-    0 2 0 default
-      % segTransition(0) == 0:
-      1 2 0 default
-            % ruler(0) == 0:
-            -1 { p3 } % not at ruler mark -> copy previous value
-
-            % ruler(0) == 1:
-            -1 { max(p3-1, 0) } % subtract 1 from previous value, or 0
-
-      % segTransition(0) == 1:
-      -1 { CARD_SEGCOUNTDOWN-1 } % maximum value
-
+$dt_spec
 $name_collection_spec
 $dirichlet_spec
 

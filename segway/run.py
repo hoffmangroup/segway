@@ -998,8 +998,8 @@ class Runner(object):
         filename = self.seg_table_filename
 
         if filename is None:
-            filename = data_filename(
-        
+            filename = data_filename("seg_table.tab")
+
         num_segs = self.num_segs
         if isinstance(num_segs, slice):
             num_segs = num_segs.end-1
@@ -1281,7 +1281,8 @@ class Runner(object):
                           aux_dirpath, self.clobber)
 
     def save_structure(self):
-        observation_sub = resource_substitute("observation.tmpl") # XXX: make this a variable
+        # XXX: make this a variable
+        observation_sub = resource_substitute("observation.tmpl")
 
         tracknames = self.tracknames
         num_tracks = self.num_tracks
@@ -1988,6 +1989,25 @@ class Runner(object):
     def make_mx_spec(self):
         return self.make_spec_multiseg("MX", MX_TMPL)
 
+    def make_items_dt(self):
+        map_parent_dt_spec = data_string("map_parent.dt.txt")
+
+        map_seg_segCountDown_dt_spec = \
+            data_string("map_seg_segCountDown.dt.txt")
+
+        map_frameIndex_ruler_dt_spec = \
+            data_string("map_frameIndex_ruler.dt.txt")
+
+        map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec = \
+            data_string("map_segTransition_ruler_seg_segCountDown_segCountDown.dt.txt")
+
+        return [map_parent_dt_spec, map_seg_segCountDown_dt_spec,
+                map_frameIndex_ruler_dt_spec,
+                map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec]
+
+    def make_dt_spec(self):
+        return make_spec("DT", self.make_items_dt())
+
     def save_input_master(self, start_index=None, new=False):
         num_free_params = 0
 
@@ -2001,6 +2021,8 @@ class Runner(object):
             input_master_filename = None
         else:
             input_master_filename = self.input_master_filename
+
+        dt_spec = self.make_dt_spec()
 
         if self.len_seg_strength > 0:
             dirichlet_spec = self.make_dirichlet_spec()

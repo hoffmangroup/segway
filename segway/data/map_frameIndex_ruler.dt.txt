@@ -1,0 +1,4 @@
+map_frameIndex_ruler
+1
+% is the frameIndex divisible by RULER_SCALE
+    -1 { mod(p0, RULER_SCALE) == 0 }
