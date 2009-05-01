@@ -1,11 +1,15 @@
 0.1.11:
 
-* switch from old DRMAA module to new drmaa module
+* new prereq: switch from old DRMAA module to new drmaa module
+* new prereq: optplus 0.1.1
+* remove old "state" random variable from default structure
 * BIC is now defined as -(2/n) ln L + k ln N where n is num of bases
   and N is num of sequences
 * new segway-layer program changes the format of segway.bed.gz to
   something that is more intuitive for large numbers of labels, using
   thick/thin lines
+* segway: remove unused --resource-profile option
+* segway: add --seg-table option to describe segment hyperparameters
 
 0.1.10:
 

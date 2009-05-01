@@ -2,7 +2,7 @@
 from __future__ import division, with_statement
 
 """
-run: DESCRIPTION
+run: main Segway implementation
 """
 
 __version__ = "$Revision$"
@@ -34,10 +34,11 @@ from numpy import (add, amin, amax, append, arange, array, column_stack,
                    isnan, NINF, ones, outer, s_, sqrt, square, tile,
                    vectorize, zeros)
 from numpy.random import uniform
+from optplus import str2slice_or_int
 from optbuild import (Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace)
 from path import path
-from tabdelim import ListWriter
+from tabdelim import DictReader, ListWriter
 
 from sge import get_sge_qacct_maxvmem
 from ._util import (constant, data_filename, data_string, DTYPE_OBS_INT,
@@ -255,18 +256,19 @@ RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
 RES_DUMPNAMES = "dumpnames.list" # XXX: remove all dumpnames stuff from code
 RES_RES_USAGE = "res_usage.tab"
+RES_SEG_TABLE = "seg_table.tab"
 
-DIRICHLET_FRAG = "dirichlet_segCountDown_state_segTransition" \
-    " 3 CARD_SEGCOUNTDOWN CARD_STATE CARD_SEGTRANSITION"
+DIRICHLET_FRAG = "dirichlet_segCountDown_seg_segTransition" \
+    " 3 CARD_SEGCOUNTDOWN CARD_SEG CARD_SEGTRANSITION"
 
-DENSE_CPT_START_STATE_FRAG = "start_state 0 CARD_STATE"
-DENSE_CPT_STATE_STATE_FRAG = "state_state 1 CARD_STATE CARD_STATE"
-DIRICHLET_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG = \
-    "DirichletTable dirichlet_segCountDown_state_segTransition"
+DENSE_CPT_START_SEG_FRAG = "start_seg 0 CARD_SEG"
+DENSE_CPT_SEG_SEG_FRAG = "seg_seg 1 CARD_SEG CARD_SEG"
+DIRICHLET_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG = \
+    "DirichletTable dirichlet_segCountDown_seg_segTransition"
 
-DENSE_CPT_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG = \
-    "segCountDown_state_segTransition" \
-    " 2 CARD_SEGCOUNTDOWN CARD_STATE CARD_SEGTRANSITION"
+DENSE_CPT_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG = \
+    "segCountDown_seg_segTransition" \
+    " 2 CARD_SEGCOUNTDOWN CARD_SEG CARD_SEGTRANSITION"
 
 DENSE_CPT_SEG_DINUCLEOTIDE_FRAG = \
     "seg_dinucleotide 1 CARD_SEG CARD_DINUCLEOTIDE"
@@ -331,6 +333,9 @@ CARD_SEGTRANSITION = 2
 OFFSET_NUM_SEGS = 1
 OFFSET_FILENAMES = 2 # where the filenames begin in the results
 OFFSET_PARAMS_FILENAME = 3
+
+SEG_TABLE_WIDTH = 3
+OFFSET_STEP = 2
 
 # set once per file run
 UUID = uuid1().hex
@@ -800,7 +805,6 @@ class RandomStartThread(Thread):
     def run(self):
         self.runner.session = self.session
         self.runner.num_segs = self.num_segs
-        self.runner.num_states = self.num_segs
         self.runner.start_index = self.start_index
         self.result = self.runner.run_train_start()
 
@@ -819,6 +823,7 @@ class Runner(object):
         self.posterior_triangulation_filename = None
         self.jt_info_filename = None
         self.res_usage_filename = data_filename(RES_RES_USAGE)
+        self.seg_table_filename = None
 
         self.params_filename = None
         self.dirname = None
@@ -890,9 +895,7 @@ class Runner(object):
         res.params_filename = options.trainable_params
         res.dont_train_filename = options.dont_train
         res.include_coords_filename = options.include_coords
-
-        if options.resource_profile:
-            res.res_usage_filename = options.resource_profile
+        res.seg_table_filename = options.seg_table
 
         res.distribution = options.distribution
         res.random_starts = options.random_starts
@@ -990,6 +993,47 @@ class Runner(object):
         filename = self.include_coords_filename
 
         self.include_coords = load_coords(filename)
+
+    def load_seg_table(self):
+        filename = self.seg_table_filename
+
+        if filename is None:
+            filename = data_filename(
+        
+        num_segs = self.num_segs
+        if isinstance(num_segs, slice):
+            num_segs = num_segs.end-1
+
+        table = zeros((num_segs, SEG_TABLE_WIDTH))
+        table[:, OFFSET_STEP] = RULER_SCALE
+
+        with open(filename) as infile:
+            reader = DictReader(infile)
+
+            # overwriting is allowed
+            for row in reader:
+                # XXX: factor out
+                # get table_row_indexes
+                label = row["label"]
+                label_slice = str2slice_or_int(label)
+
+                table_row_indexes = slice2range(label_slice)
+
+                # get slice
+                len_slice = str2slice_or_int(row["len"])
+
+                assert len_slice.step == RULER_SCALE
+
+                len_tuple = (len_slice.start, len_slice.stop, len_slice.end)
+                len_row = zeros((SEG_TABLE_WIDTH))
+
+                for item_index, item in enumerate(len_tuple):
+                    if item is not None:
+                        len_row[item_index] = item
+
+                table[table_row_indexes] = len_row
+
+        self.seg_table = table
 
     def generate_tmpl_mappings(self, segnames=None, tracknames=None):
         if segnames is None:
@@ -1214,9 +1258,6 @@ class Runner(object):
 
     def save_include(self):
         num_segs = self.num_segs
-
-        # disable the old state mapping stuff
-        self.num_states = num_segs
 
         min_seg_len = self.min_seg_len
 
@@ -1697,9 +1738,9 @@ class Runner(object):
         return make_spec(name, self.make_items_multiseg(*args, **kwargs))
 
     def make_empty_cpt(self):
-        num_states = self.num_states
+        num_segs = self.num_segs
 
-        return zeros((num_states, num_states))
+        return zeros((num_segs, num_segs))
 
     def make_linked_cpt(self):
         """
@@ -1708,18 +1749,18 @@ class Runner(object):
         also has a seg 0_f -> seg1_0 link which must be overwritten,
         such as by add_cpt()
         """
-        return diagflat(ones(self.num_states-1), 1)
+        return diagflat(ones(self.num_segs-1), 1)
 
-    def get_first_state_indexes(self):
+    def get_first_seg_indexes(self):
         # min_seg_len = 2, num_segs = 3
         # => array([1, 3, 5])
-        return arange(0, self.num_states, self.min_seg_len)
+        return arange(0, self.num_segs, self.min_seg_len)
 
-    def get_final_state_indexes(self):
+    def get_final_seg_indexes(self):
         # => array([0, 2, 4])
         min_seg_len = self.min_seg_len
 
-        return arange(min_seg_len - 1, self.num_states, min_seg_len)
+        return arange(min_seg_len - 1, self.num_segs, min_seg_len)
 
     def add_final_probs_to_cpt(self, cpt):
         """
@@ -1742,13 +1783,13 @@ class Runner(object):
     def make_dirichlet_table(self):
         num_segs = self.num_segs
 
-        probs = self.make_dense_cpt_segCountDown_state_segTransition()
+        probs = self.make_dense_cpt_segCountDown_seg_segTransition()
 
         # XXX: the ratio is not exact as num_bases is not the same as
         # the number of base-base transitions. It is surely close
         # enough, though
         total_pseudocounts = self.len_seg_strength * self.num_bases
-        divisor = self.card_seg_countdown * self.num_states
+        divisor = self.card_seg_countdown * self.num_segs
         pseudocounts_per_row = total_pseudocounts / divisor
 
         # astype(int) means flooring the floats
@@ -1762,18 +1803,18 @@ class Runner(object):
 
         return make_spec("DIRICHLET_TAB", items)
 
-    def make_dense_cpt_start_state_spec(self):
+    def make_dense_cpt_start_seg_spec(self):
         cpt = zeros((1, self.num_segs))
 
         cpt[0, :] = 1.0 / self.num_segs
 
-        return make_table_spec(DENSE_CPT_START_STATE_FRAG, cpt)
+        return make_table_spec(DENSE_CPT_START_SEG_FRAG, cpt)
 
-    def make_dense_cpt_state_state_spec(self):
+    def make_dense_cpt_seg_seg_spec(self):
         num_segs = self.num_segs
 
         cpt = self.add_final_probs_to_cpt(self.make_linked_cpt())
-        return make_table_spec(DENSE_CPT_STATE_STATE_FRAG, cpt)
+        return make_table_spec(DENSE_CPT_SEG_SEG_FRAG, cpt)
 
     def make_dinucleotide_table_row(self):
         # simple one-parameter model
@@ -1797,10 +1838,10 @@ class Runner(object):
 
         return make_table_spec(DENSE_CPT_SEG_DINUCLEOTIDE_FRAG, table)
 
-    def make_dense_cpt_segCountDown_state_segTransition(self):
+    def make_dense_cpt_segCountDown_seg_segTransition(self):
         card_seg_countdown = self.card_seg_countdown
 
-        res = zeros((card_seg_countdown, self.num_states, CARD_SEGTRANSITION))
+        res = zeros((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
 
         prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
         prob_self_other = 1.0 - prob_self_self
@@ -1815,23 +1856,23 @@ class Runner(object):
 
         return res
 
-    def make_dense_cpt_segCountDown_state_segTransition_spec(self):
-        cpt = self.make_dense_cpt_segCountDown_state_segTransition()
+    def make_dense_cpt_segCountDown_seg_segTransition_spec(self):
+        cpt = self.make_dense_cpt_segCountDown_seg_segTransition()
 
         if self.len_seg_strength > 0:
-            frag = "\n".join([DENSE_CPT_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG,
-                              DIRICHLET_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG])
+            frag = "\n".join([DENSE_CPT_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG,
+                              DIRICHLET_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG])
         else:
-            frag = DENSE_CPT_SEGCOUNTDOWN_STATE_SEGTRANSITION_FRAG
+            frag = DENSE_CPT_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG
 
         return make_table_spec(frag, cpt)
 
     def make_dense_cpt_spec(self):
         num_segs = self.num_segs
 
-        items = [self.make_dense_cpt_start_state_spec(),
-                 self.make_dense_cpt_state_state_spec(),
-                 self.make_dense_cpt_segCountDown_state_segTransition_spec()]
+        items = [self.make_dense_cpt_start_seg_spec(),
+                 self.make_dense_cpt_seg_seg_spec(),
+                 self.make_dense_cpt_segCountDown_seg_segTransition_spec()]
 
         if self.use_dinucleotide:
             items.append(self.make_dense_cpt_seg_dinucleotide_spec())
@@ -1968,10 +2009,10 @@ class Runner(object):
 
         dense_cpt_spec = self.make_dense_cpt_spec()
 
-        # state_state
+        # seg_seg
         num_free_params += num_segs * (num_segs - 1)
 
-        # segCountDown_state_segTransition
+        # segCountDown_seg_segTransition
         num_free_params += num_segs
 
         self.calc_means_vars()
@@ -2060,6 +2101,8 @@ class Runner(object):
         # sets self.chunk_lens, needed for save_structure() to do
         # Dirichlet stuff (but rewriting structure is unnecessary)
         self.make_chunk_lens()
+
+        self.load_seg_table()
 
         self.save_include()
         self.save_structure()
@@ -2163,8 +2206,8 @@ class Runner(object):
                                for wig_filename in wig_filenames]
 
         with nested(*wig_files_unentered) as wig_files:
-            for state_index, wig_file in enumerate(wig_files):
-                print >>wig_file, self.make_wig_header_posterior(state_index)
+            for seg_index, wig_file in enumerate(wig_files):
+                print >>wig_file, self.make_wig_header_posterior(seg_index)
 
             for infilename, chunk_coord in zipper:
                 load_posterior_write_wig(chunk_coord, self.num_segs,
@@ -2725,7 +2768,8 @@ class Runner(object):
             # only one random start
             # you're always going to overwrite params.params
             assert len(start_params) == 1
-            copy2(start_params[0][OFFSET_PARAMS_FILENAME], self.params_filename)
+            copy2(start_params[0][OFFSET_PARAMS_FILENAME],
+                  self.params_filename)
 
     def proc_train_results(self, start_params, dst_filenames):
         if self.dry_run:
@@ -2955,9 +2999,12 @@ class Runner(object):
                 self.run_train()
 
             if self.identify or self.posterior:
-                if (not self.posterior_triangulation_filename
-                    and not self.dry_run):
-                    self.save_posterior_triangulation()
+                if not self.dry_run:
+                    # resave now that num_segs is determined
+                    self.save_include()
+
+                    if not self.posterior_triangulation_filename:
+                        self.save_posterior_triangulation()
 
                 try:
                     self.run_identify_posterior()
@@ -3023,8 +3070,8 @@ def parse_options(args):
         group.add_option("--dont-train", metavar="FILE",
                          help="use FILE as list of parameters not to train")
 
-        group.add_option("--resource-profile", metavar="FILE",
-                         help="load segway-res-usage profile from FILE")
+        group.add_option("--seg-table", metavar="FILE",
+                         help="load segment hyperparameters from FILE")
 
     with OptionGroup(parser, "Output files") as group:
         group.add_option("-b", "--bed", metavar="FILE",

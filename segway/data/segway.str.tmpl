@@ -5,17 +5,12 @@ GRAPHICAL_MODEL model_seg
 frame: 0 {
    variable: segCountDown {
      type: TYPE_SEGCOUNTDOWN;
-     conditionalparents: state(0) using DeterministicCPT("state_segCountDown");
-   }
-
-   variable: state {
-     type: TYPE_STATE;
-     conditionalparents: nil using DenseCPT("start_state");
+     conditionalparents: seg(0) using DeterministicCPT("seg_segCountDown");
    }
 
    variable: seg {
      type: TYPE_SEG;
-     conditionalparents: CONDITIONALPARENTS_SEG;
+     conditionalparents: nil using DenseCPT("start_seg");
    }
 
 ${observations}}
@@ -33,25 +28,20 @@ frame: 1 {
 
    variable: segCountDown {
      type: TYPE_SEGCOUNTDOWN;
-     conditionalparents: segTransition(0), ruler(0), state(0), segCountDown(-1)
-                         using DeterministicCPT("segTransition_ruler_state_segCountDown_segCountDown");
+     conditionalparents: segTransition(0), ruler(0), seg(0), segCountDown(-1)
+                         using DeterministicCPT("segTransition_ruler_seg_segCountDown_segCountDown");
    }
 
    variable: segTransition {
      type: discrete hidden cardinality CARD_SEGTRANSITION;
-     conditionalparents: segCountDown(-1), state(-1) using DenseCPT("segCountDown_state_segTransition");
-   }
-
-   variable: state {
-     type: TYPE_STATE;
-     conditionalparents: state(-1) using DeterministicCPT("state_state_copy")
-                         | state(-1) using DenseCPT("state_state");
-     switchingparents: segTransition(0) using mapping("map_parent");
+     conditionalparents: segCountDown(-1), seg(-1) using DenseCPT("segCountDown_seg_segTransition");
    }
 
    variable: seg {
      type: TYPE_SEG;
-     conditionalparents: CONDITIONALPARENTS_SEG;
+     conditionalparents: seg(-1) using DeterministicCPT("seg_seg_copy")
+                         | seg(-1) using DenseCPT("seg_seg");
+     switchingparents: segTransition(0) using mapping("map_parent");
    }
 
 ${observations}}

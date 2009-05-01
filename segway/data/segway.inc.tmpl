@@ -29,22 +29,18 @@
 #define CARD_SEG $card_seg
 #endif
 
-#define CARD_STATE CARD_SEG
-
 % AA .. TT
 #define CARD_DINUCLEOTIDE 16
 
 %% types
 
 #define TYPE_SEGCOUNTDOWN discrete hidden cardinality CARD_SEGCOUNTDOWN
-#define TYPE_STATE discrete hidden cardinality CARD_STATE
 #define TYPE_SEG discrete hidden cardinality CARD_SEG
 
 %% conditionalparents
 
 #define CONDITIONALPARENTS_NIL nil using DenseCPT("internal:UnityScore")
 #define CONDITIONALPARENTS_PRESENCE CONDITIONALPARENTS_NIL
-#define CONDITIONALPARENTS_SEG state(0) using DeterministicCPT("state_seg")
 
 %% misc
 #define RULER_SCALE $ruler_scale
