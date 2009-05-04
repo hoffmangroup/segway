@@ -1,8 +1,5 @@
 map_segTransition_ruler_seg_segCountDown_segCountDown
 4
-% current seg (p2) is unused for now but will be eventually once
-% heterogeneous mappings of seg to initial segCountDown value are
-% allowed
     0 2 0 default
       % segTransition(0) == 0:
       1 2 0 default
@@ -13,4 +10,4 @@ map_segTransition_ruler_seg_segCountDown_segCountDown
             -1 { max(p3-1, 0) } % subtract 1 from previous value, or 0
 
       % segTransition(0) == 1:
-      -1 { CARD_SEGCOUNTDOWN-1 } % maximum value
+      2 $tree

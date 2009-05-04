@@ -335,6 +335,8 @@ OFFSET_FILENAMES = 2 # where the filenames begin in the results
 OFFSET_PARAMS_FILENAME = 3
 
 SEG_TABLE_WIDTH = 3
+OFFSET_START = 0
+OFFSET_END = 1
 OFFSET_STEP = 2
 
 # set once per file run
@@ -1989,21 +1991,47 @@ class Runner(object):
     def make_mx_spec(self):
         return self.make_spec_multiseg("MX", MX_TMPL)
 
+    def make_segCountDown_tree_spec(self, resourcename):
+        num_segs = self.num_segs
+        table = self.seg_table
+
+        header = ([num_segs] + [num_seg for num_seg in xrange(num_segs-1)] +
+                  ["default"])
+
+        lines = [" ".join(header), ""]
+
+        for seg in xrange(num_segs):
+            table_row = table[seg]
+            end = table_row[OFFSET_END]
+            step = table_row[OFFSET_STEP]
+
+            assert not end % step # end MOD step == 0; must be exact division
+            segCountDown_value = end / step
+
+            lines.append("    -1 { %d }" % segCountDown_value)
+
+        tree = "\n".join(lines)
+
+        return resource_substitute(resourcename)(tree=tree)
+
+    def make_map_seg_segCountDown_dt_spec(self):
+        return self.make_segCountDown_tree_spec("map_seg_segCountDown.dt.tmpl")
+
+    def make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec(self):
+        return self.make_segCountDown_tree_spec("map_segTransition_ruler_seg_segCountDown_segCountDown.dt.tmpl")
+
     def make_items_dt(self):
         map_parent_dt_spec = data_string("map_parent.dt.txt")
-
-        map_seg_segCountDown_dt_spec = \
-            data_string("map_seg_segCountDown.dt.txt")
 
         map_frameIndex_ruler_dt_spec = \
             data_string("map_frameIndex_ruler.dt.txt")
 
         map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec = \
-            data_string("map_segTransition_ruler_seg_segCountDown_segCountDown.dt.txt")
+            self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec()
 
-        return [map_parent_dt_spec, map_seg_segCountDown_dt_spec,
+        return [map_parent_dt_spec, self.make_map_seg_segCountDown_dt_spec(),
                 map_frameIndex_ruler_dt_spec,
-                map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec]
+                self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec()]
 
     def make_dt_spec(self):
         return make_spec("DT", self.make_items_dt())
