@@ -32,7 +32,7 @@ from genomedata import Genome
 from numpy import (add, amin, amax, append, arange, array, column_stack,
                    diagflat, empty, finfo, float32, intc, invert,
                    isnan, NINF, ones, outer, s_, sqrt, square, tile,
-                   vectorize, zeros)
+                   vectorize, where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
 from optbuild import (Mixin_NoConvertUnderscore,
@@ -158,6 +158,10 @@ POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
 ## defaults
 RANDOM_STARTS = 1
+
+# self->self, self->other
+PROBS_FORCE_TRANSITION = array([0.0, 1.0])
+PROBS_PREVENT_TRANSITION = array([1.0, 0.0])
 
 # replace NAN with SENTINEL to avoid warnings
 # XXX: replace with something negative and outlandish again
@@ -1040,11 +1044,16 @@ class Runner(object):
 
         self.seg_table = table
 
+        starts = table[:, OFFSET_START]
         ends = table[:, OFFSET_END]
         steps = table[:, OFFSET_STEP]
 
+        # starts and ends must all be divisible by steps
+        assert not (starts % steps).nonzero()
+        assert not (ends % steps).nonzero()
+
         # floor division
-        max_seg_countdown_by_labels = ends // steps
+        max_seg_countdown_by_labels = (starts + ends) // steps
 
         self.card_seg_countdown = max_seg_countdown_by_labels.max() + 1
 
@@ -1837,18 +1846,32 @@ class Runner(object):
     def make_dense_cpt_segCountDown_seg_segTransition(self):
         card_seg_countdown = self.card_seg_countdown
 
-        res = zeros((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
+        # by default, when segCountDown is high, never transition
+        res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
 
+        # set probs_allow_transition
         prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
         prob_self_other = 1.0 - prob_self_self
+        probs_allow_transition = array([prob_self_self, prob_self_other])
 
-        # when segCountDown == 0, allow the possibility of transition
-        res[0, :, 0] = prob_self_self
-        res[0, :, 1] = prob_self_other
+        # find the labels with maximum segment lengths and those without
+        table = self.seg_table
+        ends = table[:, OFFSET_END]
+        bitmap_without_maximum = ends == 0
+        labels_with_maximum = where(~bitmap_without_maximum)
+        labels_without_maximum = where(bitmap_without_maximum)
 
-        # when segCountDown != 0, never transition
-        if card_seg_countdown > 1:
-            res[1:, :, 0] = 1.0
+        # labels without a maximum
+        res[0, labels_without_maximum] = probs_allow_transition
+        res[1:, labels_without_maximum] = PROBS_PREVENT_TRANSITION
+
+        # labels with a maximum
+        res[0, labels_with_maximum] = PROBS_FORCE_TRANSITION
+        for label in labels_with_maximum:
+            minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
+
+            res[1:minimum, label] = probs_allow_transition
+            res[minimum:, label] = PROBS_PREVENT_TRANSITION
 
         return res
 
@@ -1995,12 +2018,15 @@ class Runner(object):
         lines = [" ".join(header)]
 
         for seg in xrange(num_segs):
-            table_row = table[seg]
-            end = table_row[OFFSET_END]
-            step = table_row[OFFSET_STEP]
+            start, end, step = table[seg]
 
-            assert not end % step # end MOD step == 0; must be exact division
-            segCountDown_value = end // step # floor division
+            segCountDown_value_numerator = start + end
+
+            # require exact division
+            assert not segCountDown_value_numerator % step
+
+            # floor division
+            segCountDown_value = segCountDown_value_numerator // step
 
             lines.append("    -1 { %d }" % segCountDown_value)
 

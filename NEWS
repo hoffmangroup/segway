@@ -8,8 +8,10 @@
 * new segway-layer program changes the format of segway.bed.gz to
   something that is more intuitive for large numbers of labels, using
   thick/thin lines
-* segway: remove unused --resource-profile option
-* segway: add --seg-table option to describe segment hyperparameters
+* segway: remove now-unused --resource-profile option
+* segway: add --seg-table option to describe segment hyperparameters,
+  including different minimum segment lengths for each label
+* remove --min-seg-len
 
 0.1.10:
 
