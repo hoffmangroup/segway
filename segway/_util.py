@@ -97,7 +97,7 @@ def Session(*args, **kwargs):
 
     res = _Session()
 
-    assert res.DRMSInfo.startswith(DRMSINFO_PREFIX)
+    assert res.drmsInfo.startswith(DRMSINFO_PREFIX)
 
     return res
 

@@ -71,9 +71,9 @@ COVAR_METHODS = [COVAR_METHOD_MAX_RANGE, COVAR_METHOD_ML_JITTER,
                  COVAR_METHOD_ML]
 COVAR_METHOD = COVAR_METHOD_ML
 
+MAX_WEIGHT_SCALE = 25
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
-MIN_SEG_LEN = 0
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
@@ -864,7 +864,6 @@ class Runner(object):
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
-        self.min_seg_len = MIN_SEG_LEN
 
         # flags
         self.clobber = False
@@ -904,7 +903,6 @@ class Runner(object):
         res.len_seg_strength = options.prior_strength
         res.include_tracknames = options.track
         res.verbosity = options.verbosity
-        res.min_seg_len = options.min_seg_length
         res.num_segs = options.num_segs
 
         res.clobber = options.clobber
@@ -1004,9 +1002,10 @@ class Runner(object):
 
         num_segs = self.num_segs
         if isinstance(num_segs, slice):
+            # XXX: wait, what if the step isn't 1?
             num_segs = num_segs.end-1
 
-        table = zeros((num_segs, SEG_TABLE_WIDTH))
+        table = zeros((num_segs, SEG_TABLE_WIDTH), dtype=int)
         table[:, OFFSET_STEP] = RULER_SCALE
 
         with open(filename) as infile:
@@ -1019,6 +1018,10 @@ class Runner(object):
                 label = row["label"]
                 label_slice = str2slice_or_int(label)
 
+                if isinstance(label_slice, slice) and label_slice.stop is None:
+                    label_slice = slice(label_slice.start, num_segs,
+                                        label_slice.step)
+
                 table_row_indexes = slice2range(label_slice)
 
                 # get slice
@@ -1026,7 +1029,7 @@ class Runner(object):
 
                 assert len_slice.step == RULER_SCALE
 
-                len_tuple = (len_slice.start, len_slice.stop, len_slice.end)
+                len_tuple = (len_slice.start, len_slice.stop, len_slice.step)
                 len_row = zeros((SEG_TABLE_WIDTH))
 
                 for item_index, item in enumerate(len_tuple):
@@ -1036,6 +1039,14 @@ class Runner(object):
                 table[table_row_indexes] = len_row
 
         self.seg_table = table
+
+        ends = table[:, OFFSET_END]
+        steps = table[:, OFFSET_STEP]
+
+        # floor division
+        max_seg_countdown_by_labels = ends // steps
+
+        self.card_seg_countdown = max_seg_countdown_by_labels.max() + 1
 
     def generate_tmpl_mappings(self, segnames=None, tracknames=None):
         if segnames is None:
@@ -1261,18 +1272,11 @@ class Runner(object):
     def save_include(self):
         num_segs = self.num_segs
 
-        min_seg_len = self.min_seg_len
-
-        # XXX: should allow shifting of the ruler scale variable
-        assert min_seg_len % RULER_SCALE == 0
-        card_seg_countdown = (min_seg_len // RULER_SCALE) + 1
-        self.card_seg_countdown = card_seg_countdown
-
         if isinstance(num_segs, slice):
             num_segs = "undefined\n#error must define CARD_SEG"
 
         mapping = dict(card_seg=num_segs,
-                       card_segCountDown=card_seg_countdown,
+                       card_segCountDown=self.card_seg_countdown,
                        card_frameIndex=MAX_FRAMES,
                        ruler_scale=RULER_SCALE)
 
@@ -1289,7 +1293,6 @@ class Runner(object):
         tracknames = self.tracknames
         num_tracks = self.num_tracks
         num_datapoints = self.num_datapoints
-        min_seg_len = self.min_seg_len
 
         if self.use_dinucleotide:
             max_num_datapoints_track = sum(self.chunk_lens)
@@ -1305,10 +1308,12 @@ class Runner(object):
             # becomes easier to mix and match different tracks without
             # changing the weights of any of them
 
-            # weight scale cannot be more than min_seg_len to avoid
+            # XXX: this should be done based on the minimum seg len in
+            # the seg table instead
+            # weight scale cannot be more than MAX_WEIGHT_SCALE to avoid
             # artifactual problems
             weight_scale = min(max_num_datapoints_track / num_datapoints_track,
-                               min_seg_len)
+                               MAX_WEIGHT_SCALE)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
@@ -1754,17 +1759,6 @@ class Runner(object):
         """
         return diagflat(ones(self.num_segs-1), 1)
 
-    def get_first_seg_indexes(self):
-        # min_seg_len = 2, num_segs = 3
-        # => array([1, 3, 5])
-        return arange(0, self.num_segs, self.min_seg_len)
-
-    def get_final_seg_indexes(self):
-        # => array([0, 2, 4])
-        min_seg_len = self.min_seg_len
-
-        return arange(min_seg_len - 1, self.num_segs, min_seg_len)
-
     def add_final_probs_to_cpt(self, cpt):
         """
         modifies original input
@@ -1835,7 +1829,6 @@ class Runner(object):
         return outer(acgt, acgt).ravel()
 
     def make_dense_cpt_seg_dinucleotide_spec(self):
-        # XXX: need to make this work for a bigger min_seg_len, appropriately tied
         table = [self.make_dinucleotide_table_row()
                  for seg_index in xrange(self.num_segs)]
 
@@ -1995,10 +1988,11 @@ class Runner(object):
         num_segs = self.num_segs
         table = self.seg_table
 
-        header = ([num_segs] + [num_seg for num_seg in xrange(num_segs-1)] +
+        header = ([str(num_segs)] +
+                  [str(num_seg) for num_seg in xrange(num_segs-1)] +
                   ["default"])
 
-        lines = [" ".join(header), ""]
+        lines = [" ".join(header)]
 
         for seg in xrange(num_segs):
             table_row = table[seg]
@@ -2006,7 +2000,7 @@ class Runner(object):
             step = table_row[OFFSET_STEP]
 
             assert not end % step # end MOD step == 0; must be exact division
-            segCountDown_value = end / step
+            segCountDown_value = end // step # floor division
 
             lines.append("    -1 { %d }" % segCountDown_value)
 
@@ -3152,11 +3146,6 @@ def parse_options(args):
                          default=NUM_SEGS, metavar="SLICE",
                          help="make SLICE segment classes"
                          " (default %d)" % NUM_SEGS)
-
-        group.add_option("--min-seg-length", type=int,
-                         default=MIN_SEG_LEN, metavar="NUM",
-                         help="enforce minimum segment length of NUM"
-                         " (default %d)" % MIN_SEG_LEN)
 
         group.add_option("--prior-strength", type=float,
                          default=PRIOR_STRENGTH, metavar="RATIO",
