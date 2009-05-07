@@ -10,7 +10,7 @@
   thick/thin lines
 * segway: remove now-unused --resource-profile option
 * segway: add --seg-table option to describe segment hyperparameters,
-  including different minimum segment lengths for each label
+  including different minimum and maximum segment lengths for each label
 * remove --min-seg-len
 
 0.1.10:

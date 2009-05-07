@@ -32,7 +32,7 @@ from genomedata import Genome
 from numpy import (add, amin, amax, append, arange, array, column_stack,
                    diagflat, empty, finfo, float32, intc, invert,
                    isnan, NINF, ones, outer, s_, sqrt, square, tile,
-                   vectorize, where, zeros)
+                   vectorize, vstack, where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
 from optbuild import (Mixin_NoConvertUnderscore,
@@ -1048,14 +1048,26 @@ class Runner(object):
         ends = table[:, OFFSET_END]
         steps = table[:, OFFSET_STEP]
 
+        # XXX: need to assert that ends are either 0 or are always
+        # greater than starts
+
         # starts and ends must all be divisible by steps
-        assert not (starts % steps).nonzero()
-        assert not (ends % steps).nonzero()
+        assert not (starts % steps).any()
+        assert not (ends % steps).any()
 
-        # floor division
-        max_seg_countdown_by_labels = (starts + ends) // steps
+        # // = floor division
+        seg_countdowns_start = starts // steps
 
-        self.card_seg_countdown = max_seg_countdown_by_labels.max() + 1
+        # need minus one to guarantee maximum
+        seg_countdowns_end = (ends // steps) - 1
+
+        seg_countdowns_both = vstack([seg_countdowns_start,
+                                      seg_countdowns_end])
+
+        seg_countdowns_initial = seg_countdowns_both.max(axis=0)
+
+        self.seg_countdowns_initial = seg_countdowns_initial
+        self.card_seg_countdown = seg_countdowns_initial.max() + 1
 
     def generate_tmpl_mappings(self, segnames=None, tracknames=None):
         if segnames is None:
@@ -1858,20 +1870,27 @@ class Runner(object):
         table = self.seg_table
         ends = table[:, OFFSET_END]
         bitmap_without_maximum = ends == 0
-        labels_with_maximum = where(~bitmap_without_maximum)
-        labels_without_maximum = where(bitmap_without_maximum)
+
+        # where() returns a tuple; this unpacks it
+        labels_with_maximum, = where(~bitmap_without_maximum)
+        labels_without_maximum, = where(bitmap_without_maximum)
 
         # labels without a maximum
         res[0, labels_without_maximum] = probs_allow_transition
         res[1:, labels_without_maximum] = PROBS_PREVENT_TRANSITION
 
         # labels with a maximum
+        seg_countdowns_initial = self.seg_countdowns_initial
+
         res[0, labels_with_maximum] = PROBS_FORCE_TRANSITION
         for label in labels_with_maximum:
+            seg_countdown_initial = seg_countdowns_initial[label]
             minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
 
-            res[1:minimum, label] = probs_allow_transition
-            res[minimum:, label] = PROBS_PREVENT_TRANSITION
+            seg_countdown_allow = seg_countdown_initial - minimum + 1
+
+            res[1:seg_countdown_allow, label] = probs_allow_transition
+            res[seg_countdown_allow:, label] = PROBS_PREVENT_TRANSITION
 
         return res
 
@@ -2010,6 +2029,7 @@ class Runner(object):
     def make_segCountDown_tree_spec(self, resourcename):
         num_segs = self.num_segs
         table = self.seg_table
+        seg_countdowns_initial = self.seg_countdowns_initial
 
         header = ([str(num_segs)] +
                   [str(num_seg) for num_seg in xrange(num_segs-1)] +
@@ -2017,18 +2037,8 @@ class Runner(object):
 
         lines = [" ".join(header)]
 
-        for seg in xrange(num_segs):
-            start, end, step = table[seg]
-
-            segCountDown_value_numerator = start + end
-
-            # require exact division
-            assert not segCountDown_value_numerator % step
-
-            # floor division
-            segCountDown_value = segCountDown_value_numerator // step
-
-            lines.append("    -1 { %d }" % segCountDown_value)
+        for seg, seg_countdown_initial in enumerate(seg_countdowns_initial):
+            lines.append("    -1 { %d }" % seg_countdown_initial)
 
         tree = "\n".join(lines)
 
