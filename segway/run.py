@@ -422,7 +422,7 @@ class NewLine(NoAdvance):
     """
     add a line rather than replacing existing
     """
-    # doesn't actually have any code. used slowly for class identification
+    # doesn't actually have any code. used solely for class identification
 
 def rewrite_strip_comments(infile, outfile):
     """
