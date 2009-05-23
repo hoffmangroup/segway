@@ -778,7 +778,7 @@ def rewrite_cliques(rewriter, frame):
 
 def make_mem_req(mem_usage):
     # don't double the usage during calibration
-    # XXX: this doesn't work, I think the linear stuff is adde
+    # XXX: this doesn't work, I think the linear stuff is added
     if mem_usage == MEM_USAGE_LIMIT:
         mem_usage_multiplier = 1
     else:
