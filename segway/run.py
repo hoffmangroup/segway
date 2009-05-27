@@ -893,16 +893,25 @@ class RestartableJobDict(dict):
             for jobid in jobids:
                 job_state = session.jobStatus(jobid)
 
-                if job_state == FAILED:
-                    self.requeue(self[jobid])
-
                 if job_state == DONE:
+                    # XXX: is this an SGE or DRMAA bug? shouldn't a
+                    # non-zero exit status be a failure? or is that
+                    # just LSF?
                     job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
-                    print >>sys.stderr, job_info
+                    resource_usage = job_info.resourceUsage
 
-                if job_state in set([DONE, FAILED]):
-                    del self[jobid]
+                    # XXX: temporary workaround
+                    # http://code.google.com/p/drmaa-python/issues/detail?id=4
+                    exit_status = int(float(resource_usage["exit_status"]))
+
+                    if not exit_status:
+                        continue
+                elif job_state != FAILED:
                     continue
+
+                # if not explicitly continued, then requeue
+                self.requeue(self[jobid])
+                del self[jobid]
 
             jobids = self.keys()
 
