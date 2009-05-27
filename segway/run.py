@@ -47,6 +47,17 @@ from ._util import (constant, data_filename, data_string, DTYPE_OBS_INT,
                     NamedTemporaryDir, OptionBuilder_GMTK, PKG, Session,
                     VITERBI_PROG)
 
+# XXXXXXXX: monkey-patching, dirty hack to fix broken code
+
+import drmaa.const
+
+def status_to_string(status):
+    return drmaa.const._JOB_PS[status]
+
+drmaa.const.status_to_string = status_to_string
+
+# XXXXXXXX: end monkey-patching
+
 # XXX: I should really get some sort of Enum for this, I think Peter
 # Norvig has one
 DISTRIBUTION_NORM = "norm"
@@ -145,16 +156,18 @@ NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 
+MB = 2**20
+GB = 2**30
+
 # minimum number of frames to test memory usage, must be sufficiently
 # long to get an accurate count
 MIN_FRAMES_MEM_USAGE = 500000 # 500,000
 MAX_FRAMES = 2000000 # 2 million
-MEM_USAGE_LIMIT = 15*2**30 # 15 GB
-MEM_USAGE_BUNDLE = 100000000 # 100M; XXX: should be included in calibration
+MEM_USAGE_BUNDLE = 100*MB # XXX: should be included in calibration
 RES_REQ_IDS = ["mem_requested", "h_vmem"] # h_vmem: hard ulimit
 ALWAYS_MAX_MEM_USAGE = True
 
-MEM_USAGE_PROGRESSION = array([2, 4, 6, 8, 10, 12, 14, 15]) * 2**30
+MEM_USAGE_PROGRESSION = "2,4,6,8,10,12,14,15"
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -482,11 +495,10 @@ def slice2range(s):
     return xrange(start, stop, step)
 
 def make_res_req(mem_usage):
-    # round up to the next gibibyte
-    mem_usage_gibibytes = ceil(mem_usage / 2**30)
-    mem_usage_mebibytes = mem_usage_gibibytes * 2**10
+    # round up to the next mebibyte
+    mem_usage_mebibytes = ceil(mem_usage / MB)
 
-    mem_requested = "%dG" % mem_usage_gibibytes
+    mem_requested = "%dM" % mem_usage_mebibytes
     h_vmem = "%dM" % (mem_usage_mebibytes - H_VMEM_GUARD)
 
     return ["mem_requested=%s" % mem_requested,
@@ -790,7 +802,7 @@ def rewrite_cliques(rewriter, frame):
 
 def make_mem_req(mem_usage):
     # double usage at this point
-    mem_usage_gibibytes = ceil(mem_usage / 2**30)
+    mem_usage_gibibytes = ceil(mem_usage / GB)
 
     return "%dG" % mem_usage_gibibytes
 
@@ -801,12 +813,14 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
     ends[next_index:next_index] = new_ends
 
 class RestartableJob(object):
-    def __init__(self, session, job_template, mem_usage=None):
+    def __init__(self, session, job_template, mem_usage_progression,
+                 mem_usage=None):
         self.session = session
         self.job_template = job_template
+        self.mem_usage_progression = mem_usage_progression
 
         if mem_usage is None:
-            self.mem_usage = MEM_USAGE_PROGRESSION[0]
+            self.mem_usage = mem_usage_progression[0]
         else:
             # XXX allow a hint later, but for now I want to ensure all
             # the old code is gone
@@ -815,9 +829,11 @@ class RestartableJob(object):
     def run(self):
         mem_usage = self.mem_usage
 
-        if mem_usage > MEM_USAGE_LIMIT:
+        mem_usage_limit = self.mem_usage_progression[-1]
+
+        if mem_usage > self.mem_usage_progression[-1]:
             msg = "request of %d memory, which is greater than " \
-                "MEM_USAGE_LIMIT" % (mem_usage)
+                "limit of %d" % (mem_usage, mem_usage_limit)
 
             raise ValueError(msg)
 
@@ -830,13 +846,15 @@ class RestartableJob(object):
 
         assert res
 
+        print >>sys.stderr, "queued %s (%s)" % (res, " ".join(res_req))
+
         return res
 
     def rerun(self):
         curr_mem_usage = self.mem_usage
 
         # inefficient but this is probably temporary code anyway
-        for mem_usage in MEM_USAGE_PROGRESSION:
+        for mem_usage in self.mem_usage_progression:
             if curr_mem_usage < mem_usage:
                 self.mem_usage = mem_usage
                 return self.run()
@@ -878,7 +896,11 @@ class RestartableJobDict(dict):
                 if job_state == FAILED:
                     self.requeue(self[jobid])
 
-                if job_state in set(DONE, FAILED):
+                if job_state == DONE:
+                    job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
+                    print >>sys.stderr, job_info
+
+                if job_state in set([DONE, FAILED]):
                     del self[jobid]
                     continue
 
@@ -996,6 +1018,9 @@ class Runner(object):
         res.include_tracknames = options.track
         res.verbosity = options.verbosity
         res.num_segs = options.num_segs
+
+        mem_usage_list = map(float, options.mem_usage.split(","))
+        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int) # XXX: should do a ceil first
 
         res.clobber = options.clobber
         res.train = not options.no_train
@@ -2473,7 +2498,8 @@ class Runner(object):
 
         set_cwd_job_tmpl(job_tmpl)
 
-        return RestartableJob(session, job_tmpl, mem_usage)
+        return RestartableJob(session, job_tmpl, self.mem_usage_progression,
+                              mem_usage)
 
     def queue_train(self, start_index, round_index, chunk_index,
                     mem_usage=None, **kwargs):
@@ -3092,6 +3118,12 @@ def parse_options(args):
                          help="use RATIO times the number of data counts as"
                          " the number of pseudocounts for the segment length"
                          " prior (default %d)" % PRIOR_STRENGTH)
+
+        group.add_option("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
+                         metavar="PROGRESSION",
+                         help="try each float in PROGRESSION as the number "
+                         "of gibibytes of memory to allocate in turn "
+                         "(default %s)" % MEM_USAGE_PROGRESSION)
 
         group.add_option("-v", "--verbosity", type=int, default=VERBOSITY,
                          metavar="NUM",
