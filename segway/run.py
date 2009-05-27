@@ -27,7 +27,7 @@ import sys
 from threading import Event, Thread
 from uuid import uuid1
 
-from drmaa import JobControlAction
+from drmaa import JobControlAction, JobState
 from genomedata import Genome
 from numpy import (add, amin, amax, append, arange, array, column_stack,
                    diagflat, empty, finfo, float32, intc, invert,
@@ -153,6 +153,8 @@ MEM_USAGE_LIMIT = 15*2**30 # 15 GB
 MEM_USAGE_BUNDLE = 100000000 # 100M; XXX: should be included in calibration
 RES_REQ_IDS = ["mem_requested", "h_vmem"] # h_vmem: hard ulimit
 ALWAYS_MAX_MEM_USAGE = True
+
+MEM_USAGE_PROGRESSION = array([2, 4, 6, 8, 10, 12, 14, 15]) * 2**30
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -332,6 +334,9 @@ FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%s step=1"
 
 CARD_SEGTRANSITION = 2
 
+# MiB of guard space to prevent going over mem_requested allocation
+H_VMEM_GUARD = 10
+
 # training results
 # XXX: this should really be a namedtuple, yuck
 OFFSET_NUM_SEGS = 1
@@ -347,6 +352,9 @@ OFFSET_STEP = 2
 UUID = uuid1().hex
 
 TERMINATE = JobControlAction.TERMINATE
+
+FAILED = JobState.FAILED
+DONE = JobState.DONE
 
 ## exceptions
 class ChunkOverMemUsageLimit(Exception):
@@ -473,12 +481,16 @@ def slice2range(s):
 
     return xrange(start, stop, step)
 
-def make_res_req(size):
-    res = []
-    for res_req_id in RES_REQ_IDS:
-        res.append("%s=%s" % (res_req_id, size))
+def make_res_req(mem_usage):
+    # round up to the next gibibyte
+    mem_usage_gibibytes = ceil(mem_usage / 2**30)
+    mem_usage_mebibytes = mem_usage_gibibytes * 2**10
 
-    return res
+    mem_requested = "%dG" % mem_usage_gibibytes
+    h_vmem = "%dM" % (mem_usage_mebibytes - H_VMEM_GUARD)
+
+    return ["mem_requested=%s" % mem_requested,
+            "h_vmem=%s" % h_vmem]
 
 def convert_chunks(attrs, name):
     supercontig_start = attrs.start
@@ -777,24 +789,100 @@ def rewrite_cliques(rewriter, frame):
     return orig_num_cliques
 
 def make_mem_req(mem_usage):
-    # don't double the usage during calibration
-    # XXX: this doesn't work, I think the linear stuff is added
-    if mem_usage == MEM_USAGE_LIMIT:
-        mem_usage_multiplier = 1
-    else:
-        mem_usage_multiplier = MEM_USAGE_MULTIPLIER
-
     # double usage at this point
     mem_usage_gibibytes = ceil(mem_usage / 2**30)
-    mem_usage_gibibytes_adjusted = mem_usage_multiplier * mem_usage_gibibytes
 
-    return "%dG" % mem_usage_gibibytes_adjusted
+    return "%dG" % mem_usage_gibibytes
 
 def update_starts(starts, ends, new_starts, new_ends, start_index):
     next_index = start_index + 1
 
     starts[next_index:next_index] = new_starts
     ends[next_index:next_index] = new_ends
+
+class RestartableJob(object):
+    def __init__(self, session, job_template, mem_usage=None):
+        self.session = session
+        self.job_template = job_template
+
+        if mem_usage is None:
+            self.mem_usage = MEM_USAGE_PROGRESSION[0]
+        else:
+            # XXX allow a hint later, but for now I want to ensure all
+            # the old code is gone
+            raise NotImplementedError
+
+    def run(self):
+        mem_usage = self.mem_usage
+
+        if mem_usage > MEM_USAGE_LIMIT:
+            msg = "request of %d memory, which is greater than " \
+                "MEM_USAGE_LIMIT" % (mem_usage)
+
+            raise ValueError(msg)
+
+        res_req = make_res_req(mem_usage)
+
+        job_template = self.job_template
+        job_template.nativeSpecification = make_native_spec(l=res_req)
+
+        res = self.session.runJob(job_template)
+
+        assert res
+
+        return res
+
+    def rerun(self):
+        curr_mem_usage = self.mem_usage
+
+        # inefficient but this is probably temporary code anyway
+        for mem_usage in MEM_USAGE_PROGRESSION:
+            if curr_mem_usage < mem_usage:
+                self.mem_usage = mem_usage
+                return self.run()
+
+        raise ValueError("edge of memory usage progression reached "
+                         "without success")
+
+class RestartableJobDict(dict):
+    def __init__(self, session, *args, **kwargs):
+        self.session = session
+
+        return dict.__init__(self, *args, **kwargs)
+
+    # XXX: duplicative
+    def queue(self, restartable_job):
+        jobid = restartable_job.run()
+
+        self[jobid] = restartable_job
+
+    def requeue(self, restartable_job):
+        jobid = restartable_job.rerun()
+
+        self[jobid] = restartable_job
+
+    def wait(self):
+        session = self.session
+
+        jobids = self.keys()
+
+        while jobids:
+            # return indicates that at least one job has completed
+            session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER,
+                                dispose=False)
+
+            # then we have to check each job individually
+            for jobid in jobids:
+                job_state = session.jobStatus(jobid)
+
+                if job_state == FAILED:
+                    self.requeue(self[jobid])
+
+                if job_state in set(DONE, FAILED):
+                    del self[jobid]
+                    continue
+
+            jobids = self.keys()
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, num_segs):
@@ -878,7 +966,7 @@ class Runner(object):
         self.identify = True # viterbi
         self.dry_run = False
         self.use_dinucleotide = None
-        self.skip_large_mem_usage = False
+        self.skip_large_mem_usage = False # XXX: should be removed, it was for segway-res-usage
         self.split_sequences = False
 
         # functions
@@ -1481,6 +1569,10 @@ class Runner(object):
         max_col = track_indexes.max() + 1
         col_slice = s_[min_col:max_col]
 
+        # XXX: doesn't work with new memory managment regime
+        # need to instead fix a memory usage and see what fits in there
+        assert not self.split_sequences
+
         mem_per_obs_undefined = None in (self.mem_per_obs[prog.prog]
                                          for prog in self.get_progs_used())
         calibrating_mem_usage = self.split_sequences and mem_per_obs_undefined
@@ -1623,47 +1715,6 @@ class Runner(object):
                     if not MIN_FRAMES <= num_frames:
                         text = " skipping short segment of length %d" % num_frames
                         print >>sys.stderr, text
-                        continue
-
-                    # check that this sequence can fit into all of the
-                    # programs that will be used
-                    max_mem_usage = self.get_max_mem_usage(num_frames)
-
-                    too_much_mem = max_mem_usage > MEM_USAGE_LIMIT
-                    too_many_frames = num_frames > MAX_FRAMES
-
-                    if too_much_mem or too_many_frames:
-                        if not self.split_sequences:
-                            if too_much_mem:
-                                msg = "chunk of length %d will take %d" \
-                                    " memory, which is greater than" \
-                                    " MEM_USAGE_LIMIT" % (num_frames,
-                                                          max_mem_usage)
-                            else:
-                                msg = "chunk of length %d greater than" \
-                                    " MAX_FRAMES" % num_frames
-
-                            raise ValueError(msg)
-
-                        # XXX: I really ought to check that this is
-                        # going to always work even for corner cases,
-                        # but if it doesn't I am saved by another
-                        # split later on
-
-                        # split_sequences was True, so split them
-                        num_new_starts_mem = max_mem_usage / MEM_USAGE_LIMIT
-                        num_new_starts_frames = num_frames / MAX_FRAMES
-                        num_new_starts = int(ceil(max(num_new_starts_mem,
-                                                      num_new_starts_frames)))
-
-                        # // means floor division
-                        offset = (num_frames // num_new_starts)
-                        new_offsets = arange(num_new_starts) * offset
-                        new_starts = start + new_offsets
-                        new_ends = append(new_starts[1:], end)
-
-                        update_starts(starts, ends, new_starts, new_ends,
-                                      start_index)
                         continue
 
                     # start: relative to beginning of chromosome
@@ -2355,50 +2406,6 @@ class Runner(object):
 
         return res
 
-    def _get_mem_usage(self, chunk_len, prog=EM_TRAIN_PROG):
-        """
-        returns an int
-        """
-        print >>sys.stderr, "estimating mem usage for size %s..." % chunk_len
-        mem_per_obs = self.mem_per_obs[prog.prog]
-
-        # assume maximum memory usage until returned results say otherwise
-        if mem_per_obs is None:
-            print >>sys.stderr, "MEM_USAGE_LIMIT = %s" % MEM_USAGE_LIMIT
-            return MEM_USAGE_LIMIT
-
-        if ISLAND:
-            linear_size = self.get_linear_size(chunk_len, prog.prog)
-
-            inference_size = mem_per_obs * log(chunk_len)
-
-            print >>sys.stderr, "inference_size: %s" % inference_size
-
-            res = (linear_size * LINEAR_MEM_USAGE_MULTIPLIER) + inference_size
-        else:
-            res = mem_per_obs * chunk_len
-
-        print >>sys.stderr, "mem_usage(%s, %s): %s" % (chunk_len, prog.prog,
-                                                       res)
-
-        return res
-
-    def get_mem_usage(self, chunk_len, *args, **kwargs):
-        res = self._get_mem_usage(chunk_len, *args, **kwargs)
-
-        if res > MEM_USAGE_LIMIT:
-            msg = "chunk of length %d will take %d memory," \
-                " which is greater than MEM_USAGE_LIMIT of %d" \
-                % (chunk_len, res, MEM_USAGE_LIMIT)
-
-            raise ValueError(msg)
-
-        return res
-
-    def get_max_mem_usage(self, num_frames):
-        return max(self._get_mem_usage(num_frames, prog)
-                   for prog in self.get_progs_used())
-
     def make_chunk_lens(self):
         self.chunk_lens = [end - start
                            for chr, start, end in self.chunk_coords]
@@ -2433,18 +2440,8 @@ class Runner(object):
 
         return model_penalty - (2/self.num_bases * log_likelihood)
 
-    def queue_gmtk(self, prog, kwargs, job_name, mem_usage, native_specs={},
-                   output_filename=None, prefix_args=[]):
-        if mem_usage > MEM_USAGE_LIMIT:
-            msg = "%s with a request of %d memory, which is greater" \
-                " than MEM_USAGE_LIMIT" % (prog.prog, mem_usage)
-
-            if self.skip_large_mem_usage:
-                print >>sys.stderr, "skipping " + msg
-                return
-
-            raise ValueError("won't queue " + msg)
-
+    def queue_gmtk(self, prog, kwargs, job_name, mem_usage=None,
+                      output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         # convoluted so I don't have to deal with a lot of escaping issues
@@ -2476,14 +2473,10 @@ class Runner(object):
 
         set_cwd_job_tmpl(job_tmpl)
 
-        res_req = make_res_req(make_mem_req(mem_usage))
-        job_tmpl.nativeSpecification = make_native_spec(l=res_req,
-                                                        **native_specs)
+        return RestartableJob(session, job_tmpl, mem_usage)
 
-        return session.runJob(job_tmpl)
-
-    def queue_train(self, start_index, round_index,
-                    chunk_index, mem_usage, hold_jid=None, **kwargs):
+    def queue_train(self, start_index, round_index, chunk_index,
+                    mem_usage=None, **kwargs):
         """
         this calls Runner.queue_gmtk() and returns None if the
         mem_usage is too large, and self.skip_large_mem_usage is True.
@@ -2494,28 +2487,16 @@ class Runner(object):
         prog = self.train_prog
         name = self.make_job_name_train(start_index, round_index, chunk_index)
 
-        native_specs = {}
-        if hold_jid:
-            native_specs["hold_jid"] = hold_jid
-
-        return self.queue_gmtk(prog, kwargs, name, mem_usage, native_specs)
+        return self.queue_gmtk(prog, kwargs, name, mem_usage)
 
     def queue_train_parallel(self, input_params_filename, start_index,
                              round_index, **kwargs):
-        queue_train_custom = partial(self.queue_train, start_index,
-                                     round_index)
+        kwargs["cppCommandOptions"] = make_cpp_options(input_params_filename,
+                                                       card_seg=self.num_segs)
 
-        kwargs["cppCommandOptions"] = \
-            make_cpp_options(input_params_filename, card_seg=self.num_segs)
+        res = RestartableJobDict(self.session)
 
-        res = [] # task ids
-
-        prog = EM_TRAIN_PROG.prog
-
-        # first round is done smallest chunk first
-        reverse = self.mem_per_obs[prog] is not None
-
-        for chunk_index, chunk_len in self.chunk_lens_sorted(reverse):
+        for chunk_index, chunk_len in self.chunk_lens_sorted():
             acc_filename = self.make_acc_filename(start_index, chunk_index)
             kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
@@ -2523,27 +2504,13 @@ class Runner(object):
             # -dirichletPriors T only on the first chunk
             kwargs_chunk["dirichletPriors"] = (chunk_index == 0)
 
-            # reread it here so that it can be reset in the middle of
-            # the stream
-            mem_usage = self.get_mem_usage(chunk_len)
-            jobid = queue_train_custom(chunk_index, mem_usage, **kwargs_chunk)
-
-            assert jobid is not None
-
-            if self.mem_per_obs[prog] is None:
-                self.wait_job(jobid)
-
-                self.set_mem_per_obs(jobid, chunk_len, prog)
-
-                # don't need to wait for this jobid again, so it's not
-                # appended to res
-            else:
-                res.append(jobid)
+            restartable_job = self.queue_train(start_index, round_index,
+                                               chunk_index, **kwargs_chunk)
+            res.queue(restartable_job)
 
         return res
 
-    def queue_train_bundle(self, parallel_jobids,
-                           input_params_filename, output_params_filename,
+    def queue_train_bundle(self, input_params_filename, output_params_filename,
                            start_index, round_index, **kwargs):
         """bundle step: take parallel accumulators and combine them
         """
@@ -2554,22 +2521,20 @@ class Runner(object):
                                        output_params_filename,
                                        card_seg=self.num_segs)
 
-        kwargs = \
-            dict(outputMasterFile=self.output_master_filename,
-                 cppCommandOptions=cpp_options,
-                 trrng="nil",
-                 loadAccRange="0:%s" % (self.num_chunks-1),
-                 loadAccFile=acc_filename,
-                 **kwargs)
+        kwargs = dict(outputMasterFile=self.output_master_filename,
+                      cppCommandOptions=cpp_options,
+                      trrng="nil",
+                      loadAccRange="0:%s" % (self.num_chunks-1),
+                      loadAccFile=acc_filename,
+                      **kwargs)
 
-        if self.dry_run:
-            hold_jid = None
-        else:
-            hold_jid = ",".join(parallel_jobids)
+        restartable_job = self.queue_train(start_index, round_index,
+                                           NAME_BUNDLE_PLACEHOLDER, **kwargs)
 
-        return self.queue_train(start_index, round_index,
-                                NAME_BUNDLE_PLACEHOLDER, MEM_USAGE_BUNDLE,
-                                hold_jid, **kwargs)
+        res = RestartableJobDict(self.session)
+        res.queue(restartable_job)
+
+        return res
 
     def save_posterior_triangulation(self):
         infilename = self.triangulation_filename
@@ -2664,25 +2629,19 @@ class Runner(object):
         last_params_filename = self.last_params_filename
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
-        parallel_jobids = \
+        restartable_jobs = \
             self.queue_train_parallel(last_params_filename, start_index,
                                       round_index, **kwargs)
+        restartable_jobs.wait()
 
-        # will be None if mem_usage > MEM_USAGE_LIMIT and
-        # self.skip_large_mem_usage
-        bundle_jobid = \
-            self.queue_train_bundle(parallel_jobids, last_params_filename,
-                                    curr_params_filename, start_index,
-                                    round_index,
+        restartable_jobs = \
+            self.queue_train_bundle(last_params_filename, curr_params_filename,
+                                    start_index, round_index,
                                     llStoreFile=self.log_likelihood_filename,
                                     **kwargs)
+        restartable_jobs.wait()
 
         self.last_params_filename = curr_params_filename
-
-        if self.dry_run:
-            return False
-
-        return self.wait_job(bundle_jobid, parallel_jobids)
 
     def set_calc_info_criterion(self):
         if self.num_free_params is None:
@@ -2721,9 +2680,9 @@ class Runner(object):
 
         while (round_index < self.max_em_iters and
                is_training_progressing(last_log_likelihood, log_likelihood)):
-            round_res = self.run_train_round(start_index, round_index,
-                                             **kwargs)
-            if round_res is not None:
+            self.run_train_round(start_index, round_index, **kwargs)
+
+            if self.dry_run:
                 return (None, None, None, None)
 
             last_log_likelihood = log_likelihood
@@ -2872,13 +2831,14 @@ class Runner(object):
         for name, src_filename, dst_filename in zipper:
             self.copy_results(name, src_filename, dst_filename)
 
-    def _queue_identify(self, jobids, chunk_index, kwargs_chunk,
-                        chunk_mem_usage, prefix_job_name, prog, kwargs_func,
-                        output_filename=None):
+    def _queue_identify(self, restartable_jobs, chunk_index,
+                        chunk_mem_usage, prefix_job_name, prog, kwargs_func, #XXX: not a function, should rename
+                        output_filenames):
+        prog = self.prog_factory(prog)
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
+        output_filename = output_filenames[chunk_index]
 
-        kwargs = kwargs_chunk.copy()
-        kwargs.update(kwargs_func)
+        kwargs = self.get_identify_kwargs(chunk_index, kwargs_func)
 
         if prog == VITERBI_PROG:
             chunk_coord = self.chunk_coords[chunk_index]
@@ -2889,34 +2849,12 @@ class Runner(object):
         else:
             prefix_args = []
 
-        jobid = self.queue_gmtk(prog, kwargs, job_name, chunk_mem_usage,
-                                output_filename=output_filename,
-                                prefix_args=prefix_args)
-        if jobid is not None:
-            jobids.append(jobid)
+        restartable_job = self.queue_gmtk(prog, kwargs, job_name,
+                                          chunk_mem_usage,
+                                          output_filename=output_filename,
+                                          prefix_args=prefix_args)
 
-        return jobid
-
-    def run_identify_or_posterior(self, chunk_index, chunk_len, prog,
-                                  filenames, queue_identify_func,
-                                  prefix_job_name, kwargs):
-        mem_usage = self.get_mem_usage(chunk_len, prog)
-        filename = filenames[chunk_index]
-
-        jobid = queue_identify_func(mem_usage, prefix_job_name,
-                                    self.prog_factory(prog), kwargs, filename)
-
-        progname = prog.prog
-        if self.mem_per_obs[progname] is None:
-            self.wait_job(jobid)
-
-            if prog == VITERBI_PROG:
-                self.set_bytes_per_viterbi_frame()
-
-            self.set_mem_per_obs(jobid, chunk_len, progname)
-            return True
-
-        return False
+        restartable_jobs.queue(restartable_job)
 
     def get_chunk_index_for_calibration(self):
         for chunk_index, chunk_len in self.chunk_lens_sorted():
@@ -2926,91 +2864,57 @@ class Runner(object):
             raise ValueError("no chunks are larger than MIN_FRAMES_MEM_USAGE"
                              " of %d" % MIN_FRAMES_MEM_USAGE)
 
+    def get_identify_kwargs(self, chunk_index, extra_kwargs):
+        cpp_command_options = make_cpp_options(self.params_filename,
+                                               card_seg=self.num_segs)
+
+        res = dict(inputMasterFile=self.input_master_filename,
+                   cppCommandOptions=cpp_command_options,
+                   dcdrng=chunk_index,
+                   **self.make_gmtk_kwargs())
+
+        res.update(extra_kwargs)
+
+        return res
+
     def run_identify_posterior(self, clobber=None):
+        ## setup files
         if not self.input_master_filename:
             self.save_input_master()
 
-        params_filename = self.params_filename
-
-        prog_viterbi = self.prog_factory(VITERBI_PROG)
-        prog_posterior = self.prog_factory(POSTERIOR_PROG)
-
-        identify_kwargs = \
-            dict(inputMasterFile=self.input_master_filename,
-
-                 cppCommandOptions=make_cpp_options(params_filename,
-                                                    card_seg=self.num_segs),
-                 **self.make_gmtk_kwargs())
-
         self.set_output_dirpaths("identify", clobber)
-
-        # XXXopt: might be inefficient to write to standard output and
-        # save via redirection
-        viterbi_kwargs = dict(triFile=self.triangulation_filename,
-                              vitValsFile="-") # standard output, saved by SGE
-
-        posterior_kwargs = dict(triFile=self.posterior_triangulation_filename,
-                                doDistributeEvidence=True,
-                                **self.get_posterior_clique_print_ranges())
         self.make_posterior_filenames()
 
         viterbi_filenames = self.viterbi_filenames
         posterior_filenames = self.posterior_filenames
 
-        changing_mem_per_obs = False
+        # -: standard output, processed by segway-task
+        viterbi_kwargs = dict(triFile=self.triangulation_filename,
+                              vitValsFile="-")
+
+        posterior_kwargs = dict(triFile=self.posterior_triangulation_filename,
+                                doDistributeEvidence=True,
+                                **self.get_posterior_clique_print_ranges())
 
         # XXX: kill submitted jobs on exception
         jobids = []
         with Session() as session:
-            self.session = session
+            restartable_jobs = RestartableJobDict(session)
 
-            chunk_indexes_lens = list(self.chunk_lens_sorted(reverse=True))
-            chunk_index_for_calibration = \
-                self.get_chunk_index_for_calibration()
-
-            chunk_len_for_calibration = \
-                self.chunk_lens[chunk_index_for_calibration]
-
-            chunk_index_len_for_calibration = (chunk_index_for_calibration,
-                                               chunk_len_for_calibration)
-
-            chunk_indexes_lens.remove(chunk_index_len_for_calibration)
-            chunk_indexes_lens.insert(0, chunk_index_len_for_calibration)
-
-            for chunk_index, chunk_len in chunk_indexes_lens:
-                identify_kwargs_chunk = dict(dcdrng=chunk_index,
-                                             **identify_kwargs)
-                _queue_identify = partial(self._queue_identify, jobids,
-                                          chunk_index, identify_kwargs_chunk)
+            for chunk_index, chunk_len in self.chunk_lens_sorted():
+                queue_identify_custom = partial(self._queue_identify,
+                                                restartable_jobs, chunk_index,
+                                                None)
 
                 if self.identify:
-                    if self.run_identify_or_posterior(chunk_index, chunk_len,
-                                                      VITERBI_PROG,
-                                                      viterbi_filenames,
-                                                      _queue_identify,
-                                                      PREFIX_JOB_NAME_VITERBI,
-                                                      viterbi_kwargs):
-                        changing_mem_per_obs = True
+                    queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
+                                          VITERBI_PROG, viterbi_kwargs,
+                                          viterbi_filenames)
 
                 if self.posterior:
-                    if self.run_identify_or_posterior(chunk_index, chunk_len,
-                                                      POSTERIOR_PROG,
-                                                      posterior_filenames,
-                                                      _queue_identify,
-                                                      PREFIX_JOB_NAME_POSTERIOR,
-                                                      posterior_kwargs):
-                        changing_mem_per_obs = True
-
-                if changing_mem_per_obs:
-                    max_chunk_len = max(self.chunk_lens)
-                    max_mem_usage = self.get_max_mem_usage(max_chunk_len)
-
-                    if self.split_sequences or max_mem_usage > MEM_USAGE_LIMIT:
-                        ## unwind a couple of levels and start over
-                        ## always happens in the split_sequences case
-                        raise ChunkOverMemUsageLimit
-
-                    changing_mem_per_obs = False
+                    queue_identify_custom(PREFIX_JOB_NAME_POSTERIOR,
+                                          POSTERIOR_PROG, posterior_kwargs,
+                                          posterior_filenames)
 
             # XXX: ask on DRMAA mailing list--how to allow
             # KeyboardInterrupt here?
@@ -3018,7 +2922,7 @@ class Runner(object):
             if self.dry_run:
                 return
 
-            session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER, True)
+            restartable_jobs.wait()
 
         if self.identify:
             self.concatenate_bed()
