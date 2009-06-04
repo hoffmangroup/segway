@@ -66,7 +66,9 @@ def parse_viterbi(lines):
     # shouldn't get to this point
     raise ValueError("%s did not complete successfully" % VITERBI_PROG.prog)
 
-def save_bed(outfilename, start_pos, labels, coord, num_labels):
+# num_cols is for use by genomedata_count_condition
+# XXX: should move this function somewhere else
+def write_bed(outfile, start_pos, labels, coord, num_labels, num_cols=None):
     (chrom, region_start, region_end) = coord
 
     start_pos += region_start
@@ -75,23 +77,26 @@ def save_bed(outfilename, start_pos, labels, coord, num_labels):
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels)
 
-    with open(outfilename, "w") as outfile:
-        # this is easily concatenated since it has no context
-        for seg_start, seg_end, seg_label in zipper:
-            name = str(seg_label)
+    # this is easily concatenated since it has no context
+    for seg_start, seg_end, seg_label in zipper:
+        name = str(seg_label)
 
-            chrom_start = str(seg_start)
-            chrom_end = str(seg_end)
-            item_rgb = get_label_color(seg_label)
+        chrom_start = str(seg_start)
+        chrom_end = str(seg_end)
+        item_rgb = get_label_color(seg_label)
 
-            row = [chrom, chrom_start, chrom_end, name,
-                   BED_SCORE, BED_STRAND, chrom_start, chrom_end, item_rgb]
+        row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
+               chrom_start, chrom_end, item_rgb][:num_cols]
 
-            print >>outfile, "\t".join(row)
+        print >>outfile, "\t".join(row)
 
     # assert that the whole region is mapped
     # seg_end here means the last seg_end in the loop
     assert seg_end == region_end
+
+def save_bed(outfilename, *args, **kwargs):
+    with open(outfilename, "w") as outfile:
+        write_bed(outfile, *args, **kwargs)
 
 def parse_viterbi_save_bed(coord, viterbi_lines, bed_filename, num_labels):
     data = parse_viterbi(viterbi_lines)

@@ -16,6 +16,8 @@
 * segway: add --seg-table option to describe segment hyperparameters,
   including different minimum and maximum segment lengths for each label
 * remove --min-seg-len
+* added some robustness to determining executable paths for queue
+  submission, eliminating calls to bash for sub-jobs
 
 0.1.10:
 

@@ -14,17 +14,19 @@ from collections import defaultdict
 from contextlib import closing, nested
 from copy import copy
 from datetime import datetime
+from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, repeat
 from math import ceil, floor, frexp, ldexp, log, log10
 from operator import neg
-from os import extsep
+from os import environ, extsep
 import re
 from shutil import copy2
 from string import Template
 import sys
 from threading import Event, Thread
+from time import sleep
 from uuid import uuid1
 
 from drmaa import JobControlAction, JobState
@@ -167,7 +169,7 @@ MEM_USAGE_BUNDLE = 100*MB # XXX: should be included in calibration
 RES_REQ_IDS = ["mem_requested", "h_vmem"] # h_vmem: hard ulimit
 ALWAYS_MAX_MEM_USAGE = True
 
-MEM_USAGE_PROGRESSION = "2,4,6,8,10,12,14,15"
+MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -368,6 +370,8 @@ TERMINATE = JobControlAction.TERMINATE
 
 FAILED = JobState.FAILED
 DONE = JobState.DONE
+
+THREAD_SLEEP_TIME = 20
 
 ## exceptions
 class ChunkOverMemUsageLimit(Exception):
@@ -891,27 +895,40 @@ class RestartableJobDict(dict):
 
             # then we have to check each job individually
             for jobid in jobids:
-                job_state = session.jobStatus(jobid)
+                print >>sys.stderr, "checking %s" % jobid
+                job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
+                print >>sys.stderr, job_info
 
-                if job_state == DONE:
-                    # XXX: is this an SGE or DRMAA bug? shouldn't a
-                    # non-zero exit status be a failure? or is that
-                    # just LSF?
-                    job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
-                    resource_usage = job_info.resourceUsage
-
-                    # XXX: temporary workaround
-                    # http://code.google.com/p/drmaa-python/issues/detail?id=4
-                    exit_status = int(float(resource_usage["exit_status"]))
-
-                    if not exit_status:
-                        continue
-                elif job_state != FAILED:
+                if not (job_info.hasExited or job_info.hasSignal):
                     continue
 
-                # if not explicitly continued, then requeue
-                self.requeue(self[jobid])
+                if job_info.hasSignal:
+                    # XXX: duplicative
+                    self.requeue(self[jobid])
+                    del self[jobid]
+                    continue
+
+                resource_usage = job_info.resourceUsage
+
+                # XXX: temporary workaround
+                # http://code.google.com/p/drmaa-python/issues/detail?id=4
+                exit_status = int(float(resource_usage["exit_status"]))
+
+                if exit_status:
+                    self.requeue(self[jobid])
+
                 del self[jobid]
+
+                # XXX: should be able to check
+                # session.jobStatus(jobid) but this has problems
+                # 1. it returns DONE even with non-zero exit status
+                # is this an SGE or DRMAA bug? shouldn't a
+                # non-zero exit status be a failure? or is that
+                # just LSF?
+                # 2. sometimes I can't get the jobStatus() of a completed job:
+                # InvalidJobException: code 18: The job specified
+                # by the 'jobid' does not exist. see versions prior to
+                # SVN r425 for code
 
             jobids = self.keys()
 
@@ -2475,7 +2492,7 @@ class Runner(object):
         return model_penalty - (2/self.num_bases * log_likelihood)
 
     def queue_gmtk(self, prog, kwargs, job_name, mem_usage=None,
-                      output_filename=None, prefix_args=[]):
+                   output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         # convoluted so I don't have to deal with a lot of escaping issues
@@ -2486,8 +2503,6 @@ class Runner(object):
             cmd = gmtk_cmdline[0]
             args = gmtk_cmdline[1:]
 
-        cmdline = make_bash_cmdline(cmd, args)
-
         print >>self.cmdline_file, " ".join(gmtk_cmdline)
 
         if self.dry_run:
@@ -2497,8 +2512,12 @@ class Runner(object):
         job_tmpl = session.createJobTemplate()
 
         job_tmpl.jobName = job_name
-        job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = cmdline
+        job_tmpl.remoteCommand = cmd
+        job_tmpl.args = map(str, args)
+
+        # this is going to cause problems on heterogeneous systems
+        # XXX: should be jobEnvironment but DRMAA has a bug
+        job_tmpl.environment = environ
 
         if output_filename is None:
             output_filename = self.output_dirpath / job_name
@@ -2811,11 +2830,19 @@ class Runner(object):
         with Session() as session:
             try:
                 for start_index, (num_seg, seg_start_index) in enumerator:
-                    print >>sys.stderr, "start_index %s, num_seg %s, seg_start_index %s" % (start_index, num_seg, seg_start_index)
+                    print >>sys.stderr, (
+                        "start_index %s, num_seg %s, seg_start_index %s"
+                        % (start_index, num_seg, seg_start_index))
                     thread = RandomStartThread(self, session, start_index,
                                                num_seg)
                     thread.start()
                     threads.append(thread)
+
+                    # let all of one thread's jobs drop in the queue
+                    # before you do the next one
+                    # XXX: using some sort of semaphore would be better
+                    # XXX: using a priority option to the system would be best
+                    sleep(THREAD_SLEEP_TIME)
 
                 # list of tuples(log_likelihood, input_master_filename,
                 #                params_filename)
@@ -2867,19 +2894,20 @@ class Runner(object):
             self.copy_results(name, src_filename, dst_filename)
 
     def _queue_identify(self, restartable_jobs, chunk_index,
-                        chunk_mem_usage, prefix_job_name, prog, kwargs_func, #XXX: not a function, should rename
+                        chunk_mem_usage, prefix_job_name, prog, kwargs,
                         output_filenames):
         prog = self.prog_factory(prog)
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
         output_filename = output_filenames[chunk_index]
 
-        kwargs = self.get_identify_kwargs(chunk_index, kwargs_func)
+        kwargs = self.get_identify_kwargs(chunk_index, kwargs)
 
         if prog == VITERBI_PROG:
             chunk_coord = self.chunk_coords[chunk_index]
             chunk_chrom, chunk_start, chunk_end = chunk_coord
-            prefix_args = ["segway-task", "run", "viterbi", output_filename,
-                           chunk_chrom, chunk_start, chunk_end, self.num_segs]
+            prefix_args = [find_executable("segway-task"), "run", "viterbi",
+                           output_filename, chunk_chrom, chunk_start,
+                           chunk_end, self.num_segs]
             output_filename = None
         else:
             prefix_args = []
@@ -2934,6 +2962,8 @@ class Runner(object):
         # XXX: kill submitted jobs on exception
         jobids = []
         with Session() as session:
+            self.session = session
+
             restartable_jobs = RestartableJobDict(session)
 
             for chunk_index, chunk_len in self.chunk_lens_sorted():
