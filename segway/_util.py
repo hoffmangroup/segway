@@ -115,6 +115,15 @@ def maybe_gzip_open(filename, *args, **kwargs):
     else:
         return open(filename, *args, **kwargs)
 
+
+def constant(val):
+    """
+    constant values for defaultdict
+    """
+    return repeat(val).next
+
+array_factory = constant(array([]))
+
 def load_coords(filename):
     if not filename:
         return
@@ -130,8 +139,8 @@ def load_coords(filename):
 
             coords[chrom].append((start, end))
 
-    return dict((chrom, array(coords_list))
-                for chrom, coords_list in coords.iteritems())
+    return defaultdict(array_factory, ((chrom, array(coords_list))
+                       for chrom, coords_list in coords.iteritems()))
 
 def get_chrom_coords(coords, chrom):
     """
@@ -139,11 +148,7 @@ def get_chrom_coords(coords, chrom):
     returns None if there are no coords whatsoever
     """
     if coords:
-        try:
-            return coords[chrom]
-        except KeyError:
-            # nothing is included on that chromosome
-            return array([])
+        return coords[chrom]
 
 def is_empty_array(arr):
     try:
@@ -190,12 +195,6 @@ def find_segment_starts(data):
     start_pos = append(start_pos, len_data)
 
     return start_pos, labels
-
-def constant(val):
-    """
-    constant values for defaultdict
-    """
-    return repeat(val).next
 
 def main(args=sys.argv[1:]):
     pass

@@ -18,6 +18,7 @@
 * remove --min-seg-len
 * added some robustness to determining executable paths for queue
   submission, eliminating calls to bash for sub-jobs
+* segway: add --exclude-coords option, works like --include-coords
 
 0.1.10:
 

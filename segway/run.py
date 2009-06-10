@@ -569,32 +569,103 @@ def save_template(filename, resource, mapping, dirname=None,
 
     return filename, is_new
 
-def find_overlaps(start, end, coords):
+def find_overlaps_include(start, end, coords):
     """
     find items in coords that overlap (start, end)
 
     NOTE: multiple overlapping regions in coords will result in data
     being considered more than once
     """
+    # diagram of how this works:
+    #        --------------------- (include)
+    #
+    # various (start, end) cases:
+    # A   --
+    # B                              --
+    # C   --------------------------
+    # D   ------
+    # E                       -------------
+    # F             ---------
     res = []
 
-    for coord_start, coord_end in coords:
-        if start > coord_end:
+    for include_start, include_end in coords:
+        if start > include_end or end <= include_start:
+            # cases A, B
             pass
-        elif end <= coord_start:
-            pass
-        elif start <= coord_start:
-            if end >= coord_end:
-                res.append([coord_start, coord_end])
+        elif start <= include_start:
+            if end >= include_end:
+                # case C
+                res.append([include_start, include_end])
             else:
-                res.append([coord_start, end])
-        elif start > coord_start:
-            if end >= coord_end:
-                res.append([start, coord_end])
+                # case D
+                res.append([include_start, end])
+        elif start > include_start:
+            if end >= include_end:
+                # case E
+                res.append([start, include_end])
             else:
+                # case F
                 res.append([start, end])
+        else:
+            assert False # can't happen
 
     return res
+
+def find_overlaps_exclude(include_coords, exclude_coords):
+    # diagram of how this works:
+    #        --------------------- (include)
+    #
+    # various exclude cases:
+    # A   --
+    # B                              --
+    # C   --------------------------
+    # D   ------
+    # E                       -------------
+    # F             ---------
+
+    # does nothing if exclude_coords is empty
+    for exclude_start, exclude_end in exclude_coords:
+        new_include_coords = []
+
+        for include_index, include_coord in enumerate(include_coords):
+            include_start, include_end = include_coord
+
+            if exclude_start > include_end or exclude_end <= include_start:
+                # cases A, B
+                new_include_coords.append([include_start, include_end])
+            elif exclude_start <= include_start:
+                if exclude_end >= include_end:
+                    # case C
+                    pass
+                else:
+                    # case D
+                    new_include_coords.append([exclude_end, include_end])
+            elif exclude_start > include_start:
+                if exclude_end >= include_end:
+                    # case E
+                    new_include_coords.append([include_start, exclude_start])
+                else:
+                    # case F
+                    new_include_coords.append([include_start, exclude_start])
+                    new_include_coords.append([exclude_end, include_end])
+
+            else:
+                assert False # can't happen
+
+        include_coords = new_include_coords
+
+    return include_coords
+
+def find_overlaps(start, end, include_coords, exclude_coords):
+    if include_coords is None or is_empty_array(include_coords):
+        res = [[start, end]]
+    else:
+        res = find_overlaps_include(start, end, include_coords)
+
+    if exclude_coords is None or is_empty_array(exclude_coords):
+        return res
+    else:
+        return find_overlaps_exclude(res, exclude_coords)
 
 def make_cpp_options(input_params_filename=None, output_params_filename=None,
                      card_seg=None):
@@ -981,6 +1052,7 @@ class Runner(object):
         self.bed_filename = None
 
         self.include_coords_filename = None
+        self.exclude_coords_filename = None
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
@@ -1036,6 +1108,7 @@ class Runner(object):
         res.params_filename = options.trainable_params
         res.dont_train_filename = options.dont_train
         res.include_coords_filename = options.include_coords
+        res.exclude_coords_filename = options.exclude_coords
         res.seg_table_filename = options.seg_table
 
         res.distribution = options.distribution
@@ -1132,10 +1205,9 @@ class Runner(object):
 
         return log_likelihood, info_criterion
 
-    def load_include_coords(self):
-        filename = self.include_coords_filename
-
-        self.include_coords = load_coords(filename)
+    def load_include_exclude_coords(self):
+        self.include_coords = load_coords(self.include_coords_filename)
+        self.exclude_coords = load_coords(self.exclude_coords_filename)
 
     def load_seg_table(self):
         filename = self.seg_table_filename
@@ -1693,6 +1765,7 @@ class Runner(object):
 
         # this function is repeatable after max_mem_usage is discovered
         include_coords = self.include_coords
+        exclude_coords = self.exclude_coords
 
         num_tracks = None # this is before any subsetting
         chunk_index = 0
@@ -1712,6 +1785,7 @@ class Runner(object):
             chrom = chromosome.name
 
             chr_include_coords = get_chrom_coords(include_coords, chrom)
+            chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
 
             if (chr_include_coords is not None
                 and is_empty_array(chr_include_coords)):
@@ -1734,22 +1808,21 @@ class Runner(object):
             for supercontig, continuous in supercontigs:
                 assert continuous is None or continuous.shape[1] >= num_tracks
 
-                convert_chunks_custom = partial(convert_chunks,
-                                                supercontig.attrs)
-
                 if continuous is None:
                     starts = [supercontig.start]
                     ends = [supercontig.end]
                 else:
-                    starts = convert_chunks_custom("chunk_starts")
-                    ends = convert_chunks_custom("chunk_ends")
+                    attrs = supercontig.attrs
+                    starts = convert_chunks(attrs, "chunk_starts")
+                    ends = convert_chunks(attrs, "chunk_ends")
 
                 ## iterate through chunks and write
                 ## izip so it can be modified in place
                 for start_index, start, end in izip(count(), starts, ends):
-                    if include_coords:
+                    if include_coords or exclude_coords:
                         overlaps = find_overlaps(start, end,
-                                                 chr_include_coords)
+                                                 chr_include_coords,
+                                                 chr_exclude_coords)
                         len_overlaps = len(overlaps)
 
                         if len_overlaps == 0:
@@ -2272,7 +2345,7 @@ class Runner(object):
                                                      SUBDIRNAME_AUX)
 
     def save_params(self):
-        self.load_include_coords()
+        self.load_include_exclude_coords()
 
         self.make_subdirs(SUBDIRNAMES_EITHER)
         self.make_obs_dir()
@@ -3105,6 +3178,10 @@ def parse_options(args):
         # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
         group.add_option("--include-coords", metavar="FILE",
                          help="limit to genomic coordinates in FILE")
+
+        # exclude goes after all includes
+        group.add_option("--exclude-coords", metavar="FILE",
+                         help="filter out genomic coordinates in FILE")
 
     with OptionGroup(parser, "Model files") as group:
         group.add_option("-i", "--input-master", metavar="FILE",
