@@ -31,8 +31,8 @@ from uuid import uuid1
 
 from drmaa import JobControlAction, JobState
 from genomedata import Genome
-from numpy import (add, amin, amax, append, arange, array, column_stack,
-                   diagflat, empty, finfo, float32, intc, invert,
+from numpy import (add, amin, amax, append, arange, arcsinh, array,
+                   column_stack, diagflat, empty, finfo, float32, intc, invert,
                    isnan, NINF, ones, outer, s_, sqrt, square, tile,
                    vectorize, vstack, where, zeros)
 from numpy.random import uniform
@@ -64,8 +64,12 @@ drmaa.const.status_to_string = status_to_string
 # Norvig has one
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
-DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA]
+DISTRIBUTION_ARCSINH_NORMAL = "arcsinh_norm"
+DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
+                 DISTRIBUTION_ARCSINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_NORM
+DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
+                                     DISTRIBUTION_ARCSINH_NORMAL])
 
 ## XXX: should be options
 MEAN_METHOD_UNIFORM = "uniform" # randomly pick from the range
@@ -304,11 +308,12 @@ GAMMASCALE_TMPL = "gammascale_${seg}_${track} 1 1 ${rand}"
 GAMMASHAPE_TMPL = "gammashape_${seg}_${track} 1 1 ${rand}"
 
 MC_NORM_TMPL = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-    " mc_norm_${seg}_${track} mean_${seg}_${track} covar_${track}"
+    " mc_${distribution}_${seg}_${track} mean_${seg}_${track} covar_${track}"
 MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${track}" \
     " ${min_track} gammascale_${seg}_${track} gammashape_${seg}_${track}"
-MC_TMPLS = dict(norm=MC_NORM_TMPL,
-                gamma=MC_GAMMA_TMPL)
+MC_TMPLS = {"norm": MC_NORM_TMPL,
+            "gamma": MC_GAMMA_TMPL,
+            "arcsinh_norm": MC_NORM_TMPL}
 
 MX_TMPL = "1 mx_${seg}_${track} 1 dpmf_always" \
     " mc_${distribution}_${seg}_${track}"
@@ -1544,8 +1549,13 @@ class Runner(object):
             # the seg table instead
             # weight scale cannot be more than MAX_WEIGHT_SCALE to avoid
             # artifactual problems
-            weight_scale = min(max_num_datapoints_track / num_datapoints_track,
-                               MAX_WEIGHT_SCALE)
+
+            # XXX: this is backwards!!! you need to make the scale
+            # smaller in this case--squaring a probability makes it bigger!
+
+            # weight_scale = min(max_num_datapoints_track / num_datapoints_track,
+            #                   MAX_WEIGHT_SCALE)
+            weight_scale = 1.0
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
@@ -1582,6 +1592,9 @@ class Runner(object):
         if float_data is None:
             int_data = None
         else:
+            if self.distribution == DISTRIBUTION_ARCSINH_NORMAL:
+                float_data = arcsinh(float_data)
+
             mask_missing = isnan(float_data)
 
             # output -> int_data
@@ -1886,15 +1899,22 @@ class Runner(object):
     def calc_means_vars(self):
         num_datapoints = self.num_datapoints
         means = self.sums / num_datapoints
+        distribution = self.distribution
+
+        if distribution == DISTRIBUTION_ARCSINH_NORMAL:
+            means = arcsinh(means)
 
         # this is an unstable way of calculating the variance,
         # but it should be good enough
         # Numerical Recipes in C, Eqn 14.1.7
         # XXX: best would be to switch to the pairwise parallel method
         # (see Wikipedia)
+        sums_squares_normalized = self.sums_squares / num_datapoints
+        if distribution == DISTRIBUTION_ARCSINH_NORMAL:
+            sums_squares_normalized = arcsinh(sums_squares_normalized)
 
         self.means = means
-        self.vars = (self.sums_squares / num_datapoints) - square(means)
+        self.vars = sums_squares_normalized - square(means)
 
     def get_track_lt_min(self, track_index):
         """
@@ -2273,7 +2293,7 @@ class Runner(object):
         self.calc_means_vars()
 
         distribution = self.distribution
-        if distribution == DISTRIBUTION_NORM:
+        if distribution in DISTRIBUTIONS_LIKE_NORM:
             mean_spec = self.make_mean_spec()
             covar_spec = self.make_covar_spec(COVAR_TIED)
             gamma_spec = ""
@@ -3212,7 +3232,6 @@ def parse_options(args):
 
         group.add_option("-d", "--directory", metavar="DIR",
                           help="create all other files in DIR")
-
 
     with OptionGroup(parser, "Variables") as group:
         group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,

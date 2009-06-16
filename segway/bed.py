@@ -26,16 +26,21 @@ class NativeDatum(Datum):
         # zero-based, http://genome.ucsc.edu/FAQ/FAQformat#format1
         self.chromStart = int(self.chromStart)
         self.chromEnd = int(self.chromEnd)
-        self.score = float(self.score)
 
-        self._words = (self.chrom, self.chromStart, self.chromEnd, self.name,
-                       self.score) + self._words[5:]
+        try:
+            self.score = float(self.score)
+        except AttributeError:
+            self._words = (self.chrom, self.chromStart,
+                           self.chromEnd) + self._words[3:]
+        else:
+            self._words = (self.chrom, self.chromStart, self.chromEnd,
+                           self.name, self.score) + self._words[5:]
 
 def read(iterator, datum_cls=Datum):
     for line in iterator:
         words = line.split()
         if words[0] == "track":
-            raise NotImplementedError
+            continue # skip
 
         assert len(words) >= 3
 

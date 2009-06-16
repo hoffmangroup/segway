@@ -1,0 +1,12 @@
+map_parent
+2              % num parents
+% first parent is the label: 0 = no label; 1 = label
+% second parent is target: 0 when the label is set
+    0 2 0 default
+        % no label
+        -1 { 1 } % doesn't matter, observed child is always true
+
+        % label set
+        1 2 0 default
+            -1 { 1 } % label set, target is zero -> always true
+            -1 { 0 } % label set, target is nonzero -> impossible
