@@ -5,7 +5,7 @@
   }
 
   variable: dinucleotide {
-     type: discrete observed $dinucleotide_index:$dinucleotide_index cardinality CARD_DINUCLEOTIDE;
+     type: discrete observed $track_index:$track_index cardinality CARD_DINUCLEOTIDE;
 
      switchingparents: presence_dinucleotide(0) using mapping("map_parent");
 

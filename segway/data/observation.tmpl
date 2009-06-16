@@ -9,7 +9,7 @@
 
      switchingparents: presence_$track(0) using mapping("map_parent");
 
-     conditionalparents: nil using mixture("internal:UnityScore")
+     conditionalparents: CONDITIONALPARENTS_NIL
                          | seg(0) using mixture collection("collection_seg_$track")
                          mapping("map_parent");
 

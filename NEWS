@@ -21,6 +21,8 @@
 * segway: add --exclude-coords option, works like --include-coords
 * segway: add arcsinh-norm distribution
 * segway: disabled track weighting
+* segway: add --semisupervised=FILE option to get semisupervision
+  labels from a BED file
 
 0.1.10:
 

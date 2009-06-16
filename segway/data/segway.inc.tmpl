@@ -7,17 +7,20 @@
 
 %% cardinalities
 
+% any boolean (such as alwaysTrue)
+#define CARD_BOOLEAN 2
+
 % data exists or is missing?
-#define CARD_PRESENCE 2
+#define CARD_PRESENCE CARD_BOOLEAN
 
 % transition or not?
-#define CARD_SEGTRANSITION 2
+#define CARD_SEGTRANSITION CARD_BOOLEAN
 
 % maximum number of frames
 #define CARD_FRAMEINDEX $card_frameIndex
 
 % allow transition or not?
-#define CARD_RULER 2
+#define CARD_RULER CARD_BOOLEAN
 
 % others
 #ifndef CARD_SEGCOUNTDOWN

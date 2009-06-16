@@ -124,6 +124,7 @@ def constant(val):
 
 array_factory = constant(array([]))
 
+# XXX: duplicates bed.py?
 def load_coords(filename):
     if not filename:
         return

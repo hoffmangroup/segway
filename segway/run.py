@@ -33,7 +33,7 @@ from drmaa import JobControlAction, JobState
 from genomedata import Genome
 from numpy import (add, amin, amax, append, arange, arcsinh, array,
                    column_stack, diagflat, empty, finfo, float32, intc, invert,
-                   isnan, NINF, ones, outer, s_, sqrt, square, tile,
+                   isnan, NINF, ones, outer, sqrt, square, tile,
                    vectorize, vstack, where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
@@ -42,7 +42,8 @@ from optbuild import (Mixin_NoConvertUnderscore,
 from path import path
 from tabdelim import DictReader, ListWriter
 
-from sge import get_sge_qacct_maxvmem
+from .bed import read_native
+from .sge import get_sge_qacct_maxvmem
 from ._util import (constant, data_filename, data_string, DTYPE_OBS_INT,
                     EXT_GZ, get_chrom_coords, get_label_color, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
@@ -209,7 +210,7 @@ NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
 
 NATIVE_SPEC_DEFAULT = dict(w="n")
 
-SPECIAL_TRACKNAMES = ["dinucleotide"]
+SPECIAL_TRACKNAMES = ["dinucleotide", "supervisionLabel"]
 
 def extjoin(*args):
     return extsep.join(args)
@@ -367,6 +368,12 @@ SEG_TABLE_WIDTH = 3
 OFFSET_START = 0
 OFFSET_END = 1
 OFFSET_STEP = 2
+
+SUPERVISION_UNSUPERVISED = 0
+SUPERVISION_SEMISUPERVISED  = 1
+SUPERVISION_SUPERVISED = 2
+
+SUPERVISION_LABEL_OFFSET = 1
 
 # set once per file run
 UUID = uuid1().hex
@@ -574,7 +581,13 @@ def save_template(filename, resource, mapping, dirname=None,
 
     return filename, is_new
 
-def find_overlaps_include(start, end, coords):
+class NoData(object):
+    """
+    sentinel for not adding an extra field to coords, so that one can
+    still use None
+    """
+
+def find_overlaps_include(start, end, coords, data=repeat(NoData)):
     """
     find items in coords that overlap (start, end)
 
@@ -593,26 +606,33 @@ def find_overlaps_include(start, end, coords):
     # F             ---------
     res = []
 
-    for include_start, include_end in coords:
+    for (include_start, include_end), datum in izip(coords, data):
         if start > include_end or end <= include_start:
             # cases A, B
-            pass
+            continue
         elif start <= include_start:
-            if end >= include_end:
-                # case C
-                res.append([include_start, include_end])
-            else:
+            if end < include_end:
                 # case D
-                res.append([include_start, end])
+                include_end = end
+
+            # case C otherwise
         elif start > include_start:
-            if end >= include_end:
-                # case E
-                res.append([start, include_end])
-            else:
+            include_start = start
+
+            if end < include_end:
                 # case F
-                res.append([start, end])
+                include_end = end
+
+            # case E otherwise
         else:
             assert False # can't happen
+
+        item = [include_start, include_end]
+
+        if datum is not NoData:
+            item.append(data)
+
+        res.append(item)
 
     return res
 
@@ -892,6 +912,9 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
     starts[next_index:next_index] = new_starts
     ends[next_index:next_index] = new_ends
 
+def add_observation(observations, resourcename, **kwargs):
+    observations.append(resource_substitute(resourcename)(**kwargs))
+
 class RestartableJob(object):
     def __init__(self, session, job_template, mem_usage_progression,
                  mem_usage=None):
@@ -1065,6 +1088,11 @@ class Runner(object):
 
         self.triangulation_filename_is_new = None
 
+        self.supervision_coords = None
+        self.supervision_labels = None
+
+        self.card_supervision_label = -1
+
         # data
         # a "chunk" is what GMTK calls a segment
         self.num_chunks = None
@@ -1091,7 +1119,9 @@ class Runner(object):
         self.identify = True # viterbi
         self.dry_run = False
         self.use_dinucleotide = None
-        self.skip_large_mem_usage = False # XXX: should be removed, it was for segway-res-usage
+
+        # XXX: should be removed, it was for segway-res-usage
+        self.skip_large_mem_usage = False
         self.split_sequences = False
 
         # functions
@@ -1116,15 +1146,28 @@ class Runner(object):
         res.exclude_coords_filename = options.exclude_coords
         res.seg_table_filename = options.seg_table
 
+        res.supervision_filename = options.semisupervised
+        if options.semisupervised:
+            res.supervision_type = SUPERVISION_SEMISUPERVISED
+        else:
+            res.supervision_type = SUPERVISION_UNSUPERVISED
+
         res.distribution = options.distribution
         res.random_starts = options.random_starts
         res.len_seg_strength = options.prior_strength
-        res.include_tracknames = options.track
+
+        include_tracknames = options.track
+        # will mess things up if it's there
+        assert "supervisionLabel" not in include_tracknames
+        res.include_tracknames = include_tracknames
+
         res.verbosity = options.verbosity
         res.num_segs = options.num_segs
 
         mem_usage_list = map(float, options.mem_usage.split(","))
-        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int) # XXX: should do a ceil first
+
+        # XXX: should do a ceil first
+        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int)
 
         res.clobber = options.clobber
         res.train = not options.no_train
@@ -1514,6 +1557,7 @@ class Runner(object):
 
         mapping = dict(card_seg=num_segs,
                        card_segCountDown=self.card_seg_countdown,
+                       card_supervisionLabel=self.card_supervision_label,
                        card_frameIndex=MAX_FRAMES,
                        ruler_scale=RULER_SCALE)
 
@@ -1524,9 +1568,6 @@ class Runner(object):
                           aux_dirpath, self.clobber)
 
     def save_structure(self):
-        # XXX: make this a variable
-        observation_sub = resource_substitute("observation.tmpl")
-
         tracknames = self.tracknames
         num_tracks = self.num_tracks
         num_datapoints = self.num_datapoints
@@ -1559,17 +1600,23 @@ class Runner(object):
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
-            item = observation_sub(track=track, track_index=track_index,
-                                   presence_index=num_tracks+track_index,
-                                   weight_scale=weight_scale)
-            observation_items.append(item)
+            add_observation(observation_items, "observation.tmpl",
+                            track=track, track_index=track_index,
+                            presence_index=num_tracks+track_index,
+                            weight_scale=weight_scale)
 
+        next_int_track_index = num_tracks*2
+        # XXX: duplicative
         if self.use_dinucleotide:
-            dinucleotide_sub = resource_substitute("dinucleotide.tmpl")
+            add_observation(observation_items, "dinucleotide.tmpl",
+                            track_index=next_int_track_index,
+                            presence_index=next_int_track_index+1)
+            next_int_track_index += 2
 
-            item = dinucleotide_sub(dinucleotide_index=num_tracks*2,
-                                    presence_index=num_tracks*2+1)
-            observation_items.append(item)
+        if self.supervision_type != SUPERVISION_UNSUPERVISED:
+            add_observation(observation_items, "supervision.tmpl",
+                            track_index=next_int_track_index)
+            next_int_track_index += 1
 
         assert observation_items # must be at least one track
         observations = "\n".join(observation_items)
@@ -1582,39 +1629,39 @@ class Runner(object):
                           self.dirname, self.clobber)
 
     def save_observations_chunk(self, float_filepath, int_filepath, float_data,
-                                seq_data):
+                                seq_data, supervision_data):
         # input function in GMTK_ObservationMatrix.cc:
         # ObservationMatrix::readBinSentence
 
         # input per frame is a series of float32s, followed by a series of
         # int32s it is better to optimize both sides here by sticking all
         # the floats in one file, and the ints in another one
-        if float_data is None:
-            int_data = None
-        else:
+
+        int_blocks = []
+        if float_data is not None:
             if self.distribution == DISTRIBUTION_ARCSINH_NORMAL:
                 float_data = arcsinh(float_data)
 
             mask_missing = isnan(float_data)
 
-            # output -> int_data
+            # output -> int_blocks
             # done in two steps so I can specify output type
-            int_data = empty(mask_missing.shape, DTYPE_OBS_INT)
-            invert(mask_missing, int_data)
+            presence_data = empty(mask_missing.shape, DTYPE_OBS_INT)
+            invert(mask_missing, presence_data)
+            int_blocks.append(presence_data)
 
             float_data[mask_missing] = SENTINEL
 
             float_data.tofile(float_filepath)
 
         if seq_data is not None:
-            extra_int_data = make_dinucleotide_int_data(seq_data)
+            int_blocks.append(make_dinucleotide_int_data(seq_data))
 
-            # XXXopt: use the correctly sized matrix in the first place
-            if int_data is None:
-                int_data = extra_int_data
-            else:
-                int_data = column_stack([int_data, extra_int_data])
+        if supervision_data is not None:
+            int_blocks.append(supervision_data)
 
+        # XXXopt: use the correctly sized matrix in the first place
+        int_data = column_stack(int_blocks)
         int_data.tofile(int_filepath)
 
     def subset_metadata_attr(self, name):
@@ -1697,14 +1744,6 @@ class Runner(object):
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
 
-        track_indexes = self.track_indexes
-
-        # col_slice: the largest contiguous subset of the dataset
-        # tracks that is still a superset of the tracks that are used
-        min_col = track_indexes.min()
-        max_col = track_indexes.max() + 1
-        col_slice = s_[min_col:max_col]
-
         # XXX: doesn't work with new memory managment regime
         # need to instead fix a memory usage and see what fits in there
         assert not self.split_sequences
@@ -1742,35 +1781,80 @@ class Runner(object):
                 chunk_start = start - supercontig.start
                 chunk_end = end - supercontig.start
 
-                continuous = supercontig.continuous
-                if continuous is None:
-                    cells = None
-                else:
-                    # first, extract a contiguous subset of the tracks in
-                    # the dataset, which is a superset of the tracks that
-                    # are used
-                    rows = continuous[chunk_start:chunk_end, col_slice]
+                # XXX: next several lines are duplicative
+                continuous_cells = \
+                    self.make_continuous_cells(supercontig,
+                                               chunk_start, chunk_end)
 
-                    # extract only the tracks that are used
-                    # correct for min_col offset
-                    cells = rows[..., track_indexes - min_col]
+                seq_cells = self.make_seq_cells(supercontig,
+                                                chunk_start, chunk_end)
 
-            if self.use_dinucleotide:
-                seq = supercontig.seq
-                len_seq = len(seq)
+                supervision_cells = \
+                    self.make_supervision_cells(chrom, start, end)
 
-                if chunk_end < len_seq:
-                    seq_cells = seq[chunk_start:chunk_end+1]
-                elif chunk_end == len(seq):
-                    seq_chunk = seq[chunk_start:chunk_end]
-                    seq_cells = append(seq_chunk, ord("N"))
-                else:
-                    raise ValueError("sequence too short for supercontig")
-            else:
-                seq_cells = None
+                save_observations_chunk(float_filepath, int_filepath,
+                                        continuous_cells, seq_cells,
+                                        supervision_cells)
 
-            save_observations_chunk(float_filepath, int_filepath, cells,
-                                    seq_cells)
+    def make_continuous_cells(self, supercontig, start, end):
+        continuous = supercontig.continuous
+        if continuous is None:
+            return
+
+        track_indexes = self.track_indexes
+
+        # XXXopt: reading all the extra tracks is probably quite
+        # wasteful given the genomedata striping pattern; it is
+        # probably better to read one at a time and stick into an
+        # array
+        min_col = track_indexes.min()
+        max_col = track_indexes.max() + 1
+
+        # first, extract a contiguous subset of the tracks in the
+        # dataset, which is a superset of the tracks that are used
+        rows = continuous[start:end, min_col:max_col]
+
+        # extract only the tracks that are used
+        # correct for min_col offset
+        return rows[..., track_indexes - min_col]
+
+    def make_supervision_cells(self, chrom, start, end):
+        supervision_type = self.supervision_type
+        if supervision_type == SUPERVISION_UNSUPERVISED:
+            return
+
+        assert supervision_type == SUPERVISION_SEMISUPERVISED
+
+        coords_chrom = self.supervision_coords[chrom]
+        labels_chrom = self.supervision_labels[chrom]
+
+        res = zeros(end - start, dtype=DTYPE_OBS_INT)
+
+        supercontig_coords_labels = find_overlaps_include(start, end,
+                                                          coords_chrom,
+                                                          labels_chrom)
+
+        for label_start, label_end, label_index in supercontig_coords_labels:
+            # adjust so that zero means no label
+            label_adjusted = label_index + SUPERVISION_LABEL_OFFSET
+            res[label_start-start:label_end-start] = label_adjusted
+
+        return res
+
+    def make_seq_cells(self, supercontig, start, end):
+        if not self.use_dinucleotide:
+            return
+
+        seq = supercontig.seq
+        len_seq = len(seq)
+
+        if end < len_seq:
+            return seq[start:end+1]
+        elif end == len(seq):
+            seq_chunk = seq[start:end]
+            return append(seq_chunk, ord("N"))
+        else:
+            raise ValueError("sequence too short for supercontig")
 
     def prep_observations(self):
         # XXX: this function is way too long, try to get it to fit
@@ -2246,17 +2330,23 @@ class Runner(object):
         return self.make_segCountDown_tree_spec("map_segTransition_ruler_seg_segCountDown_segCountDown.dt.tmpl")
 
     def make_items_dt(self):
-        map_parent_dt_spec = data_string("map_parent.dt.txt")
+        res = []
 
-        map_frameIndex_ruler_dt_spec = \
-            data_string("map_frameIndex_ruler.dt.txt")
+        res.append(data_string("map_parent.dt.txt"))
+        res.append(data_string("map_frameIndex_ruler.dt.txt"))
+        res.append(self.make_map_seg_segCountDown_dt_spec())
+        res.append(self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec())
 
-        map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec = \
-            self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec()
+        supervision_type = self.supervision_type
+        if supervision_type == SUPERVISION_SEMISUPERVISED:
+            res.append(data_string("map_supervisionLabel_seg_alwaysTrue_semisupervised.dt.txt"))
+        elif supervision_type == SUPERVISION_SUPERVISED:
+             # XXX: does not exist yet
+            res.append(data_string("map_supervisionLabel_seg_alwaysTrue_supervised.dt.txt"))
+        else:
+            assert supervision_type == SUPERVISION_UNSUPERVISED
 
-        return [map_parent_dt_spec, self.make_map_seg_segCountDown_dt_spec(),
-                map_frameIndex_ruler_dt_spec,
-                self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec()]
+        return res
 
     def make_dt_spec(self):
         return make_spec("DT", self.make_items_dt())
@@ -2364,11 +2454,42 @@ class Runner(object):
         self.dumpnames_filename = self.save_resource(RES_DUMPNAMES,
                                                      SUBDIRNAME_AUX)
 
+    def load_supervision(self):
+        supervision_type = self.supervision_type
+        if supervision_type == SUPERVISION_UNSUPERVISED:
+            return
+
+        assert supervision_type == SUPERVISION_SEMISUPERVISED
+
+        supervision_labels = defaultdict(list)
+        supervision_coords = defaultdict(list)
+
+        with open(self.supervision_filename) as supervision_file:
+            for datum in read_native(supervision_file):
+                chrom = datum.chrom
+
+                coord = (datum.chromStart, datum.chromEnd)
+                supervision_coords[chrom].append(coord)
+                supervision_labels[chrom].append(int(datum.name))
+
+        max_supervision_label = max(max(labels)
+                                    for labels
+                                    in supervision_labels.itervalues())
+
+        self.supervision_coords = supervision_coords
+        self.supervision_labels = supervision_labels
+
+        self.include_tracknames.append("supervisionLabel")
+        self.card_supervision_label = (max_supervision_label + 1 +
+                                       SUPERVISION_LABEL_OFFSET)
+
     def save_params(self):
         self.load_include_exclude_coords()
 
         self.make_subdirs(SUBDIRNAMES_EITHER)
         self.make_obs_dir()
+
+        self.load_supervision()
 
         # do first, because it sets self.num_tracks and self.tracknames
         self.prep_observations()
@@ -3218,6 +3339,10 @@ def parse_options(args):
 
         group.add_option("--seg-table", metavar="FILE",
                          help="load segment hyperparameters from FILE")
+
+        group.add_option("--semisupervised", metavar="FILE",
+                         help="semisupervised segmentation with labels in "
+                         "FILE")
 
     with OptionGroup(parser, "Output files") as group:
         group.add_option("-b", "--bed", metavar="FILE",
