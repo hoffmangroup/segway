@@ -943,16 +943,34 @@ class JobTemplateFactory(object):
         return res
 
 class RestartableJob(object):
-    def __init__(self, session, job_template_factory, global_mem_usage, mem_usage_key XXXX):
+    def __init__(self, session, job_template_factory, global_mem_usage,
+                 mem_usage_key):
         self.session = session
         self.job_template_factory = job_template_factory
-        self.trial_index = 0
+
+        # last trial index tried
+        self.trial_index = -1
+
+        self.global_mem_usage = global_mem_usage
+        self.mem_usage_key = mem_usage_key
 
     def run(self):
         job_template_factory = self.job_template_factory
-        job_template = job_template_factory(self.trial_index)
-        self.trial_index += 1
 
+        global_mem_usage = self.global_mem_usage
+        mem_usage_key = self.mem_usage_key
+        trial_index = global_mem_usage[mem_usage_key]
+
+        # if this index was tried before and unsuccessful, increment
+        # and set global_mem_usage, controlling for race conditions
+        if self.trial_index == trial_index:
+            with global_mem_usage.lock:
+                choices = [global_mem_usage[mem_usage_key], trial_index+1]
+                trial_index = max(choices)
+
+            self.trial_index = trial_index
+
+        job_template = job_template_factory(trial_index)
         res = self.session.runJob(job_template)
 
         assert res
@@ -1084,7 +1102,8 @@ class Runner(object):
 
         self.card_supervision_label = -1
 
-        self.global_mem_usage = (Mixin_Lockable + dict)()
+        # default is 0
+        self.global_mem_usage = (Mixin_Lockable + defaultdict)(int)
 
         # data
         # a "chunk" is what GMTK calls a segment
@@ -2706,7 +2725,7 @@ class Runner(object):
 
         return model_penalty - (2/self.num_bases * log_likelihood)
 
-    def queue_gmtk(self, prog, kwargs, job_name, mem_usage=None,
+    def queue_gmtk(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
@@ -2746,24 +2765,25 @@ class Runner(object):
         job_tmpl_factory = JobTemplateFactory(job_tmpl,
                                               self.mem_usage_progression)
 
-        mem_usage_key = (XXXXXXXXXXXXXXXX num frames goes here!!!, self.num_segs)
+        mem_usage_key = (prog.prog, self.num_segs, num_frames)
 
         return RestartableJob(session, job_tmpl_factory, self.global_mem_usage,
                               mem_usage_key)
 
-    def queue_train(self, start_index, round_index, chunk_index,
-                    mem_usage=None, **kwargs):
+    def queue_train(self, start_index, round_index, chunk_index, num_frames=0,
+                    **kwargs):
         """
-        this calls Runner.queue_gmtk() and returns None if the
-        mem_usage is too large, and self.skip_large_mem_usage is True.
-        If it is False, a ValueError is raised.
+        this calls Runner.queue_gmtk()
+
+        if num_frames is not specified, then it is set to 0, where
+        everyone will share their min/max memory usage. Used for calls from queue_train_bundle()
         """
         kwargs["inputMasterFile"] = self.input_master_filename
 
         prog = self.train_prog
         name = self.make_job_name_train(start_index, round_index, chunk_index)
 
-        return self.queue_gmtk(prog, kwargs, name, mem_usage)
+        return self.queue_gmtk(prog, kwargs, name, num_frames)
 
     def queue_train_parallel(self, input_params_filename, start_index,
                              round_index, **kwargs):
@@ -2780,8 +2800,11 @@ class Runner(object):
             # -dirichletPriors T only on the first chunk
             kwargs_chunk["dirichletPriors"] = (chunk_index == 0)
 
+            num_frames = self.chunk_lens[chunk_index]
+
             restartable_job = self.queue_train(start_index, round_index,
-                                               chunk_index, **kwargs_chunk)
+                                               chunk_index, num_frames,
+                                               **kwargs_chunk)
             res.queue(restartable_job)
 
         return res
@@ -3115,9 +3138,8 @@ class Runner(object):
         for name, src_filename, dst_filename in zipper:
             self.copy_results(name, src_filename, dst_filename)
 
-    def _queue_identify(self, restartable_jobs, chunk_index,
-                        chunk_mem_usage, prefix_job_name, prog, kwargs,
-                        output_filenames):
+    def _queue_identify(self, restartable_jobs, chunk_index, prefix_job_name,
+                        prog, kwargs, output_filenames):
         prog = self.prog_factory(prog)
         job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
         output_filename = output_filenames[chunk_index]
@@ -3134,8 +3156,10 @@ class Runner(object):
         else:
             prefix_args = []
 
+        num_frames = self.chunk_lens[chunk_index]
+
         restartable_job = self.queue_gmtk(prog, kwargs, job_name,
-                                          chunk_mem_usage,
+                                          num_frames,
                                           output_filename=output_filename,
                                           prefix_args=prefix_args)
 
@@ -3190,8 +3214,7 @@ class Runner(object):
 
             for chunk_index, chunk_len in self.chunk_lens_sorted():
                 queue_identify_custom = partial(self._queue_identify,
-                                                restartable_jobs, chunk_index,
-                                                None)
+                                                restartable_jobs, chunk_index)
 
                 if self.identify:
                     queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
