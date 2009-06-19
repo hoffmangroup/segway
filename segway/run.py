@@ -25,7 +25,7 @@ import re
 from shutil import copy2
 from string import Template
 import sys
-from threading import Event, Thread
+from threading import Event, Lock, Thread
 from time import sleep
 from uuid import uuid1
 
@@ -37,7 +37,7 @@ from numpy import (add, amin, amax, append, arange, arcsinh, array,
                    vectorize, vstack, where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
-from optbuild import (Mixin_NoConvertUnderscore,
+from optbuild import (AddableMixin, Mixin_NoConvertUnderscore,
                       OptionBuilder_ShortOptWithSpace)
 from path import path
 from tabdelim import DictReader, ListWriter
@@ -712,11 +712,11 @@ def make_cpp_options(input_params_filename=None, output_params_filename=None,
 
     # default: return None
 
-def make_native_spec(**kwargs):
+def make_native_spec(*args, **kwargs):
     options = NATIVE_SPEC_DEFAULT.copy()
     options.update(kwargs)
 
-    res = " ".join(NATIVE_SPEC_PROG.build_args(options=options))
+    res = " ".join(NATIVE_SPEC_PROG.build_args(args=args, options=options))
 
     return res
 
@@ -915,55 +915,52 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
 
-class RestartableJob(object):
-    def __init__(self, session, job_template, mem_usage_progression,
-                 mem_usage=None):
-        self.session = session
-        self.job_template = job_template
+class Mixin_Lockable(AddableMixin):
+    def __init__(self, *args, **kwargs):
+        self.lock = Lock()
+        return AddableMixin.__init__(*args, **kwargs)
+
+class JobTemplateFactory(object):
+    def __init__(self, template, mem_usage_progression):
+        self.template = template
+        self.native_spec = template.nativeSpecification
         self.mem_usage_progression = mem_usage_progression
 
-        if mem_usage is None:
-            self.mem_usage = mem_usage_progression[0]
-        else:
-            # XXX allow a hint later, but for now I want to ensure all
-            # the old code is gone
-            raise NotImplementedError
+    def __call__(self, trial_index):
+        res = self.template
 
-    def run(self):
-        mem_usage = self.mem_usage
-
-        mem_usage_limit = self.mem_usage_progression[-1]
-
-        if mem_usage > self.mem_usage_progression[-1]:
-            msg = "request of %d memory, which is greater than " \
-                "limit of %d" % (mem_usage, mem_usage_limit)
-
-            raise ValueError(msg)
+        try:
+            mem_usage = self.mem_usage_progression[trial_index]
+        except IndexError:
+            raise ValueError("edge of memory usage progression reached "
+                             "without success")
 
         res_req = make_res_req(mem_usage)
+        self.res_req = res_req
+        res_spec = make_native_spec(l=res_req)
+        res.nativeSpecification = self.native_spec + res_spec
 
-        job_template = self.job_template
-        job_template.nativeSpecification = make_native_spec(l=res_req)
+        return res
+
+class RestartableJob(object):
+    def __init__(self, session, job_template_factory, global_mem_usage, mem_usage_key XXXX):
+        self.session = session
+        self.job_template_factory = job_template_factory
+        self.trial_index = 0
+
+    def run(self):
+        job_template_factory = self.job_template_factory
+        job_template = job_template_factory(self.trial_index)
+        self.trial_index += 1
 
         res = self.session.runJob(job_template)
 
         assert res
 
-        print >>sys.stderr, "queued %s (%s)" % (res, " ".join(res_req))
+        res_req_text = " ".join(job_template_factory.res_req)
+        print >>sys.stderr, "queued %s (%s)" % (res, res_req_text)
 
         return res
-
-    def rerun(self):
-        curr_mem_usage = self.mem_usage
-
-        # inefficient but this is probably temporary code anyway
-        for mem_usage in self.mem_usage_progression:
-            if curr_mem_usage < mem_usage:
-                self.mem_usage = mem_usage
-                return self.run()
-
-        raise ValueError("edge of memory usage progression reached "
-                         "without success")
 
 class RestartableJobDict(dict):
     def __init__(self, session, *args, **kwargs):
@@ -971,14 +968,8 @@ class RestartableJobDict(dict):
 
         return dict.__init__(self, *args, **kwargs)
 
-    # XXX: duplicative
     def queue(self, restartable_job):
         jobid = restartable_job.run()
-
-        self[jobid] = restartable_job
-
-    def requeue(self, restartable_job):
-        jobid = restartable_job.rerun()
 
         self[jobid] = restartable_job
 
@@ -1003,7 +994,7 @@ class RestartableJobDict(dict):
 
                 if job_info.hasSignal:
                     # XXX: duplicative
-                    self.requeue(self[jobid])
+                    self.queue(self[jobid])
                     del self[jobid]
                     continue
 
@@ -1014,7 +1005,7 @@ class RestartableJobDict(dict):
                 exit_status = int(float(resource_usage["exit_status"]))
 
                 if exit_status:
-                    self.requeue(self[jobid])
+                    self.queue(self[jobid])
 
                 del self[jobid]
 
@@ -1093,6 +1084,8 @@ class Runner(object):
 
         self.card_supervision_label = -1
 
+        self.global_mem_usage = (Mixin_Lockable + dict)()
+
         # data
         # a "chunk" is what GMTK calls a segment
         self.num_chunks = None
@@ -1162,6 +1155,8 @@ class Runner(object):
         res.include_tracknames = include_tracknames
 
         res.verbosity = options.verbosity
+        res.user_native_spec = [opt.split(" ") for opt in options.drm_opt]
+
         res.num_segs = options.num_segs
 
         mem_usage_list = map(float, options.mem_usage.split(","))
@@ -2467,9 +2462,15 @@ class Runner(object):
         with open(self.supervision_filename) as supervision_file:
             for datum in read_native(supervision_file):
                 chrom = datum.chrom
+                supervision_coords_chrom = supervision_coords[chrom]
+                start = datum.chromStart
+                end = datum.chromEnd
 
-                coord = (datum.chromStart, datum.chromEnd)
-                supervision_coords[chrom].append(coord)
+                for coord_start, coord_end in supervision_coords_chrom:
+                    # disallow overlaps
+                    assert coord_start >= end or coord_end <= start
+
+                supervision_coords_chrom.append((start, end))
                 supervision_labels[chrom].append(int(datum.name))
 
         max_supervision_label = max(max(labels)
@@ -2738,10 +2739,17 @@ class Runner(object):
         job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
 
+        job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec)
+
         set_cwd_job_tmpl(job_tmpl)
 
-        return RestartableJob(session, job_tmpl, self.mem_usage_progression,
-                              mem_usage)
+        job_tmpl_factory = JobTemplateFactory(job_tmpl,
+                                              self.mem_usage_progression)
+
+        mem_usage_key = (XXXXXXXXXXXXXXXX num frames goes here!!!, self.num_segs)
+
+        return RestartableJob(session, job_tmpl_factory, self.global_mem_usage,
+                              mem_usage_key)
 
     def queue_train(self, start_index, round_index, chunk_index,
                     mem_usage=None, **kwargs):
@@ -3388,6 +3396,11 @@ def parse_options(args):
         group.add_option("-v", "--verbosity", type=int, default=VERBOSITY,
                          metavar="NUM",
                          help="show messages with verbosity NUM")
+
+        group.add_option("--drm-opt", action="append", default=[],
+                         metavar="OPT",
+                         help="specify an option to be passed to the "
+                         "distributed resource manager")
 
     with OptionGroup(parser, "Flags") as group:
         group.add_option("-c", "--clobber", action="store_true",
