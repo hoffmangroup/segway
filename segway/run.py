@@ -246,6 +246,7 @@ PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
 PREFIX_JT_INFO = "jt_info"
+PREFIX_RES_USAGE = "res_usage"
 
 PREFIX_JOB_NAME_TRAIN = "emt"
 PREFIX_JOB_NAME_VITERBI = "vit"
@@ -981,8 +982,9 @@ class RestartableJob(object):
         return res
 
 class RestartableJobDict(dict):
-    def __init__(self, session, *args, **kwargs):
+    def __init__(self, session, res_usage_file, *args, **kwargs):
         self.session = session
+        self.res_usage_file = res_usage_file
 
         return dict.__init__(self, *args, **kwargs)
 
@@ -1007,6 +1009,14 @@ class RestartableJobDict(dict):
                 job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
                 print >>sys.stderr, job_info
 
+                resource_usage = job_info.resourceUsage
+
+                prog, num_segs, num_frames = self[jobid].mem_usage_key
+                maxvmem = resource_usage["maxvmem"]
+                cpu = resource_usage["cpu"]
+                row = [prog, str(num_segs), str(num_frames), maxvmem, cpu]
+                print >>self.res_usage_file, "\t".join(row)
+
                 if not (job_info.hasExited or job_info.hasSignal):
                     continue
 
@@ -1015,8 +1025,6 @@ class RestartableJobDict(dict):
                     self.queue(self[jobid])
                     del self[jobid]
                     continue
-
-                resource_usage = job_info.resourceUsage
 
                 # XXX: temporary workaround
                 # http://code.google.com/p/drmaa-python/issues/detail?id=4
@@ -2790,7 +2798,7 @@ class Runner(object):
         kwargs["cppCommandOptions"] = make_cpp_options(input_params_filename,
                                                        card_seg=self.num_segs)
 
-        res = RestartableJobDict(self.session)
+        res = RestartableJobDict(self.session, self.res_usage_file)
 
         for chunk_index, chunk_len in self.chunk_lens_sorted():
             acc_filename = self.make_acc_filename(start_index, chunk_index)
@@ -2830,7 +2838,7 @@ class Runner(object):
         restartable_job = self.queue_train(start_index, round_index,
                                            NAME_BUNDLE_PLACEHOLDER, **kwargs)
 
-        res = RestartableJobDict(self.session)
+        res = RestartableJobDict(self.session, self.res_usage_file)
         res.queue(restartable_job)
 
         return res
@@ -3210,7 +3218,7 @@ class Runner(object):
         with Session() as session:
             self.session = session
 
-            restartable_jobs = RestartableJobDict(session)
+            restartable_jobs = RestartableJobDict(session, self.res_usage_file)
 
             for chunk_index, chunk_len in self.chunk_lens_sorted():
                 queue_identify_custom = partial(self._queue_identify,
@@ -3257,6 +3265,8 @@ class Runner(object):
         self.make_subdir(SUBDIRNAME_LOG)
         cmdline_filename = self.make_filename(PREFIX_CMDLINE, EXT_SH,
                                               subdirname=SUBDIRNAME_LOG)
+        res_usage_filename = self.make_filename(PREFIX_RES_USAGE, EXT_TAB,
+                                                subdirname=SUBDIRNAME_LOG)
 
         self.interrupt_event = Event()
 
@@ -3276,11 +3286,12 @@ class Runner(object):
         else:
             self.island_lst = min_chunk_len - 1
 
+        now = datetime.now()
+
         with open(cmdline_filename, "w") as cmdline_file:
             # XXX: works around a pyflakes bug; report
             self.cmdline_file = cmdline_file
 
-            now = datetime.now()
             print >>self.cmdline_file, "## %s run %s at %s" % (PKG, UUID, now)
 
             # so that we can immediately out the UUID if we want it
@@ -3289,27 +3300,30 @@ class Runner(object):
             if self.triangulate:
                 self.run_triangulate()
 
-            if self.train:
-                self.run_train()
+            with open(res_usage_filename, "w") as res_usage_file:
+                self.res_usage_file = res_usage_file
 
-            if self.identify or self.posterior:
-                if not self.dry_run:
-                    # resave now that num_segs is determined
-                    self.save_include()
+                if self.train:
+                    self.run_train()
 
-                    if not self.posterior_triangulation_filename:
-                        self.save_posterior_triangulation()
+                if self.identify or self.posterior:
+                    if not self.dry_run:
+                        # resave now that num_segs is determined
+                        self.save_include()
 
-                try:
-                    self.run_identify_posterior()
-                except ChunkOverMemUsageLimit:
-                    if not self.split_sequences:
-                        raise
+                        if not self.posterior_triangulation_filename:
+                            self.save_posterior_triangulation()
 
-                    self.resave_params()
+                    try:
+                        self.run_identify_posterior()
+                    except ChunkOverMemUsageLimit:
+                        if not self.split_sequences:
+                            raise
 
-                    # erase old output
-                    self.run_identify_posterior(clobber=True)
+                        self.resave_params()
+
+                        # erase old output
+                        self.run_identify_posterior(clobber=True)
 
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources

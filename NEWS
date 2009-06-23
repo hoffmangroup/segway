@@ -27,6 +27,7 @@
 * segway: add --drm-opt=OPTION option to allow specification of an
   arbitrary distributed resource manager option (e.g. for SGE -p sets
   priority, -l sets a resource requirement, etc.)
+* segway: log memory and CPU usage to log/res_usage.tab
 
 0.1.10:
 
