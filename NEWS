@@ -1,5 +1,6 @@
 0.1.11:
 
+* optbuild >0.1.6 is now a prerequisite
 * totally different memory management regime that eliminates old
   prediction stuff, and instead relies on trying at 2 GiB, 4 GiB, etc.
   until failure. globally shares minimum values for each thread

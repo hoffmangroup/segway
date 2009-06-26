@@ -103,8 +103,6 @@ ISLAND = True
 # XXX: temporary code to allow easy switching
 if ISLAND:
     ISLAND_BASE = 3
-    # XXXopt: should be 100000, or really test some values, but Xiaoyu
-    # has a smaller sequence
     ISLAND_LST = 100000
     HASH_LOAD_FACTOR = 0.98
 else:
@@ -115,8 +113,8 @@ else:
 COMPONENT_CACHE = not ISLAND
 DETERMINISTIC_CHILDREN_STORE = not ISLAND
 
-ISLAND = ISLAND_BASE != ISLAND_BASE_NA
-assert ISLAND or ISLAND_LST == ISLAND_LST_NA
+assert (ISLAND or
+        (ISLAND_LST == ISLAND_LST_NA and ISLAND_BASE == ISLAND_BASE_NA))
 
 LINEAR_MEM_USAGE_MULTIPLIER = 1
 MEM_USAGE_MULTIPLIER = 2
@@ -274,6 +272,8 @@ SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
 SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
 
 FLOAT_TAB_FIELDNAMES = ["filename", "chunk_index", "chrom", "start", "end"]
+RES_USAGE_FIELDNAMES = ["prog", "num_segs", "num_frames", "maxvmem", "cpu",
+                        "exit_status"]
 
 # templates and formats
 RES_STR_TMPL = "segway.str.tmpl"
@@ -714,12 +714,7 @@ def make_cpp_options(input_params_filename=None, output_params_filename=None,
     # default: return None
 
 def make_native_spec(*args, **kwargs):
-    options = NATIVE_SPEC_DEFAULT.copy()
-    options.update(kwargs)
-
-    res = " ".join(NATIVE_SPEC_PROG.build_args(args=args, options=options))
-
-    return res
+    return " ".join(NATIVE_SPEC_PROG.build_args(args=args, options=kwargs))
 
 def make_spec(name, items):
     header_lines = ["%s_IN_FILE inline" % name, str(len(items)), ""]
@@ -919,7 +914,9 @@ def add_observation(observations, resourcename, **kwargs):
 class Mixin_Lockable(AddableMixin):
     def __init__(self, *args, **kwargs):
         self.lock = Lock()
-        return AddableMixin.__init__(*args, **kwargs)
+        return AddableMixin.__init__(self, *args, **kwargs)
+
+LockableDefaultDict = Mixin_Lockable + defaultdict
 
 class JobTemplateFactory(object):
     def __init__(self, template, mem_usage_progression):
@@ -939,7 +936,7 @@ class JobTemplateFactory(object):
         res_req = make_res_req(mem_usage)
         self.res_req = res_req
         res_spec = make_native_spec(l=res_req)
-        res.nativeSpecification = self.native_spec + res_spec
+        res.nativeSpecification = " ".join([self.native_spec, res_spec])
 
         return res
 
@@ -962,6 +959,8 @@ class RestartableJob(object):
         mem_usage_key = self.mem_usage_key
         trial_index = global_mem_usage[mem_usage_key]
 
+        print >>sys.stderr, "self.trial_index=%d; trial_index=%d" % (self.trial_index, trial_index)
+
         # if this index was tried before and unsuccessful, increment
         # and set global_mem_usage, controlling for race conditions
         if self.trial_index == trial_index:
@@ -969,7 +968,9 @@ class RestartableJob(object):
                 choices = [global_mem_usage[mem_usage_key], trial_index+1]
                 trial_index = max(choices)
 
-            self.trial_index = trial_index
+            global_mem_usage[mem_usage_key] = trial_index
+
+        self.trial_index = trial_index
 
         job_template = job_template_factory(trial_index)
         res = self.session.runJob(job_template)
@@ -999,7 +1000,7 @@ class RestartableJobDict(dict):
         jobids = self.keys()
 
         while jobids:
-            # return indicates that at least one job has completed
+            # return indicates that all jobs have completed
             session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER,
                                 dispose=False)
 
@@ -1011,27 +1012,27 @@ class RestartableJobDict(dict):
 
                 resource_usage = job_info.resourceUsage
 
+                if not (job_info.hasExited or job_info.hasSignal):
+                    # for some reason I think this is more robust than
+                    # relying on the exit status
+                    exit_status = 0
+                else:
+                    if job_info.hasSignal:
+                        exit_status = job_info.terminatedSignal
+                    else:
+                        # XXX: temporary workaround
+                        # http://code.google.com/p/drmaa-python/issues/detail?id=4
+                        exit_status = int(float(resource_usage["exit_status"]))
+
+                    if exit_status != 0:
+                        self.queue(self[jobid])
+
                 prog, num_segs, num_frames = self[jobid].mem_usage_key
                 maxvmem = resource_usage["maxvmem"]
                 cpu = resource_usage["cpu"]
-                row = [prog, str(num_segs), str(num_frames), maxvmem, cpu]
+                row = [prog, str(num_segs), str(num_frames), maxvmem, cpu,
+                       str(exit_status)]
                 print >>self.res_usage_file, "\t".join(row)
-
-                if not (job_info.hasExited or job_info.hasSignal):
-                    continue
-
-                if job_info.hasSignal:
-                    # XXX: duplicative
-                    self.queue(self[jobid])
-                    del self[jobid]
-                    continue
-
-                # XXX: temporary workaround
-                # http://code.google.com/p/drmaa-python/issues/detail?id=4
-                exit_status = int(float(resource_usage["exit_status"]))
-
-                if exit_status:
-                    self.queue(self[jobid])
 
                 del self[jobid]
 
@@ -1047,6 +1048,8 @@ class RestartableJobDict(dict):
                 # SVN r425 for code
 
             jobids = self.keys()
+
+            self.res_usage_file.flush() # allow reading file now
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, num_segs):
@@ -1111,7 +1114,7 @@ class Runner(object):
         self.card_supervision_label = -1
 
         # default is 0
-        self.global_mem_usage = (Mixin_Lockable + defaultdict)(int)
+        self.global_mem_usage = LockableDefaultDict(int)
 
         # data
         # a "chunk" is what GMTK calls a segment
@@ -1244,8 +1247,8 @@ class Runner(object):
         maxvmem = get_sge_qacct_maxvmem(jobname)
 
         if ISLAND:
-            # XXX: otherwise, we really do linear inference
-            assert chunk_len > self.island_lst
+            # otherwise, we really do linear inference
+            assert chunk_len > ISLAND_LST
 
             linear_size = self.get_linear_size(chunk_len, progname)
 
@@ -2677,7 +2680,7 @@ class Runner(object):
 
         if ISLAND:
             res["base"] = ISLAND_BASE
-            res["lst"] = self.island_lst
+            res["lst"] = ISLAND_LST
 
         if HASH_LOAD_FACTOR is not None:
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
@@ -2766,7 +2769,7 @@ class Runner(object):
         job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
 
-        job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec)
+        job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec, **NATIVE_SPEC_DEFAULT)
 
         set_cwd_job_tmpl(job_tmpl)
 
@@ -3272,20 +3275,6 @@ class Runner(object):
 
         self.save_params()
 
-        # XXX: gmtkViterbi only works with island
-        # XXX: gmtkJT/20090302 has a bug in non-island mode: does not
-        # produce frame indexes correctly
-        assert ISLAND or (not self.identify and not self.posterior)
-
-        # XXX: I'm not so sure about all of this, it may react badly
-        # when you split a sequence and it is smaller than
-        # self.island_lst again
-        min_chunk_len = min(self.chunk_lens)
-        if min_chunk_len > ISLAND_LST:
-            self.island_lst = ISLAND_LST
-        else:
-            self.island_lst = min_chunk_len - 1
-
         now = datetime.now()
 
         with open(cmdline_filename, "w") as cmdline_file:
@@ -3302,6 +3291,7 @@ class Runner(object):
 
             with open(res_usage_filename, "w") as res_usage_file:
                 self.res_usage_file = res_usage_file
+                print >>res_usage_file, "\t".join(RES_USAGE_FIELDNAMES)
 
                 if self.train:
                     self.run_train()
