@@ -1527,7 +1527,9 @@ class Runner(object):
             save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
                           aux_dirpath, self.clobber)
 
-        include_filename_relative = include_filename.partition(self.dirpath)
+        dirpath_trailing_slash = self.dirpath + "/"
+        include_filename_relative = \
+            include_filename.partition(dirpath_trailing_slash)[2]
         assert include_filename_relative
 
         self.gmtk_include_filename = include_filename
