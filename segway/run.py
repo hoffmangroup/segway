@@ -1204,68 +1204,6 @@ class Runner(object):
 
         return res
 
-    def set_bytes_per_viterbi_frame(self):
-        num_words = []
-
-        with open(self.jt_info_filename) as infile:
-            for line in infile:
-                line = line.rstrip()
-
-                m_num_cliques = re_num_cliques.match(line)
-                if m_num_cliques:
-                    # will need to do addition if there's more than one
-                    assert m_num_cliques.group(1) == "1"
-
-                m_clique_info = re_clique_info.match(line)
-                if m_clique_info:
-                    num_words.append(int(m_clique_info.group(1)))
-
-        self.bytes_per_viterbi_frame = SIZEOF_INTC * max(num_words)
-
-    def get_observation_size(self, chunk_len):
-        float_rowsize = self.num_tracks * SIZEOF_FLOAT32
-        int_rowsize = self.num_int_cols * SIZEOF_DTYPE_OBS_INT
-
-        return (float_rowsize + int_rowsize) * chunk_len
-
-    def get_viterbi_size(self, chunk_len, progname):
-        if progname == VITERBI_PROG.prog:
-            return self.bytes_per_viterbi_frame * chunk_len
-        else:
-            return 0
-
-    def get_linear_size(self, chunk_len, progname):
-        observation_size = self.get_observation_size(chunk_len)
-        viterbi_size = self.get_viterbi_size(chunk_len, progname)
-
-        print >>sys.stderr, "observation_size: %s" % observation_size
-        print >>sys.stderr, "viterbi_size: %s" % viterbi_size
-
-        return observation_size + viterbi_size
-
-    def set_mem_per_obs(self, jobname, chunk_len, progname):
-        maxvmem = get_sge_qacct_maxvmem(jobname)
-
-        if ISLAND:
-            # otherwise, we really do linear inference
-            assert chunk_len > ISLAND_LST
-
-            linear_size = self.get_linear_size(chunk_len, progname)
-
-            inference_size = maxvmem - linear_size
-            mem_per_obs = inference_size / log(chunk_len)
-        else:
-            mem_per_obs = maxvmem / chunk_len
-
-        if mem_per_obs <= 0:
-            msg = ("%s did not use any memory. Check log files in output/e"
-                   % progname)
-            raise ValueError(msg)
-
-        print >>sys.stderr, "mem_per_obs = %s / %s = %s" % (maxvmem, chunk_len,
-                                                            mem_per_obs)
-        self.mem_per_obs[progname] = mem_per_obs
-
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
             log_likelihood = float(infile.read().strip())
