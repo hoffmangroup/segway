@@ -1074,6 +1074,7 @@ class Runner(object):
         self.int_filelistpath = None
 
         self.gmtk_include_filename = None
+        self.gmtk_include_filename_relative = None
         self.input_master_filename = None
         self.structure_filename = None
         self.triangulation_filename = None
@@ -1522,9 +1523,17 @@ class Runner(object):
 
         aux_dirpath = self.dirpath / SUBDIRNAME_AUX
 
-        self.gmtk_include_filename, self.gmtk_include_filename_is_new = \
+        include_filename, self.gmtk_include_filename_is_new = \
             save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
                           aux_dirpath, self.clobber)
+
+        self.gmtk_include_filename = include_filename
+
+        include_filename_relative = include_filename.partition(self.dirpath)
+
+        assert include_filename_relative
+
+        self.include_filename_relative = include_filename_relative
 
     def save_structure(self):
         tracknames = self.tracknames
@@ -1580,7 +1589,7 @@ class Runner(object):
         assert observation_items # must be at least one track
         observations = "\n".join(observation_items)
 
-        mapping = dict(include_filename=self.gmtk_include_filename,
+        mapping = dict(include_filename=self.gmtk_include_filename_relative,
                        observations=observations)
 
         self.structure_filename, self.structure_filename_is_new = \
@@ -2311,7 +2320,7 @@ class Runner(object):
         num_segs = self.num_segs
         num_tracks = self.num_tracks
 
-        include_filename = self.gmtk_include_filename
+        include_filename = self.gmtk_include_filename_relative
 
         if new:
             input_master_filename = None
