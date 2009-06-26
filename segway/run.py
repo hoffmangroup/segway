@@ -1527,13 +1527,11 @@ class Runner(object):
             save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
                           aux_dirpath, self.clobber)
 
-        self.gmtk_include_filename = include_filename
-
         include_filename_relative = include_filename.partition(self.dirpath)
-
         assert include_filename_relative
 
-        self.include_filename_relative = include_filename_relative
+        self.gmtk_include_filename = include_filename
+        self.gmtk_include_filename_relative = include_filename_relative
 
     def save_structure(self):
         tracknames = self.tracknames
