@@ -43,7 +43,6 @@ from path import path
 from tabdelim import DictReader, ListWriter
 
 from .bed import read_native
-from .sge import get_sge_qacct_maxvmem
 from ._util import (constant, data_filename, data_string, DTYPE_OBS_INT,
                     EXT_GZ, get_chrom_coords, get_label_color, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
@@ -164,11 +163,8 @@ MIN_FRAMES = 2
 MB = 2**20
 GB = 2**30
 
-# minimum number of frames to test memory usage, must be sufficiently
-# long to get an accurate count
-MIN_FRAMES_MEM_USAGE = 500000 # 500,000
 MAX_FRAMES = 2000000 # 2 million
-MEM_USAGE_BUNDLE = 100*MB # XXX: should be included in calibration
+MEM_USAGE_BUNDLE = 100*MB # XXX: should start using this again
 RES_REQ_IDS = ["mem_requested", "h_vmem"] # h_vmem: hard ulimit
 ALWAYS_MAX_MEM_USAGE = True
 
@@ -1714,20 +1710,14 @@ class Runner(object):
         mem_per_obs_undefined = None in (self.mem_per_obs[prog.prog]
                                          for prog in self.get_progs_used())
         calibrating_mem_usage = self.split_sequences and mem_per_obs_undefined
-        chunk_index_for_calibration = \
-            self.get_chunk_index_for_calibration()
+        if calibrating_mem_usage:
+            raise NotImplementedError
 
         zipper = izip(count(), self.used_supercontigs, self.chunk_coords)
 
         for chunk_index, supercontig, (chrom, start, end) in zipper:
             float_filepath, int_filepath = \
                 print_obs_filepaths_custom(chrom, chunk_index)
-
-            if (calibrating_mem_usage
-                and chunk_index != chunk_index_for_calibration):
-                # other chunk names are already written to index file,
-                # but sequence is not saved
-                continue
 
             row = [float_filepath, str(chunk_index), chrom, str(start),
                    str(end)]
@@ -3113,14 +3103,6 @@ class Runner(object):
                                           prefix_args=prefix_args)
 
         restartable_jobs.queue(restartable_job)
-
-    def get_chunk_index_for_calibration(self):
-        for chunk_index, chunk_len in self.chunk_lens_sorted():
-            if chunk_len >= MIN_FRAMES_MEM_USAGE:
-                return chunk_index
-        else:
-            raise ValueError("no chunks are larger than MIN_FRAMES_MEM_USAGE"
-                             " of %d" % MIN_FRAMES_MEM_USAGE)
 
     def get_identify_kwargs(self, chunk_index, extra_kwargs):
         cpp_command_options = make_cpp_options(self.params_filename,
