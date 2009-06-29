@@ -1533,7 +1533,12 @@ class Runner(object):
         assert include_filename_relative
 
         self.gmtk_include_filename = include_filename
-        self.gmtk_include_filename_relative = include_filename_relative
+        self.gmtk_include_filename_relative = include_filename
+
+        # XXX: disable until you figure out a good way of dealing with
+        # includes from params/input.master as well
+
+        #self.gmtk_include_filename_relative = include_filename_relative
 
     def save_structure(self):
         tracknames = self.tracknames
