@@ -119,7 +119,7 @@ LINEAR_MEM_USAGE_MULTIPLIER = 1
 MEM_USAGE_MULTIPLIER = 2
 
 JOIN_TIMEOUT = finfo(float).max
-LEN_SEG_EXPECTED = 10000
+LEN_SEG_EXPECTED = 100000
 SWAP_ENDIAN = False
 POSTERIOR_SCALE_FACTOR = 100.0
 
@@ -367,7 +367,7 @@ OFFSET_END = 1
 OFFSET_STEP = 2
 
 SUPERVISION_UNSUPERVISED = 0
-SUPERVISION_SEMISUPERVISED  = 1
+SUPERVISION_SEMISUPERVISED = 1
 SUPERVISION_SUPERVISED = 2
 
 SUPERVISION_LABEL_OFFSET = 1
@@ -627,7 +627,7 @@ def find_overlaps_include(start, end, coords, data=repeat(NoData)):
         item = [include_start, include_end]
 
         if datum is not NoData:
-            item.append(data)
+            item.append(datum)
 
         res.append(item)
 
@@ -1922,12 +1922,15 @@ class Runner(object):
         self.used_supercontigs = used_supercontigs
 
     def set_num_tracks(self, num_tracks):
-        self.num_tracks = num_tracks
+        num_int_cols = num_tracks
 
         if self.use_dinucleotide:
-            self.num_int_cols = num_tracks + NUM_SEQ_COLS
-        else:
-            self.num_int_cols = num_tracks
+            num_int_cols += NUM_SEQ_COLS
+        if self.supervision_type != SUPERVISION_UNSUPERVISED:
+            num_int_cols += 1
+
+        self.num_tracks = num_tracks
+        self.num_int_cols = num_int_cols
 
     def open_writable_or_dummy(self, filepath, clobber=None):
         if clobber is None:

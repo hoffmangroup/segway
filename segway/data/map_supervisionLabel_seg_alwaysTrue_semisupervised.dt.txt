@@ -4,7 +4,7 @@ map_supervisionLabel_seg_alwaysTrue
 % second parent is target
     0 2 0 default
         % no label
-        -1 { 1 } % doesn't matter, observed child is always true
+        -1 { 1 } % does not matter, observed child is always true
 
         % label set
         %% if the target == label - 1: then observed child is true

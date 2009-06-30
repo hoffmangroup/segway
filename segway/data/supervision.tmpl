@@ -6,7 +6,7 @@
    }
 
    variable: supervisionLabel {
-     type: discrete observed $track_index:$track_index;
+     type: discrete observed $track_index:$track_index cardinality CARD_SUPERVISIONLABEL;
 
-     conditionalparents: CONDITIONALPARENTS_NIL;
+     conditionalparents: CONDITIONALPARENTS_NIL_DISCRETE;
    }

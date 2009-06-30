@@ -39,7 +39,7 @@ class NativeDatum(Datum):
 def read(iterator, datum_cls=Datum):
     for line in iterator:
         words = line.split()
-        if words[0] == "track":
+        if not words or words[0] == "track":
             continue # skip
 
         assert len(words) >= 3

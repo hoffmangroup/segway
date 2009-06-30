@@ -48,7 +48,7 @@ any inference using the ``--dry-run`` option.
 You can use the ``--num-labels`` option to specify the number of
 possible segment labels to use in the model. Using ``--num-starts``
 will generate multiple copies of the ``input.master`` file, named
-``input.0.master``, ``input.1.master`, and so on, with different
+``input.0.master``, ``input.1.master``, and so on, with different
 randomly picked initial parameters. You may substitute your own
 ``input.master`` files but I recommend starting with a
 Segway-generated template. This will help avoid some common pitfalls.
@@ -67,6 +67,8 @@ distribution (``--distribution=gamma``). The ideal methodology for
 setting gamma parameter values is less well-understood, and it also
 requires an unreleased version of GMTK. I recommend the use of the
 default) in most cases.
+
+XXX add arcsinh_normal similar to log
 
 You may specify a subset of tracks using the ``--trackname`` option
 which may be repeated. For example:
