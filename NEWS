@@ -2,6 +2,7 @@
 
 * segway: LEN_SEG_EXPECTED becomes 100000
 * segway: fixed --semisupervised bugs
+* segway-layer: add --mnemonic-file option
 * BED parsing now handles empty lines by ignoring them instead of
   generating an error
 * docs changes
