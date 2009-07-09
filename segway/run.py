@@ -2763,6 +2763,9 @@ class Runner(object):
                                                **kwargs_chunk)
             res.queue(restartable_job)
 
+            XXXX repeat for reversed job with gpr="^0:-1:0"
+            XXXX add extra jobs to bundle
+
         return res
 
     def queue_train_bundle(self, input_params_filename, output_params_filename,
