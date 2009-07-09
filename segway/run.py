@@ -2747,8 +2747,11 @@ class Runner(object):
 
         res = RestartableJobDict(self.session, self.res_usage_file)
 
+        make_acc_filename_custom = partial(self.make_acc_filename, start_index)
+        num_chunks = self.num_chunks
+
         for chunk_index, chunk_len in self.chunk_lens_sorted():
-            acc_filename = self.make_acc_filename(start_index, chunk_index)
+            acc_filename = make_acc_filename_custom(chunk_index)
             kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
                                 **kwargs)
 
@@ -2765,7 +2768,9 @@ class Runner(object):
 
             # XXX: temporary add extra chunks for reverse
             kwargs_chunk["gpr"] = "^0:-1:0"
-            kwargs_chunk["storeAccFile"] = self.num_chunks + chunk_index
+
+            acc_filename = make_acc_filename_custom(num_chunks + chunk_index)
+            kwargs_chunk["storeAccFile"] = acc_filename
 
             restartable_job = self.queue_train(start_index, round_index,
                                                str(chunk_index) + "r",
