@@ -1712,7 +1712,6 @@ class Runner(object):
         print_obs_filepaths_custom = partial(self.print_obs_filepaths,
                                              float_filelist, int_filelist)
         save_observations_chunk = self.save_observations_chunk
-        clobber = self.clobber
 
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
@@ -2759,12 +2758,20 @@ class Runner(object):
             num_frames = self.chunk_lens[chunk_index]
 
             restartable_job = self.queue_train(start_index, round_index,
-                                               chunk_index, num_frames,
+                                               str(chunk_index) + "f",
+                                               num_frames,
                                                **kwargs_chunk)
             res.queue(restartable_job)
 
-            XXXX repeat for reversed job with gpr="^0:-1:0"
-            XXXX add extra jobs to bundle
+            # XXX: temporary add extra chunks for reverse
+            kwargs_chunk["gpr"] = "^0:-1:0"
+            kwargs_chunk["storeAccFile"] = self.num_chunks + chunk_index
+
+            restartable_job = self.queue_train(start_index, round_index,
+                                               str(chunk_index) + "r",
+                                               num_frames,
+                                               **kwargs_chunk)
+            res.queue(restartable_job)
 
         return res
 
@@ -2779,10 +2786,13 @@ class Runner(object):
                                        output_params_filename,
                                        card_seg=self.num_segs)
 
+        # XXX: temporary add extra chunks for reverse
+        last_chunk = (2 * self.num_chunks) - 1
+
         kwargs = dict(outputMasterFile=self.output_master_filename,
                       cppCommandOptions=cpp_options,
                       trrng="nil",
-                      loadAccRange="0:%s" % (self.num_chunks-1),
+                      loadAccRange="0:%s" % last_chunk,
                       loadAccFile=acc_filename,
                       **kwargs)
 
