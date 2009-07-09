@@ -35,6 +35,7 @@ frame: 1 {
    variable: segTransition {
      type: discrete hidden cardinality CARD_SEGTRANSITION;
      conditionalparents: segCountDown(-1), seg(-1) using DenseCPT("segCountDown_seg_segTransition");
+     weight: scale 20;
    }
 
    variable: seg {

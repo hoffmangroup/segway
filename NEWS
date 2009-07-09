@@ -1,6 +1,7 @@
 0.1.12:
 
 * segway: LEN_SEG_EXPECTED becomes 100000
+* segway: P(segTransition(0) | segCountDown(-1), seg(-1)) is now weighted with scale 20
 * segway: fixed --semisupervised bugs
 * segway-layer: add --mnemonic-file option
 * BED parsing now handles empty lines by ignoring them instead of
