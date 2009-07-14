@@ -2,7 +2,10 @@
 
 * segway: trains on all sequence in both forward and reverse direction (temporary)
 * segway: LEN_SEG_EXPECTED becomes 100000
-* segway: P(segTransition(0) | segCountDown(-1), seg(-1)) is now weighted with scale 20
+* segway: P(segTransition(0) | segCountDown(-1), seg(-1)) is now
+  weighted with scale which can be set through
+  -DSEGTRANSITION_WEIGHT_SCALE (not exposed to user, but you can hack
+  include files)
 * segway: fixed --semisupervised bugs
 * segway-layer: add --mnemonic-file option
 * BED parsing now handles empty lines by ignoring them instead of
