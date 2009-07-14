@@ -2761,20 +2761,7 @@ class Runner(object):
             num_frames = self.chunk_lens[chunk_index]
 
             restartable_job = self.queue_train(start_index, round_index,
-                                               str(chunk_index) + "f",
-                                               num_frames,
-                                               **kwargs_chunk)
-            res.queue(restartable_job)
-
-            # XXX: temporary add extra chunks for reverse
-            kwargs_chunk["gpr"] = "^0:-1:0"
-
-            acc_filename = make_acc_filename_custom(num_chunks + chunk_index)
-            kwargs_chunk["storeAccFile"] = acc_filename
-
-            restartable_job = self.queue_train(start_index, round_index,
-                                               str(chunk_index) + "r",
-                                               num_frames,
+                                               chunk_index, num_frames,
                                                **kwargs_chunk)
             res.queue(restartable_job)
 
@@ -2791,8 +2778,7 @@ class Runner(object):
                                        output_params_filename,
                                        card_seg=self.num_segs)
 
-        # XXX: temporary add extra chunks for reverse
-        last_chunk = (2 * self.num_chunks) - 1
+        last_chunk = self.num_chunks - 1
 
         kwargs = dict(outputMasterFile=self.output_master_filename,
                       cppCommandOptions=cpp_options,
