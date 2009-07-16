@@ -2671,6 +2671,7 @@ class Runner(object):
         BIC = -2 ln L + k ln n
         this is a modified BIC = -(2/n) ln L + k ln N
 
+        k: # of free params
         n: # of bases
         N: # of sequences
         """
