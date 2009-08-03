@@ -64,21 +64,21 @@ def uniquify(seq):
     seen_add = seen.add
     return [x for x in seq if x not in seen and not seen_add(x)]
 
-re_alpha = re.compile("^[A-Za-z]*")
-def get_alpha_part(text):
-    # returns empty string when there is no alpha part
-    return re_alpha.match(text).group(0)
+re_stem = re.compile(r"^(.+(?=\.)|[A-Za-x]+|)")
+def get_stem(text):
+    # returns empty string when there is no stem part
+    return re_stem.match(text).group(0)
 
 def recolor(mnemonics):
     res = {}
 
-    alpha_colors = IncrementingDefaultDict()
+    stem_colors = IncrementingDefaultDict()
 
     for label_index in sorted(mnemonics.iterkeys()):
         mnemonic = mnemonics[label_index]
-        alpha_part = get_alpha_part(mnemonic)
+        stem = get_stem(mnemonic)
 
-        res[int(label_index)] = get_label_color(alpha_colors[alpha_part])
+        res[int(label_index)] = get_label_color(stem_colors[stem])
 
     return res
 

@@ -1,6 +1,8 @@
 0.1.13:
 
-
+* segway: fix bug: --dry-run causes traceback during training
+* segway-layer: automatically recolor in groups defined by period
+  (such as 1.3) as well as alphabetical characters (A3)
 
 0.1.12:
 

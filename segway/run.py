@@ -986,6 +986,10 @@ class RestartableJobDict(dict):
         return dict.__init__(self, *args, **kwargs)
 
     def queue(self, restartable_job):
+        # handle dry run case
+        if restartable_job is None:
+            return
+
         jobid = restartable_job.run()
 
         self[jobid] = restartable_job
@@ -1570,6 +1574,9 @@ class Runner(object):
             # weight_scale = min(max_num_datapoints_track / num_datapoints_track,
             #                   MAX_WEIGHT_SCALE)
             weight_scale = 1.0
+            # XXX: right now, I am repurposing this for resolution
+            # changing, do not change it
+            assert weight_scale == 1.0
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
