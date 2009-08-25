@@ -64,7 +64,7 @@ def uniquify(seq):
     seen_add = seen.add
     return [x for x in seq if x not in seen and not seen_add(x)]
 
-re_stem = re.compile(r"^(.+(?=\.)|[A-Za-x]+|)")
+re_stem = re.compile(r"^(.+(?=\.)|[A-Za-z]+|)")
 def get_stem(text):
     # returns empty string when there is no stem part
     return re_stem.match(text).group(0)
