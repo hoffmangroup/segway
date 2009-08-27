@@ -447,6 +447,15 @@ def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
 
+def quote_spaced_str(text):
+    """"
+    add quotes around text if it has spaces in it
+    """
+    if " " in text:
+        return '"%s"' % text
+    else:
+        return text
+
 class NoAdvance(str):
     """
     cause rewrite_strip_comments() to not consume an extra line
@@ -2688,6 +2697,9 @@ class Runner(object):
 
         return model_penalty - (2/self.num_bases * log_likelihood)
 
+    def log_cmdline(self, cmdline):
+        print >>self.cmdline_file, " ".join(map(quote_spaced_str, cmdline))
+
     def queue_gmtk(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
@@ -2700,7 +2712,7 @@ class Runner(object):
             cmd = gmtk_cmdline[0]
             args = gmtk_cmdline[1:]
 
-        print >>self.cmdline_file, " ".join(gmtk_cmdline)
+        self.log_cmdline(gmtk_cmdline)
 
         if self.dry_run:
             return None
@@ -2876,8 +2888,7 @@ class Runner(object):
 
         # XXX: need exist/clobber logic here
         # XXX: repetitive with queue_gmtk
-        cmdline = prog.build_cmdline(options=kwargs)
-        print >>self.cmdline_file, " ".join(cmdline)
+        self.log_cmdline(prog.build_cmdline(options=kwargs))
 
         prog(**kwargs)
 
