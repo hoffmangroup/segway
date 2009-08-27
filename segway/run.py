@@ -60,16 +60,19 @@ drmaa.const.status_to_string = status_to_string
 
 # XXXXXXXX: end monkey-patching
 
+# set once per file run
+UUID = uuid1().hex
+
 # XXX: I should really get some sort of Enum for this, I think Peter
 # Norvig has one
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
-DISTRIBUTION_ARCSINH_NORMAL = "arcsinh_norm"
+DISTRIBUTION_ASINH_NORMAL = "asinh_norm"
 DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
-                 DISTRIBUTION_ARCSINH_NORMAL]
+                 DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_NORM
 DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
-                                     DISTRIBUTION_ARCSINH_NORMAL])
+                                     DISTRIBUTION_ASINH_NORMAL])
 
 ## XXX: should be options
 MEAN_METHOD_UNIFORM = "uniform" # randomly pick from the range
@@ -311,7 +314,7 @@ MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${track}" \
     " ${min_track} gammascale_${seg}_${track} gammashape_${seg}_${track}"
 MC_TMPLS = {"norm": MC_NORM_TMPL,
             "gamma": MC_GAMMA_TMPL,
-            "arcsinh_norm": MC_NORM_TMPL}
+            "asinh_norm": MC_NORM_TMPL}
 
 MX_TMPL = "1 mx_${seg}_${track} 1 dpmf_always" \
     " mc_${distribution}_${seg}_${track}"
@@ -323,7 +326,7 @@ TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
 WIG_ATTRS = dict(autoScale="off")
-WIG_ATTRS_VITERBI = dict(name="%s" % PKG,
+WIG_ATTRS_VITERBI = dict(name="%s.%s" % (PKG, UUID),
                          visibility="dense",
                          viewLimits="0:1",
                          itemRgb="on",
@@ -371,9 +374,6 @@ SUPERVISION_SEMISUPERVISED = 1
 SUPERVISION_SUPERVISED = 2
 
 SUPERVISION_LABEL_OFFSET = 1
-
-# set once per file run
-UUID = uuid1().hex
 
 TERMINATE = JobControlAction.TERMINATE
 
@@ -1619,7 +1619,7 @@ class Runner(object):
 
         int_blocks = []
         if float_data is not None:
-            if self.distribution == DISTRIBUTION_ARCSINH_NORMAL:
+            if self.distribution == DISTRIBUTION_ASINH_NORMAL:
                 float_data = arcsinh(float_data)
 
             mask_missing = isnan(float_data)
@@ -1961,7 +1961,7 @@ class Runner(object):
         means = self.sums / num_datapoints
         distribution = self.distribution
 
-        if distribution == DISTRIBUTION_ARCSINH_NORMAL:
+        if distribution == DISTRIBUTION_ASINH_NORMAL:
             means = arcsinh(means)
 
         # this is an unstable way of calculating the variance,
@@ -1970,7 +1970,7 @@ class Runner(object):
         # XXX: best would be to switch to the pairwise parallel method
         # (see Wikipedia)
         sums_squares_normalized = self.sums_squares / num_datapoints
-        if distribution == DISTRIBUTION_ARCSINH_NORMAL:
+        if distribution == DISTRIBUTION_ASINH_NORMAL:
             sums_squares_normalized = arcsinh(sums_squares_normalized)
 
         self.means = means

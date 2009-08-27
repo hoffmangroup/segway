@@ -8,8 +8,8 @@
 
 For a conceptual overview see the paper:
 
-Michael M. Hoffman, Jeff A. Bilmes, William Stafford Noble. Segway: a
-dynamic Bayesian network for genomic segmentation. In preparation.
+  Michael M. Hoffman, Jeff A. Bilmes, William Stafford Noble. Segway:
+  a dynamic Bayesian network for genomic segmentation. In preparation.
 
 Michael <mmh1 at washington dot edu> can send you a copy of the latest
 manuscript.
@@ -45,35 +45,55 @@ fully in the Segway article.
 You can tell Segway just to generate these files and not to perform
 any inference using the ``--dry-run`` option.
 
-You can use the ``--num-labels`` option to specify the number of
-possible segment labels to use in the model. Using ``--num-starts``
-will generate multiple copies of the ``input.master`` file, named
-``input.0.master``, ``input.1.master``, and so on, with different
-randomly picked initial parameters. You may substitute your own
-``input.master`` files but I recommend starting with a
-Segway-generated template. This will help avoid some common pitfalls.
-In particular, if you are going to perform training on your model, you
-must ensure that the ``input.master`` file retains the same ``#ifdef``
-structure for parameters you wish to train. Otherwise, the values
-discovered after one round of trainin will not be used in subsequent
-rounds, or in the identify or posterior stages.
+Using :option:`--num-starts`\=\ *starts* will generate multiple copies of the
+``input.master`` file, named ``input.0.master``, ``input.1.master``,
+and so on, with different randomly picked initial parameters. You may
+substitute your own ``input.master`` files but I recommend starting
+with a Segway-generated template. This will help avoid some common
+pitfalls. In particular, if you are going to perform training on your
+model, you must ensure that the ``input.master`` file retains the same
+``#ifdef`` structure for parameters you wish to train. Otherwise, the
+values discovered after one round of training will not be used in
+subsequent rounds, or in the identify or posterior stages.
 
-XXX mention --num-labels is a range and will result in <num_starts>
-times the length of this range different random starts.
+You can use the :option:`--num-labels`\=\ *labels* option to specify the
+number of segment labels to use in the model (default 2). You can set
+this to a single number or a range with Python slice notation. For
+example, ``--num-labels=5:20:5`` will result in 5, 10, and 15 labels
+being tried. If you specify :option:`--num-starts`\=\ *starts*, then
+there will be *starts* different threads for each of the *labels*
+labels tried.
+
+Segway allows multiple models of the values of an observation track
+using three different probability distributions: the normal
+distribution, the gamma distribution, and a multinomial distribution,
+where the nominal output classes each map to a different bin of the
+numerical data.
+
+XXX cleanup duplication
 
 The model may be generated using a normal distribution for continuous
-observed tracks (``--distribution=normal``, the default), or a gamma
-distribution (``--distribution=gamma``). The ideal methodology for
-setting gamma parameter values is less well-understood, and it also
-requires an unreleased version of GMTK. I recommend the use of the
-default) in most cases.
+observed tracks (``--distribution=norm``, the default), a normal
+distribution on asinh-transformed data
+(``--distribution=asinh_norm``), or a gamma distribution
+(``--distribution=gamma``). The ideal methodology for setting gamma
+parameter values is less well-understood, and it also requires an
+unreleased version of GMTK. I recommend the use of ``asinh_norm`` in
+most cases.
+
+For gamma distributions, Segway generates initial parameters by
+converting mean~$\mu$ and variance~$\sigma^2$ to shape~$k$ and
+scale~$\theta$ using the equations~$\mu = k \theta$ and~$\sigma^2 = k
+\theta^2$.
 
 XXX add arcsinh_normal similar to log
 
 You may specify a subset of tracks using the ``--trackname`` option
-which may be repeated. For example:
+which may be repeated. For example::
 
-  XXX add example
+    segway --trackname dnasei --trackname h3k36me3
+
+will include the two tracks ``dnasei`` and ``h3k36me3`` and no others.
 
 It is very important that you always specify the same ``--trackname``
 options at all stages in the Segway workflow. There is also a special
@@ -82,8 +102,15 @@ track name, ``dinucleotide``. When you specify
 the dinucleotide that starts at a particular position. This can help
 in modeling CpG or G+C bias.
 
-XXX cover min-seq-len
-XXX cover --prior-strength
+Segment length constraints
+==========================
+
+The XXX option allows specification of minimum and maximum segment
+lengths for various labels. XXX include sample of table
+
+also a way to add a soft prior on XXX cover --prior-strength
+XXX default is XXXcomp, this can't be changed at the moment. E-mail
+Michael if you need it to be changable.
 
 Distributed computing
 =====================
@@ -93,7 +120,7 @@ only tested it against Sun Grid Engine, but it should be possible to
 work with other DRMAA-compatible distriuted computing systems, such as
 Platform LSF, PBS, Condor, (XXXcomp add others). If you are interested
 in using one of these systems, please contact me so we can correct all
-the fine details.
+the fine details. A standalone version is planned.
 
 Training
 ========
@@ -110,21 +137,95 @@ coordinates of the ENCODE pilot regions in this format at XXXcomp. For
 human whole-genome studies, these regions have nice properties since
 they mark 1 percent of the genome, and were carefully picked to
 include a variety of different gene densities, and a number of more
-limited studies provide data just for these regions.
+limited studies provide data just for these regions. There is a file
+containing only nine of these regions at XXXcomp(make it), which
+covers 0.15% of the human genome, and is useful for training.
 
 Memory usage
 ============
 
-DBN inference can be quite memory intensive with the long sequences
-found in genomic data, so Segway first tries to measure the memory use
-of a single sequence. It then uses the results of this measurement to
-predict memory use for future subtasks and allocate them efficiently,
-if possible.
+XXX describe new regime
 
 other sections of workflow XXX
 
 XXX add section on all other options
 
+Command-line usage summary
+==========================
+
+XXX cover all of these options.
+
+::
+
+  Usage: segway [OPTION]... GENOMEDATADIR
+  
+  Options:
+    --version             show program's version number and exit
+    -h, --help            show this help message and exit
+  
+    Data subset:
+      -t TRACK, --track=TRACK
+                          append TRACK to list of tracks to use (default all)
+      --include-coords=FILE
+                          limit to genomic coordinates in FILE
+      --exclude-coords=FILE
+                          filter out genomic coordinates in FILE
+  
+    Model files:
+      -i FILE, --input-master=FILE
+                          use or create input master in FILE
+      -s FILE, --structure=FILE
+                          use or create structure in FILE
+      -p FILE, --trainable-params=FILE
+                          use or create trainable parameters in FILE
+      --dont-train=FILE   use FILE as list of parameters not to train
+      --seg-table=FILE    load segment hyperparameters from FILE
+      --semisupervised=FILE
+                          semisupervised segmentation with labels in FILE
+  
+    Output files:
+      -b FILE, --bed=FILE
+                          create bed track in FILE
+  
+    Intermediate files:
+      -o DIR, --observations=DIR
+                          use or create observations in DIR
+      -d DIR, --directory=DIR
+                          create all other files in DIR
+  
+    Variables:
+      -D DIST, --distribution=DIST
+                          use DIST distribution
+      -r NUM, --random-starts=NUM
+                          randomize start parameters NUM times (default 1)
+      -N SLICE, --num-segs=SLICE
+                          make SLICE segment classes (default 2)
+      --prior-strength=RATIO
+                          use RATIO times the number of data counts as the
+                          number of pseudocounts for the segment length prior
+                          (default 0)
+      -m PROGRESSION, --mem-usage=PROGRESSION
+                          try each float in PROGRESSION as the number of
+                          gibibytes of memory to allocate in turn (default
+                          2,3,4,6,8,10,12,14,15)
+      -v NUM, --verbosity=NUM
+                          show messages with verbosity NUM
+      --drm-opt=OPT       specify an option to be passed to the distributed
+                          resource manager
+  
+    Flags:
+      -c, --clobber       delete any preexisting files
+      -T, --no-train      do not train model
+      -I, --no-identify   do not identify segments
+      -P, --no-posterior  do not identify probability of segments
+      -k, --keep-going    keep going in some threads even when you have errors
+                          in another
+      -n, --dry-run       write all files, but do not run any executables
+      -S, --split-sequences
+                          split up sequences that are too large to fit into
+                          memory
+  
+  
 
 Python interface
 ================
@@ -136,7 +237,7 @@ XXXcomp table here (from the setup.py)
 
 You can then call the appropriate module through its ``main()``
 function with the same arguments you would use at the command line.
-For example:
+For example::
 
   from segway import run
 

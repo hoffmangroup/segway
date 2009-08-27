@@ -1,8 +1,13 @@
 0.1.13:
 
-* segway: fix bug: --dry-run causes traceback during training
+* segway: adding switching weights
+* genomedata >0.1.2 is now a prerequisite
+* segway: identify BED output now names tracks segway.<uuid> in order
+  to prevent conflicts
 * segway-layer: automatically recolor in groups defined by period
   (such as 1.3) as well as alphabetical characters (A3)
+* segway: fix bug: --dry-run causes traceback during training
+* segway: --distribution=arcsinh_norm becomes --distribution=asinh_norm
 
 0.1.12:
 
