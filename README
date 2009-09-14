@@ -35,7 +35,12 @@ install it yourself. The URL is in the source to setup.py
 If you want DRMAA distributed job control (and you can't turn this off
 right now), it will also install:
 
-- DRMAA-python 0.2
+- drmaa
+
+It works with SGE or LSF. If you are using LSF, there is an additional
+prerequisite of FedStage_ DRMAA for LSF:
+
+.. _FedStage http://sourceforge.net/projects/lsf-drmaa/
 
 In order for automatic prerequisite installation to work, you either
 need write access to your Python installation's site-packages

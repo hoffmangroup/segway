@@ -37,28 +37,17 @@ from numpy import (add, amin, amax, append, arange, arcsinh, array,
                    vectorize, vstack, where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
-from optbuild import (AddableMixin, Mixin_NoConvertUnderscore,
-                      OptionBuilder_ShortOptWithSpace)
+from optbuild import AddableMixin
 from path import path
 from tabdelim import DictReader, ListWriter
 
 from .bed import read_native
+from .cluster import Session, JobTemplateFactory, make_native_spec
 from ._util import (constant, data_filename, data_string, DTYPE_OBS_INT,
-                    EXT_GZ, get_chrom_coords, get_label_color, gzip_open,
+                    EXT_GZ, GB, get_chrom_coords, get_label_color, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
-                    NamedTemporaryDir, OptionBuilder_GMTK, PKG, Session,
+                    MB, NamedTemporaryDir, OptionBuilder_GMTK, PKG,
                     VITERBI_PROG)
-
-# XXXXXXXX: monkey-patching, dirty hack to fix broken code
-
-import drmaa.const
-
-def status_to_string(status):
-    return drmaa.const._JOB_PS[status]
-
-drmaa.const.status_to_string = status_to_string
-
-# XXXXXXXX: end monkey-patching
 
 # set once per file run
 UUID = uuid1().hex
@@ -163,9 +152,6 @@ NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
 
-MB = 2**20
-GB = 2**30
-
 MAX_FRAMES = 2000000 # 2 million
 MEM_USAGE_BUNDLE = 100*MB # XXX: should start using this again
 MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
@@ -198,11 +184,6 @@ BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
-
-NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
-                    + OptionBuilder_ShortOptWithSpace)() # do not run
-
-NATIVE_SPEC_DEFAULT = dict(w="n")
 
 SPECIAL_TRACKNAMES = ["dinucleotide", "supervisionLabel"]
 
@@ -351,9 +332,6 @@ COMMENT_POSTERIOR_TRIANGULATION = \
 FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%s step=1"
 
 CARD_SEGTRANSITION = 2
-
-# MiB of guard space to prevent going over mem_requested allocation
-H_VMEM_GUARD = 10
 
 # training results
 # XXX: this should really be a namedtuple, yuck
@@ -512,16 +490,6 @@ def slice2range(s):
         step = 1
 
     return xrange(start, stop, step)
-
-def make_res_req(mem_usage):
-    # round up to the next mebibyte
-    mem_usage_mebibytes = ceil(mem_usage / MB)
-
-    mem_requested = "%dM" % mem_usage_mebibytes
-    h_vmem = "%dM" % (mem_usage_mebibytes - H_VMEM_GUARD)
-
-    return ["mem_requested=%s" % mem_requested,
-            "h_vmem=%s" % h_vmem]
 
 def convert_chunks(attrs, name):
     supercontig_start = attrs.start
@@ -714,9 +682,6 @@ def make_cpp_options(input_params_filename=None, output_params_filename=None,
         return res
 
     # default: return None
-
-def make_native_spec(*args, **kwargs):
-    return " ".join(NATIVE_SPEC_PROG.build_args(args=args, options=kwargs))
 
 def make_spec(name, items):
     header_lines = ["%s_IN_FILE inline" % name, str(len(items)), ""]
@@ -919,28 +884,6 @@ class Mixin_Lockable(AddableMixin):
         return AddableMixin.__init__(self, *args, **kwargs)
 
 LockableDefaultDict = Mixin_Lockable + defaultdict
-
-class JobTemplateFactory(object):
-    def __init__(self, template, mem_usage_progression):
-        self.template = template
-        self.native_spec = template.nativeSpecification
-        self.mem_usage_progression = mem_usage_progression
-
-    def __call__(self, trial_index):
-        res = self.template
-
-        try:
-            mem_usage = self.mem_usage_progression[trial_index]
-        except IndexError:
-            raise ValueError("edge of memory usage progression reached "
-                             "without success")
-
-        res_req = make_res_req(mem_usage)
-        self.res_req = res_req
-        res_spec = make_native_spec(l=res_req)
-        res.nativeSpecification = " ".join([self.native_spec, res_spec])
-
-        return res
 
 class RestartableJob(object):
     def __init__(self, session, job_template_factory, global_mem_usage,
@@ -2728,7 +2671,7 @@ class Runner(object):
         job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
 
-        job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec, **NATIVE_SPEC_DEFAULT)
+        job_tmpl.nativeSpecification = make_native_spec(self.user_native_spec)
 
         set_cwd_job_tmpl(job_tmpl)
 

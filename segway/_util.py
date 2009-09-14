@@ -36,8 +36,6 @@ try:
 except NameError:
     PKG = "segway"
 
-DRMSINFO_PREFIX = "GE" # XXX: only SGE is supported for now
-
 PKG_DATA = ".".join([PKG, "data"])
 
 SUFFIX_GZ = extsep + EXT_GZ
@@ -55,6 +53,9 @@ data_string = partial(resource_string, PKG_DATA)
 
 NUM_COLORS = 8
 SCHEME = colorbrewer.Dark2[NUM_COLORS]
+
+MB = 2**20
+GB = 2**30
 
 OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
@@ -91,15 +92,6 @@ class NamedTemporaryDir(object):
     def __exit__(self, exc, value, tb):
         self.close()
 
-def Session(*args, **kwargs):
-    # here so that other modules will not fail on lack of DRMAA
-    from drmaa import Session as _Session
-
-    res = _Session()
-
-    assert res.drmsInfo.startswith(DRMSINFO_PREFIX)
-
-    return res
 
 def get_col_index(chromosome, trackname):
     return get_tracknames(chromosome).index(trackname)
@@ -114,7 +106,6 @@ def maybe_gzip_open(filename, *args, **kwargs):
         return gzip_open(filename, *args, **kwargs)
     else:
         return open(filename, *args, **kwargs)
-
 
 def constant(val):
     """
