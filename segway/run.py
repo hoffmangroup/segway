@@ -1580,12 +1580,10 @@ class Runner(object):
             # XXX: this is backwards!!! you need to make the scale
             # smaller in this case--squaring a probability makes it bigger!
 
-            # weight_scale = min(max_num_datapoints_track / num_datapoints_track,
-            #                   MAX_WEIGHT_SCALE)
-            weight_scale = 1.0
-            # XXX: right now, I am repurposing this for resolution
-            # changing, do not change it
-            assert weight_scale == 1.0
+            weight_scale = min(max_num_datapoints_track / num_datapoints_track,
+                               MAX_WEIGHT_SCALE)
+            # weight_scale = 1.0
+            # assert weight_scale == 1.0
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
