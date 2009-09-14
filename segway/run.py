@@ -886,10 +886,10 @@ class Mixin_Lockable(AddableMixin):
 LockableDefaultDict = Mixin_Lockable + defaultdict
 
 class RestartableJob(object):
-    def __init__(self, session, job_template_factory, global_mem_usage,
+    def __init__(self, session, job_tmpl_factory, global_mem_usage,
                  mem_usage_key):
         self.session = session
-        self.job_template_factory = job_template_factory
+        self.job_tmpl_factory = job_tmpl_factory
 
         # last trial index tried
         self.trial_index = -1
@@ -898,7 +898,7 @@ class RestartableJob(object):
         self.mem_usage_key = mem_usage_key
 
     def run(self):
-        job_template_factory = self.job_template_factory
+        job_tmpl_factory = self.job_tmpl_factory
 
         global_mem_usage = self.global_mem_usage
         mem_usage_key = self.mem_usage_key
@@ -917,12 +917,12 @@ class RestartableJob(object):
 
         self.trial_index = trial_index
 
-        job_template = job_template_factory(trial_index)
+        job_template = job_tmpl_factory(trial_index)
         res = self.session.runJob(job_template)
 
         assert res
 
-        res_req_text = " ".join(job_template_factory.res_req)
+        res_req_text = " ".join(job_tmpl_factory.res_req)
         print >>sys.stderr, "queued %s (%s)" % (res, res_req_text)
 
         return res

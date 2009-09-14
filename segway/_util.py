@@ -54,6 +54,7 @@ data_string = partial(resource_string, PKG_DATA)
 NUM_COLORS = 8
 SCHEME = colorbrewer.Dark2[NUM_COLORS]
 
+KB = 2**10
 MB = 2**20
 GB = 2**30
 

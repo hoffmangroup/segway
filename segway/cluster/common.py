@@ -33,6 +33,7 @@ class _JobTemplateFactory(object):
             raise ValueError("edge of memory usage progression reached "
                              "without success")
 
+        self.mem_limit = calc_mem_limit(mem_usage)
         self.res_req = self.make_res_req(mem_usage)
         res.nativeSpecification = self.make_native_spec()
 
