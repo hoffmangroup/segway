@@ -168,9 +168,6 @@ GB = 2**30
 
 MAX_FRAMES = 2000000 # 2 million
 MEM_USAGE_BUNDLE = 100*MB # XXX: should start using this again
-RES_REQ_IDS = ["mem_requested", "h_vmem"] # h_vmem: hard ulimit
-ALWAYS_MAX_MEM_USAGE = True
-
 MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
