@@ -904,7 +904,8 @@ class RestartableJob(object):
         mem_usage_key = self.mem_usage_key
         trial_index = global_mem_usage[mem_usage_key]
 
-        print >>sys.stderr, "self.trial_index=%d; trial_index=%d" % (self.trial_index, trial_index)
+        print >>sys.stderr, ("self.trial_index=%d; trial_index=%d"
+                             % (self.trial_index, trial_index))
 
         # if this index was tried before and unsuccessful, increment
         # and set global_mem_usage, controlling for race conditions
