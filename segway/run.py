@@ -357,7 +357,7 @@ DONE = JobState.DONE
 
 THREAD_SLEEP_TIME = 20
 
-DOWNSAMPLE_RESOLUTION = 10
+RESOLUTION = 1
 
 ## exceptions
 class ChunkOverMemUsageLimit(Exception):
@@ -1156,6 +1156,7 @@ class Runner(object):
         res.distribution = options.distribution
         res.random_starts = options.random_starts
         res.len_seg_strength = options.prior_strength
+        res.resolution = options.resolution
 
         include_tracknames = options.track
         # will mess things up if it's there
@@ -1180,7 +1181,6 @@ class Runner(object):
         res.keep_going = options.keep_going
         res.split_sequences = options.split_sequences
 
-        res.resolution = DOWNSAMPLE_RESOLUTION
 
         return res
 
@@ -3361,6 +3361,11 @@ def parse_options(args):
                          default=NUM_SEGS, metavar="SLICE",
                          help="make SLICE segment classes"
                          " (default %d)" % NUM_SEGS)
+
+        group.add_option("--resolution", type=int,
+                         default=RESOLUTION, metavar="RES",
+                         help="downsample to every RES bp (default %d)" %
+                         RESOLUTION)
 
         group.add_option("--prior-strength", type=float,
                          default=PRIOR_STRENGTH, metavar="RATIO",

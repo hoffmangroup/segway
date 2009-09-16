@@ -4,6 +4,7 @@
 * segway: restoring weighting to global number of datapoints in a track
 * segway: now supports Platform LSF with FedStage DRMAA for LSF
 * segway: moved SGE-specific code into modular driver architecture
+* segway: --resolution option allows downsampling for speed
 * segway: start quoting words with spaces in log/run.sh
 * genomedata >0.1.2 is now a prerequisite
 * segway: identify BED output now names tracks segway.<uuid> in order
