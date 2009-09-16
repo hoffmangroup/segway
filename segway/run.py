@@ -33,7 +33,7 @@ from drmaa import JobControlAction, JobState
 from genomedata import Genome
 from numpy import (add, amin, amax, append, arange, arcsinh, array,
                    column_stack, diagflat, empty, finfo, float32, intc, invert,
-                   isnan, NINF, ones, outer, sqrt, square, tile,
+                   isnan, maximum, NINF, ones, outer, sqrt, square, tile,
                    vectorize, vstack, where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
@@ -356,6 +356,8 @@ FAILED = JobState.FAILED
 DONE = JobState.DONE
 
 THREAD_SLEEP_TIME = 20
+
+DOWNSAMPLE_RESOLUTION = 10
 
 ## exceptions
 class ChunkOverMemUsageLimit(Exception):
@@ -878,6 +880,31 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
 
+def downsample_add(inarray, resolution):
+    # downsample presence data into num_datapoints
+    full_num_rows = inarray.shape[0]
+
+    quotient = full_num_rows // resolution
+    remainder = full_num_rows % resolution
+    downsampled_num_rows = quotient + int(bool(remainder))
+    downsampled_shape = [downsampled_num_rows] + list(inarray.shape[1:])
+
+    res = zeros(downsampled_shape, inarray.dtype)
+
+    # if there's no remainder, then only use loop 0
+    if remainder == 0:
+        remainder = resolution
+
+    # loop 0: every bit
+    for index in xrange(remainder):
+        res += inarray[index::resolution]
+
+    # loop 1: remainder
+    for index in xrange(remainder, resolution):
+        res[:-1] += inarray[index::resolution]
+
+    return res
+
 class Mixin_Lockable(AddableMixin):
     def __init__(self, *args, **kwargs):
         self.lock = Lock()
@@ -1152,6 +1179,8 @@ class Runner(object):
         res.dry_run = options.dry_run
         res.keep_going = options.keep_going
         res.split_sequences = options.split_sequences
+
+        res.resolution = DOWNSAMPLE_RESOLUTION
 
         return res
 
@@ -1470,6 +1499,7 @@ class Runner(object):
             num_segs = "undefined\n#error must define CARD_SEG"
 
         mapping = dict(card_seg=num_segs,
+                       card_presence=self.resolution+1,
                        card_segCountDown=self.card_seg_countdown,
                        card_supervisionLabel=self.card_supervision_label,
                        card_frameIndex=MAX_FRAMES,
@@ -1493,6 +1523,18 @@ class Runner(object):
         # includes from params/input.master as well
 
         #self.gmtk_include_filename_relative = include_filename_relative
+
+    def make_weight_spec(self, multiplier):
+        return " | ".join("scale %f" % (index * multiplier)
+                          for index in xrange(self.resolution + 1))
+
+    def make_conditionalparents_spec(self, track):
+        spec = ('seg(0) using mixture collection("collection_seg_%s") '
+                'mapping("map_parent")'
+                % track)
+
+        return " | ".join(["CONDITIONALPARENTS_NIL_CONTINUOUS"] +
+                          [spec] * self.resolution)
 
     def save_structure(self):
         tracknames = self.tracknames
@@ -1518,20 +1560,21 @@ class Runner(object):
             # weight scale cannot be more than MAX_WEIGHT_SCALE to avoid
             # artifactual problems
 
-            # XXX: this is backwards!!! you need to make the scale
-            # smaller in this case--squaring a probability makes it bigger!
-
-            weight_scale = min(max_num_datapoints_track / num_datapoints_track,
-                               MAX_WEIGHT_SCALE)
+            weight_multiplier = min(max_num_datapoints_track
+                                    / num_datapoints_track, MAX_WEIGHT_SCALE)
             # weight_scale = 1.0
             # assert weight_scale == 1.0
+
+            conditionalparents_spec = self.make_conditionalparents_spec(track)
+            weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
             add_observation(observation_items, "observation.tmpl",
                             track=track, track_index=track_index,
                             presence_index=num_tracks+track_index,
-                            weight_scale=weight_scale)
+                            conditionalparents_spec=conditionalparents_spec,
+                            weight_spec=weight_spec)
 
         next_int_track_index = num_tracks*2
         # XXX: duplicative
@@ -1564,6 +1607,7 @@ class Runner(object):
         # input per frame is a series of float32s, followed by a series of
         # int32s it is better to optimize both sides here by sticking all
         # the floats in one file, and the ints in another one
+        resolution = self.resolution
 
         int_blocks = []
         if float_data is not None:
@@ -1572,20 +1616,31 @@ class Runner(object):
 
             mask_missing = isnan(float_data)
 
-            # output -> int_blocks
+            # output -> presence_data -> int_blocks
             # done in two steps so I can specify output type
             presence_data = empty(mask_missing.shape, DTYPE_OBS_INT)
             invert(mask_missing, presence_data)
-            int_blocks.append(presence_data)
 
-            float_data[mask_missing] = SENTINEL
+            num_datapoints = downsample_add(presence_data, resolution)
 
-            float_data.tofile(float_filepath)
+            int_blocks.append(num_datapoints)
+
+            # so that there is no divide by zero
+            num_datapoints_min_1 = maximum(num_datapoints, 1)
+
+            # make float
+            float_data[mask_missing] = 0.0
+
+            float_data_downsampled = downsample_add(float_data, resolution)
+            float_data_downsampled /= num_datapoints_min_1
+            float_data_downsampled.tofile(float_filepath)
 
         if seq_data is not None:
+            assert resolution == 1 # not implemented yet
             int_blocks.append(make_dinucleotide_int_data(seq_data))
 
         if supervision_data is not None:
+            assert resolution == 1 # not implemented yet
             int_blocks.append(supervision_data)
 
         # XXXopt: use the correctly sized matrix in the first place
@@ -2672,7 +2727,7 @@ class Runner(object):
         job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
 
-        job_tmpl.nativeSpecification = make_native_spec(self.user_native_spec)
+        job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec)
 
         set_cwd_job_tmpl(job_tmpl)
 

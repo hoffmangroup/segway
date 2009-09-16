@@ -9,8 +9,7 @@
 
      switchingparents: presence_$track(0) using mapping("map_parent");
 
-     conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | 
-                         seg(0) using mixture collection("collection_seg_$track") mapping("map_parent");
+     conditionalparents: $conditionalparents_spec;
 
-     weight: scale 0 | scale $weight_scale;
+     weight: $weight_spec;
    }

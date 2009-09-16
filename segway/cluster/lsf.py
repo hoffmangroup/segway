@@ -10,7 +10,7 @@ import sys
 
 ## native specs work the same way as SGE
 from .._util import KB, MB
-from .common import _JobTemplateFactory, _make_native_spec
+from .common import _JobTemplateFactory, make_native_spec
 
 class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage):
@@ -24,9 +24,6 @@ class JobTemplateFactory(_JobTemplateFactory):
         res_spec = make_native_spec(R=self.res_req, v=mem_limit_spec)
 
         return " ".join([self.native_spec, res_spec])
-
-def make_native_spec(args):
-    return _make_native_spec(*args)
 
 def main(args=sys.argv[1:]):
     pass

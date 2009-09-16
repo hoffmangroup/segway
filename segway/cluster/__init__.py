@@ -20,7 +20,7 @@ drmaa.const.status_to_string = status_to_string
 
 # XXXXXXXX: end monkey-patching
 
-def get_cluster_key(session):
+def get_driver_name(session):
     drms_info = session.drmsInfo
 
     if drms_info.startswith("GE"):
@@ -33,10 +33,10 @@ def get_cluster_key(session):
         raise ValueError(msg)
 
 # non-reentrant code
-with Session() as session:
-    cluster_key = get_cluster_key(session)
+with Session() as _session:
+    driver_name = get_driver_name(_session)
 
-driver = __import__(cluster_key)
+driver = __import__(driver_name, globals(), locals(), [driver_name], 1)
 JobTemplateFactory = driver.JobTemplateFactory
 make_native_spec = driver.make_native_spec
 

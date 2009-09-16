@@ -9,7 +9,7 @@ from math import ceil
 import sys
 
 from .._util import MB
-from .common import _JobTemplateFactory, _make_native_spec
+from .common import _JobTemplateFactory, make_native_spec
 
 # qsub -w: switches off job validation
 NATIVE_SPEC_DEFAULT = dict(w="n")
@@ -23,16 +23,15 @@ class JobTemplateFactory(_JobTemplateFactory):
         # qsub -l: resource requirement
         res_spec = make_native_spec(l=self.res_req)
 
-        return " ".join([self.native_spec,
-                         _make_native_spec(**NATIVE_SPEC_DEFAULT),
-                         res_spec])
+        res = " ".join([self.native_spec,
+                        make_native_spec(**NATIVE_SPEC_DEFAULT),
+                        res_spec])
+
+        return res
 
 def make_single_res_req(name, mem):
     # round up to the next mebibyte
     return "%s=%dM" % (name, ceil(mem / MB))
-
-def make_native_spec(args):
-    return _make_native_spec(*args)
 
 def main(args=sys.argv[1:]):
     pass

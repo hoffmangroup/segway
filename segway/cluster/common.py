@@ -16,7 +16,7 @@ NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
 # guard space to prevent going over mem_requested allocation
-MEM_GUARD = 10**MB
+MEM_GUARD = 10*MB
 
 class _JobTemplateFactory(object):
     def __init__(self, template, mem_usage_progression):
@@ -47,7 +47,7 @@ class _JobTemplateFactory(object):
         # pure virtual function
         raise NotImplementedError
 
-def _make_native_spec(*args, **kwargs):
+def make_native_spec(*args, **kwargs):
     return " ".join(NATIVE_SPEC_PROG.build_args(args=args, options=kwargs))
 
 def calc_mem_limit(mem_usage):
