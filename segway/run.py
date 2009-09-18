@@ -329,7 +329,7 @@ LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % PKG
 
-FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%s step=1"
+FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%d step=%d span=%d"
 
 CARD_SEGTRANSITION = 2
 
@@ -397,13 +397,18 @@ except ImportError:
 def make_bash_cmdline(cmd, args):
     return BASH_CMDLINE + ['%s "$@"' % cmd, cmd] + map(str, args)
 
-def make_fixedstep_header(chrom, start):
+def make_fixedstep_header(chrom, start, resolution):
     """
     this function expects 0-based coordinates
     it does the conversion to 1-based coordinates for you
     """
     start_1based = start+1
-    return FIXEDSTEP_HEADER % (chrom, start_1based)
+
+    # XXX: if there is an overhang of less than resolution, then
+    # having step/span = resolution means the last datum in a chunk
+    # will actually extend too far. There's no point in fixing this
+    # now, since we want to switch to bedGraph eventually anyway
+    return FIXEDSTEP_HEADER % (chrom, start_1based, resolution, resolution)
 
 def make_wig_attr(key, value):
     if " " in value:
@@ -424,8 +429,14 @@ def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
 
+def ceildiv(dividend, divisor):
+    "integer ceiling division"
+
+    # int(bool) means 0 -> 0, 1+ -> 1
+    return (dividend // divisor) + int(bool(dividend % divisor))
+
 def quote_spaced_str(text):
-    """"
+    """
     add quotes around text if it has spaces in it
     """
     if " " in text:
@@ -770,9 +781,9 @@ def read_posterior(infile, num_frames, num_labels):
 
     return res
 
-def load_posterior_write_wig((chrom, start, end), num_labels,
+def load_posterior_write_wig((chrom, start, end), resolution, num_labels,
                              infilename, outfiles):
-    header = make_fixedstep_header(chrom, start)
+    header = make_fixedstep_header(chrom, start, resolution)
     num_frames = end - start
 
     for outfile in outfiles:
@@ -884,9 +895,8 @@ def downsample_add(inarray, resolution):
     # downsample presence data into num_datapoints
     full_num_rows = inarray.shape[0]
 
-    quotient = full_num_rows // resolution
+    downsampled_num_rows = ceildiv(full_num_rows, resolution)
     remainder = full_num_rows % resolution
-    downsampled_num_rows = quotient + int(bool(remainder))
     downsampled_shape = [downsampled_num_rows] + list(inarray.shape[1:])
 
     res = zeros(downsampled_shape, inarray.dtype)
@@ -1156,6 +1166,7 @@ class Runner(object):
         res.distribution = options.distribution
         res.random_starts = options.random_starts
         res.len_seg_strength = options.prior_strength
+        res.ruler_scale = options.ruler_scale
         res.resolution = options.resolution
 
         include_tracknames = options.track
@@ -1164,7 +1175,9 @@ class Runner(object):
         res.include_tracknames = include_tracknames
 
         res.verbosity = options.verbosity
-        res.user_native_spec = [opt.split(" ") for opt in options.drm_opt]
+        # multiple lists to one
+        res.user_native_spec = sum([opt.split(" ")
+                                    for opt in options.cluster_opt], [])
 
         res.num_segs = options.num_segs
 
@@ -1180,7 +1193,6 @@ class Runner(object):
         res.dry_run = options.dry_run
         res.keep_going = options.keep_going
         res.split_sequences = options.split_sequences
-
 
         return res
 
@@ -1212,7 +1224,8 @@ class Runner(object):
             num_segs = num_segs.end-1
 
         table = zeros((num_segs, SEG_TABLE_WIDTH), dtype=int)
-        table[:, OFFSET_STEP] = RULER_SCALE
+        ruler_scale = self.ruler_scale
+        table[:, OFFSET_STEP] = ruler_scale
 
         with open(filename) as infile:
             reader = DictReader(infile)
@@ -1233,7 +1246,9 @@ class Runner(object):
                 # get slice
                 len_slice = str2slice_or_int(row["len"])
 
-                assert len_slice.step == RULER_SCALE
+                # XXX: eventually, should read ruler scale from file
+                # instead of using as a command-line option
+                assert len_slice.step == self.ruler_scale
 
                 len_tuple = (len_slice.start, len_slice.stop, len_slice.step)
                 len_row = zeros((SEG_TABLE_WIDTH))
@@ -1498,12 +1513,20 @@ class Runner(object):
         if isinstance(num_segs, slice):
             num_segs = "undefined\n#error must define CARD_SEG"
 
+        resolution = self.resolution
+        ruler_scale = self.ruler_scale
+        if ruler_scale % resolution != 0:
+            msg = ("resolution %d is not a divisor of ruler scale %d"
+                   % (resolution, ruler_scale))
+            raise ValueError(msg)
+        ruler_scale_scaled = ruler_scale // resolution
+
         mapping = dict(card_seg=num_segs,
-                       card_presence=self.resolution+1,
+                       card_presence=resolution+1,
                        card_segCountDown=self.card_seg_countdown,
                        card_supervisionLabel=self.card_supervision_label,
                        card_frameIndex=MAX_FRAMES,
-                       ruler_scale=RULER_SCALE)
+                       ruler_scale=ruler_scale_scaled)
 
         aux_dirpath = self.dirpath / SUBDIRNAME_AUX
 
@@ -1908,7 +1931,8 @@ class Runner(object):
                                           start_index)
                             continue # consider the newly split sequences next
 
-                    num_frames = end - start
+                    num_bases_chunk = end - start
+                    num_frames = ceildiv(num_bases_chunk, self.resolution)
                     if not MIN_FRAMES <= num_frames:
                         text = " skipping short segment of length %d" % num_frames
                         print >>sys.stderr, text
@@ -1918,7 +1942,7 @@ class Runner(object):
                     chunk_coords.append((chrom, start, end))
                     used_supercontigs.append(supercontig)
 
-                    num_bases += end - start
+                    num_bases += num_bases_chunk
 
                     chunk_index += 1
 
@@ -2120,7 +2144,9 @@ class Runner(object):
         res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
 
         # set probs_allow_transition
-        prob_self_self = prob_transition_from_expected_len(LEN_SEG_EXPECTED)
+        len_seg_expected_scaled = LEN_SEG_EXPECTED // self.resolution
+        prob_self_self = \
+            prob_transition_from_expected_len(len_seg_expected_scaled)
         prob_self_other = 1.0 - prob_self_self
         probs_allow_transition = array([prob_self_self, prob_self_other])
 
@@ -2591,8 +2617,8 @@ class Runner(object):
                 print >>wig_file, self.make_wig_header_posterior(seg_index)
 
             for infilename, chunk_coord in zipper:
-                load_posterior_write_wig(chunk_coord, self.num_segs,
-                                         infilename, wig_files)
+                load_posterior_write_wig(chunk_coord, self.resolution,
+                                         self.num_segs, infilename, wig_files)
 
         # delete original input files because they are enormous
         for infilename in infilenames:
@@ -3124,7 +3150,7 @@ class Runner(object):
             chunk_chrom, chunk_start, chunk_end = chunk_coord
             prefix_args = [find_executable("segway-task"), "run", "viterbi",
                            output_filename, chunk_chrom, chunk_start,
-                           chunk_end, self.num_segs]
+                           chunk_end, self.resolution, self.num_segs]
             output_filename = None
         else:
             prefix_args = []
@@ -3367,6 +3393,11 @@ def parse_options(args):
                          help="downsample to every RES bp (default %d)" %
                          RESOLUTION)
 
+        group.add_option("--ruler-scale", type=int,
+                         default=RULER_SCALE, metavar="SCALE",
+                         help="ruler marking every SCALE bp (default %d)" %
+                         RULER_SCALE)
+
         group.add_option("--prior-strength", type=float,
                          default=PRIOR_STRENGTH, metavar="RATIO",
                          help="use RATIO times the number of data counts as"
@@ -3383,10 +3414,10 @@ def parse_options(args):
                          metavar="NUM",
                          help="show messages with verbosity NUM")
 
-        group.add_option("--drm-opt", action="append", default=[],
+        group.add_option("--cluster-opt", action="append", default=[],
                          metavar="OPT",
                          help="specify an option to be passed to the "
-                         "distributed resource manager")
+                         "cluster manager")
 
     with OptionGroup(parser, "Flags") as group:
         group.add_option("-c", "--clobber", action="store_true",

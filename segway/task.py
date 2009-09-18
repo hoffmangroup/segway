@@ -68,10 +68,22 @@ def parse_viterbi(lines):
 
 # num_cols is for use by genomedata_count_condition
 # XXX: should move this function somewhere else
-def write_bed(outfile, start_pos, labels, coord, num_labels, num_cols=None):
+def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
+              num_cols=None):
+    """
+    start_pos is an array
+    """
     (chrom, region_start, region_end) = coord
 
-    start_pos += region_start
+    start_pos = region_start + (start_pos * resolution)
+
+    # correct last position which may not be a full sample beyond
+    if __debug__:
+        remainder = (region_end - region_start) % resolution
+        if remainder == 0:
+            remainder = resolution
+        assert region_end == start_pos[-1] - resolution + remainder
+    start_pos[-1] = region_end
 
     score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
 
@@ -98,41 +110,42 @@ def save_bed(outfilename, *args, **kwargs):
     with open(outfilename, "w") as outfile:
         write_bed(outfile, *args, **kwargs)
 
-def parse_viterbi_save_bed(coord, viterbi_lines, bed_filename, num_labels):
+def parse_viterbi_save_bed(coord, resolution, viterbi_lines, bed_filename, num_labels):
     data = parse_viterbi(viterbi_lines)
 
     start_pos, labels = find_segment_starts(data)
 
-    save_bed(bed_filename, start_pos, labels, coord, int(num_labels))
+    save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
 
-def load_viterbi_save_bed(coord, outfilename, num_labels, infilename):
+def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename):
     with open(infilename) as infile:
         lines = infile.readlines()
 
-    return parse_viterbi_save_bed(coord, lines, outfilename, num_labels)
+    return parse_viterbi_save_bed(coord, resolution, lines, outfilename, num_labels)
 
-def run_viterbi_save_bed(coord, outfilename, num_labels, *args):
+def run_viterbi_save_bed(coord, resolution, outfilename, num_labels, *args):
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
 
     output = VITERBI_PROG.getoutput(*args)
     lines = output.splitlines()
 
-    return parse_viterbi_save_bed(coord, lines, outfilename, num_labels)
+    return parse_viterbi_save_bed(coord, resolution, lines, outfilename, num_labels)
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed}
 
-def task(verb, kind, outfilename, chrom, start, end, *args):
+def task(verb, kind, outfilename, chrom, start, end, resolution, *args):
     start = int(start)
     end = int(end)
+    resolution = int(resolution)
 
-    TASKS[verb, kind]((chrom, start, end), outfilename, *args)
+    TASKS[verb, kind]((chrom, start, end), resolution, outfilename, *args)
 
 def main(args=sys.argv[1:]):
-    if len(args) < 6:
+    if len(args) < 7:
         print >>sys.stderr, \
-            "args: VERB KIND OUTFILE CHROM START END [ARGS...]"
+            "args: VERB KIND OUTFILE CHROM START END RESOLUTION [ARGS...]"
         sys.exit(2)
 
     return task(*args)
