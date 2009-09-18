@@ -32,6 +32,38 @@ tasks quite unlike segmentation), train it on one dataset, and then
 perform posterior decoding on another dataset, skipping the identify
 stage. This is easily possible.
 
+Technical description
+---------------------
+More specifically, Segway performs the following steps:
+
+  1. Acquires data in ``genomedata`` format
+  2. Generates an appropriate model for unsupervised
+     segmentation (``segway.str``, ``segway.inc``) for use by GMTK
+  3. Generates appropriate initial parameters (``input.master``
+     or ``input.*.master``) for use by GMTK
+  4. Writes the data in a format usable by GMTK
+  5. Call GMTK to perform expectation maximization (EM) training,
+     resulting in a parameter file (``params.params``)
+  6. Call GMTK to perform Viterbi decoding of the observations
+     using the generated model and discovered parameters
+  7. Convert the GMTK Viterbi results into BED format
+     (``segway.bed.gz``) for use in a genome browser, or by
+     EvalSeg, or other tools
+  8. Call GMTK to perform posterior decoding of the observations
+     using the generated model and discovered parameters
+  9. Convert the GMTK posterior results into wiggle format
+     (``posterior.seg*.wig.gz``) for use in a genome browser or
+     other tools
+  10. Use a distributed computing system to parallelize all of the
+      GMTK tasks listed above, and track and predict their resource
+      consumption to maximize efficiency
+  11. Generate reports on the established likelihood at each round of
+      training (``likelihood.*.tab``)
+  12. (not implemented) create plots of simple statistics of the above
+      processes
+  13. (not implemented) Call EvalSeg for a more comprehensive report
+      and plots on the resulting segmentation
+
 Generating the model
 ====================
 
@@ -146,7 +178,9 @@ Memory usage
 
 XXX describe new regime
 
-other sections of workflow XXX
+XXX other sections of workflow
+
+XXX other sections of technical description
 
 XXX add section on all other options
 
@@ -245,6 +279,8 @@ For example::
 
   run.main("--no-identify", GENOMEDATA_DIRNAME)
 
+XXX describe runner.fromoptions() interface
+
 All other interfaces (the ones that do not use a ``main()`` function)
 to Segway code are undocumented and should not be used. If you do use
-them,know that the API may change at any time without notice.
+them, know that the API may change at any time without notice.

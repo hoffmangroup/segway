@@ -54,7 +54,8 @@ gtf2bed = segway.gtf2bed:main
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
 install_requires = ["genomedata>0.1.2", "textinput", "optbuild>0.1.6",
-                    "optplus>0.1.0", "tables>2.0.4", "numpy", "path", "colorbrewer"]
+                    "optplus>0.1.0", "tables>2.0.4", "numpy", "path",
+                    "colorbrewer"]
 
 # XXX: ask if there is a way to specify this at the command-line
 extras_require = dict(parallel=["drmaa"])
