@@ -39,6 +39,7 @@ from numpy.random import uniform
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
+from pkg_resources import Requirement, working_set
 from tabdelim import DictReader, ListWriter
 
 from .bed import read_native
@@ -214,6 +215,7 @@ def make_prefix_fmt(num):
 
 PREFIX_ACC = "acc"
 PREFIX_CMDLINE = "run"
+PREFIX_CMDLINE_TOP = "segway"
 PREFIX_POSTERIOR = "posterior"
 
 PREFIX_VITERBI = "viterbi"
@@ -784,7 +786,7 @@ def read_posterior(infile, num_frames, num_labels):
 def load_posterior_write_wig((chrom, start, end), resolution, num_labels,
                              infilename, outfiles):
     header = make_fixedstep_header(chrom, start, resolution)
-    num_frames = end - start
+    num_frames = ceildiv(end - start, resolution)
 
     for outfile in outfiles:
         print >>outfile, header
@@ -1055,6 +1057,12 @@ class RandomStartThread(Thread):
         self.runner.num_segs = self.num_segs
         self.runner.start_index = self.start_index
         self.result = self.runner.run_train_start()
+
+def maybe_quote_arg(text):
+    return '"%s"' % text.replace('"', r'\"')
+
+def cmdline2text(cmdline=sys.argv):
+    return " ".join(maybe_quote_arg(arg) for arg in cmdline)
 
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
@@ -3248,6 +3256,8 @@ class Runner(object):
         self.make_subdir(SUBDIRNAME_LOG)
         cmdline_filename = self.make_filename(PREFIX_CMDLINE, EXT_SH,
                                               subdirname=SUBDIRNAME_LOG)
+        cmdline_top_filename = self.make_filename(PREFIX_CMDLINE_TOP, EXT_SH,
+                                                  subdirname=SUBDIRNAME_LOG)
         res_usage_filename = self.make_filename(PREFIX_RES_USAGE, EXT_TAB,
                                                 subdirname=SUBDIRNAME_LOG)
 
@@ -3256,12 +3266,19 @@ class Runner(object):
         self.save_params()
 
         now = datetime.now()
+        pkg_desc = working_set.find(Requirement.parse(PKG))
+        run_msg = "## %s run %s at %s" % (pkg_desc, UUID, now)
+
+        with open(cmdline_top_filename, "w") as cmdline_top_file:
+            print >>cmdline_top_file, run_msg
+            print >>cmdline_top_file
+            print >>cmdline_top_file, cmdline2text()
 
         with open(cmdline_filename, "w") as cmdline_file:
-            # XXX: works around a pyflakes bug; report
+            # XXX: works around a pyflakes bug for with * as self.*; report
             self.cmdline_file = cmdline_file
 
-            print >>self.cmdline_file, "## %s run %s at %s" % (PKG, UUID, now)
+            print >>cmdline_file, run_msg
 
             # so that we can immediately out the UUID if we want it
             self.cmdline_file.flush()
