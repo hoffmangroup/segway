@@ -44,11 +44,11 @@ from tabdelim import DictReader, ListWriter
 
 from .bed import read_native
 from .cluster import Session, JobTemplateFactory, make_native_spec
-from ._util import (constant, data_filename, data_string, DTYPE_OBS_INT,
-                    EXT_GZ, GB, get_chrom_coords, get_label_color, gzip_open,
-                    is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
-                    MB, NamedTemporaryDir, OptionBuilder_GMTK, PKG,
-                    VITERBI_PROG)
+from ._util import (ceildiv, constant, data_filename, data_string,
+                    DTYPE_OBS_INT, EXT_GZ, GB, get_chrom_coords,
+                    get_label_color, gzip_open, is_empty_array, ISLAND_BASE_NA,
+                    ISLAND_LST_NA, load_coords, MB, NamedTemporaryDir,
+                    OptionBuilder_GMTK, PKG, VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
@@ -430,12 +430,6 @@ def vstack_tile(array_like, reps):
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
-
-def ceildiv(dividend, divisor):
-    "integer ceiling division"
-
-    # int(bool) means 0 -> 0, 1+ -> 1
-    return (dividend // divisor) + int(bool(dividend % divisor))
 
 def quote_spaced_str(text):
     """
@@ -2760,6 +2754,7 @@ class Runner(object):
             output_filename = self.output_dirpath / job_name
         job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
+        job_tmpl.blockEmail = True
 
         job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec)
 
@@ -3073,10 +3068,36 @@ class Runner(object):
 
         num_segs_range = slice2range(self.num_segs)
 
+        if len(num_segs_range) > 1 or random_starts > 1:
+            thread_runner = self.run_train_multithread
+        else:
+            thread_runner = self.run_train_singlethread
+
+        start_params = thread_runner(num_segs_range)
+
+        if self.make_new_params:
+            self.proc_train_results(start_params, dst_filenames)
+        else:
+            # only one random start: always overwrite params.params
+            assert len(start_params) == 1
+            copy2(start_params[0][OFFSET_PARAMS_FILENAME],
+                  self.params_filename)
+
+    def run_train_singlethread(self, num_segs_range):
+        with Session() as session:
+            self.session = session
+            self.start_index = 0
+            start_params = [self.run_train_start()]
+
+        self.session = None
+
+        return start_params
+
+    def run_train_multithread(self, num_segs_range):
         # XXX: Python 2.6 use itertools.product()
         enumerator = enumerate((num_seg, seg_start_index)
                                for num_seg in num_segs_range
-                               for seg_start_index in xrange(random_starts))
+                               for seg_start_index in xrange(self.random_starts))
 
         threads = []
         with Session() as session:
@@ -3115,14 +3136,7 @@ class Runner(object):
 
                 raise
 
-        if self.make_new_params:
-            self.proc_train_results(start_params, dst_filenames)
-        else:
-            # only one random start
-            # you're always going to overwrite params.params
-            assert len(start_params) == 1
-            copy2(start_params[0][OFFSET_PARAMS_FILENAME],
-                  self.params_filename)
+        return start_params
 
     def proc_train_results(self, start_params, dst_filenames):
         if self.dry_run:

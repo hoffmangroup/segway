@@ -54,7 +54,7 @@ def calc_mem_limit(mem_usage):
     """
     amount of memory allowed to be used (less than that requested)
     """
-    return mem_usage - MEM_GUARD
+    return int(mem_usage - MEM_GUARD)
 
 def main(args=sys.argv[1:]):
     pass

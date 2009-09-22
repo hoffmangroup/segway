@@ -5,19 +5,18 @@ __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
 
-from math import ceil
 import sys
 
 ## native specs work the same way as SGE
-from .._util import KB, MB
+from .._util import ceildiv, KB, MB
 from .common import _JobTemplateFactory, make_native_spec
 
 class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage):
-        return "rusage[mem=%s]" % ceil(mem_usage / MB)
+        return "rusage[mem=%s]" % ceildiv(mem_usage, MB)
 
     def make_native_spec(self):
-        mem_limit_spec = ceil(self.mem_limit / KB)
+        mem_limit_spec = ceildiv(self.mem_limit, KB)
 
         # bsub -R: resource requirement
         # bsub -v: hard virtual memory limit
