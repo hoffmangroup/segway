@@ -2754,7 +2754,9 @@ class Runner(object):
             output_filename = self.output_dirpath / job_name
         job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
-        job_tmpl.blockEmail = True
+
+        # XXX: temporarily disable until http://code.google.com/p/drmaa-python/issues/detail?id=13 is fixed
+        # job_tmpl.blockEmail = True
 
         job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec)
 

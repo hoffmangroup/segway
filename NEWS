@@ -18,7 +18,6 @@
 * segway: now creates log/segway.sh to report arguments from which Segway was called
 * segway: now prints out Segway distribution version to log files
 * segway: with only one random start, now runs in a single-threaded mode
-* segway: now blocks sending of e-mail on cluster job completion
 
 0.1.12:
 
