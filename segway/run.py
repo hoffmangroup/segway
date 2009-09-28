@@ -31,9 +31,8 @@ from uuid import uuid1
 
 from drmaa import JobControlAction, JobState
 from genomedata import Genome
-from numpy import (add, amin, amax, append, arange, arcsinh, array,
-                   column_stack, diagflat, empty, finfo, float32, intc, invert,
-                   isnan, maximum, NINF, ones, outer, sqrt, square, tile,
+from numpy import (amin, amax, append, arange, arcsinh, array, diagflat, empty,
+                   finfo, float32, intc, NINF, ones, outer, sqrt, square, tile,
                    vectorize, vstack, where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
@@ -44,20 +43,19 @@ from tabdelim import DictReader, ListWriter
 
 from .bed import read_native
 from .cluster import Session, JobTemplateFactory, make_native_spec
-from ._util import (ceildiv, constant, data_filename, data_string,
-                    DTYPE_OBS_INT, EXT_GZ, GB, get_chrom_coords,
+from ._util import (ceildiv, data_filename, data_string,
+                    DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
+                    DISTRIBUTION_ASINH_NORMAL, EXT_GZ, GB, get_chrom_coords,
                     get_label_color, gzip_open, is_empty_array, ISLAND_BASE_NA,
-                    ISLAND_LST_NA, load_coords, MB, NamedTemporaryDir,
-                    OptionBuilder_GMTK, PKG, VITERBI_PROG)
+                    ISLAND_LST_NA, load_coords, _make_continuous_cells, MB,
+                    NamedTemporaryDir, OptionBuilder_GMTK, PKG,
+                    _save_observations_chunk, VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
 
 # XXX: I should really get some sort of Enum for this, I think Peter
 # Norvig has one
-DISTRIBUTION_NORM = "norm"
-DISTRIBUTION_GAMMA = "gamma"
-DISTRIBUTION_ASINH_NORMAL = "asinh_norm"
 DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_NORM
@@ -89,6 +87,8 @@ MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
+
+TEMP_DIRPATH = path("/tmp")
 
 ISLAND = True
 
@@ -140,14 +140,6 @@ ABSOLUTE_FUDGE = 0.001
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
-ORD_A = ord("A")
-ORD_C = ord("C")
-ORD_G = ord("G")
-ORD_T = ord("T")
-ORD_a = ord("a")
-ORD_c = ord("c")
-ORD_g = ord("g")
-ORD_t = ord("t")
 NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 
 # number of frames in a segment must be at least number of frames in model
@@ -803,43 +795,6 @@ def load_posterior_write_wig((chrom, start, end), resolution, num_labels,
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
 
-def make_dinucleotide_int_data(seq):
-    """
-    makes an array with two columns, one with 0..15=AA..TT and the other
-    as a presence variable. Set column one to 0 when not present
-    """
-    nucleotide_int_data = (((seq == ORD_A) + (seq == ORD_a))
-                           + ((seq == ORD_C) + (seq == ORD_c)) * 2
-                           + ((seq == ORD_G) + (seq == ORD_g)) * 3
-                           + ((seq == ORD_T) + (seq == ORD_t)) * 4) - 1
-    nucleotide_missing = nucleotide_int_data == -1
-
-    # rewrite all Ns as A now that you have the missingness mask
-    nucleotide_int_data[nucleotide_int_data == -1] = 0
-    col_shape = (len(nucleotide_int_data)-1,)
-
-    # first column: dinucleotide: AA..TT=0..15
-    # combine, and add extra AA stub at end, which will be set missing
-    # 0 AA AC AG AT
-    # 4 CA CC CG CT
-    # 8 GA GC GG GT
-    # 12 TA TC TG TT
-    dinucleotide_int_data = empty(col_shape, DTYPE_OBS_INT)
-    add(nucleotide_int_data[:-1] * 4, nucleotide_int_data[1:],
-        dinucleotide_int_data)
-
-    # second column: presence_dinucleotide: some missing=0; all present = 1
-    # there are so few N boundaries that it is okay to
-    # disregard the whole dinucleotide when half is N
-    dinucleotide_missing = (nucleotide_missing[:-1] + nucleotide_missing[1:])
-
-    dinucleotide_presence = empty(dinucleotide_missing.shape, DTYPE_OBS_INT)
-    invert(dinucleotide_missing, dinucleotide_presence)
-
-    # XXXopt: set these up properly in the first place instead of
-    # column_stacking at the end
-    return column_stack([dinucleotide_int_data, dinucleotide_presence])
-
 def jitter_cell(cell):
     """
     adds some random noise
@@ -886,30 +841,6 @@ def update_starts(starts, ends, new_starts, new_ends, start_index):
 
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
-
-def downsample_add(inarray, resolution):
-    # downsample presence data into num_datapoints
-    full_num_rows = inarray.shape[0]
-
-    downsampled_num_rows = ceildiv(full_num_rows, resolution)
-    remainder = full_num_rows % resolution
-    downsampled_shape = [downsampled_num_rows] + list(inarray.shape[1:])
-
-    res = zeros(downsampled_shape, inarray.dtype)
-
-    # if there's no remainder, then only use loop 0
-    if remainder == 0:
-        remainder = resolution
-
-    # loop 0: every bit
-    for index in xrange(remainder):
-        res += inarray[index::resolution]
-
-    # loop 1: remainder
-    for index in xrange(remainder, resolution):
-        res[:-1] += inarray[index::resolution]
-
-    return res
 
 class Mixin_Lockable(AddableMixin):
     def __init__(self, *args, **kwargs):
@@ -1003,9 +934,7 @@ class RestartableJobDict(dict):
                     if job_info.hasSignal:
                         exit_status = job_info.terminatedSignal
                     else:
-                        # XXX: temporary workaround
-                        # http://code.google.com/p/drmaa-python/issues/detail?id=4
-                        exit_status = int(float(resource_usage["exit_status"]))
+                        exit_status = job_info.exitStatus
 
                     if exit_status != 0:
                         self.queue(self[jobid])
@@ -1057,6 +986,7 @@ def maybe_quote_arg(text):
 
 def cmdline2text(cmdline=sys.argv):
     return " ".join(maybe_quote_arg(arg) for arg in cmdline)
+
 
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
@@ -1113,7 +1043,6 @@ class Runner(object):
         self.mins = None
         self.maxs = None
         self.tracknames = None
-        self.mem_per_obs = defaultdict(constant(None))
         self.num_free_params = None
 
         # variables
@@ -1122,6 +1051,7 @@ class Runner(object):
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
+        self.split_sequences = None
 
         # flags
         self.clobber = False
@@ -1135,7 +1065,6 @@ class Runner(object):
 
         # XXX: should be removed, it was for segway-res-usage
         self.skip_large_mem_usage = False
-        self.split_sequences = False
 
         # functions
         self.train_prog = None
@@ -1365,6 +1294,7 @@ class Runner(object):
             self.tracknames = tracknames
             self.tracknames_all = tracknames_all
             self.track_indexes = track_indexes
+            self.track_indexes_text = ",".join(map(str, track_indexes))
         elif (self.tracknames != tracknames
               or (self.track_indexes != track_indexes).any()):
             raise ValueError("all tracknames attributes must be identical")
@@ -1477,14 +1407,21 @@ class Runner(object):
         self.int_filelistpath = self.make_obs_filelistpath(EXT_INT)
         self.float_tabfilepath = obs_dirpath / FLOAT_TABFILEBASENAME
 
-    def make_obs_filepath(self, prefix, suffix):
-        return self.obs_dirpath / (prefix + suffix)
+    def make_obs_filepath(self, dirpath, prefix, suffix):
+        return dirpath / (prefix + suffix)
 
-    def make_obs_filepaths(self, chrom, chunk_index):
+    def make_obs_filepaths(self, chrom, chunk_index, temp=False):
         prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_CHUNKS))
         prefix = prefix_feature_tmpl % chunk_index
 
-        make_obs_filepath_custom = partial(self.make_obs_filepath, prefix)
+        if temp:
+            dirpath = TEMP_DIRPATH
+            prefix = "".join([prefix, UUID, extsep])
+        else:
+            dirpath = self.obs_dirpath
+
+        make_obs_filepath_custom = partial(self.make_obs_filepath, dirpath,
+                                           prefix)
 
         return (make_obs_filepath_custom(EXT_FLOAT),
                 make_obs_filepath_custom(EXT_INT))
@@ -1624,53 +1561,12 @@ class Runner(object):
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.dirname, self.clobber)
 
-    def save_observations_chunk(self, float_filepath, int_filepath, float_data,
-                                seq_data, supervision_data):
-        # input function in GMTK_ObservationMatrix.cc:
-        # ObservationMatrix::readBinSentence
-
-        # input per frame is a series of float32s, followed by a series of
-        # int32s it is better to optimize both sides here by sticking all
-        # the floats in one file, and the ints in another one
-        resolution = self.resolution
-
-        int_blocks = []
-        if float_data is not None:
-            if self.distribution == DISTRIBUTION_ASINH_NORMAL:
-                float_data = arcsinh(float_data)
-
-            mask_missing = isnan(float_data)
-
-            # output -> presence_data -> int_blocks
-            # done in two steps so I can specify output type
-            presence_data = empty(mask_missing.shape, DTYPE_OBS_INT)
-            invert(mask_missing, presence_data)
-
-            num_datapoints = downsample_add(presence_data, resolution)
-
-            int_blocks.append(num_datapoints)
-
-            # so that there is no divide by zero
-            num_datapoints_min_1 = maximum(num_datapoints, 1)
-
-            # make float
-            float_data[mask_missing] = 0.0
-
-            float_data_downsampled = downsample_add(float_data, resolution)
-            float_data_downsampled /= num_datapoints_min_1
-            float_data_downsampled.tofile(float_filepath)
-
-        if seq_data is not None:
-            assert resolution == 1 # not implemented yet
-            int_blocks.append(make_dinucleotide_int_data(seq_data))
-
-        if supervision_data is not None:
-            assert resolution == 1 # not implemented yet
-            int_blocks.append(supervision_data)
-
-        # XXXopt: use the correctly sized matrix in the first place
-        int_data = column_stack(int_blocks)
-        int_data.tofile(int_filepath)
+    def save_observations_chunk(self, float_filename, int_filename, float_data,
+                                seq_data=None, supervision_data=None):
+        return _save_observations_chunk(float_filename, int_filename,
+                                        float_data, self.resolution,
+                                        self.distribution, seq_data,
+                                        supervision_data)
 
     def subset_metadata_attr(self, name):
         subset_array = getattr(self, name)[self.track_indexes]
@@ -1743,9 +1639,12 @@ class Runner(object):
         return res
 
     def write_observations(self, float_filelist, int_filelist, float_tabfile):
-        # observations
+        # XXX: these expect different filepaths
+        assert not ((self.train or self.posterior) and self.identify)
+
         print_obs_filepaths_custom = partial(self.print_obs_filepaths,
-                                             float_filelist, int_filelist)
+                                             float_filelist, int_filelist,
+                                             temp=self.identify)
         save_observations_chunk = self.save_observations_chunk
 
         float_tabwriter = ListWriter(float_tabfile)
@@ -1753,13 +1652,7 @@ class Runner(object):
 
         # XXX: doesn't work with new memory managment regime
         # need to instead fix a memory usage and see what fits in there
-        assert not self.split_sequences
-
-        mem_per_obs_undefined = None in (self.mem_per_obs[prog.prog]
-                                         for prog in self.get_progs_used())
-        calibrating_mem_usage = self.split_sequences and mem_per_obs_undefined
-        if calibrating_mem_usage:
-            raise NotImplementedError
+        assert self.split_sequences is None
 
         zipper = izip(count(), self.used_supercontigs, self.chunk_coords)
 
@@ -1774,50 +1667,30 @@ class Runner(object):
 
             # if they don't both exist
             if not (float_filepath.exists() and int_filepath.exists()):
-                # read rows first into a numpy.array because you can't
-                # do complex imports on a numpy.Array
-
-                # chunk_start: relative to the beginning of the
-                # supercontig
-                chunk_start = start - supercontig.start
-                chunk_end = end - supercontig.start
-
                 # XXX: next several lines are duplicative
-                continuous_cells = \
-                    self.make_continuous_cells(supercontig,
-                                               chunk_start, chunk_end)
-
-                seq_cells = self.make_seq_cells(supercontig,
-                                                chunk_start, chunk_end)
+                seq_cells = self.make_seq_cells(supercontig, start, end)
 
                 supervision_cells = \
                     self.make_supervision_cells(chrom, start, end)
+
+                if __debug__:
+                    if self.identify:
+                        assert seq_cells is None and supervision_cells is None
+
+                if not (self.train or self.posterior):
+                    # don't actually write data
+                    continue
+
+                continuous_cells = \
+                    self.make_continuous_cells(supercontig, start, end)
 
                 save_observations_chunk(float_filepath, int_filepath,
                                         continuous_cells, seq_cells,
                                         supervision_cells)
 
     def make_continuous_cells(self, supercontig, start, end):
-        continuous = supercontig.continuous
-        if continuous is None:
-            return
-
-        track_indexes = self.track_indexes
-
-        # XXXopt: reading all the extra tracks is probably quite
-        # wasteful given the genomedata striping pattern; it is
-        # probably better to read one at a time and stick into an
-        # array
-        min_col = track_indexes.min()
-        max_col = track_indexes.max() + 1
-
-        # first, extract a contiguous subset of the tracks in the
-        # dataset, which is a superset of the tracks that are used
-        rows = continuous[start:end, min_col:max_col]
-
-        # extract only the tracks that are used
-        # correct for min_col offset
-        return rows[..., track_indexes - min_col]
+        return _make_continuous_cells(supercontig, start, end,
+                                      self.track_indexes)
 
     def make_supervision_cells(self, chrom, start, end):
         supervision_type = self.supervision_type
@@ -1849,10 +1722,15 @@ class Runner(object):
         seq = supercontig.seq
         len_seq = len(seq)
 
-        if end < len_seq:
-            return seq[start:end+1]
-        elif end == len(seq):
-            seq_chunk = seq[start:end]
+        # chunk_start: relative to the beginning of the
+        # supercontig
+        chunk_start = start - supercontig.start
+        chunk_end = end - supercontig.start
+
+        if chunk_end < len_seq:
+            return seq[chunk_start:chunk_end+1]
+        elif chunk_end == len(seq):
+            seq_chunk = seq[chunk_start:chunk_end]
             return append(seq_chunk, ord("N"))
         else:
             raise ValueError("sequence too short for supercontig")
@@ -1874,7 +1752,8 @@ class Runner(object):
         use_dinucleotide = "dinucleotide" in self.include_tracknames
         self.use_dinucleotide = use_dinucleotide
 
-        # XXX: move this outside this function so self.genome can be reused
+        # XXX: move this outside this function so self.genome can be
+        # reused, and have a with statement
 
         # XXX: use groupby(include_coords) and then access chromosomes
         # randomly rather than iterating through them all
@@ -2535,7 +2414,6 @@ class Runner(object):
             # might turn off self.train, if the params already exist
             self.set_log_likelihood_filename()
 
-        # XXX: if self.split_sequences we should only save the smallest chunk
         self.save_observations()
 
         if identify or posterior:
@@ -2754,9 +2632,7 @@ class Runner(object):
             output_filename = self.output_dirpath / job_name
         job_tmpl.outputPath = ":" + output_filename
         job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
-
-        # XXX: temporarily disable until http://code.google.com/p/drmaa-python/issues/detail?id=13 is fixed
-        # job_tmpl.blockEmail = True
+        job_tmpl.blockEmail = True
 
         job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec)
 
@@ -3172,9 +3048,16 @@ class Runner(object):
         if prog == VITERBI_PROG:
             chunk_coord = self.chunk_coords[chunk_index]
             chunk_chrom, chunk_start, chunk_end = chunk_coord
+
+            float_filepath, int_filepath = \
+                self.make_obs_filepaths(chunk_chrom, chunk_index, temp=True)
+
             prefix_args = [find_executable("segway-task"), "run", "viterbi",
                            output_filename, chunk_chrom, chunk_start,
-                           chunk_end, self.resolution, self.num_segs]
+                           chunk_end, self.resolution, self.num_segs,
+                           self.genomedata_dirname, float_filepath,
+                           int_filepath, self.distribution,
+                           self.track_indexes_text]
             output_filename = None
         else:
             prefix_args = []
@@ -3263,7 +3146,7 @@ class Runner(object):
         this is exposed so that it can be overriden in a subclass
         """
         # XXXopt: use binary I/O to gmtk rather than ascii
-        if self.train and self.split_sequences:
+        if self.train and self.split_sequences is not None:
             msg = "can't use --split-sequences in training"
             raise NotImplementedError(msg)
 
@@ -3320,9 +3203,6 @@ class Runner(object):
                     try:
                         self.run_identify_posterior()
                     except ChunkOverMemUsageLimit:
-                        if not self.split_sequences:
-                            raise
-
                         self.resave_params()
 
                         # erase old output
@@ -3443,6 +3323,10 @@ def parse_options(args):
                          "of gibibytes of memory to allocate in turn "
                          "(default %s)" % MEM_USAGE_PROGRESSION)
 
+        group.add_option("-S", "--split-sequences", metavar="SIZE",
+                         help="split up sequences that are larger than SIZE "
+                         "bp")
+
         group.add_option("-v", "--verbosity", type=int, default=VERBOSITY,
                          metavar="NUM",
                          help="show messages with verbosity NUM")
@@ -3467,9 +3351,6 @@ def parse_options(args):
         group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
                          " executables")
-        group.add_option("-S", "--split-sequences", action="store_true",
-                         help="split up sequences that are too large to fit" \
-                         " into memory")
 
     options, args = parser.parse_args(args)
 

@@ -12,9 +12,12 @@ __version__ = "$Revision$"
 import re
 import sys
 
-from numpy import zeros
+from genomedata import Genome
+from numpy import array, zeros
+from path import path
 
 from ._util import (DTYPE_IDENTIFY, find_segment_starts, get_label_color,
+                    _make_continuous_cells, _save_observations_chunk,
                     VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
@@ -24,6 +27,9 @@ BED_STRAND = "."
 
 SCORE_MIN = 100
 SCORE_MAX = 1000
+
+def make_track_indexes(text):
+    return array(map(int, text.split(",")))
 
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 def parse_viterbi(lines):
@@ -121,13 +127,37 @@ def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename
     with open(infilename) as infile:
         lines = infile.readlines()
 
-    return parse_viterbi_save_bed(coord, resolution, lines, outfilename, num_labels)
+    return parse_viterbi_save_bed(coord, resolution, lines, outfilename,
+                                  num_labels)
 
-def run_viterbi_save_bed(coord, resolution, outfilename, num_labels, *args):
+def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
+                         genomedata_dirname, float_filename, int_filename,
+                         distribution, track_indexes_text, *args):
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
 
-    output = VITERBI_PROG.getoutput(*args)
+    # XXX: it would be best if the name were chosen now rather than
+    # storing a bunch of /tmp files and using dcdrng
+
+    (chrom, start, end) = coord
+
+    track_indexes = make_track_indexes(track_indexes_text)
+
+    with Genome(genomedata_dirname) as genome:
+        supercontig = genome[chrom][start:end]
+
+        continuous_cells = _make_continuous_cells(supercontig, start, end,
+                                                  track_indexes)
+
+    try:
+        _save_observations_chunk(float_filename, int_filename,
+                                 continuous_cells, resolution, distribution)
+
+        output = VITERBI_PROG.getoutput(*args)
+    finally:
+        path(float_filename).remove()
+        path(int_filename).remove()
+
     lines = output.splitlines()
 
     return parse_viterbi_save_bed(coord, resolution, lines, outfilename, num_labels)
