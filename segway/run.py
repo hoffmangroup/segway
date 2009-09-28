@@ -1059,7 +1059,7 @@ class Runner(object):
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
-        self.split_sequences = None
+        self.max_frames = MAX_FRAMES
 
         # flags
         self.clobber = False
@@ -1131,7 +1131,7 @@ class Runner(object):
         res.posterior = not options.no_posterior
         res.dry_run = options.dry_run
         res.keep_going = options.keep_going
-        res.split_sequences = options.split_sequences
+        res.max_frames = options.split_sequences
 
         return res
 
@@ -1472,7 +1472,7 @@ class Runner(object):
                        card_presence=resolution+1,
                        card_segCountDown=self.card_seg_countdown,
                        card_supervisionLabel=self.card_supervision_label,
-                       card_frameIndex=MAX_FRAMES,
+                       card_frameIndex=self.max_frames,
                        ruler_scale=ruler_scale_scaled)
 
         aux_dirpath = self.dirpath / SUBDIRNAME_AUX
@@ -1658,10 +1658,6 @@ class Runner(object):
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
 
-        # XXX: doesn't work with new memory managment regime
-        # need to instead fix a memory usage and see what fits in there
-        assert self.split_sequences is None
-
         zipper = izip(count(), self.used_supercontigs, self.chunk_coords)
 
         for chunk_index, supercontig, (chrom, start, end) in zipper:
@@ -1756,6 +1752,7 @@ class Runner(object):
         chunk_coords = []
         num_bases = 0
         used_supercontigs = [] # continuous objects
+        max_frames = self.max_frames
 
         use_dinucleotide = "dinucleotide" in self.include_tracknames
         self.use_dinucleotide = use_dinucleotide
@@ -1825,6 +1822,25 @@ class Runner(object):
                     if not MIN_FRAMES <= num_frames:
                         text = " skipping short segment of length %d" % num_frames
                         print >>sys.stderr, text
+                        continue
+
+                    if num_frames > max_frames:
+                        # XXX: I really ought to check that this is
+                        # going to always work even for corner cases,
+                        # but if it doesn't I am saved by another
+                        # split later on
+
+                        # split_sequences was True, so split them
+                        num_new_starts = ceildiv(num_frames, max_frames)
+
+                        # // means floor division
+                        offset = (num_frames // num_new_starts)
+                        new_offsets = arange(num_new_starts) * offset
+                        new_starts = start + new_offsets
+                        new_ends = append(new_starts[1:], end)
+
+                        update_starts(starts, ends, new_starts, new_ends,
+                                      start_index)
                         continue
 
                     # start: relative to beginning of chromosome
@@ -3153,10 +3169,7 @@ class Runner(object):
 
         this is exposed so that it can be overriden in a subclass
         """
-        # XXXopt: use binary I/O to gmtk rather than ascii
-        if self.train and self.split_sequences is not None:
-            msg = "can't use --split-sequences in training"
-            raise NotImplementedError(msg)
+        # XXXopt: use binary I/O to gmtk rather than ascii for parameters
 
         self.dirpath = path(self.dirname)
 
@@ -3332,8 +3345,9 @@ def parse_options(args):
                          "(default %s)" % MEM_USAGE_PROGRESSION)
 
         group.add_option("-S", "--split-sequences", metavar="SIZE",
+                         default=MAX_FRAMES,
                          help="split up sequences that are larger than SIZE "
-                         "bp")
+                         "bp (default %s)" % MAX_FRAMES)
 
         group.add_option("-v", "--verbosity", type=int, default=VERBOSITY,
                          metavar="NUM",

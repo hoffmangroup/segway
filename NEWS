@@ -2,6 +2,9 @@
 
 * now requires drmaa-python >= 0.4a2 (really >=r40)
 * segway: off-load identify file creation to the subtasks
+* segway: --split-sequences now called --max-frames, reenabled for all tasks
+* segway: by default, split sequences instead of throwing errors on long sequences
+* segway: CARD_FRAMEINDEX is now based on --max-frames value
 * segway: supervision and dinucleotide tracks are temporarily disabled
 * segway: block e-mail report creation by cluster
 * segway: fixes for LSF support
