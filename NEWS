@@ -5,6 +5,7 @@
 * segway: supervision and dinucleotide tracks are temporarily disabled
 * segway: block e-mail report creation by cluster
 * segway: fixes for LSF support
+* segway: disabled a lot of diagnostic noise
 
 0.1.13:
 

@@ -868,8 +868,8 @@ class RestartableJob(object):
         mem_usage_key = self.mem_usage_key
         trial_index = global_mem_usage[mem_usage_key]
 
-        print >>sys.stderr, ("self.trial_index=%d; trial_index=%d"
-                             % (self.trial_index, trial_index))
+        #print >>sys.stderr, ("self.trial_index=%d; trial_index=%d"
+        #                     % (self.trial_index, trial_index))
 
         # if this index was tried before and unsuccessful, increment
         # and set global_mem_usage, controlling for race conditions
@@ -923,9 +923,9 @@ class RestartableJobDict(dict):
 
             # then we have to check each job individually
             for jobid in jobids:
-                print >>sys.stderr, "checking %s" % jobid
+                #print >>sys.stderr, "checking %s" % jobid
                 job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
-                print >>sys.stderr, job_info
+                #print >>sys.stderr, job_info
 
                 resource_usage = job_info.resourceUsage
 
@@ -2311,12 +2311,12 @@ class Runner(object):
                           locals(), params_dirpath, self.clobber,
                           start_index)
 
-        print >>sys.stderr, "input_master_filename = %s; is_new = %s" \
-            % (self.input_master_filename, input_master_filename_is_new)
+        # print >>sys.stderr, "input_master_filename = %s; is_new = %s" \
+        #     % (self.input_master_filename, input_master_filename_is_new)
 
         # only use num_free_params if a new input.master was created
         if input_master_filename_is_new:
-            print >>sys.stderr, "num_free_params = %d" % num_free_params
+            # print >>sys.stderr, "num_free_params = %d" % num_free_params
             self.num_free_params = num_free_params
 
     def save_dont_train(self):
@@ -2600,8 +2600,8 @@ class Runner(object):
         N: # of sequences
         """
         model_penalty = (self.num_free_params * log(self.num_chunks))
-        print >>sys.stderr, "num_free_params = %s; num_bases = %s; model_penalty = %s" \
-            % (self.num_free_params, self.num_bases, model_penalty)
+        #print >>sys.stderr, "num_free_params = %s; num_bases = %s; model_penalty = %s" \
+        #    % (self.num_free_params, self.num_bases, model_penalty)
 
         return model_penalty - (2/self.num_bases * log_likelihood)
 
@@ -2780,11 +2780,11 @@ class Runner(object):
             self.triangulation_filename = (self.triangulation_dirpath
                                            / triangulation_filebasename)
 
-        print >>sys.stderr, ("setting triangulation_filename = %s"
-                             % self.triangulation_filename)
+        # print >>sys.stderr, ("setting triangulation_filename = %s"
+        #                     % self.triangulation_filename)
 
     def run_triangulate_single(self, num_segs):
-        print >>sys.stderr, "running triangulation"
+        # print >>sys.stderr, "running triangulation"
         prog = self.prog_factory(TRIANGULATE_PROG)
 
         self.set_triangulation_filename(num_segs)
@@ -2875,8 +2875,8 @@ class Runner(object):
             last_log_likelihood = log_likelihood
             log_likelihood, info_criterion = self.load_log_likelihood()
 
-            print >>sys.stderr, "log likelihood = %s" % log_likelihood
-            print >>sys.stderr, "info criterion = %s" % info_criterion
+            # print >>sys.stderr, "log likelihood = %s" % log_likelihood
+            # print >>sys.stderr, "info criterion = %s" % info_criterion
 
             round_index += 1
 
@@ -2989,9 +2989,9 @@ class Runner(object):
         with Session() as session:
             try:
                 for start_index, (num_seg, seg_start_index) in enumerator:
-                    print >>sys.stderr, (
-                        "start_index %s, num_seg %s, seg_start_index %s"
-                        % (start_index, num_seg, seg_start_index))
+                    # print >>sys.stderr, (
+                    #    "start_index %s, num_seg %s, seg_start_index %s"
+                    #    % (start_index, num_seg, seg_start_index))
                     thread = RandomStartThread(self, session, start_index,
                                                num_seg)
                     thread.start()
