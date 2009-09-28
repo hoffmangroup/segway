@@ -4,6 +4,7 @@
 * segway: off-load identify file creation to the subtasks
 * segway: supervision and dinucleotide tracks are temporarily disabled
 * segway: block e-mail report creation by cluster
+* segway: fixes for LSF support
 
 0.1.13:
 

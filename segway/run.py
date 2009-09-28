@@ -887,8 +887,11 @@ class RestartableJob(object):
 
         assert res
 
-        res_req_text = " ".join(job_tmpl_factory.res_req)
-        print >>sys.stderr, "queued %s (%s)" % (res, res_req_text)
+        res_req = job_tmpl_factory.res_req
+        if not isinstance(res_req, basestring):
+            res_req = " ".join(res_req)
+
+        print >>sys.stderr, "queued %s (%s)" % (res, res_req)
 
         return res
 
@@ -940,7 +943,12 @@ class RestartableJobDict(dict):
                         self.queue(self[jobid])
 
                 prog, num_segs, num_frames = self[jobid].mem_usage_key
-                maxvmem = resource_usage["maxvmem"]
+
+                try: # SGE
+                    maxvmem = resource_usage["maxvmem"]
+                except KeyError: # LSF
+                    maxvmem = resource_usage["vmem"]
+
                 cpu = resource_usage["cpu"]
                 row = [prog, str(num_segs), str(num_frames), maxvmem, cpu,
                        str(exit_status)]
