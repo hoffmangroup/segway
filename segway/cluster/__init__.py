@@ -9,23 +9,12 @@ import sys
 
 from drmaa import Session
 
-# XXXXXXXX: monkey-patching, dirty hack to fix broken code
-
-import drmaa.const
-
-def status_to_string(status):
-    return drmaa.const._JOB_PS[status]
-
-drmaa.const.status_to_string = status_to_string
-
-# XXXXXXXX: end monkey-patching
-
 def get_driver_name(session):
     drms_info = session.drmsInfo
 
     if drms_info.startswith("GE"):
         return "sge"
-    elif drms_info == "LSF":
+    elif drms_info.startswith("Platform LSF"):
         return "lsf"
     else:
         msg = ("unsupported distributed resource management system: %s"
