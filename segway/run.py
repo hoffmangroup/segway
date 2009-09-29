@@ -2649,8 +2649,7 @@ class Runner(object):
         job_tmpl.args = map(str, args)
 
         # this is going to cause problems on heterogeneous systems
-        # XXX: should be jobEnvironment but DRMAA has a bug
-        job_tmpl.environment = environ
+        job_tmpl.jobEnvironment = environ
 
         if output_filename is None:
             output_filename = self.output_dirpath / job_name

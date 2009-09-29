@@ -37,7 +37,6 @@ classifiers = ["Natural Language :: English",
 entry_points = """
 [console_scripts]
 segway = segway.run:main [parallel]
-segway-res-usage = segway.res_usage:main [parallel]
 segway-calc-distance = segway.calc_distance:main
 segway-task = segway.task:main
 segway-layer = segway.layer:main
@@ -58,7 +57,7 @@ install_requires = ["genomedata>0.1.2", "textinput", "optbuild>0.1.6",
                     "colorbrewer"]
 
 # XXX: ask if there is a way to specify this at the command-line
-extras_require = dict(parallel=["drmaa>=0.4a2"])
+extras_require = dict(parallel=["drmaa>=0.4a3"])
 
 if __name__ == "__main__":
     setup(name=name,
