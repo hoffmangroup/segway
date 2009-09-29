@@ -26,10 +26,15 @@ assert sys.version_info >= (2, 4)
 
 MIN_HDF5_VERSION = (1, 8)
 MIN_NUMPY_VERSION = (1, 2)
+MIN_DRMAA_VERSION = (0, 4)
 
 HDF5_DOWNLOAD_VERSION = (1, 8, 2)  # Should match URL below (displayed to user)
 HDF5_URL = "http://www.hdfgroup.org/ftp/HDF5/prev-releases/hdf5-1.8.2/src/hdf5-1.8.2.tar.gz"
+LSF_DRMAA_DOWNLOAD_VERSION = (1, 0, 3)  # Should match URL below (displayed to user)
+LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
+
 EZ_SETUP_URL = "http://peak.telecommunity.com/dist/ez_setup.py"
+
 
 EASY_INSTALL_PROMPT = "May I install %s and dependencies?"
 HDF5_INSTALL_MESSAGE = "\nHDF5 is very large and installation usually takes 5-10 minutes. Please be patient.\nIt is common to see many warnings during compilation."
@@ -50,6 +55,16 @@ script_dir = $scripts
 
 # One command per line
 HDF5_INSTALL_SCRIPT = """
+if [ ! -e $file ]; then wget $url -O $file; fi
+if [ ! -d $filebase ]; then tar -xzf $file; fi
+cd $filebase
+./configure --prefix=$dir
+make
+make install
+rm -f $file
+"""
+
+LSF_DRMAA_INSTALL_SCRIPT = """
 if [ ! -e $file ]; then wget $url -O $file; fi
 if [ ! -d $filebase ]; then tar -xzf $file; fi
 cd $filebase
@@ -220,12 +235,12 @@ def main(args=sys.argv[1:]):
         prompt_install_numpy()
 
         # Install segway (and dependencies)
-        prompt_install_segway()
+        prompt_install_segway(arch_home)
         
         # Test package installations
         prompt_test_packages(arch_home=arch_home)
 
-        print >>sys.stderr, "Installation complete"
+        print >>sys.stderr, "\n============ Installation complete! ==========="
         
     finally:  # Clean up
         shell.close()
@@ -271,6 +286,12 @@ def make_dir(dirname, verbose=True):
 
 def substitute_template(template, fields):
     return Template(template).substitute(fields)
+
+def has_lsf():
+    return "LSF_ENVDIR" in os.environ
+
+def has_sge():
+    return "SGE_ROOT" in os.environ
 
 ########################## CFG FILE ##########################
 def prompt_create_cfg(arch_home, python_home, default_python_home,
@@ -361,6 +382,20 @@ def get_segway_version():
     except (AttributeError, ImportError):
         return None
     
+def is_lsf_drmaa_installed():
+    """Returns True if library found, None otherwise."""
+    return can_find_library("libdrmaa.so")
+    
+def get_drmaa_version():
+    """Returns drmaa-python version as a tuple (or None if not found or
+    installed)
+    """
+    try:
+        import drmaa
+        return version2tuple(drmaa.__version__)
+    except (AttributeError, ImportError):
+        return None
+    
 def get_setuptools_version():
     """Returns setuptools version as a tuple (or None if not found or installed)
     """
@@ -374,6 +409,7 @@ def version2str(ver):  # (#, #[, #]) -> #.#[.#]
     return ".".join([str(val) for val in ver])
 
 def version2tuple(ver):  #  version -> (#, #[, #])
+    # XXX: Fix: 4.3a3 > 4.3b2
     import re
     components = re.split("[^0-9]+", ver)
     res = []
@@ -390,6 +426,15 @@ def version2tuple(ver):  #  version -> (#, #[, #])
     else:
         return None
 
+def can_find_library(libname):
+    """Returns a boolean indicating if the given library could be found"""
+    try:
+        from ctypes import CDLL
+        CDLL(libname)
+        return True
+    except OSError:
+        return None
+
 ##################### SPECIFIC PROGRAM INSTALLERS ################
 def prompt_install_hdf5(arch_home):
     return _installer("HDF5", install_hdf5, get_hdf5_version,
@@ -399,27 +444,59 @@ def prompt_install_hdf5(arch_home):
 def prompt_install_numpy():
     return _installer("Numpy", install_numpy, get_numpy_version,
                       min_version=MIN_NUMPY_VERSION,
-                      install_prompt = EASY_INSTALL_PROMPT)
+                      install_prompt=EASY_INSTALL_PROMPT)
 
-def prompt_install_segway():
+def prompt_install_lsf_drmaa(arch_home):
+    return _installer("drmaa-python", install_lsf_drmaa, is_lsf_drmaa_installed,
+                      version=LSF_DRMAA_DOWNLOAD_VERSION, arch_home=arch_home)
+
+def prompt_install_drmaa():
+    return _installer("drmaa-python", install_drmaa, get_drmaa_version,
+                      install_prompt=EASY_INSTALL_PROMPT)
+
+def prompt_install_segway(arch_home):
     return _installer("segway", install_segway, get_segway_version,
-                      install_prompt = EASY_INSTALL_PROMPT)
+                      install_prompt = EASY_INSTALL_PROMPT, arch_home=arch_home)
                   
 def install_hdf5(arch_home, *args, **kwargs):
     hdf5_dir = prompt_install_path("HDF5", arch_home)
     install_dir = install_script("HDF5", hdf5_dir, HDF5_INSTALL_SCRIPT,
                                  url=HDF5_URL)
-
     return install_dir
+
 
 def install_numpy(min_version=MIN_NUMPY_VERSION, *args, **kwargs):
     return easy_install("numpy", min_version=min_version)
 
-def install_segway(*args, **kwargs):
+
+def install_lsf_drmaa(arch_home, *args, **kwargs):
+    drmaa_dir = prompt_install_path("LSF-DRMAA", arch_home)
+    install_dir = install_script("LSF-DRMAA", drmaa_dir,
+                                 LSF_DRMAA_INSTALL_SCRIPT,
+                                 url=LSF_DRMAA_URL)
+    return install_dir
+
+def install_drmaa(min_version=MIN_DRMAA_VERSION, *args, **kwargs):
+    return easy_install("drmaa-python", min_version=min_version)
+
+def install_segway(arch_home, *args, **kwargs):
+    lsf_found = has_lsf()
+    sge_found = has_sge()
+    if not (lsf_found or sge_found):
+        print >>sys.stderr, """
+Segway can only be run where there is a cluster management system.
+I was unable to find either an LSF or SGE system.
+Please try reinstalling on a system with one of these installed."""
+        return None
+
+    if lsf_found and not sge_found:
+        # Need to download and install FedStage lsf-drmaa
+        prompt_install_lsf_drmaa(arch_home)
+
+    prompt_install_drmaa()
     query = "Where is segway installed (where is the directory that contains setup.py)?"
     segway_dir = prompt_user(query)
-    install_dir = install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)
-    return install_dir
+    return install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)
     
 #################### GENERIC INSTALL METHODS ###################         
 def _installer(progname, install_func, version_func=None,
@@ -434,6 +511,9 @@ def _installer(progname, install_func, version_func=None,
 
     Checks if program is installed in a succificent version,
     if not, prompts user and installs program.
+
+    Returns result of installation if installation attempted,
+    else returns False
     """
     found = _check_install(progname, version_func, *args, **kwargs)
     if not found:
@@ -445,6 +525,10 @@ def _installer(progname, install_func, version_func=None,
                 print >>sys.stderr, "%s successfully installed." % progname
             else:
                 print >>sys.stderr, "%s not installed." % progname
+
+            return success
+        
+    return False
 
 def _abort_skip_install(func, *args, **kwargs):
     """Calls func with args. If it fails, prompts user to abort or skip.
@@ -462,23 +546,31 @@ def _abort_skip_install(func, *args, **kwargs):
         if permission:
             return None
         else:
-            die("Installation aborted")
+            die("\n============== Installation aborted =================")
             
 def _check_install(progname, version_func, min_version=None, *args, **kwargs):
     """Returns True if program found with at least min_version, False otherwise
 
     version_func should be a function that, when called, returns the version of
-    the installation (or None if not found/unavailable) as a tuple
+    the installation as a tuple, or True if installed,
+    or None if not found/unavailable.
+
+    If version_func returns True, installation accepted regardless of
+    min_version
     """
     print >>sys.stdout, "\nSearching for %s..." % progname,
     sys.stdout.flush()
     version = version_func()
     if version is not None:
         print >>sys.stderr, "found!"
-        if min_version is not None and min_version > version:
+        if min_version is None or version is True:
+            # "True" testing necessary to distinguish from tuple
+            return True
+        elif tuple(min_version) > tuple(version):
             print >>sys.stderr, "Found version: %s. Version %s or above required." % (version2str(version), version2str(min_version))
         else:
             return True
+        
     else:
         print >>sys.stderr, "not found."
 
@@ -596,6 +688,7 @@ def prompt_test_packages(*args, **kwargs):
     """Run each dependency's unit tests and if they fail, prompt reinstall
     XXX: implement this! (but numpy fails test even when correctly installed!)
     """
+    print >>sys.stderr, "\n"
     prompt_test_pytables(*args, **kwargs)
 
 def prompt_test_pytables(*args, **kwargs):
@@ -678,7 +771,7 @@ def prompt_user(query, default=None, choices=None):
         else:
             msg = "%s [%s] " % (prompt, default)
 
-        print >>sys.stderr, prompt,
+        print >>sys.stderr, msg,
         sys.stdin.flush()
         response = raw_input().strip()
 
