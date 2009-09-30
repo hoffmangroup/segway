@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import with_statement
+
 """
 install.py
 
@@ -18,21 +20,25 @@ XXX: Completely untested
 import os
 import sys
 
+from contextlib import contextmanager
+from distutils.spawn import find_executable
+from distutils.version import StrictVersion
 from urllib import urlretrieve
 from string import Template
 from subprocess import PIPE, Popen
 
 assert sys.version_info >= (2, 4)
 
-MIN_HDF5_VERSION = (1, 8)
-MIN_NUMPY_VERSION = (1, 2)
-MIN_DRMAA_VERSION = (0, 4)
+MIN_HDF5_VERSION = "1.8"
+MIN_NUMPY_VERSION = "1.2"
+MIN_DRMAA_VERSION = "0.4a3"
 
-HDF5_DOWNLOAD_VERSION = (1, 8, 2)  # Should match URL below (displayed to user)
+# Should match download URLs below (displayed to user)
+HDF5_DOWNLOAD_VERSION = "1.8.2"
+LSF_DRMAA_DOWNLOAD_VERSION = "1.0.3"
+
 HDF5_URL = "http://www.hdfgroup.org/ftp/HDF5/prev-releases/hdf5-1.8.2/src/hdf5-1.8.2.tar.gz"
-LSF_DRMAA_DOWNLOAD_VERSION = (1, 0, 3)  # Should match URL below (displayed to user)
 LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
-
 EZ_SETUP_URL = "http://peak.telecommunity.com/dist/ez_setup.py"
 
 
@@ -80,6 +86,9 @@ python setup.py install
 """
 
 ############################ CLASSES ##########################
+class DependencyError(Exception):
+    pass
+
 class InstallationError(Exception):
     pass
 
@@ -234,9 +243,12 @@ def main(args=sys.argv[1:]):
         # Add Numpy, if necessary
         prompt_install_numpy()
 
+        # Ensure gmtkViterbi in path
+        assert_executable_in_path("gmtkViterbi")
+
         # Install segway (and dependencies)
         prompt_install_segway(arch_home)
-        
+
         # Test package installations
         prompt_test_packages(arch_home=arch_home)
 
@@ -287,6 +299,39 @@ def make_dir(dirname, verbose=True):
 def substitute_template(template, fields):
     return Template(template).substitute(fields)
 
+def assert_executable_in_path(bin):
+    path = find_executable(bin)
+    if path:
+        return path
+    else:
+        die("Could not find required executable: %s" % bin)
+
+@contextmanager
+def dir_not_in_path(dir):
+    """Temporarily remove given directory from path
+
+    Replaces removed directory (at same location) after closing.
+    """
+    try:
+        index = sys.path.index(dir)
+        del sys.path[index]
+        yield
+        sys.path.insert(index, dir)
+    except ValueError:
+        yield
+
+@contextmanager
+def env_unset(var):
+    """Temporarily unset given environment variable"""
+    try:
+        var_old = os.environ[var]
+        del os.environ[var]
+        yield
+        assert var not in os.environ  # Make sure variable didn't come back!
+        os.environ[var] = var_old
+    except KeyError:
+        yield
+    
 def has_lsf():
     return "LSF_ENVDIR" in os.environ
 
@@ -338,17 +383,8 @@ def write_pydistutils_cfg(cfg_file, arch_home,
     
     
 ########################### GET VERSION ########################
-def get_program_version(progname):
-    progname_lower = progname.lower()
-    if progname_lower == "hdf5":
-        return get_hdf5_version()
-    elif progname_lower == "numpy":
-        return get_numpy_version()
-    else:
-        raise NotImplementedError
-    
 def get_hdf5_version():
-    """Returns HDF5 version as tuple (or None if not found or installed)
+    """Returns HDF5 version as string or None if not found or installed
 
     Only works if h52gif is installed and in current user path
     """
@@ -357,74 +393,66 @@ def get_hdf5_version():
         res = cmd.stdout.readlines()[0].strip()
         if "Version" in res:
             # HDF5 Found!
-            ver = res.split("Version ")[1]
-            return version2tuple(ver)
+            return res.split("Version ")[1]
         else:
             return None
     except (OSError, IndexError):
         return None
 
 def get_numpy_version():
-    """Returns Numpy version as a tuple (or None if not found or installed)
+    """Returns Numpy version as a string or None if not found or installed
+
+    Temporarily unsets LDFLAGS during numpy installation as kludgy solution to:
+    http://projects.scipy.org/numpy/ticket/182
     """
-    try:
-        import numpy
-        return version2tuple(numpy.__version__)
-    except (AttributeError, ImportError):
-        return None
+    with env_unset("LDFLAGS"):
+        try:
+            import numpy
+            return numpy.__version__
+        except (AttributeError, ImportError):
+            return None
 
 def get_segway_version():
-    """Returns segway version as a tuple (or None if not found or installed)
+    """Returns segway version as a string or None if not found or installed
+
+    Temporarily removes '.' from sys.path during installation to prevent
+    finding segway in current directory (but uninstalled)
     """
-    try:
-        import segway
-        return version2tuple(segway.__version__)
-    except (AttributeError, ImportError):
-        return None
+    with dir_not_in_path(os.getcwd()):
+        try:
+            import segway
+            print "Path: %s" % sys.path
+            return segway.__version__
+        except (AttributeError, ImportError):
+            return None
     
 def is_lsf_drmaa_installed():
     """Returns True if library found, None otherwise."""
     return can_find_library("libdrmaa.so")
     
 def get_drmaa_version():
-    """Returns drmaa-python version as a tuple (or None if not found or
-    installed)
+    """Returns drmaa-python version as a string or None if not found or
+    installed
     """
     try:
         import drmaa
-        return version2tuple(drmaa.__version__)
+        return drmaa.__version__
     except (AttributeError, ImportError):
         return None
     
 def get_setuptools_version():
-    """Returns setuptools version as a tuple (or None if not found or installed)
+    """Returns setuptools version as a string or None if not found or installed
     """
     try:
         import setuptools
-        return version2tuple(setuptools.__version__)
+        return setuptools.__version__
     except (AttributeError, ImportError):
         return None
     
-def version2str(ver):  # (#, #[, #]) -> #.#[.#]
-    return ".".join([str(val) for val in ver])
-
-def version2tuple(ver):  #  version -> (#, #[, #])
-    # XXX: Fix: 4.3a3 > 4.3b2
-    import re
-    components = re.split("[^0-9]+", ver)
-    res = []
-    for component in components:
-        try:
-            if len(component) > 0:
-                val = int(component)
-                res.append(val)
-        except ValueError:
-            break
-
-    if len(res) > 0:
-        return tuple(res)
-    else:
-        return None
+def str2version(ver):  # string to version object
+    if ver.startswith("$Revision:"):
+        ver = ver.split()[1]  # Get revision number
+    return StrictVersion(ver)
 
 def can_find_library(libname):
     """Returns a boolean indicating if the given library could be found"""
@@ -466,7 +494,13 @@ def install_hdf5(arch_home, *args, **kwargs):
 
 
 def install_numpy(min_version=MIN_NUMPY_VERSION, *args, **kwargs):
-    return easy_install("numpy", min_version=min_version)
+    # Unset LDFLAGS when installing numpy as kludgy solution to
+    #   http://projects.scipy.org/numpy/ticket/182
+    ldflags = os.environ["LDFLAGS"]
+    del os.environ["LDFLAGS"]
+    result = easy_install("numpy", min_version=min_version)
+    os.environ["LDFLAGS"] = ldflags
+    return result
 
 
 def install_lsf_drmaa(arch_home, *args, **kwargs):
@@ -540,7 +574,7 @@ def _abort_skip_install(func, *args, **kwargs):
     try:
         return func(*args, **kwargs)
     except InstallationError:
-        query = "\nWould you like to continue the installation without this program?"
+        query = "\nWould you like to try to continue the installation without this program?"
         default = "n"
         permission = prompt_yes_no(query, default)
         if permission:
@@ -566,8 +600,8 @@ def _check_install(progname, version_func, min_version=None, *args, **kwargs):
         if min_version is None or version is True:
             # "True" testing necessary to distinguish from tuple
             return True
-        elif tuple(min_version) > tuple(version):
-            print >>sys.stderr, "Found version: %s. Version %s or above required." % (version2str(version), version2str(min_version))
+        elif str2version(min_version) > str2version(version):
+            print >>sys.stderr, "Found version: %s. Version %s or above required." % (version, min_version)
         else:
             return True
         
@@ -595,7 +629,7 @@ def easy_install(progname, min_version=None):
     
     cmd = "easy_install %s" % progname.lower()
     if min_version is not None:  # Add version requirement
-        cmd += ' "%s>=%s"' % (progname, version2str(min_version))
+        cmd += ' "%s>=%s"' % (progname, min_version)
 
     if os.path.isdir(progname):
         print >>sys.stderr, "\nWarning: installation may fail because there is a subdirectory named %s at your current path."
@@ -711,7 +745,7 @@ def prompt_test_pytables(*args, **kwargs):
 def prompt_install(progname, install_prompt = None,
                    version=None, default="Y", *args, **kwargs):
     if version is not None:
-        info = "%s %s" % (progname, version2str(version))
+        info = "%s %s" % (progname, version)
     else:
         info = "%s" % progname
 
