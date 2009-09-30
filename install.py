@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-from __future__ import with_statement
-
 """
 install.py
 
@@ -20,7 +18,6 @@ XXX: Completely untested
 import os
 import sys
 
-from contextlib import contextmanager
 from distutils.spawn import find_executable
 from distutils.version import StrictVersion
 from urllib import urlretrieve
@@ -306,32 +303,6 @@ def assert_executable_in_path(bin):
     else:
         die("Could not find required executable: %s" % bin)
 
-@contextmanager
-def dir_not_in_path(dir):
-    """Temporarily remove given directory from path
-
-    Replaces removed directory (at same location) after closing.
-    """
-    try:
-        index = sys.path.index(dir)
-        del sys.path[index]
-        yield
-        sys.path.insert(index, dir)
-    except ValueError:
-        yield
-
-@contextmanager
-def env_unset(var):
-    """Temporarily unset given environment variable"""
-    try:
-        var_old = os.environ[var]
-        del os.environ[var]
-        yield
-        assert var not in os.environ  # Make sure variable didn't come back!
-        os.environ[var] = var_old
-    except KeyError:
-        yield
-    
 def has_lsf():
     return "LSF_ENVDIR" in os.environ
 
@@ -401,16 +372,12 @@ def get_hdf5_version():
 
 def get_numpy_version():
     """Returns Numpy version as a string or None if not found or installed
-
-    Temporarily unsets LDFLAGS during numpy installation as kludgy solution to:
-    http://projects.scipy.org/numpy/ticket/182
     """
-    with env_unset("LDFLAGS"):
-        try:
-            import numpy
-            return numpy.__version__
-        except (AttributeError, ImportError):
-            return None
+    try:
+        import numpy
+        return numpy.__version__
+    except (AttributeError, ImportError):
+        return None
 
 def get_segway_version():
     """Returns segway version as a string or None if not found or installed
@@ -418,13 +385,21 @@ def get_segway_version():
     Temporarily removes '.' from sys.path during installation to prevent
     finding segway in current directory (but uninstalled)
     """
-    with dir_not_in_path(os.getcwd()):
+    dir = os.getcwd()
+    index = None
+    if dir in sys.path:
+        index = sys.path.index(dir)
+        del sys.path[index]
+
+    try:
         try:
             import segway
-            print "Path: %s" % sys.path
             return segway.__version__
         except (AttributeError, ImportError):
             return None
+    finally:
+        if index is not None:
+            sys.path.insert(index, dir)
     
 def is_lsf_drmaa_installed():
     """Returns True if library found, None otherwise."""
@@ -492,17 +467,22 @@ def install_hdf5(arch_home, *args, **kwargs):
                                  url=HDF5_URL)
     return install_dir
 
-
 def install_numpy(min_version=MIN_NUMPY_VERSION, *args, **kwargs):
     # Unset LDFLAGS when installing numpy as kludgy solution to
     #   http://projects.scipy.org/numpy/ticket/182
-    ldflags = os.environ["LDFLAGS"]
-    del os.environ["LDFLAGS"]
-    result = easy_install("numpy", min_version=min_version)
-    os.environ["LDFLAGS"] = ldflags
-    return result
+    env_old = None
+    if "LDFLAGS" in os.environ:
+        env_old = os.environ["LDFLAGS"]
+        del os.environ["LDFLAGS"]
 
-
+    try:
+        return easy_install("numpy", min_version=min_version)
+    finally:
+        if env_old is not None:
+            # Make sure variable didn't return, and then replace variable
+            assert "LDFLAGS" not in os.environ
+            os.environ["LDFLAGS"] = env_old
+            
 def install_lsf_drmaa(arch_home, *args, **kwargs):
     drmaa_dir = prompt_install_path("LSF-DRMAA", arch_home)
     install_dir = install_script("LSF-DRMAA", drmaa_dir,
