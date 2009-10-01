@@ -666,6 +666,10 @@ def prompt_install(progname, install_prompt = None,
     query = install_prompt % info
     return prompt_yes_no(query, default=default)
 
+def prompt_path(query, default):
+    path = prompt_user(query, default)
+    return fix_path(path)
+
 def prompt_install_path(progname, default):
     query = "Where should %s be installed?" % progname
     path = prompt_user(query, default)
@@ -793,7 +797,7 @@ def main(args=sys.argv[1:]):
         check_executable_in_path("gmtkViterbi")
 
         # Install segway (and dependencies)
-        prompt_install_segway(arch_home)
+        prompt_install_segway()
 
         # Test package installations
         prompt_test_packages(arch_home=arch_home)
@@ -851,9 +855,9 @@ def prompt_install_drmaa():
     return _installer("drmaa-python", install_drmaa, get_drmaa_version,
                       install_prompt=EASY_INSTALL_PROMPT)
 
-def prompt_install_segway(arch_home):
+def prompt_install_segway():
     return _installer("segway", install_segway, get_segway_version,
-                      install_prompt = EASY_INSTALL_PROMPT, arch_home=arch_home)
+                      install_prompt = EASY_INSTALL_PROMPT)
                             
 def install_lsf_drmaa(arch_home, *args, **kwargs):
     progname = "FedStage DRMAA for LSF"
@@ -866,7 +870,7 @@ def install_lsf_drmaa(arch_home, *args, **kwargs):
 def install_drmaa(min_version=MIN_DRMAA_VERSION, *args, **kwargs):
     return easy_install("drmaa", min_version=min_version)
 
-def install_segway(arch_home, *args, **kwargs):
+def install_segway(*args, **kwargs):
     lsf_found = has_lsf()
     sge_found = has_sge()
     if not (lsf_found or sge_found):
@@ -881,9 +885,8 @@ Please try reinstalling on a system with one of these installed."""
         prompt_install_lsf_drmaa(arch_home)
 
     prompt_install_drmaa()
-    query = ("Where is segway installed (where is the directory that"
-             " contains setup.py)?")
-    segway_dir = prompt_user(query)
+    query = "Where is the segway source located?"
+    segway_dir = prompt_path(query, default=".")
     return install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)
     
 
