@@ -1,5 +1,7 @@
 0.1.14:
 
+* there is now a Segway issue tracker at http://code.google.com/p/segway-genome/
+  file your bugs and feature requests there
 * now requires drmaa-python >= 0.4a3
 * segway: off-load identify file creation to the subtasks
 * segway: --split-sequences now called --max-frames, reenabled for all tasks
@@ -9,6 +11,7 @@
 * segway: block e-mail report creation by cluster
 * segway: fixes for LSF support
 * segway: disabled a lot of diagnostic noise
+* segway: default distribution is now asinh_norm
 * segway-res-usage: remove
 
 0.1.13:

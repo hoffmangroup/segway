@@ -19,8 +19,9 @@ class JobTemplateFactory(_JobTemplateFactory):
         mem_limit_spec = ceildiv(self.mem_limit, KB)
 
         # bsub -R: resource requirement
-        # bsub -v: hard virtual memory limit
-        res_spec = make_native_spec(R=self.res_req, v=mem_limit_spec)
+        # bsub -M: per-process memory limit
+        # bsub -v: hard virtual memory limit for all processes
+        res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec, v=mem_limit_spec)
 
         return " ".join([self.native_spec, res_spec])
 

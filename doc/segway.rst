@@ -1,17 +1,20 @@
 ======================
  Segway documentation
 ======================
-:Author: Michael M. Hoffman <mmh1 at washington dot edu>
+:Author: Michael M. Hoffman <mmh1 at uw dot edu>
 :Organization: University of Washington
 :Address: Department of Genome Sciences, PO Box 355065, Seattle, WA 98195-5065, United States of America
 :Copyright: 2009 Michael M. Hoffman
 
+.. include:: <isogrk3.txt>
+
 For a conceptual overview see the paper:
 
-  Michael M. Hoffman, Jeff A. Bilmes, William Stafford Noble. Segway:
-  a dynamic Bayesian network for genomic segmentation. In preparation.
+  Michael M. Hoffman, Orion Buske, Jeff A. Bilmes, William Stafford
+  Noble. Segway: a dynamic Bayesian network for genomic segmentation.
+  In preparation.
 
-Michael <mmh1 at washington dot edu> can send you a copy of the latest
+Michael <mmh1 at uw dot edu> can send you a copy of the latest
 manuscript.
 
 The workflow
@@ -21,9 +24,9 @@ single command-line will--
 
   1. generate an unsupervised segmentation model and initial
      parameters appropriate for this data;
-  2. train parameters of the model starting with the initial parameters;
-  3. identify segments in this data with the model; and
-  4. calculate posterior probability for each possible segment label
+  2. **train** parameters of the model starting with the initial parameters;
+  3. **identify** segments in this data with the model; and
+  4. calculate **posterior** probability for each possible segment label
      at each position.
 
 It is also possible to run each of these steps independently. For
@@ -48,7 +51,7 @@ More specifically, Segway performs the following steps:
      using the generated model and discovered parameters
   7. Convert the GMTK Viterbi results into BED format
      (``segway.bed.gz``) for use in a genome browser, or by
-     EvalSeg, or other tools
+     ``segtools``, or other tools
   8. Call GMTK to perform posterior decoding of the observations
      using the generated model and discovered parameters
   9. Convert the GMTK posterior results into wiggle format
@@ -59,9 +62,7 @@ More specifically, Segway performs the following steps:
       consumption to maximize efficiency
   11. Generate reports on the established likelihood at each round of
       training (``likelihood.*.tab``)
-  12. (not implemented) create plots of simple statistics of the above
-      processes
-  13. (not implemented) Call EvalSeg for a more comprehensive report
+  12. (not implemented) Call ``segtools`` for a more comprehensive report
       and plots on the resulting segmentation
 
 Generating the model
@@ -75,7 +76,7 @@ and the default structure and starting parameters are described more
 fully in the Segway article.
 
 You can tell Segway just to generate these files and not to perform
-any inference using the ``--dry-run`` option.
+any inference using the :option:`--dry-run` option.
 
 Using :option:`--num-starts`\=\ *starts* will generate multiple copies of the
 ``input.master`` file, named ``input.0.master``, ``input.1.master``,
@@ -96,40 +97,28 @@ being tried. If you specify :option:`--num-starts`\=\ *starts*, then
 there will be *starts* different threads for each of the *labels*
 labels tried.
 
-Segway allows multiple models of the values of an observation track
-using three different probability distributions: the normal
-distribution, the gamma distribution, and a multinomial distribution,
-where the nominal output classes each map to a different bin of the
-numerical data.
+Segway allows multiple models of the values of a continuous
+observation tracks using three different probability distributions: a
+normal distribution (``--distribution=norm``), a normal distribution
+on asinh-transformed data (``--distribution=asinh_norm``, the
+default), or a gamma distribution (``--distribution=gamma``). For
+gamma distributions, Segway generates initial parameters by converting
+mean |mu| and variance |sigma|:sup:`2` to shape *k* and scale \theta
+using the equations |mu| = *k*\ |theta| and |sigma|:sup:`2` =
+*k*\ |theta|:sup:`2`. The ideal methodology for setting gamma parameter
+values is less well-understood, and it also requires an unreleased
+version of GMTK. I recommend the use of ``asinh_norm`` in most cases.
 
-XXX cleanup duplication
-
-The model may be generated using a normal distribution for continuous
-observed tracks (``--distribution=norm``, the default), a normal
-distribution on asinh-transformed data
-(``--distribution=asinh_norm``), or a gamma distribution
-(``--distribution=gamma``). The ideal methodology for setting gamma
-parameter values is less well-understood, and it also requires an
-unreleased version of GMTK. I recommend the use of ``asinh_norm`` in
-most cases.
-
-For gamma distributions, Segway generates initial parameters by
-converting mean~$\mu$ and variance~$\sigma^2$ to shape~$k$ and
-scale~$\theta$ using the equations~$\mu = k \theta$ and~$\sigma^2 = k
-\theta^2$.
-
-XXX add arcsinh_normal similar to log
-
-You may specify a subset of tracks using the ``--trackname`` option
+You may specify a subset of tracks using the :option:`--trackname` option
 which may be repeated. For example::
 
     segway --trackname dnasei --trackname h3k36me3
 
 will include the two tracks ``dnasei`` and ``h3k36me3`` and no others.
 
-It is very important that you always specify the same ``--trackname``
-options at all stages in the Segway workflow. There is also a special
-track name, ``dinucleotide``. When you specify
+It is very important that you always specify the same
+:option:`--trackname` options at all stages in the Segway workflow.
+There is also a special track name, ``dinucleotide``. When you specify
 ``--trackname=dinucleotide``, Segway will create a track containing
 the dinucleotide that starts at a particular position. This can help
 in modeling CpG or G+C bias.
@@ -141,46 +130,65 @@ The XXX option allows specification of minimum and maximum segment
 lengths for various labels. XXX include sample of table
 
 also a way to add a soft prior on XXX cover --prior-strength
-XXX default is XXXcomp, this can't be changed at the moment. E-mail
-Michael if you need it to be changable.
+XXX default is XXXcomp, this can't be changed at the moment.
 
 Distributed computing
 =====================
 Segway can currently perform training and identification tasks only
 using a cluster controllable with the DRMAA (cite) interface. I have
-only tested it against Sun Grid Engine, but it should be possible to
-work with other DRMAA-compatible distriuted computing systems, such as
-Platform LSF, PBS, Condor, (XXXcomp add others). If you are interested
-in using one of these systems, please contact me so we can correct all
-the fine details. A standalone version is planned.
+only tested it against Sun Grid Engine and Platform LSF, but it should
+be possible to work with other DRMAA-compatible distributed computing
+systems, such as PBS Pro, PBS/TORQUE, Condor, or GridWay. If you are
+interested in using one of these systems, please contact Michael so he
+correct all the fine details. A standalone version is planned.
 
 Training
 ========
 Most users will generate the model at training time, but to specify
-your own model there are the ``--structure=<filename>`` and
-``--input-master=<filename>`` options.
+your own model there are the :option:`--structure`\=\ *filename* and
+:option:`--input-master`\=\ *filename* options.
 
 Training can be a time-consuming process. You may wish to train only
 on a subset of your data. To facilitate this, there is an
-``--include-regions=<filename>`` option which specifies a BED file
-containing a list of regions to limit to. For example, the ENCODE Data
-Coordination Center at University of Califronia Santa Cruz keeps the
-coordinates of the ENCODE pilot regions in this format at XXXcomp. For
-human whole-genome studies, these regions have nice properties since
-they mark 1 percent of the genome, and were carefully picked to
+:option:`--input-regions`\=\ *filename* option which specifies a BED
+file containing a list of regions to limit to. For example, the ENCODE
+Data Coordination Center at University of California Santa Cruz keeps
+the coordinates of the ENCODE pilot regions in this format at
+<http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/encodeRegions.txt.gz>.
+For human whole-genome studies, these regions have nice properties
+since they mark 1 percent of the genome, and were carefully picked to
 include a variety of different gene densities, and a number of more
 limited studies provide data just for these regions. There is a file
-containing only nine of these regions at XXXcomp(make it), which
-covers 0.15% of the human genome, and is useful for training.
+containing only nine of these regions at
+<http://noble.gs.washington.edu/~mmh1/software/segway/data/regions.manual.1.tab>,
+which covers 0.15% of the human genome, and is useful for training.
+All coordinates are in terms of the NCBI36 assembly of the human
+reference genome (also called ``hg18`` by UCSC).
 
 Memory usage
 ============
 
-XXX describe new regime
+Inference on complex models or long sequences can be memory-intensive.
+In order to work efficiently when it is not always easy to predict
+memory use in advance, Segway controls the memory use of its subtasks
+on a cluster with a trial-and-error approach. It will submit jobs to
+your clustering system specifying the amount of memory they are
+expected to take up. Your clustering system will allocate these jobs
+such that they XXX. If a job takes up more memory than allocated, then
+it will be killed and restarted with a larger amount of memory
+allocated, along the progression specified in gibibytes by
+:option:`--mem-usage`\=\ *progression*. The default *progression* is
+2,3,4,6,8,10,12,14,15.
 
-XXX other sections of workflow
+XXX memory use XXX also, in current version of GMTK, there is a
+problem with running out of dynamic range on sequences that are too
+large that manifests itself as a "zero clique error." This will be
+fixed in GMTK soon. XXX :option:`--split-sequences`\=\ *size* XXX default
+2,000,000.
 
-XXX other sections of technical description
+XXX new sections: other sections of workflow
+
+XXX new sections: other sections of technical description
 
 XXX add section on all other options
 
@@ -234,6 +242,9 @@ XXX cover all of these options.
                           randomize start parameters NUM times (default 1)
       -N SLICE, --num-segs=SLICE
                           make SLICE segment classes (default 2)
+      --resolution=RES    downsample to every RES bp (default 1)
+      --ruler-scale=SCALE
+                          ruler marking every SCALE bp (default 10)
       --prior-strength=RATIO
                           use RATIO times the number of data counts as the
                           number of pseudocounts for the segment length prior
@@ -242,10 +253,12 @@ XXX cover all of these options.
                           try each float in PROGRESSION as the number of
                           gibibytes of memory to allocate in turn (default
                           2,3,4,6,8,10,12,14,15)
+      -S SIZE, --split-sequences=SIZE
+                          split up sequences that are larger than SIZE bp
+                          (default 2000000)
       -v NUM, --verbosity=NUM
                           show messages with verbosity NUM
-      --drm-opt=OPT       specify an option to be passed to the distributed
-                          resource manager
+      --cluster-opt=OPT   specify an option to be passed to the cluster manager
   
     Flags:
       -c, --clobber       delete any preexisting files
@@ -255,11 +268,7 @@ XXX cover all of these options.
       -k, --keep-going    keep going in some threads even when you have errors
                           in another
       -n, --dry-run       write all files, but do not run any executables
-      -S, --split-sequences
-                          split up sequences that are too large to fit into
-                          memory
-  
-  
+
 
 Python interface
 ================
@@ -284,3 +293,29 @@ XXX describe runner.fromoptions() interface
 All other interfaces (the ones that do not use a ``main()`` function)
 to Segway code are undocumented and should not be used. If you do use
 them, know that the API may change at any time without notice.
+
+Support
+=======
+
+For support of Segway, please write to the <segway-users@uw.edu> mailing
+list, rather than writing the authors directly. Using the mailing list
+will get your question answered more quickly. It also allows us to
+pool knowledge and reduce getting the same inquiries over and over.
+You can subscribe here:
+
+https://mailman1.u.washington.edu/mailman/listinfo/segway-users
+
+Specifically, if you want to report a bug or request a feature, please
+do so using the Segway issue tracker at:
+
+http://code.google.com/p/segway-genome/issues/
+
+If you do not want to read discussions about other people's use of
+Segway, but would like to hear about new releases and other important
+information, please subscribe to <segway-announce@uw.edu> by visiting
+this web page:
+
+https://mailman1.u.washington.edu/mailman/listinfo/segway-announce
+
+Announcements of this nature are sent to both `segway-users` and
+`segway-announce`.

@@ -58,7 +58,7 @@ UUID = uuid1().hex
 # Norvig has one
 DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
-DISTRIBUTION_DEFAULT = DISTRIBUTION_NORM
+DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
                                      DISTRIBUTION_ASINH_NORMAL])
 
@@ -353,6 +353,8 @@ THREAD_SLEEP_TIME = 20
 
 RESOLUTION = 1
 
+INDEX_BED_START = 1
+
 ## exceptions
 class ChunkOverMemUsageLimit(Exception):
     pass
@@ -472,6 +474,11 @@ def consume_until(iterable, text):
     for line in iterable:
         if line.startswith(text):
             break
+
+def parse_bed4(line):
+    row = line.split()
+    chrom, start, end, seg = row[:4]
+    return row, (chrom, start, end, seg)
 
 def slice2range(s):
     if isinstance(s, int):
@@ -2496,6 +2503,11 @@ class Runner(object):
         if bed_filename is None:
             bed_filename = self.dirpath / BED_FILEBASENAME
 
+        # values for comparison to combine adjoining segments
+        last_line = ""
+        last_start = None
+        last_vals = (None, None, None) # (chrom, coord, seg)
+
         with gzip_open(bed_filename, "w") as bed_file:
             # XXX: add in browser track line (see SVN revisions
             # previous to 195)
@@ -2503,7 +2515,50 @@ class Runner(object):
 
             for viterbi_filename in self.viterbi_filenames:
                 with open(viterbi_filename) as viterbi_file:
-                    bed_file.write(viterbi_file.read())
+                    lines = viterbi_file.readlines()
+                    first_line = lines[0]
+                    first_row, first_coords = parse_bed4(first_line)
+                    (chrom, start, end, seg) = first_coords
+
+                    # write the last line and the first line, after
+                    # potentially merging
+                    if last_vals == (chrom, start, seg):
+                        first_row[INDEX_BED_START] = last_start
+                        merged_line = "\t".join(first_row)
+
+                        # if there's just a single line in the BED file
+                        if len(lines) == 1:
+                            last_line = merged_line
+                            last_vals = (chrom, end, seg)
+                            # last_start is already set correctly
+                            # postpone writing until after additional merges
+                            continue
+                        else:
+                            # write the merged line
+                            bed_file.write(merged_line)
+                    else:
+                        if len(lines) == 1:
+                            # write the last line of the last file.
+                            # hold back the first line of this file,
+                            # and treat it as the last line
+                            bed_file.write(last_line)
+                        else:
+                            # write the last line of the last file, first
+                            # line of this file
+                            bed_file.writelines([last_line, first_line])
+
+                    # write the bulk of the lines
+                    bed_file.writelines(lines[1:-1])
+
+                    # set last_line
+                    last_line = lines[-1]
+                    last_row, last_coords = parse_bed4(last_line)
+                    (chrom, start, end, seg) = last_coords
+                    last_vals = (chrom, end, seg)
+                    last_start = start
+
+            # write the very last line of all files
+            bed_file.write(last_line)
 
     def posterior2wig(self):
         infilenames = self.posterior_filenames
