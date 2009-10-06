@@ -12,6 +12,9 @@
 * segway: fixes for LSF support
 * segway: disabled a lot of diagnostic noise
 * segway: default distribution is now asinh_norm
+* segway: will now resubmit jobs in a cohort before all of the other
+  jobs are done. this increases the load on the cluster manager, so
+  job completion is only checked every 60 s per thread
 * segway-res-usage: remove
 
 0.1.13:

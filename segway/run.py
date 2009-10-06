@@ -29,7 +29,7 @@ from threading import Event, Lock, Thread
 from time import sleep
 from uuid import uuid1
 
-from drmaa import JobControlAction, JobState
+from drmaa import ExitTimeoutException, JobControlAction, JobState
 from genomedata import Genome
 from numpy import (amin, amax, append, arange, arcsinh, array, diagflat, empty,
                    finfo, float32, intc, NINF, ones, outer, sqrt, square, tile,
@@ -349,7 +349,8 @@ TERMINATE = JobControlAction.TERMINATE
 FAILED = JobState.FAILED
 DONE = JobState.DONE
 
-THREAD_SLEEP_TIME = 20
+THREAD_START_SLEEP_TIME = 20
+JOB_WAIT_SLEEP_TIME = 60 # time to wait between checking job status
 
 RESOLUTION = 1
 
@@ -924,17 +925,15 @@ class RestartableJobDict(dict):
         jobids = self.keys()
 
         while jobids:
-            # return indicates that all jobs have completed
-            session.synchronize(jobids, session.TIMEOUT_WAIT_FOREVER,
-                                dispose=False)
+            sleep(JOB_WAIT_SLEEP_TIME)
 
-            # then we have to check each job individually
+            # check each job individually
             for jobid in jobids:
-                #print >>sys.stderr, "checking %s" % jobid
-                job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
-                #print >>sys.stderr, job_info
-
-                resource_usage = job_info.resourceUsage
+                try:
+                    job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
+                except ExitTimeoutException:
+                    # job isn't done yet
+                    continue
 
                 if not (job_info.hasExited or job_info.hasSignal):
                     # for some reason I think this is more robust than
@@ -951,6 +950,7 @@ class RestartableJobDict(dict):
 
                 prog, num_segs, num_frames = self[jobid].mem_usage_key
 
+                resource_usage = job_info.resourceUsage
                 try: # SGE
                     maxvmem = resource_usage["maxvmem"]
                 except KeyError: # LSF
@@ -3071,7 +3071,7 @@ class Runner(object):
                     # before you do the next one
                     # XXX: using some sort of semaphore would be better
                     # XXX: using a priority option to the system would be best
-                    sleep(THREAD_SLEEP_TIME)
+                    sleep(THREAD_START_SLEEP_TIME)
 
                 # list of tuples(log_likelihood, input_master_filename,
                 #                params_filename)
