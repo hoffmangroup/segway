@@ -930,7 +930,10 @@ class RestartableJobDict(dict):
             # check each job individually
             for jobid in jobids:
                 clean_safe_sleep_time = CLEAN_SAFE_TIME / len(self)
-                sleep(min(clean_safe_sleep_time, JOB_WAIT_SLEEP_TIME))
+                sleep_time = min(clean_safe_sleep_time, JOB_WAIT_SLEEP_TIME)
+
+                print >>sys.stderr, "sleeping for %s s" % sleep_time
+                sleep(sleep_time)
 
                 try:
                     job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
