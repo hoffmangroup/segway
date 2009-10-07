@@ -2626,7 +2626,7 @@ class Runner(object):
                    island=ISLAND,
                    componentCache=COMPONENT_CACHE,
                    deterministicChildrenStore=DETERMINISTIC_CHILDREN_STORE,
-                   cliqueTableNormalize=True,
+                   cliqueTableNormalize=False,
                    jtFile=self.jt_info_filename)
 
         if ISLAND:
