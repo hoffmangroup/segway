@@ -3183,7 +3183,7 @@ class Runner(object):
 
         # -: standard output, processed by segway-task
         viterbi_kwargs = dict(triFile=self.triangulation_filename,
-                              vitValsFile="-")
+                              pVitValsFile="-")
 
         posterior_kwargs = dict(triFile=self.posterior_triangulation_filename,
                                 doDistributeEvidence=True,
