@@ -186,7 +186,6 @@ def extjoin(*args):
 # extensions and suffixes
 EXT_BED = "bed"
 EXT_BIN = "bin"
-EXT_IDENTIFY = "identify.h5"
 EXT_LIKELIHOOD = "ll"
 EXT_LIST = "list"
 EXT_FLOAT = "float32"
@@ -349,8 +348,11 @@ TERMINATE = JobControlAction.TERMINATE
 FAILED = JobState.FAILED
 DONE = JobState.DONE
 
+# CLEAN_PERIOD in lsb.params, after which jobs are removed from mbatchd's memory
+# default is 3600, multiplying by 0.9 for a margin of error
+CLEAN_SAFE_TIME = int(3600 * 0.9)
 THREAD_START_SLEEP_TIME = 20
-JOB_WAIT_SLEEP_TIME = 60 # time to wait between checking job status
+JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
 
 RESOLUTION = 1
 
@@ -925,10 +927,11 @@ class RestartableJobDict(dict):
         jobids = self.keys()
 
         while jobids:
-            sleep(JOB_WAIT_SLEEP_TIME)
-
             # check each job individually
             for jobid in jobids:
+                clean_safe_sleep_time = CLEAN_SAFE_TIME / len(self)
+                sleep(min(clean_safe_sleep_time, JOB_WAIT_SLEEP_TIME))
+
                 try:
                     job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
                 except ExitTimeoutException:
@@ -2524,7 +2527,9 @@ class Runner(object):
                     # potentially merging
                     if last_vals == (chrom, start, seg):
                         first_row[INDEX_BED_START] = last_start
-                        merged_line = "\t".join(first_row)
+
+                        # add back trailing newline eliminated by line.split()
+                        merged_line = "\t".join(first_row) + "\n"
 
                         # if there's just a single line in the BED file
                         if len(lines) == 1:
