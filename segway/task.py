@@ -35,9 +35,13 @@ re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 def parse_viterbi(lines):
     lines = iter(lines)
 
+    # Segment 0, after Island[...]
     assert lines.next().startswith("Segment ")
+
+    # ========
     assert lines.next().startswith("========")
 
+    # Segment 0, number of frames = 1001, viteri-score = -6998.363710
     line = lines.next()
     assert line.startswith("Segment ")
 
@@ -47,19 +51,22 @@ def parse_viterbi(lines):
 
     num_frames = int(num_frames_text[2])
 
+    # Printing random variables from (P,C,E)=(1,999,0) partitions
     line = lines.next()
     assert line.startswith("Printing random variables from (P,C,E)")
 
     res = zeros(num_frames, DTYPE_IDENTIFY)
 
     for line in lines:
+        # Ptn-0 P': seg(0)=24,seg(1)=24
         if line.startswith(MSG_SUCCESS):
             return res
 
-        assert line.rstrip().endswith(" partition")
+        assert line.startswith("Ptn-")
 
-        line = lines.next()
-        for pair in line.split(","):
+        values = line.rpartition(": ")[2]
+
+        for pair in values.split(","):
             match = re_seg.match(pair)
             if not match:
                 continue
