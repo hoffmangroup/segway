@@ -2618,11 +2618,15 @@ class Runner(object):
                                UUID)
 
     def make_gmtk_kwargs(self):
+        """
+        universal args to gmtkEMtrainNew, gmtkViterbi, gmtkJT
+        """
         res = dict(strFile=self.structure_filename,
                    verbosity=self.verbosity,
                    island=ISLAND,
                    componentCache=COMPONENT_CACHE,
                    deterministicChildrenStore=DETERMINISTIC_CHILDREN_STORE,
+                   cliqueTableNormalize=True,
                    jtFile=self.jt_info_filename)
 
         if ISLAND:
