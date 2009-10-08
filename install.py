@@ -18,13 +18,15 @@ XXX: Completely untested
 ####################### BEGIN COMMON CODE HEADER #####################
 
 import os
+import pkg_resources
 import sys
 
 from distutils.spawn import find_executable
-from distutils.version import StrictVersion
+from distutils.version import LooseVersion, StrictVersion
 from urllib import urlretrieve
+from site import addsitedir
 from string import Template
-from subprocess import PIPE, Popen
+from subprocess import call, PIPE, Popen
 
 assert sys.version_info >= (2, 4)
 
@@ -62,6 +64,7 @@ cd $filebase
 ./configure --prefix=$dir
 make
 make install
+cd ..
 rm -f $file
 """
 
@@ -99,7 +102,7 @@ class DependencyError(Exception):
 
 class InstallationError(Exception):
     pass
-
+        
 class ShellManager(object):
     """Class to manage details of shells.
 
@@ -160,7 +163,7 @@ class ShellManager(object):
                 self._out = open(os.path.expanduser(self.file), "a")
         
         cmd = self._env_format % (variable, value)
-        print >>self._out, "\n%s  # Added in segway installation\n" % cmd
+        print >>self._out, "\n%s  # Added by install script" % cmd
             
     def add_to_rc_env(self, variable, value):
         """Prepend the value to the variable in the shell rc file (or stdout)
@@ -222,7 +225,7 @@ def get_default_arch_home():
         
     return os.path.expanduser("~/arch/%s" % arch)
 
-def setup_python_home(arch_home = None):
+def setup_python_home(arch_home=None):
     if arch_home is None:
         arch_home = get_default_arch_home()
         
@@ -230,13 +233,15 @@ def setup_python_home(arch_home = None):
     default_python_home = get_default_python_home(arch_home)
     python_home = fix_path(prompt_user(query, default_python_home))
     make_dir(python_home)
+    addsitedir(python_home)  # Load already-installed packages/eggs
+    reload(pkg_resources)  # Update working set
     return python_home, default_python_home
 
 def get_default_python_home(arch_home):
     python_version = sys.version[:3]
     return os.path.join(arch_home, "lib", "python%s" % python_version)
 
-def setup_script_home(arch_home = None):
+def setup_script_home(arch_home=None):
     if arch_home is None:
         arch_home = get_default_arch_home()
         
@@ -245,6 +250,21 @@ def setup_script_home(arch_home = None):
     script_home = fix_path(prompt_user(query, default_script_home))
     make_dir(script_home)
     return script_home, default_script_home
+
+def setup_hdf5_installation(shell, arch_home):
+    hdf5_dir = prompt_install_hdf5(arch_home)
+    if hdf5_dir:
+        print >>sys.stderr, ("\nPyTables uses the environment variable"
+                             " HDF5_DIR to locate HDF5.")
+        prompt_set_env(shell, "HDF5_DIR", hdf5_dir)
+        bin_path = os.path.join(hdf5_dir, "bin")
+        include_path = os.path.join(hdf5_dir, "include")
+        lib_path = os.path.join(hdf5_dir, "lib")
+        prompt_add_to_env(shell, "PATH", bin_path)
+        prompt_add_to_env(shell, "C_INCLUDE_PATH", include_path)
+        prompt_add_to_env(shell, "LIBRARY_PATH", lib_path)
+        prompt_add_to_env(shell, "LD_LIBRARY_PATH", lib_path)
+    return hdf5_dir
 
 def prompt_add_to_env(shell, variable, value):
     if shell.in_env(variable, value):
@@ -336,7 +356,7 @@ def write_pydistutils_cfg(cfg_file, arch_home,
     """Write a pydistutils.cfg file
     """
     fields = {}
-    fields["prefix"] = arch_home
+    fields["prefix"] = fix_path(arch_home)
     
     if python_home == default_python_home:
         platlib = "$platbase/lib/python$py_version_short"
@@ -366,7 +386,7 @@ def get_hdf5_version():
     Only works if h52gif is installed and in current user path
     """
     try:
-        cmd = Popen("h52gif -V", shell=True, stdout=PIPE, stderr=PIPE)
+        cmd = Popen(["h52gif", "-V"], stdout=PIPE, stderr=PIPE)
         res = cmd.stdout.readlines()[0].strip()
         if "Version" in res:
             # HDF5 Found!
@@ -397,7 +417,7 @@ def get_setuptools_version():
 def str2version(ver):  # string to version object
     if ver.startswith("$Revision:"):
         ver = ver.split()[1]  # Get revision number
-    return StrictVersion(ver)
+    return LooseVersion(ver)
 
 ##################### SPECIFIC PROGRAM INSTALLERS ################
 def prompt_install_hdf5(arch_home):
@@ -405,13 +425,14 @@ def prompt_install_hdf5(arch_home):
                       install_message=HDF5_INSTALL_MESSAGE, arch_home=arch_home,
                       version=HDF5_DOWNLOAD_VERSION)
 
-def prompt_install_numpy():
+def prompt_install_numpy(min_version=MIN_NUMPY_VERSION):
     return _installer("Numpy", install_numpy, get_numpy_version,
-                      min_version=MIN_NUMPY_VERSION,
+                      min_version=min_version,
                       install_prompt=EASY_INSTALL_PROMPT)
 
 def install_hdf5(arch_home, *args, **kwargs):
     hdf5_dir = prompt_install_path("HDF5", arch_home)
+    make_dir(hdf5_dir)
     install_dir = install_script("HDF5", hdf5_dir, HDF5_INSTALL_SCRIPT,
                                  url=HDF5_URL)
     return install_dir
@@ -441,6 +462,7 @@ def _installer(progname, install_func, version_func=None,
     progname: string name of program
     install_func: function to call with *args, **kwargs to install progname
     version_func: function to call with *args, **kwargs to find progname version
+      If version_func is none, installation will be promped no matter what.
     install_message: helpful message to print if user chooses to install program
 
     Checks if program is installed in a succificent version,
@@ -459,9 +481,7 @@ def _installer(progname, install_func, version_func=None,
                 print >>sys.stderr, "%s successfully installed." % progname
             else:
                 print >>sys.stderr, "%s not installed." % progname
-
             return success
-        
     return False
 
 def _abort_skip_install(func, *args, **kwargs):
@@ -473,7 +493,11 @@ def _abort_skip_install(func, *args, **kwargs):
     """
     try:
         return func(*args, **kwargs)
-    except InstallationError:
+    except InstallationError, e:
+        e_str = str(e)
+        if e_str:
+            print >>sys.stderr, "Error: %s" % e_str  # print any error message
+            
         query = ("\nWould you like to try to continue the installation"
                  " without this program?")
         default = "n"
@@ -486,16 +510,23 @@ def _abort_skip_install(func, *args, **kwargs):
 def _check_install(progname, version_func, min_version=None, *args, **kwargs):
     """Returns True if program found with at least min_version, False otherwise
 
-    version_func should be a function that, when called, returns the version of
-    the installation as a tuple, or True if installed,
-    or None if not found/unavailable.
+    version_func should either:
+    - be a function that, when called, returns the version of
+      the installation as a tuple, or True if installed,
+      or None if not found/unavailable.
+    - or None, in which False will be returned immediately
 
     If version_func returns True, installation accepted regardless of
     min_version
+    
     """
-    print >>sys.stdout, "\nSearching for %s..." % progname,
-    sys.stdout.flush()
-    version = version_func()
+    if version_func is None:
+        return False
+    else:
+        print >>sys.stdout, "\nSearching for %s..." % progname,
+        sys.stdout.flush()
+        version = version_func()
+        
     if version is not None:
         print >>sys.stderr, "found!"
         if min_version is None or version is True:
@@ -532,9 +563,9 @@ def easy_install(progname, min_version=None):
         else:
             raise InstallationError()
     
-    cmd = "easy_install %s" % progname.lower()
+    cmd = ["easy_install", progname.lower()]
     if min_version is not None:  # Add version requirement
-        cmd += ' "%s>=%s"' % (progname, min_version)
+        cmd.append('"%s>=%s"' % (progname, min_version))
 
     if os.path.isdir(progname):
         print >>sys.stderr, ("\nWarning: installation may fail because"
@@ -542,8 +573,7 @@ def easy_install(progname, min_version=None):
                              " current path.") % progname
 
     print >>sys.stderr, ">> %s" % cmd
-    proc = Popen(cmd, shell=True, stdout=None, stderr=None)
-    code = proc.wait()
+    code = call(cmd, stdout=None, stderr=None)
 
     if code != 0:
         print >>sys.stderr, "Error occured installing %s" % progname
@@ -566,12 +596,16 @@ def install_script(progname, prog_dir, script, **kwargs):
     
     Returns installation directory if installation is successful
     (or True if unknown), and None otherwise.
+    
     """
     fields = kwargs
 
     # Set fields for template substitution
     if "dir" not in fields:
         fields["dir"] = prog_dir
+
+    # Make dir absolute
+    fields["dir"] = fix_path(fields["dir"])
         
     if "url" in fields:
         filename = os.path.basename(fields["url"])
@@ -614,26 +648,21 @@ def install_script(progname, prog_dir, script, **kwargs):
     os.chdir(cwd)
     return prog_dir
 
-def reinstall_program(progname, *args, **kwargs):
-    """Reinstall program given name and arguments."""
-    progname = progname.lower()
-    if progname == "hdf5":
-        install_hdf5(*args, **kwargs)
-    elif progname == "numpy":
-        install_numpy(*args, **kwargs)
-    elif progname == "segway":
-        install_segway(*args, **kwargs)
 
 ########################## PROGRAM TESTING ######################
-def prompt_test_packages(*args, **kwargs):
+def prompt_test_packages(python_home, *args, **kwargs):
     """Run each dependency's unit tests and if they fail, prompt reinstall
     
     XXX: implement this for more than pytables (but numpy always fails)
+    
     """
-    print >>sys.stderr, "\n\n"
+    # Start by making sure everything is up to date loaded into sys.path
+    if python_home:
+        addsitedir(python_home)
+        
+    print >>sys.stderr, "\n"
     try:
         prompt_test_pytables(*args, **kwargs)
-        print >>sys.stderr, "\n=========== All tests passed! ============"
     except InstallationError:
         die("\n=========== Some tests failed! =============="
             "\nYour installation may be incomplete and might not work.")
@@ -646,7 +675,7 @@ def prompt_test_pytables(*args, **kwargs):
         try:
             import tables
             tables.test()
-            print >>sys.stderr, "Test passed!"
+            print >>sys.stderr, "Test seemed to have passed."
         except:
             print >>sys.stderr, ("There seems to be an error with the"
                                  " PyTables installation!")
@@ -784,11 +813,7 @@ def main(args=sys.argv[1:]):
                           script_home, default_script_home)
             
         # Add HDF5, if necessary
-        hdf5_dir = prompt_install_hdf5(arch_home)
-        if hdf5_dir:
-            print >>sys.stderr, "\nPyTables uses the environment variable HDF5DIR to locate HDF5."
-            prompt_set_env(shell, "HDF5_DIR", hdf5_dir)
-
+        hdf5_dir = setup_hdf5_installation(shell, arch_home)
 
         # Add Numpy, if necessary
         prompt_install_numpy()
@@ -800,7 +825,7 @@ def main(args=sys.argv[1:]):
         prompt_install_segway()
 
         # Test package installations
-        prompt_test_packages(arch_home=arch_home)
+        prompt_test_packages(python_home)
 
         print >>sys.stderr, "\n============ Installation complete! ==========="
         
@@ -813,6 +838,9 @@ def get_segway_version():
 
     Temporarily removes '.' from sys.path during installation to prevent
     finding segway in current directory (but uninstalled)
+    
+    Since segway __version__ is currently a revision number, get the full
+    number from pkg_resources
     """
     dir = os.getcwd()
     index = None
@@ -822,8 +850,9 @@ def get_segway_version():
 
     try:
         try:
-            import segway
-            return segway.__version__
+            ref = pkg_resources.Requirement.parse("segway")
+            data = pkg_resources.working_set.find(ref)
+            return data.version
         except (AttributeError, ImportError):
             return None
     finally:

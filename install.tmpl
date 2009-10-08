@@ -70,11 +70,7 @@ def main(args=sys.argv[1:]):
                           script_home, default_script_home)
             
         # Add HDF5, if necessary
-        hdf5_dir = prompt_install_hdf5(arch_home)
-        if hdf5_dir:
-            print >>sys.stderr, "\nPyTables uses the environment variable HDF5DIR to locate HDF5."
-            prompt_set_env(shell, "HDF5_DIR", hdf5_dir)
-
+        hdf5_dir = setup_hdf5_installation(shell, arch_home)
 
         # Add Numpy, if necessary
         prompt_install_numpy()
@@ -86,7 +82,7 @@ def main(args=sys.argv[1:]):
         prompt_install_segway()
 
         # Test package installations
-        prompt_test_packages(arch_home=arch_home)
+        prompt_test_packages(python_home)
 
         print >>sys.stderr, "\n============ Installation complete! ==========="
         
@@ -99,6 +95,9 @@ def get_segway_version():
 
     Temporarily removes '.' from sys.path during installation to prevent
     finding segway in current directory (but uninstalled)
+    
+    Since segway __version__ is currently a revision number, get the full
+    number from pkg_resources
     """
     dir = os.getcwd()
     index = None
@@ -108,8 +107,9 @@ def get_segway_version():
 
     try:
         try:
-            import segway
-            return segway.__version__
+            ref = pkg_resources.Requirement.parse("segway")
+            data = pkg_resources.working_set.find(ref)
+            return data.version
         except (AttributeError, ImportError):
             return None
     finally:
