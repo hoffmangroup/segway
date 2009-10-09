@@ -22,7 +22,7 @@ import pkg_resources
 import sys
 
 from distutils.spawn import find_executable
-from distutils.version import LooseVersion, StrictVersion
+from distutils.version import LooseVersion
 from urllib import urlretrieve
 from site import addsitedir
 from string import Template
@@ -793,17 +793,14 @@ def main(args=sys.argv[1:]):
     except KeyError:
         shell_name = None
     shell = ShellManager(shell_name)
-                
+
     try:
-        # Set up arch_home
         arch_home = setup_arch_home()
-        
-        # Set up python home
+
         python_home, default_python_home = setup_python_home(arch_home)
         # Add python_home to PYTHONPATH
         prompt_add_to_env(shell, "PYTHONPATH", python_home)
-        
-        # Set up bin directory
+
         script_home, default_script_home = setup_script_home(arch_home)
         # Add script_home to PATH
         prompt_add_to_env(shell, "PATH", script_home)
@@ -811,24 +808,22 @@ def main(args=sys.argv[1:]):
         # Maybe create pydistutils.cfg
         prompt_create_cfg(arch_home, python_home, default_python_home,
                           script_home, default_script_home)
-            
-        # Add HDF5, if necessary
+
         hdf5_dir = setup_hdf5_installation(shell, arch_home)
 
-        # Add Numpy, if necessary
         prompt_install_numpy()
 
         # Ensure gmtkViterbi in path
         check_executable_in_path("gmtkViterbi")
 
         # Install segway (and dependencies)
-        prompt_install_segway()
+        prompt_install_segway(arch_home=arch_home)
 
         # Test package installations
         prompt_test_packages(python_home)
 
         print >>sys.stderr, "\n============ Installation complete! ==========="
-        
+
     finally:  # Clean up
         shell.close()
 
@@ -858,11 +853,11 @@ def get_segway_version():
     finally:
         if index is not None:
             sys.path.insert(index, dir)
-    
+
 def is_lsf_drmaa_installed():
     """Returns True if library found, None otherwise."""
     return can_find_library("libdrmaa.so")
-    
+
 def get_drmaa_version():
     """Returns drmaa-python version as a string or None if not found or
     installed
@@ -884,10 +879,10 @@ def prompt_install_drmaa():
     return _installer("drmaa-python", install_drmaa, get_drmaa_version,
                       install_prompt=EASY_INSTALL_PROMPT)
 
-def prompt_install_segway():
+def prompt_install_segway(arch_home):
     return _installer("segway", install_segway, get_segway_version,
-                      install_prompt = EASY_INSTALL_PROMPT)
-                            
+                      install_prompt=EASY_INSTALL_PROMPT, arch_home=arch_home)
+
 def install_lsf_drmaa(arch_home, *args, **kwargs):
     progname = "FedStage DRMAA for LSF"
     drmaa_dir = prompt_install_path(progname, arch_home)
@@ -899,7 +894,7 @@ def install_lsf_drmaa(arch_home, *args, **kwargs):
 def install_drmaa(min_version=MIN_DRMAA_VERSION, *args, **kwargs):
     return easy_install("drmaa", min_version=min_version)
 
-def install_segway(*args, **kwargs):
+def install_segway(arch_home, *args, **kwargs):
     lsf_found = has_lsf()
     sge_found = has_sge()
     if not (lsf_found or sge_found):
@@ -917,7 +912,7 @@ Please try reinstalling on a system with one of these installed."""
     query = "Where is the segway source located?"
     segway_dir = prompt_path(query, default=".")
     return install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)
-    
+
 
 if __name__ == "__main__":
     sys.exit(main())
