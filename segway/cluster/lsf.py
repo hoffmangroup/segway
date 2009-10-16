@@ -11,8 +11,8 @@ import sys
 from path import path
 
 from .._configparser import OneSectionRawConfigParser
-import .._util
-from .._util import ceildiv
+from .. import _util
+from .._util import ceildiv, MB
 from .common import _JobTemplateFactory, make_native_spec
 
 SIZE_UNITS = dict((unit, getattr(_util, unit))
