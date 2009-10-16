@@ -11,8 +11,12 @@ import sys
 from path import path
 
 from .._configparser import OneSectionRawConfigParser
-from .._util import ceildiv, KB, MB, GB, TB, PB, EB
+import .._util
+from .._util import ceildiv
 from .common import _JobTemplateFactory, make_native_spec
+
+SIZE_UNITS = dict((unit, getattr(_util, unit))
+                  for unit in ["KB", "MB", "GB", "TB", "PB", "EB"])
 
 LSF_CONF_BASENAME = "lsf.conf"
 LSF_CONF_FILEPATH = path(environ["LSF_ENVDIR"]) / LSF_CONF_BASENAME
@@ -21,7 +25,7 @@ LSF_CONF = OneSectionRawConfigParser(dict(LSF_UNIT_FOR_LIMITS="KB"))
 LSF_CONF.read(LSF_CONF_FILEPATH)
 
 UNIT_FOR_LIMITS = LSF_CONF.get("LSF_UNIT_FOR_LIMITS")
-DIVISOR_FOR_LIMITS = dict(KB=KB, MB=MB, GB=GB, TB=TB, PB=PB, EB=EB)
+DIVISOR_FOR_LIMITS = SIZE_UNITS[UNIT_FOR_LIMITS]
 
 class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage):
