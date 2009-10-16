@@ -10,7 +10,7 @@ import sys
 
 from optbuild import Mixin_NoConvertUnderscore, OptionBuilder_ShortOptWithSpace
 
-from .._util import MB
+from .._util import die, MB
 
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
@@ -30,8 +30,10 @@ class _JobTemplateFactory(object):
         try:
             mem_usage = self.mem_usage_progression[trial_index]
         except IndexError:
-            raise ValueError("edge of memory usage progression reached "
-                             "without success")
+            print >>sys.stderr, "Edge of memory usage progression reached without success."
+            print >>sys.stderr, "Check for errors in output/e subdirectory."
+            print >>sys.stderr, "E-mail segway-users@uw.edu for help (subscription required)."
+            die()
 
         self.mem_limit = calc_mem_limit(mem_usage)
         self.res_req = self.make_res_req(mem_usage)

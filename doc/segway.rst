@@ -126,16 +126,52 @@ in modeling CpG or G+C bias.
 Segment length constraints
 ==========================
 
-The XXX option allows specification of minimum and maximum segment
-lengths for various labels. XXX include sample of table
+The :option:`--seg-table`\=\ *file* option allows specification of a
+*segment table* that specifies minimum and maximum segment lengths for
+various labels. Here is an example of a segment table::
 
-also a way to add a soft prior on XXX cover --prior-strength
-XXX default is XXXcomp, this can't be changed at the moment.
+  label	len
+  1:4	200:2200:200
+  0	200::200
+  4:	200::200
+
+The header line with ``label`` in one column and ``len`` in another is
+mandatory. Slices are specified with a colon as in Python, and are
+half-open. So label ``1:4`` specifies labels 1, 2, and 3. For those
+labels, segment lengths between 200 and 2200 are allowed, with a 200
+bp ruler. The ruler for every label must match each other and the
+option set with :option:`--ruler-scale`. The label ``4:`` means all
+labels 4 or higher, which here are set to a minimum segment length of
+200 and a maximum segment length of 2200.
+
+Due to the lack of an epilogue in the model, it is possible to get one
+segment per sequence that actually does not meet. This is expected and
+will be fixed in a future release.
+
+Use these segment lengths along with the supervised learning feature
+with caution. If you try to create something impossible with your
+supervision labels, such as defining a 2300-bp region to have label 1,
+which you have already constrained to have a maximum segment length of
+2200, GMTK will produce the dreaded zero clique error and your
+training run will fail. Don't do this. In practice, due to the
+imprecision introduced by the 200-bp ruler, a region labeled in the
+supervision process with label 1 that is only 2000 bp long may also
+cause the training process to fail with a zero clique error. If this
+happens either decrease the size of the ruler, increase the size of
+the maximum segment length, or decrease the size of the supervision region.
+
+There is also a way to add a soft prior on the length distribution,
+which will tend to make the expected segment length 100000, but will
+still allow data that strongly suggests another length control. You
+can control the strength of the prior with the
+:option:`--prior-strength`\=\ *strength* option. The default expected
+segment length of 100000 can't be changed at the moment but will in a
+future version.
 
 Distributed computing
 =====================
 Segway can currently perform training and identification tasks only
-using a cluster controllable with the DRMAA (cite) interface. I have
+using a cluster controllable with the DRMAA interface. I have
 only tested it against Sun Grid Engine and Platform LSF, but it should
 be possible to work with other DRMAA-compatible distributed computing
 systems, such as PBS Pro, PBS/TORQUE, Condor, or GridWay. If you are
@@ -160,7 +196,7 @@ since they mark 1 percent of the genome, and were carefully picked to
 include a variety of different gene densities, and a number of more
 limited studies provide data just for these regions. There is a file
 containing only nine of these regions at
-<http://noble.gs.washington.edu/~mmh1/software/segway/data/regions.manual.1.tab>,
+<http://noble.gs.washington.edu/proj/segway/data/regions.manual.1.tab>,
 which covers 0.15% of the human genome, and is useful for training.
 All coordinates are in terms of the NCBI36 assembly of the human
 reference genome (also called ``hg18`` by UCSC).
@@ -200,19 +236,19 @@ XXX cover all of these options.
 ::
 
   Usage: segway [OPTION]... GENOMEDATADIR
-  
+
   Options:
     --version             show program's version number and exit
     -h, --help            show this help message and exit
-  
-    Data subset:
+
+    Input selection:
       -t TRACK, --track=TRACK
                           append TRACK to list of tracks to use (default all)
       --include-coords=FILE
                           limit to genomic coordinates in FILE
       --exclude-coords=FILE
                           filter out genomic coordinates in FILE
-  
+
     Model files:
       -i FILE, --input-master=FILE
                           use or create input master in FILE
@@ -224,17 +260,17 @@ XXX cover all of these options.
       --seg-table=FILE    load segment hyperparameters from FILE
       --semisupervised=FILE
                           semisupervised segmentation with labels in FILE
-  
+
     Output files:
       -b FILE, --bed=FILE
                           create bed track in FILE
-  
+
     Intermediate files:
       -o DIR, --observations=DIR
                           use or create observations in DIR
       -d DIR, --directory=DIR
                           create all other files in DIR
-  
+
     Variables:
       -D DIST, --distribution=DIST
                           use DIST distribution
@@ -259,7 +295,7 @@ XXX cover all of these options.
       -v NUM, --verbosity=NUM
                           show messages with verbosity NUM
       --cluster-opt=OPT   specify an option to be passed to the cluster manager
-  
+
     Flags:
       -c, --clobber       delete any preexisting files
       -T, --no-train      do not train model
@@ -269,6 +305,59 @@ XXX cover all of these options.
                           in another
       -n, --dry-run       write all files, but do not run any executables
 
+XXXcomp add other commands (segway-layer)
+
+Files
+=====
+  drwxr-sr-x  2 mmh1 noblelab  4096 Sep 17 14:57 accumulators
+  drwxr-sr-x  2 mmh1 noblelab  4096 Sep 17 11:48 auxiliary
+  drwxr-sr-x  2 mmh1 noblelab  4096 Sep 17 14:57 likelihood
+  drwxr-sr-x  2 mmh1 noblelab  4096 Sep 17 14:57 log
+  drwxr-sr-x  2 mmh1 noblelab  4096 Sep 17 11:50 observations
+  drwxr-sr-x  4 mmh1 noblelab  4096 Sep 17 11:50 output
+  output/e
+  output/e/0,1,2,3,4,5,...,identify
+  output/o
+  drwxr-sr-x  2 mmh1 noblelab 36864 Sep 23 18:05 params
+  drwxr-sr-x  2 mmh1 noblelab    4096 Sep 24 17:12 posterior
+  -rw-r--r--  1 mmh1 noblelab 2041564 Sep 25 00:08 segway.bed.gz
+  -rw-r--r--  1 mmh1 noblelab 34262 Sep 17 11:48 segway.str
+  drwxr-sr-x  2 mmh1 noblelab  4096 Sep 17 11:50 triangulation
+  drwxr-sr-x  2 mmh1 noblelab    4096 Sep 25 00:08 viterbi
+
+Job names
+=========
+
+In order to watch Segway's progress on your cluster, it is helpful to
+understand how it names jobs. A job name for the training task might
+look like this::
+
+  emt0.1.34.traindir.ed03201cea2047399d4cbcc4b62f9827
+
+In this example, ``emt`` means expectation maximization training, the
+``0`` means thread 0, the ``1`` means round 1, and the ``34`` means
+sequence 34. The name of the training directory is ``traindir``, and
+``ed03201cea2047399d4cbcc4b62f9827`` is a universally unique
+identifier for this particular Segway run. This can be useful if you
+want to manage all of your jobs on your clustering system with
+wildcard specification. On SGE you can delete all the jobs from this
+run with::
+
+  qdel "*.ed03201cea2047399d4cbcc4b62f9827"
+
+Jobs created in the identify or posterior tasks are named similarly::
+
+  vit34.identifydir.4f32630d53724f08b34a8fc58793307d
+  jt34.identifydir.4f32630d53724f08b34a8fc58793307d
+
+Of course, there are no threads or rounds for the identify or
+posterior tasks, so only the sequence index is reported.
+
+Troubleshooting
+===============
+
+Look in the output/e files to see what the cause of the underlying
+error was. XXX
 
 Python interface
 ================
@@ -293,6 +382,33 @@ XXX describe runner.fromoptions() interface
 All other interfaces (the ones that do not use a ``main()`` function)
 to Segway code are undocumented and should not be used. If you do use
 them, know that the API may change at any time without notice.
+
+Support
+=======
+
+For support of Segway, please write to the <segway-users@uw.edu> mailing
+list, rather than writing the authors directly. Using the mailing list
+will get your question answered more quickly. It also allows us to
+pool knowledge and reduce getting the same inquiries over and over.
+You can subscribe here:
+
+https://mailman1.u.washington.edu/mailman/listinfo/segway-users
+
+Specifically, if you want to report a bug or request a feature, please
+do so using the Segway issue tracker at:
+
+http://code.google.com/p/segway-genome/issues/
+
+If you do not want to read discussions about other people's use of
+Segway, but would like to hear about new releases and other important
+information, please subscribe to <segway-announce@uw.edu> by visiting
+this web page:
+
+https://mailman1.u.washington.edu/mailman/listinfo/segway-announce
+
+Announcements of this nature are sent to both ``segway-users`` and
+``segway-announce``.
+=======
 
 Support
 =======

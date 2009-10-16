@@ -72,6 +72,9 @@ SCHEME = colorbrewer.Dark2[NUM_COLORS]
 KB = 2**10
 MB = 2**20
 GB = 2**30
+TB = 2**40
+PB = 2**50
+EB = 2**60
 
 OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
@@ -108,6 +111,10 @@ class NamedTemporaryDir(object):
     def __exit__(self, exc, value, tb):
         self.close()
 
+def die(msg=""):
+    if msg:
+        print >>sys.stderr, msg
+    sys.exit(1)
 
 def get_col_index(chromosome, trackname):
     return get_tracknames(chromosome).index(trackname)

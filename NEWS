@@ -1,3 +1,9 @@
+0.1.15:
+
+* segway: more informative error on memory progression failure
+* segway: now works on LSF even when LSF_UNIT_FOR_LIMITS has been changed
+* docs updates
+
 0.1.14:
 
 * there is now a Segway issue tracker at http://code.google.com/p/segway-genome/

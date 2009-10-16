@@ -932,7 +932,6 @@ class RestartableJobDict(dict):
                 clean_safe_sleep_time = CLEAN_SAFE_TIME / len(self)
                 sleep_time = min(clean_safe_sleep_time, JOB_WAIT_SLEEP_TIME)
 
-                print >>sys.stderr, "sleeping for %s s" % sleep_time
                 sleep(sleep_time)
 
                 try:
@@ -3325,7 +3324,7 @@ def parse_options(args):
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
 
-    with OptionGroup(parser, "Data subset") as group:
+    with OptionGroup(parser, "Input selection") as group:
         group.add_option("-t", "--track", action="append", default=[],
                          metavar="TRACK",
                          help="append TRACK to list of tracks to use"

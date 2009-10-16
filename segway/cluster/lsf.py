@@ -5,23 +5,35 @@ __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
 
+from os import environ
 import sys
 
-## native specs work the same way as SGE
-from .._util import ceildiv, KB, MB
+from path import path
+
+from .._configparser import OneSectionRawConfigParser
+from .._util import ceildiv, KB, MB, GB, TB, PB, EB
 from .common import _JobTemplateFactory, make_native_spec
+
+LSF_CONF_BASENAME = "lsf.conf"
+LSF_CONF_FILEPATH = path(environ["LSF_ENVDIR"]) / LSF_CONF_BASENAME
+
+LSF_CONF = OneSectionRawConfigParser(dict(LSF_UNIT_FOR_LIMITS="KB"))
+
+UNIT_FOR_LIMITS = LSF_CONF.get("LSF_UNIT_FOR_LIMITS")
+DIVISOR_FOR_LIMITS = dict(KB=KB, MB=MB, GB=GB, TB=TB, PB=PB, EB=EB)
 
 class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage):
         return "rusage[mem=%s]" % ceildiv(mem_usage, MB)
 
     def make_native_spec(self):
-        mem_limit_spec = ceildiv(self.mem_limit, KB)
+        mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)
 
         # bsub -R: resource requirement
         # bsub -M: per-process memory limit
         # bsub -v: hard virtual memory limit for all processes
-        res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec, v=mem_limit_spec)
+        # disabled per Gavin Kelman: v=mem_limit_spec
+        res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec)
 
         return " ".join([self.native_spec, res_spec])
 
