@@ -12,7 +12,6 @@ code.
 
 (c) 2009: Orion Buske <orion.buske@gmail.com>
 
-XXX: Completely untested
 """
 
 ${COMMON_CODE_HEADER}
@@ -23,7 +22,8 @@ MIN_DRMAA_VERSION = "0.4a3"
 
 # Should match download URLs below (displayed to user)
 LSF_DRMAA_DOWNLOAD_VERSION = "1.0.3"
-LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
+LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa\
+/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
 
 LSF_DRMAA_INSTALL_SCRIPT = """
 if [ ! -e $file ]; then wget $url -O $file; fi
@@ -37,7 +37,7 @@ rm -f $file
 
 SEGWAY_INSTALL_SCRIPT = """
 cd $dir
-python setup.py install
+$python setup.py install
 """
 
 ${COMMON_CODE_BODY}
@@ -66,15 +66,15 @@ def main(args=sys.argv[1:]):
         prompt_create_cfg(arch_home, python_home, default_python_home,
                           script_home, default_script_home)
 
-        hdf5_dir = setup_hdf5_installation(shell, arch_home)
+        setup_hdf5_installation(shell, arch_home)
 
         prompt_install_numpy()
 
-        # Ensure gmtkViterbi in path
         check_executable_in_path("gmtkViterbi")
 
-        # Install segway (and dependencies)
-        prompt_install_segway(arch_home=arch_home)
+        setup_drmaa_installation(shell, arch_home)
+
+        prompt_install_segway()
 
         # Test package installations
         prompt_test_packages(python_home)
@@ -90,7 +90,7 @@ def get_segway_version():
 
     Temporarily removes '.' from sys.path during installation to prevent
     finding segway in current directory (but uninstalled)
-    
+
     Since segway __version__ is currently a revision number, get the full
     number from pkg_resources
     """
@@ -126,6 +126,28 @@ def get_drmaa_version():
         return None
 
 ##################### SPECIFIC PROGRAM INSTALLERS ################
+def setup_drmaa_installation(shell, arch_home):
+    return _abort_skip_install(prompt_drmaa_installation, shell, arch_home)
+
+def prompt_drmaa_installation(shell, arch_home):
+    print >>sys.stderr, "\nSearching for LSF or SGE...",
+    lsf_found = has_lsf()
+    sge_found = has_sge()
+    if not (lsf_found or sge_found):
+        print >>sys.stderr, "not found."
+        raise InstallationError("Segway can only be run where there is \
+a cluster management system.\nI was unable to find either an LSF or SGE \
+system.\nPlease try reinstalling on a system with one of these installed.")
+
+    print >>sys.stderr, "found!"
+    if lsf_found and not sge_found:
+        # Need to download and install FedStage lsf-drmaa
+        lsf_drmaa_dir = prompt_install_lsf_drmaa(arch_home)
+        if lsf_drmaa_dir:
+            prompt_add_to_env(shell, "DRMAA_LIBRARY_PATH", lsf_drmaa_dir)
+
+    return prompt_install_drmaa()
+
 def prompt_install_lsf_drmaa(arch_home):
     return _installer("FedStage DRMAA for LSF", install_lsf_drmaa,
                       is_lsf_drmaa_installed,
@@ -136,9 +158,9 @@ def prompt_install_drmaa():
     return _installer("drmaa-python", install_drmaa, get_drmaa_version,
                       install_prompt=EASY_INSTALL_PROMPT)
 
-def prompt_install_segway(arch_home):
+def prompt_install_segway():
     return _installer("segway", install_segway, get_segway_version,
-                      install_prompt=EASY_INSTALL_PROMPT, arch_home=arch_home)
+                      install_prompt=EASY_INSTALL_PROMPT)
 
 def install_lsf_drmaa(arch_home, *args, **kwargs):
     progname = "FedStage DRMAA for LSF"
@@ -151,21 +173,7 @@ def install_lsf_drmaa(arch_home, *args, **kwargs):
 def install_drmaa(min_version=MIN_DRMAA_VERSION, *args, **kwargs):
     return easy_install("drmaa", min_version=min_version)
 
-def install_segway(arch_home, *args, **kwargs):
-    lsf_found = has_lsf()
-    sge_found = has_sge()
-    if not (lsf_found or sge_found):
-        print >>sys.stderr, """
-Segway can only be run where there is a cluster management system.
-I was unable to find either an LSF or SGE system.
-Please try reinstalling on a system with one of these installed."""
-        return None
-
-    if lsf_found and not sge_found:
-        # Need to download and install FedStage lsf-drmaa
-        prompt_install_lsf_drmaa(arch_home)
-
-    prompt_install_drmaa()
+def install_segway(*args, **kwargs):
     query = "Where is the segway source located?"
     segway_dir = prompt_path(query, default=".")
     return install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)

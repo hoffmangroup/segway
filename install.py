@@ -12,7 +12,6 @@ code.
 
 (c) 2009: Orion Buske <orion.buske@gmail.com>
 
-XXX: Completely untested
 """
 
 ####################### BEGIN COMMON CODE HEADER #####################
@@ -77,7 +76,8 @@ MIN_DRMAA_VERSION = "0.4a3"
 
 # Should match download URLs below (displayed to user)
 LSF_DRMAA_DOWNLOAD_VERSION = "1.0.3"
-LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
+LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa\
+/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
 
 LSF_DRMAA_INSTALL_SCRIPT = """
 if [ ! -e $file ]; then wget $url -O $file; fi
@@ -91,7 +91,7 @@ rm -f $file
 
 SEGWAY_INSTALL_SCRIPT = """
 cd $dir
-python setup.py install
+$python setup.py install
 """
 
 ####################### BEGIN COMMON CODE BODY #####################
@@ -102,7 +102,7 @@ class DependencyError(Exception):
 
 class InstallationError(Exception):
     pass
-        
+
 class ShellManager(object):
     """Class to manage details of shells.
 
@@ -128,14 +128,14 @@ class ShellManager(object):
                 self.name = shell
             except KeyError:
                 self.name = ""
-                
+
         if self.name.endswith("csh"):
             self._env_format = "setenv %s %s"
         elif self.name.endswith("sh"):
             self._env_format = "export %s=%s"
         else:
             self._env_format = "set %s to %s"  # Console output
-            
+
         # What RC file are we using, or are we printing to the terminal?
         if self.name.endswith("sh"):
             self.file = os.path.join("~", ".%src" % shell)
@@ -145,14 +145,14 @@ class ShellManager(object):
                 print >>sys.stderr, "SHELL variable missing or confusing."
             else:
                 print >>sys.stderr, "Unrecognized shell: %s" % shell
-            
+
         if self.file is None:
             print >>sys.stderr, ("Shell-specific commands will be printed"
                                  " to the terminal")
-            
+
         self._out = None  # Output file not yet open
         self.has_file = (self.file is not None)
-        
+
     def set_rc_env(self, variable, value):
         """Write the given variable and value the the shell rc file (or stdout)
         """
@@ -161,10 +161,10 @@ class ShellManager(object):
                 self._out = sys.stdout
             else:
                 self._out = open(os.path.expanduser(self.file), "a")
-        
+
         cmd = self._env_format % (variable, value)
         print >>self._out, "\n%s  # Added by install script" % cmd
-            
+
     def add_to_rc_env(self, variable, value):
         """Prepend the value to the variable in the shell rc file (or stdout)
         """
@@ -213,7 +213,7 @@ def setup_arch_home():
     arch_home = prompt_user(query, default_arch_home)
     make_dir(arch_home)
     return arch_home
-            
+
 def get_default_arch_home():
     if "ARCHHOME" in os.environ:
         return os.environ["ARCHHOME"]
@@ -222,13 +222,13 @@ def get_default_arch_home():
     else:
         (sysname, nodename, release, version, machine) = os.uname()
         arch = "-".join([sysname, machine])
-        
+
     return os.path.expanduser("~/arch/%s" % arch)
 
 def setup_python_home(arch_home=None):
     if arch_home is None:
         arch_home = get_default_arch_home()
-        
+
     query = "\nWhere should new Python packages be installed?"
     default_python_home = get_default_python_home(arch_home)
     python_home = fix_path(prompt_user(query, default_python_home))
@@ -244,7 +244,7 @@ def get_default_python_home(arch_home):
 def setup_script_home(arch_home=None):
     if arch_home is None:
         arch_home = get_default_arch_home()
-        
+
     query = "\nWhere should new scripts and executables be installed?"
     default_script_home = os.path.join(arch_home, "bin")
     script_home = fix_path(prompt_user(query, default_script_home))
@@ -252,6 +252,16 @@ def setup_script_home(arch_home=None):
     return script_home, default_script_home
 
 def setup_hdf5_installation(shell, arch_home):
+    if os.environ["HDF5_DIR"]:
+        hdf5_bin_dir = os.path.join(os.environ["HDF5_DIR"], "bin")
+        if not shell.in_env("PATH", hdf5_bin_dir):
+            # Add hdf5 bin dir to path for now to use h52gif for version
+            shell.add_to_env("PATH", hdf5_bin_dir)
+            sys.path.append(hdf5_bin_dir)
+
+    print sys.path
+    print os.environ["HDF5_DIR"]
+    print os.environ["PATH"]
     hdf5_dir = prompt_install_hdf5(arch_home)
     if hdf5_dir:
         print >>sys.stderr, ("\nPyTables uses the environment variable"
@@ -273,15 +283,15 @@ def prompt_add_to_env(shell, variable, value):
     else:
         shell.add_to_env(variable, value)
         query = "\nMay I edit your %s to add %s to your %s?" % \
-            (shell.file, value, variable) 
+            (shell.file, value, variable)
         permission = prompt_yes_no(query)
         if permission:
             shell.add_to_rc_env(variable, value)
-        
+
 def prompt_set_env(shell, variable, value):
     shell.set_env(variable, value)
     query = "\nMay I edit your %s to set your %s to %s?" % \
-        (shell.file, variable, value) 
+        (shell.file, variable, value)
     permission = prompt_yes_no(query)
     if permission:
         shell.set_rc_env(variable, value)
@@ -289,7 +299,7 @@ def prompt_set_env(shell, variable, value):
 def fix_path(path):
     # Put path in standard form
     return os.path.abspath(os.path.expanduser(path))
-        
+
 def make_dir(dirname, verbose=True):
     """Make directory if it does not exist"""
     absdir = fix_path(dirname)
@@ -314,7 +324,7 @@ def check_executable_in_path(bin):
         continue_inst = prompt_yes_no(query)
         if not continue_inst:
             die("\n============ Installation Aborted ============")
-            
+
     return path
 
 def has_lsf():
@@ -349,7 +359,7 @@ def prompt_create_cfg(arch_home, python_home, default_python_home,
             write_pydistutils_cfg(cfg_path, arch_home,
                                   python_home, default_python_home,
                                   script_home, default_script_home)
-    
+
 def write_pydistutils_cfg(cfg_file, arch_home,
                           python_home, default_python_home,
                           script_home, default_script_home):
@@ -357,7 +367,7 @@ def write_pydistutils_cfg(cfg_file, arch_home,
     """
     fields = {}
     fields["prefix"] = fix_path(arch_home)
-    
+
     if python_home == default_python_home:
         platlib = "$platbase/lib/python$py_version_short"
     else:
@@ -377,8 +387,7 @@ def write_pydistutils_cfg(cfg_file, arch_home,
         print >>ofp, cfg_file_contents
     finally:
         ofp.close()
-    
-    
+
 ########################### GET VERSION ########################
 def get_hdf5_version():
     """Returns HDF5 version as string or None if not found or installed
@@ -413,7 +422,7 @@ def get_setuptools_version():
         return setuptools.__version__
     except (AttributeError, ImportError):
         return None
-    
+
 def str2version(ver):  # string to version object
     if ver.startswith("$Revision:"):
         ver = ver.split()[1]  # Get revision number
@@ -452,8 +461,8 @@ def install_numpy(min_version=MIN_NUMPY_VERSION, *args, **kwargs):
             # Make sure variable didn't return, and then replace variable
             assert "LDFLAGS" not in os.environ
             os.environ["LDFLAGS"] = env_old
-    
-#################### GENERIC INSTALL METHODS ###################         
+
+#################### GENERIC INSTALL METHODS ###################
 def _installer(progname, install_func, version_func=None,
                install_message=None, *args, **kwargs):
     """Program installation wrapper method.
@@ -497,7 +506,7 @@ def _abort_skip_install(func, *args, **kwargs):
         e_str = str(e)
         if e_str:
             print >>sys.stderr, "Error: %s" % e_str  # print any error message
-            
+
         query = ("\nWould you like to try to continue the installation"
                  " without this program?")
         default = "n"
@@ -506,7 +515,7 @@ def _abort_skip_install(func, *args, **kwargs):
             return None
         else:
             die("\n============== Installation aborted =================")
-            
+
 def _check_install(progname, version_func, min_version=None, *args, **kwargs):
     """Returns True if program found with at least min_version, False otherwise
 
@@ -518,7 +527,7 @@ def _check_install(progname, version_func, min_version=None, *args, **kwargs):
 
     If version_func returns True, installation accepted regardless of
     min_version
-    
+
     """
     if version_func is None:
         return False
@@ -526,7 +535,7 @@ def _check_install(progname, version_func, min_version=None, *args, **kwargs):
         print >>sys.stdout, "\nSearching for %s..." % progname,
         sys.stdout.flush()
         version = version_func()
-        
+
     if version is not None:
         print >>sys.stderr, "found!"
         if min_version is None or version is True:
@@ -537,7 +546,7 @@ def _check_install(progname, version_func, min_version=None, *args, **kwargs):
                                  " required.") % (version, min_version)
         else:
             return True
-        
+
     else:
         print >>sys.stderr, "not found."
 
@@ -562,7 +571,7 @@ def easy_install(progname, min_version=None):
                 raise InstallationError()
         else:
             raise InstallationError()
-    
+
     cmd = ["easy_install", progname.lower()]
     if min_version is not None:  # Add version requirement
         cmd.append('"%s>=%s"' % (progname, min_version))
@@ -585,45 +594,47 @@ def install_script(progname, prog_dir, script, **kwargs):
     """Tries to install the specified program, given a script, url
 
     progname: string name of program being installed
-    
+
     prog_dir: directory program is to be installed in
-    
+
     script: multi-line string, where each line is a command to run in the
     shell in order to install the program. Variables in this script
-    will be substituted with keywords in kwargs, as well as dir
-    (the installation directory) and, if a url is specified,
-    the downloaded file and filebase
-    
+    will be substituted with keywords in kwargs, as well as:
+    - dir: the program installation directory
+    - file: the downloaded file (if url specified)
+    - filebase: the basename of the downloaded file (if url specified)
+    - python: sys.executable (should be the python command used to call
+      this program)
+
     Returns installation directory if installation is successful
     (or True if unknown), and None otherwise.
-    
+
     """
-    fields = kwargs
-
     # Set fields for template substitution
-    if "dir" not in fields:
-        fields["dir"] = prog_dir
+    fields = {}
+    fields["dir"] = prog_dir
+    fields["python"] = sys.executable
+    if "url" in kwargs:
+        filename = os.path.basename(kwargs["url"])
+        fields["file"] = filename
+        if filename.endswith(".tar.gz"):
+            fields["filebase"] = filename[:-7]  # minus .tar.gz
+        else:
+            fields["filebase"] = filename
 
-    # Make dir absolute
+    # Add in kwargs (overwriting if collision)
+    fields.update(kwargs)
+
+    # Make dir absolute (even if specified as kwarg)
     fields["dir"] = fix_path(fields["dir"])
-        
-    if "url" in fields:
-        filename = os.path.basename(fields["url"])
-        if "file" not in fields:
-            fields["file"] = filename
-        if "filebase" not in fields:
-            if filename.endswith(".tar.gz"):
-                fields["filebase"] = filename[:-7]  # minus .tar.gz
-            else:
-                fields["filebase"] = filename
-    
+
     script = substitute_template(script, fields).strip().splitlines()
 
     cwd = os.getcwd()  # Keep track of cwd state
 
     if prog_dir is not None:
         os.chdir(prog_dir)  # Move to installation directory
-        
+
     for line in script:
         line = line.strip()
         print >>sys.stderr, ">> %s" % line
@@ -635,7 +646,7 @@ def install_script(progname, prog_dir, script, **kwargs):
                 continue
             except IndexError:
                 die("Invalid cd command: %s" % line)
-                
+
         # Run command in shell
         proc = Popen(line, shell=True, stdout=None, stderr=None)
         code = proc.wait()
@@ -648,18 +659,17 @@ def install_script(progname, prog_dir, script, **kwargs):
     os.chdir(cwd)
     return prog_dir
 
-
 ########################## PROGRAM TESTING ######################
 def prompt_test_packages(python_home, *args, **kwargs):
     """Run each dependency's unit tests and if they fail, prompt reinstall
-    
+
     XXX: implement this for more than pytables (but numpy always fails)
-    
+
     """
     # Start by making sure everything is up to date loaded into sys.path
     if python_home:
         addsitedir(python_home)
-        
+
     print >>sys.stderr, "\n"
     try:
         prompt_test_pytables(*args, **kwargs)
@@ -691,7 +701,7 @@ def prompt_install(progname, install_prompt = None,
 
     if install_prompt is None:
         install_prompt = "May I download and install %s?"
-        
+
     query = install_prompt % info
     return prompt_yes_no(query, default=default)
 
@@ -717,18 +727,17 @@ def prompt_yes_no(query, default="Y"):
         response = raw_input().strip().lower()
         if len(response) == 0:
             response = default.strip().lower()
-            
+
         if response.startswith("y"):
             return True
         elif response.startswith("n"):
             return False
         else:
             print >>sys.stderr, "Please enter yes or no."
-        
+
 def prompt_user(query, default=None, choices=None):
-    """Prompt user with query, given default answer and optional choices
-    """
-    
+    """Prompt user with query, given default answer and optional choices."""
+
     if choices is None:
         prompt = str(query)
     else:
@@ -740,7 +749,7 @@ def prompt_user(query, default=None, choices=None):
             prompt = "%s (%s)" % (query, " / ".join(choices))
         except (AssertionError, TypeError):
             die("Invalid choice list: %s" % choices)
-        
+
     # Loop until we get a valid response
     while True:
         # Query user and get response
@@ -777,7 +786,7 @@ def prompt_user(query, default=None, choices=None):
             else:
                 print >>sys.stderr, ("Response matched multiple choices."
                                      " Please be more specific.")
-                
+
 def die(message):
     print >>sys.stderr, str(message)
     sys.exit(1)
@@ -809,15 +818,15 @@ def main(args=sys.argv[1:]):
         prompt_create_cfg(arch_home, python_home, default_python_home,
                           script_home, default_script_home)
 
-        hdf5_dir = setup_hdf5_installation(shell, arch_home)
+        setup_hdf5_installation(shell, arch_home)
 
         prompt_install_numpy()
 
-        # Ensure gmtkViterbi in path
         check_executable_in_path("gmtkViterbi")
 
-        # Install segway (and dependencies)
-        prompt_install_segway(arch_home=arch_home)
+        setup_drmaa_installation(shell, arch_home)
+
+        prompt_install_segway()
 
         # Test package installations
         prompt_test_packages(python_home)
@@ -833,7 +842,7 @@ def get_segway_version():
 
     Temporarily removes '.' from sys.path during installation to prevent
     finding segway in current directory (but uninstalled)
-    
+
     Since segway __version__ is currently a revision number, get the full
     number from pkg_resources
     """
@@ -869,6 +878,28 @@ def get_drmaa_version():
         return None
 
 ##################### SPECIFIC PROGRAM INSTALLERS ################
+def setup_drmaa_installation(shell, arch_home):
+    return _abort_skip_install(prompt_drmaa_installation, shell, arch_home)
+
+def prompt_drmaa_installation(shell, arch_home):
+    print >>sys.stderr, "\nSearching for LSF or SGE...",
+    lsf_found = has_lsf()
+    sge_found = has_sge()
+    if not (lsf_found or sge_found):
+        print >>sys.stderr, "not found."
+        raise InstallationError("Segway can only be run where there is \
+a cluster management system.\nI was unable to find either an LSF or SGE \
+system.\nPlease try reinstalling on a system with one of these installed.")
+
+    print >>sys.stderr, "found!"
+    if lsf_found and not sge_found:
+        # Need to download and install FedStage lsf-drmaa
+        lsf_drmaa_dir = prompt_install_lsf_drmaa(arch_home)
+        if lsf_drmaa_dir:
+            prompt_add_to_env(shell, "DRMAA_LIBRARY_PATH", lsf_drmaa_dir)
+
+    return prompt_install_drmaa()
+
 def prompt_install_lsf_drmaa(arch_home):
     return _installer("FedStage DRMAA for LSF", install_lsf_drmaa,
                       is_lsf_drmaa_installed,
@@ -879,9 +910,9 @@ def prompt_install_drmaa():
     return _installer("drmaa-python", install_drmaa, get_drmaa_version,
                       install_prompt=EASY_INSTALL_PROMPT)
 
-def prompt_install_segway(arch_home):
+def prompt_install_segway():
     return _installer("segway", install_segway, get_segway_version,
-                      install_prompt=EASY_INSTALL_PROMPT, arch_home=arch_home)
+                      install_prompt=EASY_INSTALL_PROMPT)
 
 def install_lsf_drmaa(arch_home, *args, **kwargs):
     progname = "FedStage DRMAA for LSF"
@@ -894,21 +925,7 @@ def install_lsf_drmaa(arch_home, *args, **kwargs):
 def install_drmaa(min_version=MIN_DRMAA_VERSION, *args, **kwargs):
     return easy_install("drmaa", min_version=min_version)
 
-def install_segway(arch_home, *args, **kwargs):
-    lsf_found = has_lsf()
-    sge_found = has_sge()
-    if not (lsf_found or sge_found):
-        print >>sys.stderr, """
-Segway can only be run where there is a cluster management system.
-I was unable to find either an LSF or SGE system.
-Please try reinstalling on a system with one of these installed."""
-        return None
-
-    if lsf_found and not sge_found:
-        # Need to download and install FedStage lsf-drmaa
-        prompt_install_lsf_drmaa(arch_home)
-
-    prompt_install_drmaa()
+def install_segway(*args, **kwargs):
     query = "Where is the segway source located?"
     segway_dir = prompt_path(query, default=".")
     return install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)
