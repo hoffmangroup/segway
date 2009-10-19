@@ -27,6 +27,8 @@ LSF_CONF.read(LSF_CONF_FILEPATH)
 UNIT_FOR_LIMITS = LSF_CONF.get("LSF_UNIT_FOR_LIMITS")
 DIVISOR_FOR_LIMITS = SIZE_UNITS[UNIT_FOR_LIMITS]
 
+CORE_FILE_SIZE_LIMIT = 0
+
 class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage):
         return "rusage[mem=%s]" % ceildiv(mem_usage, MB)
@@ -34,11 +36,15 @@ class JobTemplateFactory(_JobTemplateFactory):
     def make_native_spec(self):
         mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)
 
+        # XXX: it would be good if this added -o and -e so that
+        # overwriting is not done as outputPath and errorPath do automatically
+
         # bsub -R: resource requirement
         # bsub -M: per-process memory limit
         # bsub -v: hard virtual memory limit for all processes
+        # bsub -C: core file size limit
         res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec,
-                                    v=mem_limit_spec)
+                                    v=mem_limit_spec, C=CORE_FILE_SIZE_LIMIT)
 
         return " ".join([self.native_spec, res_spec])
 

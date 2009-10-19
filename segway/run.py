@@ -243,7 +243,7 @@ SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
 
 FLOAT_TAB_FIELDNAMES = ["filename", "chunk_index", "chrom", "start", "end"]
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs", "num_frames",
-                        "maxvmem", "cpu", "exit_status"]
+                      "maxvmem", "cpu", "exit_status"]
 
 # templates and formats
 RES_STR_TMPL = "segway.str.tmpl"
@@ -900,7 +900,9 @@ class RestartableJob(object):
         if not isinstance(res_req, basestring):
             res_req = " ".join(res_req)
 
-        print >>sys.stderr, "queued %s (%s)" % (res, res_req)
+        jobname = job_template.jobName
+
+        print >>sys.stderr, "queued %s: %s (%s)" % (res, jobname, res_req)
 
         return res
 
@@ -939,18 +941,21 @@ class RestartableJobDict(dict):
                     # job isn't done yet
                     continue
 
-                if not (job_info.hasExited or job_info.hasSignal):
-                    # for some reason I think this is more robust than
-                    # relying on the exit status
-                    exit_status = 0
+                if job_info.hasSignal:
+                    exit_status = job_info.terminatedSignal
+                    # just in case this edge case ever happens
+                    if exit_status == 0:
+                        exit_status = "hasSignal"
+                elif job_info.wasAborted:
+                    exit_status = "wasAborted"
+                elif job_info.hasExited:
+                    exit_status = job_info.exitStatus
                 else:
-                    if job_info.hasSignal:
-                        exit_status = job_info.terminatedSignal
-                    else:
-                        exit_status = job_info.exitStatus
+                    # this happens when the exit status is unknown
+                    exit_status = "noExit"
 
-                    if exit_status != 0:
-                        self.queue(self[jobid])
+                if exit_status != 0:
+                    self.queue(self[jobid])
 
                 restartable_job = self[jobid]
                 jobname = restartable_job.job_tmpl_factory.template.jobName
