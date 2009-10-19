@@ -44,7 +44,8 @@ class JobTemplateFactory(_JobTemplateFactory):
         # bsub -v: hard virtual memory limit for all processes
         # bsub -C: core file size limit
         res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec,
-                                    v=mem_limit_spec, C=CORE_FILE_SIZE_LIMIT)
+                                    v=mem_limit_spec,
+                                    C=str(CORE_FILE_SIZE_LIMIT))
 
         return " ".join([self.native_spec, res_spec])
 
