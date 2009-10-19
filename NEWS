@@ -7,6 +7,7 @@
 * segway: add jobid, jobname to jobs.tab
 * segway: eliminate core dumps of jobs in LSF
 * segway: make job abnormal error handling more robust
+* segway: add log/details.sh to give all details of queued commands
 * docs updates
 
 0.1.14:

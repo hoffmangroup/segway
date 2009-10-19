@@ -171,8 +171,6 @@ NAME_BUNDLE_PLACEHOLDER = "bundle"
 ENV_CMD = "/usr/bin/env"
 BASH_CMD = "bash"
 
-BASH_CMDLINE = [BASH_CMD, "--login", "-c"]
-
 # XXX: need to differentiate this (prog) from prog.prog == progname throughout
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
@@ -205,7 +203,8 @@ def make_prefix_fmt(num):
     return "%%0%dd." % (int(floor(log10(num))) + 1)
 
 PREFIX_ACC = "acc"
-PREFIX_CMDLINE = "run"
+PREFIX_CMDLINE_SHORT = "run"
+PREFIX_CMDLINE_LONG = "details"
 PREFIX_CMDLINE_TOP = "segway"
 PREFIX_POSTERIOR = "posterior"
 
@@ -392,9 +391,6 @@ except ImportError:
                     break
             else:
                 return
-
-def make_bash_cmdline(cmd, args):
-    return BASH_CMDLINE + ['%s "$@"' % cmd, cmd] + map(str, args)
 
 def make_fixedstep_header(chrom, start, resolution):
     """
@@ -1015,6 +1011,8 @@ def maybe_quote_arg(text):
 def cmdline2text(cmdline=sys.argv):
     return " ".join(maybe_quote_arg(arg) for arg in cmdline)
 
+def _log_cmdline(logfile, cmdline):
+    print >>logfile, " ".join(map(quote_spaced_str, cmdline))
 
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
@@ -2695,21 +2693,26 @@ class Runner(object):
 
         return model_penalty - (2/self.num_bases * log_likelihood)
 
-    def log_cmdline(self, cmdline):
-        print >>self.cmdline_file, " ".join(map(quote_spaced_str, cmdline))
+    def log_cmdline(self, cmdline, args=None):
+        if args is None:
+            args = cmdline
+
+        _log_cmdline(self.cmdline_short_file, cmdline)
+        _log_cmdline(self.cmdline_long_file, args)
 
     def queue_gmtk(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
+        wrapper_cmdline = [BASH_CMD, data_filename(RES_WRAPPER)]
 
         if prefix_args:
             # remove the command name itself from the passed arguments
             # XXX: this is ugly
-            args = prefix_args + gmtk_cmdline[1:]
+            args = wrapper_cmdline + prefix_args + gmtk_cmdline[1:]
         else:
-            args = gmtk_cmdline
+            args = wrapper_cmdline + gmtk_cmdline
 
-        self.log_cmdline(gmtk_cmdline)
+        self.log_cmdline(gmtk_cmdline, args)
 
         if self.dry_run:
             return None
@@ -2718,7 +2721,7 @@ class Runner(object):
         job_tmpl = session.createJobTemplate()
 
         job_tmpl.jobName = job_name
-        job_tmpl.remoteCommand = data_filename(RES_WRAPPER)
+        job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = map(str, args)
 
         # this is going to cause problems on heterogeneous systems
@@ -3247,8 +3250,11 @@ class Runner(object):
         self.dirpath = path(self.dirname)
 
         self.make_subdir(SUBDIRNAME_LOG)
-        cmdline_filename = self.make_filename(PREFIX_CMDLINE, EXT_SH,
-                                              subdirname=SUBDIRNAME_LOG)
+        cmdline_short_filename = self.make_filename(PREFIX_CMDLINE_SHORT,
+                                                    EXT_SH,
+                                                    subdirname=SUBDIRNAME_LOG)
+        cmdline_long_filename = self.make_filename(PREFIX_CMDLINE_LONG, EXT_SH,
+                                                    subdirname=SUBDIRNAME_LOG)
         cmdline_top_filename = self.make_filename(PREFIX_CMDLINE_TOP, EXT_SH,
                                                   subdirname=SUBDIRNAME_LOG)
         job_log_filename = self.make_filename(PREFIX_JOB_LOG, EXT_TAB,
@@ -3267,40 +3273,44 @@ class Runner(object):
             print >>cmdline_top_file
             print >>cmdline_top_file, cmdline2text()
 
-        with open(cmdline_filename, "w") as cmdline_file:
+        with open(cmdline_short_filename, "w") as cmdline_short_file:
             # XXX: works around a pyflakes bug for with * as self.*; report
-            self.cmdline_file = cmdline_file
+            self.cmdline_short_file = cmdline_short_file
 
-            print >>cmdline_file, run_msg
+            with open(cmdline_long_filename, "w") as cmdline_long_file:
+                self.cmdline_long_file = cmdline_short_file
 
-            # so that we can immediately out the UUID if we want it
-            self.cmdline_file.flush()
+                print >>cmdline_short_file, run_msg
+                print >>cmdline_long_file, run_msg
 
-            if self.triangulate:
-                self.run_triangulate()
+                # so that we can immediately get the UUID if we want it
+                self.cmdline_short_file.flush()
 
-            with open(job_log_filename, "w") as job_log_file:
-                self.job_log_file = job_log_file
-                print >>job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
+                if self.triangulate:
+                    self.run_triangulate()
 
-                if self.train:
-                    self.run_train()
+                with open(job_log_filename, "w") as job_log_file:
+                    self.job_log_file = job_log_file
+                    print >>job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
 
-                if self.identify or self.posterior:
-                    if not self.dry_run:
-                        # resave now that num_segs is determined
-                        self.save_include()
+                    if self.train:
+                        self.run_train()
 
-                        if not self.posterior_triangulation_filename:
-                            self.save_posterior_triangulation()
+                    if self.identify or self.posterior:
+                        if not self.dry_run:
+                            # resave now that num_segs is determined
+                            self.save_include()
 
-                    try:
-                        self.run_identify_posterior()
-                    except ChunkOverMemUsageLimit:
-                        self.resave_params()
+                            if not self.posterior_triangulation_filename:
+                                self.save_posterior_triangulation()
 
-                        # erase old output
-                        self.run_identify_posterior(clobber=True)
+                        try:
+                            self.run_identify_posterior()
+                        except ChunkOverMemUsageLimit:
+                            self.resave_params()
+
+                            # erase old output
+                            self.run_identify_posterior(clobber=True)
 
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
