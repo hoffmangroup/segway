@@ -37,8 +37,8 @@ class JobTemplateFactory(_JobTemplateFactory):
         # bsub -R: resource requirement
         # bsub -M: per-process memory limit
         # bsub -v: hard virtual memory limit for all processes
-        # disabled per Gavin Kelman: v=mem_limit_spec
-        res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec)
+        res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec,
+                                    v=mem_limit_spec)
 
         return " ".join([self.native_spec, res_spec])
 

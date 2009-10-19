@@ -214,7 +214,7 @@ PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_CHUNK = "chunk"
 PREFIX_PARAMS = "params"
 PREFIX_JT_INFO = "jt_info"
-PREFIX_RES_USAGE = "res_usage"
+PREFIX_JOB_LOG = "jobs"
 
 PREFIX_JOB_NAME_TRAIN = "emt"
 PREFIX_JOB_NAME_VITERBI = "vit"
@@ -242,8 +242,8 @@ SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
 SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
 
 FLOAT_TAB_FIELDNAMES = ["filename", "chunk_index", "chrom", "start", "end"]
-RES_USAGE_FIELDNAMES = ["prog", "num_segs", "num_frames", "maxvmem", "cpu",
-                        "exit_status"]
+JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs", "num_frames",
+                        "maxvmem", "cpu", "exit_status"]
 
 # templates and formats
 RES_STR_TMPL = "segway.str.tmpl"
@@ -252,7 +252,6 @@ RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
 RES_DUMPNAMES = "dumpnames.list" # XXX: remove all dumpnames stuff from code
-RES_RES_USAGE = "res_usage.tab"
 RES_SEG_TABLE = "seg_table.tab"
 
 DIRICHLET_FRAG = "dirichlet_segCountDown_seg_segTransition" \
@@ -906,9 +905,9 @@ class RestartableJob(object):
         return res
 
 class RestartableJobDict(dict):
-    def __init__(self, session, res_usage_file, *args, **kwargs):
+    def __init__(self, session, job_log_file, *args, **kwargs):
         self.session = session
-        self.res_usage_file = res_usage_file
+        self.job_log_file = job_log_file
 
         return dict.__init__(self, *args, **kwargs)
 
@@ -953,7 +952,10 @@ class RestartableJobDict(dict):
                     if exit_status != 0:
                         self.queue(self[jobid])
 
-                prog, num_segs, num_frames = self[jobid].mem_usage_key
+                restartable_job = self[jobid]
+                jobname = restartable_job.job_tmpl_factory.template.jobName
+
+                prog, num_segs, num_frames = restartable_job.mem_usage_key
 
                 resource_usage = job_info.resourceUsage
                 try: # SGE
@@ -962,9 +964,9 @@ class RestartableJobDict(dict):
                     maxvmem = resource_usage["vmem"]
 
                 cpu = resource_usage["cpu"]
-                row = [prog, str(num_segs), str(num_frames), maxvmem, cpu,
-                       str(exit_status)]
-                print >>self.res_usage_file, "\t".join(row)
+                row = [jobid, jobname, prog, str(num_segs), str(num_frames),
+                       maxvmem, cpu, str(exit_status)]
+                print >>self.job_log_file, "\t".join(row)
 
                 del self[jobid]
 
@@ -981,7 +983,7 @@ class RestartableJobDict(dict):
 
             jobids = self.keys()
 
-            self.res_usage_file.flush() # allow reading file now
+            self.job_log_file.flush() # allow reading file now
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, num_segs):
@@ -1023,7 +1025,7 @@ class Runner(object):
         self.triangulation_filename = None
         self.posterior_triangulation_filename = None
         self.jt_info_filename = None
-        self.res_usage_filename = data_filename(RES_RES_USAGE)
+        self.job_log_filename = None
         self.seg_table_filename = None
 
         self.params_filename = None
@@ -2755,7 +2757,7 @@ class Runner(object):
         kwargs["cppCommandOptions"] = make_cpp_options(input_params_filename,
                                                        card_seg=self.num_segs)
 
-        res = RestartableJobDict(self.session, self.res_usage_file)
+        res = RestartableJobDict(self.session, self.job_log_file)
 
         make_acc_filename_custom = partial(self.make_acc_filename, start_index)
         num_chunks = self.num_chunks
@@ -2800,7 +2802,7 @@ class Runner(object):
         restartable_job = self.queue_train(start_index, round_index,
                                            NAME_BUNDLE_PLACEHOLDER, **kwargs)
 
-        res = RestartableJobDict(self.session, self.res_usage_file)
+        res = RestartableJobDict(self.session, self.job_log_file)
         res.queue(restartable_job)
 
         return res
@@ -3198,7 +3200,7 @@ class Runner(object):
         with Session() as session:
             self.session = session
 
-            restartable_jobs = RestartableJobDict(session, self.res_usage_file)
+            restartable_jobs = RestartableJobDict(session, self.job_log_file)
 
             for chunk_index, chunk_len in self.chunk_lens_sorted():
                 queue_identify_custom = partial(self._queue_identify,
@@ -3244,7 +3246,7 @@ class Runner(object):
                                               subdirname=SUBDIRNAME_LOG)
         cmdline_top_filename = self.make_filename(PREFIX_CMDLINE_TOP, EXT_SH,
                                                   subdirname=SUBDIRNAME_LOG)
-        res_usage_filename = self.make_filename(PREFIX_RES_USAGE, EXT_TAB,
+        job_log_filename = self.make_filename(PREFIX_JOB_LOG, EXT_TAB,
                                                 subdirname=SUBDIRNAME_LOG)
 
         self.interrupt_event = Event()
@@ -3272,9 +3274,9 @@ class Runner(object):
             if self.triangulate:
                 self.run_triangulate()
 
-            with open(res_usage_filename, "w") as res_usage_file:
-                self.res_usage_file = res_usage_file
-                print >>res_usage_file, "\t".join(RES_USAGE_FIELDNAMES)
+            with open(job_log_filename, "w") as job_log_file:
+                self.job_log_file = job_log_file
+                print >>job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
 
                 if self.train:
                     self.run_train()

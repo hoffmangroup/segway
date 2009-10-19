@@ -10,13 +10,16 @@ import sys
 
 from optbuild import Mixin_NoConvertUnderscore, OptionBuilder_ShortOptWithSpace
 
-from .._util import die, MB
+from .._util import MB
 
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
 # guard space to prevent going over mem_requested allocation
 MEM_GUARD = 10*MB
+
+class JobError(RuntimeError):
+    pass
 
 class _JobTemplateFactory(object):
     def __init__(self, template, mem_usage_progression):
@@ -32,8 +35,8 @@ class _JobTemplateFactory(object):
         except IndexError:
             print >>sys.stderr, "Edge of memory usage progression reached without success."
             print >>sys.stderr, "Check for errors in output/e subdirectory."
-            print >>sys.stderr, "E-mail segway-users@uw.edu for help (subscription required)."
-            die()
+            print >>sys.stderr, "See the troubleshooting section of the Segway documentation."
+            raise RuntimeError("Edge of memory usage progression reached without success.")
 
         self.mem_limit = calc_mem_limit(mem_usage)
         self.res_req = self.make_res_req(mem_usage)
