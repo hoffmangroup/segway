@@ -253,6 +253,7 @@ RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
 RES_DUMPNAMES = "dumpnames.list" # XXX: remove all dumpnames stuff from code
 RES_SEG_TABLE = "seg_table.tab"
+RES_WRAPPER = "segway-wrapper.sh"
 
 DIRICHLET_FRAG = "dirichlet_segCountDown_seg_segTransition" \
     " 3 CARD_SEGCOUNTDOWN CARD_SEG CARD_SEGTRANSITION"
@@ -2701,13 +2702,12 @@ class Runner(object):
                    output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
-        # convoluted so I don't have to deal with a lot of escaping issues
         if prefix_args:
-            cmd = prefix_args[0]
-            args = prefix_args[1:] + gmtk_cmdline[1:]
+            # remove the command name itself from the passed arguments
+            # XXX: this is ugly
+            args = prefix_args + gmtk_cmdline[1:]
         else:
-            cmd = gmtk_cmdline[0]
-            args = gmtk_cmdline[1:]
+            args = gmtk_cmdline
 
         self.log_cmdline(gmtk_cmdline)
 
@@ -2718,7 +2718,7 @@ class Runner(object):
         job_tmpl = session.createJobTemplate()
 
         job_tmpl.jobName = job_name
-        job_tmpl.remoteCommand = cmd
+        job_tmpl.remoteCommand = data_filename(RES_WRAPPER)
         job_tmpl.args = map(str, args)
 
         # this is going to cause problems on heterogeneous systems
