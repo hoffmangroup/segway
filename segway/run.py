@@ -3061,6 +3061,7 @@ class Runner(object):
                   self.params_filename)
 
     def run_train_singlethread(self, num_segs_range):
+        # having a single-threaded version makes debugging much easier
         with Session() as session:
             self.session = session
             self.start_index = 0
@@ -3072,9 +3073,10 @@ class Runner(object):
 
     def run_train_multithread(self, num_segs_range):
         # XXX: Python 2.6 use itertools.product()
+        seg_start_indexes = xrange(self.random_starts)
         enumerator = enumerate((num_seg, seg_start_index)
                                for num_seg in num_segs_range
-                               for seg_start_index in xrange(self.random_starts))
+                               for seg_start_index in seg_start_indexes)
 
         threads = []
         with Session() as session:
@@ -3128,7 +3130,7 @@ class Runner(object):
         src_filenames = min_params[OFFSET_FILENAMES:]
 
         if None in src_filenames:
-            raise ValueError, "all training threads failed"
+            raise ValueError("all training threads failed")
 
         assert LEN_TRAIN_ATTRNAMES == len(src_filenames) == len(dst_filenames)
 
