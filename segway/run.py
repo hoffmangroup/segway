@@ -347,10 +347,14 @@ TERMINATE = JobControlAction.TERMINATE
 FAILED = JobState.FAILED
 DONE = JobState.DONE
 
-# CLEAN_PERIOD in lsb.params, after which jobs are removed from mbatchd's memory
-# default is 3600, multiplying by 0.9 for a margin of error
+# CLEAN_PERIOD in lsb.params, after which jobs are removed from
+# mbatchd's memory default is 3600, multiplying by 0.9 for a margin of
+# error
+# XXX: check lsb.params for real value
 CLEAN_SAFE_TIME = int(3600 * 0.9)
-THREAD_START_SLEEP_TIME = 20
+
+# 62 so that it's not in sync with the 10 second job wait sleep time
+THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
 JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
 
 RESOLUTION = 1
@@ -969,6 +973,7 @@ class RestartableJobDict(dict):
                 row = [jobid, jobname, prog, str(num_segs), str(num_frames),
                        maxvmem, cpu, str(exit_status)]
                 print >>self.job_log_file, "\t".join(row)
+                self.job_log_file.flush() # allow reading file now
 
                 del self[jobid]
 
@@ -984,8 +989,6 @@ class RestartableJobDict(dict):
                 # SVN r425 for code
 
             jobids = self.keys()
-
-            self.job_log_file.flush() # allow reading file now
 
 class RandomStartThread(Thread):
     def __init__(self, runner, session, start_index, num_segs):
@@ -1013,6 +1016,9 @@ def cmdline2text(cmdline=sys.argv):
 
 def _log_cmdline(logfile, cmdline):
     print >>logfile, " ".join(map(quote_spaced_str, cmdline))
+
+def make_weight_scale(scale):
+    return "scale %f" % scale
 
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
@@ -1513,8 +1519,12 @@ class Runner(object):
         #self.gmtk_include_filename_relative = include_filename_relative
 
     def make_weight_spec(self, multiplier):
-        return " | ".join("scale %f" % (index * multiplier)
-                          for index in xrange(self.resolution + 1))
+        resolution = self.resolution
+        if resolution == 1:
+            return make_weight_scale(multiplier)
+        else:
+            return " | ".join(make_weight_scale(index * multiplier)
+                              for index in xrange(resolution + 1))
 
     def make_conditionalparents_spec(self, track):
         spec = ('seg(0) using mixture collection("collection_seg_%s") '
@@ -2245,7 +2255,7 @@ class Runner(object):
         lines = [" ".join(header)]
 
         for seg, seg_countdown_initial in enumerate(seg_countdowns_initial):
-            lines.append("    -1 { %d }" % seg_countdown_initial)
+            lines.append("    -1 %d" % seg_countdown_initial)
 
         tree = "\n".join(lines)
 
@@ -2631,7 +2641,6 @@ class Runner(object):
                    island=ISLAND,
                    componentCache=COMPONENT_CACHE,
                    deterministicChildrenStore=DETERMINISTIC_CHILDREN_STORE,
-                   cliqueTableNormalize=False,
                    jtFile=self.jt_info_filename)
 
         if ISLAND:
@@ -3179,6 +3188,7 @@ class Runner(object):
         res = dict(inputMasterFile=self.input_master_filename,
                    cppCommandOptions=cpp_command_options,
                    dcdrng=chunk_index,
+                   cliqueTableNormalize="0.0",
                    **self.make_gmtk_kwargs())
 
         res.update(extra_kwargs)
@@ -3280,7 +3290,7 @@ class Runner(object):
             self.cmdline_short_file = cmdline_short_file
 
             with open(cmdline_long_filename, "w") as cmdline_long_file:
-                self.cmdline_long_file = cmdline_short_file
+                self.cmdline_long_file = cmdline_long_file
 
                 print >>cmdline_short_file, run_msg
                 print >>cmdline_long_file, run_msg
