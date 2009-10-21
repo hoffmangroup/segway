@@ -14,6 +14,8 @@ from .._configparser import OneSectionRawConfigParser
 from .._util import ceildiv
 from .common import _JobTemplateFactory, make_native_spec
 
+# use SI prefixes. I can't find any documentation for this but Tim
+# Cutts seems to assume this is how it works
 KB = 10**3
 MB = 10**6
 GB = 10**9
@@ -21,7 +23,7 @@ TB = 10**12
 PB = 10**15
 EB = 10**18
 
-SIZE_UNITS = dict((unit, locals()[unit])
+SIZE_UNITS = dict((unit, globals()[unit])
                   for unit in ["KB", "MB", "GB", "TB", "PB", "EB"])
 
 LSF_CONF_BASENAME = "lsf.conf"
