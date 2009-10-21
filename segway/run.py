@@ -2671,7 +2671,7 @@ class Runner(object):
         self.chunk_lens = [end - start
                            for chr, start, end in self.chunk_coords]
 
-    def chunk_lens_sorted(self, reverse=False):
+    def chunk_lens_sorted(self, reverse=True):
         """
         yields (chunk_index, chunk_mem_usage)
 
