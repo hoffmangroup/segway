@@ -10,6 +10,7 @@
 * segway: add log/details.sh to give all details of queued commands
 * segway: queue longest jobs first
 * segway: changed way GMTK model is specified for speedup
+* segway: LSF: select only hosts with sufficient memory
 * docs updates
 
 0.1.14:

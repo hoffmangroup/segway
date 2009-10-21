@@ -31,7 +31,9 @@ CORE_FILE_SIZE_LIMIT = 0
 
 class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage):
-        return "rusage[mem=%s]" % ceildiv(mem_usage, MB)
+        mem_usage_mb = ceildiv(mem_usage, MB)
+
+        return "select[mem>%s] rusage[mem=%s]" % (mem_usage_mb, mem_usage_mb)
 
     def make_native_spec(self):
         mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)
