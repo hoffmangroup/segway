@@ -11,6 +11,7 @@
 * segway: queue longest jobs first
 * segway: changed way GMTK model is specified for speedup
 * segway: LSF: select only hosts with sufficient memory
+* segway: eliminate 10 MB memory guard for declared usage versus crash usage
 * docs updates
 
 0.1.14:

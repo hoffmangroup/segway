@@ -10,13 +10,11 @@ import sys
 
 from optbuild import Mixin_NoConvertUnderscore, OptionBuilder_ShortOptWithSpace
 
-from .._util import MB
-
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
 # guard space to prevent going over mem_requested allocation
-MEM_GUARD = 10*MB
+MEM_GUARD = 0
 
 class JobError(RuntimeError):
     pass

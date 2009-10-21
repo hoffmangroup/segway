@@ -11,11 +11,17 @@ import sys
 from path import path
 
 from .._configparser import OneSectionRawConfigParser
-from .. import _util
-from .._util import ceildiv, MB
+from .._util import ceildiv
 from .common import _JobTemplateFactory, make_native_spec
 
-SIZE_UNITS = dict((unit, getattr(_util, unit))
+KB = 10**3
+MB = 10**6
+GB = 10**9
+TB = 10**12
+PB = 10**15
+EB = 10**18
+
+SIZE_UNITS = dict((unit, locals()[unit])
                   for unit in ["KB", "MB", "GB", "TB", "PB", "EB"])
 
 LSF_CONF_BASENAME = "lsf.conf"
@@ -33,7 +39,8 @@ class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage):
         mem_usage_mb = ceildiv(mem_usage, MB)
 
-        return "select[mem>%s] rusage[mem=%s]" % (mem_usage_mb, mem_usage_mb)
+        # return a quoted string
+        return '"select[mem>%s] rusage[mem=%s]"' % (mem_usage_mb, mem_usage_mb)
 
     def make_native_spec(self):
         mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)
