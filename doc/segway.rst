@@ -231,6 +231,8 @@ XXX add section on all other options
 Command-line usage summary
 ==========================
 
+XXX :option:`--trainable-params` can be included multiple times now
+
 XXX cover all of these options.
 
 ::

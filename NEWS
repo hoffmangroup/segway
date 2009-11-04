@@ -1,6 +1,12 @@
 0.1.16:
 
-
+* segway: a change in the semantics of --trainable-params for
+  training. If it is specified and the file exists, then it will be
+  used as a parameter file in the first round of training. Before it
+  was clobbered (with --clobber), or training was disabled.
+* segway: allow multiple sets of parameters with --trainable-params,
+  one for each random start. This together with the previous change
+  will allow for the easy continuation of a multithread training run.
 
 0.1.15:
 

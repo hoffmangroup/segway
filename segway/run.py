@@ -525,7 +525,7 @@ def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
 
 def make_template_filename(filename, resource, dirname=None, clobber=False,
-                           start_index=None):
+                           thread_index=None):
     """
     returns (filename, is_new)
     """
@@ -540,19 +540,19 @@ def make_template_filename(filename, resource, dirname=None, clobber=False,
         prefix = stem_part[0]
         ext = stem_part[2]
 
-        filebasename = extjoin_not_none(prefix, start_index, ext)
+        filebasename = extjoin_not_none(prefix, thread_index, ext)
 
         filename = path(dirname) / filebasename
 
     return filename, True
 
 def save_template(filename, resource, mapping, dirname=None,
-                  clobber=False, start_index=None):
+                  clobber=False, thread_index=None):
     """
     creates a temporary file if filename is None or empty
     """
     filename, is_new = make_template_filename(filename, resource, dirname,
-                                              clobber, start_index)
+                                              clobber, thread_index)
 
     if is_new:
         with open(filename, "w+") as outfile:
@@ -843,8 +843,8 @@ def make_mem_req(mem_usage):
 
     return "%dG" % mem_usage_gibibytes
 
-def update_starts(starts, ends, new_starts, new_ends, start_index):
-    next_index = start_index + 1
+def update_starts(starts, ends, new_starts, new_ends, thread_index):
+    next_index = thread_index + 1
 
     starts[next_index:next_index] = new_starts
     ends[next_index:next_index] = new_ends
@@ -991,21 +991,21 @@ class RestartableJobDict(dict):
             jobids = self.keys()
 
 class RandomStartThread(Thread):
-    def __init__(self, runner, session, start_index, num_segs):
+    def __init__(self, runner, session, thread_index, num_segs):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
         self.runner = copy(runner)
 
         self.session = session
         self.num_segs = num_segs
-        self.start_index = start_index
+        self.thread_index = thread_index
 
         Thread.__init__(self)
 
     def run(self):
         self.runner.session = self.session
         self.runner.num_segs = self.num_segs
-        self.runner.start_index = self.start_index
+        self.runner.thread_index = self.thread_index
         self.result = self.runner.run_train_start()
 
 def maybe_quote_arg(text):
@@ -1038,7 +1038,8 @@ class Runner(object):
         self.job_log_filename = None
         self.seg_table_filename = None
 
-        self.params_filename = None
+        self.params_filename = None # actual params filename for this instance
+        self.params_filenames = None # list of possible params filenames
         self.dirname = None
         self.is_dirname_temp = False
         self.log_likelihood_filename = None
@@ -1114,7 +1115,7 @@ class Runner(object):
 
         res.input_master_filename = options.input_master
         res.structure_filename = options.structure
-        res.params_filename = options.trainable_params
+        res.params_filenames = options.trainable_params
         res.dont_train_filename = options.dont_train
         res.include_coords_filename = options.include_coords
         res.exclude_coords_filename = options.exclude_coords
@@ -1339,32 +1340,63 @@ class Runner(object):
                 self.make_filename(PREFIX_JT_INFO, EXT_TXT,
                                    subdirname=SUBDIRNAME_LOG)
 
-    def set_params_filename(self, start_index=None, new=False):
+    def set_last_params_filename(self, params_filename):
+        if params_filename is None:
+            self.last_params_filename = None
+        elif path(params_filename).exists():
+            self.last_params_filename = params_filename
+        else:
+            # if it doesn't exist, then it's actually a new filename,
+            # but the only time this will be used is when new is not
+            # set. And this will only happen from the master thread.
+            self.last_params_filename = None
+
+    def set_params_filename(self, thread_index=None, new=False):
+        """
+        None means the final params file, not for any particular thread
+        """
         # if this is not run and params_filename is
         # unspecified, then it won't be passed to gmtkViterbiNew
 
-        params_filename = self.params_filename
-        if not new and params_filename:
-            if (not self.clobber
-                and path(params_filename).exists()):
-                # it already exists and you don't want to force regen
-                self.train = False
+        # these are unexpected corner cases for now
+        assert not ((thread_index is not None and not new)
+                    or (thread_index is None and new))
+
+        params_filenames = self.params_filenames
+        num_params_filenames = len(params_filenames)
+
+        if thread_index is None and num_params_filenames == 1:
+            # special case if there is only one param filename set
+            # otherwise generate "params.params" anew
+            params_filename = params_filenames[0]
+        elif thread_index is not None and num_params_filenames > thread_index:
+            params_filename = params_filenames[thread_index]
         else:
-            self.params_filename = \
-                self.make_filename(PREFIX_PARAMS, start_index, EXT_PARAMS,
+            params_filename = None
+
+        self.set_last_params_filename(params_filename)
+
+        # make new filenames when new is set, or params_filename is
+        # not set, or the file already exists and we are training
+        if (new or not params_filename
+            or (self.train and path(params_filename).exists())):
+            params_filename = \
+                self.make_filename(PREFIX_PARAMS, thread_index, EXT_PARAMS,
                                    subdirname=SUBDIRNAME_PARAMS)
 
-    def set_log_likelihood_filename(self, start_index=None, new=False):
+        self.params_filename = params_filename
+
+    def set_log_likelihood_filename(self, thread_index=None, new=False):
         if new or not self.log_likelihood_filename:
             log_likelihood_filename = \
-                self.make_filename(PREFIX_LIKELIHOOD, start_index,
+                self.make_filename(PREFIX_LIKELIHOOD, thread_index,
                                    EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
 
             self.log_likelihood_filename = log_likelihood_filename
 
             self.log_likelihood_log_filename = \
-                self.make_filename(PREFIX_LIKELIHOOD, start_index, EXT_TAB,
+                self.make_filename(PREFIX_LIKELIHOOD, thread_index, EXT_TAB,
                                    subdirname=SUBDIRNAME_LOG)
 
     def make_triangulation_dirpath(self):
@@ -1373,15 +1405,15 @@ class Runner(object):
 
         self.triangulation_dirpath = res
 
-    def make_output_dirpath(self, dirname, start_index, clobber=None):
-        res = self.dirpath / "output" / dirname / str(start_index)
+    def make_output_dirpath(self, dirname, thread_index, clobber=None):
+        res = self.dirpath / "output" / dirname / str(thread_index)
         self.make_dir(res, clobber)
 
         return res
 
-    def set_output_dirpaths(self, start_index, clobber=None):
+    def set_output_dirpaths(self, thread_index, clobber=None):
         make_output_dirpath_custom = partial(self.make_output_dirpath,
-                                             start_index=start_index,
+                                             thread_index=thread_index,
                                              clobber=clobber)
 
         self.output_dirpath = make_output_dirpath_custom("o")
@@ -1828,7 +1860,7 @@ class Runner(object):
 
                 ## iterate through chunks and write
                 ## izip so it can be modified in place
-                for start_index, start, end in izip(count(), starts, ends):
+                for thread_index, start, end in izip(count(), starts, ends):
                     if include_coords or exclude_coords:
                         overlaps = find_overlaps(start, end,
                                                  chr_include_coords,
@@ -1842,7 +1874,7 @@ class Runner(object):
                         else:
                             new_starts, new_ends = zip(*overlaps)
                             update_starts(starts, ends, new_starts, new_ends,
-                                          start_index)
+                                          thread_index)
                             continue # consider the newly split sequences next
 
                     num_bases_chunk = end - start
@@ -1868,7 +1900,7 @@ class Runner(object):
                         new_ends = append(new_starts[1:], end)
 
                         update_starts(starts, ends, new_starts, new_ends,
-                                      start_index)
+                                      thread_index)
                         continue
 
                     # start: relative to beginning of chromosome
@@ -2289,7 +2321,7 @@ class Runner(object):
     def make_dt_spec(self):
         return make_spec("DT", self.make_items_dt())
 
-    def save_input_master(self, start_index=None, new=False):
+    def save_input_master(self, thread_index=None, new=False):
         num_free_params = 0
 
         tracknames = self.tracknames
@@ -2353,7 +2385,7 @@ class Runner(object):
         self.input_master_filename, input_master_filename_is_new = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
                           locals(), params_dirpath, self.clobber,
-                          start_index)
+                          thread_index)
 
         # print >>sys.stderr, "input_master_filename = %s; is_new = %s" \
         #     % (self.input_master_filename, input_master_filename_is_new)
@@ -2615,16 +2647,16 @@ class Runner(object):
 
         return prog
 
-    def make_acc_filename(self, start_index, chunk_index):
-        return self.make_filename(PREFIX_ACC, start_index, chunk_index,
+    def make_acc_filename(self, thread_index, chunk_index):
+        return self.make_filename(PREFIX_ACC, thread_index, chunk_index,
                                   EXT_BIN, subdirname=SUBDIRNAME_ACC)
 
     def make_posterior_filename(self, chunk_index):
         return self.make_filename(PREFIX_POSTERIOR, chunk_index, EXT_TXT,
                                   subdirname=SUBDIRNAME_POSTERIOR)
 
-    def make_job_name_train(self, start_index, round_index, chunk_index):
-        return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, start_index,
+    def make_job_name_train(self, thread_index, round_index, chunk_index):
+        return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, thread_index,
                                      round_index, chunk_index,
                                      self.dirpath.name, UUID)
 
@@ -2754,7 +2786,7 @@ class Runner(object):
         return RestartableJob(session, job_tmpl_factory, self.global_mem_usage,
                               mem_usage_key)
 
-    def queue_train(self, start_index, round_index, chunk_index, num_frames=0,
+    def queue_train(self, thread_index, round_index, chunk_index, num_frames=0,
                     **kwargs):
         """
         this calls Runner.queue_gmtk()
@@ -2765,18 +2797,18 @@ class Runner(object):
         kwargs["inputMasterFile"] = self.input_master_filename
 
         prog = self.train_prog
-        name = self.make_job_name_train(start_index, round_index, chunk_index)
+        name = self.make_job_name_train(thread_index, round_index, chunk_index)
 
         return self.queue_gmtk(prog, kwargs, name, num_frames)
 
-    def queue_train_parallel(self, input_params_filename, start_index,
+    def queue_train_parallel(self, input_params_filename, thread_index,
                              round_index, **kwargs):
         kwargs["cppCommandOptions"] = make_cpp_options(input_params_filename,
                                                        card_seg=self.num_segs)
 
         res = RestartableJobDict(self.session, self.job_log_file)
 
-        make_acc_filename_custom = partial(self.make_acc_filename, start_index)
+        make_acc_filename_custom = partial(self.make_acc_filename, thread_index)
         num_chunks = self.num_chunks
 
         for chunk_index, chunk_len in self.chunk_lens_sorted():
@@ -2789,7 +2821,7 @@ class Runner(object):
 
             num_frames = self.chunk_lens[chunk_index]
 
-            restartable_job = self.queue_train(start_index, round_index,
+            restartable_job = self.queue_train(thread_index, round_index,
                                                chunk_index, num_frames,
                                                **kwargs_chunk)
             res.queue(restartable_job)
@@ -2797,10 +2829,10 @@ class Runner(object):
         return res
 
     def queue_train_bundle(self, input_params_filename, output_params_filename,
-                           start_index, round_index, **kwargs):
+                           thread_index, round_index, **kwargs):
         """bundle step: take parallel accumulators and combine them
         """
-        acc_filename = self.make_acc_filename(start_index,
+        acc_filename = self.make_acc_filename(thread_index,
                                               GMTK_INDEX_PLACEHOLDER)
 
         cpp_options = make_cpp_options(input_params_filename,
@@ -2816,7 +2848,7 @@ class Runner(object):
                       loadAccFile=acc_filename,
                       **kwargs)
 
-        restartable_job = self.queue_train(start_index, round_index,
+        restartable_job = self.queue_train(thread_index, round_index,
                                            NAME_BUNDLE_PLACEHOLDER, **kwargs)
 
         res = RestartableJobDict(self.session, self.job_log_file)
@@ -2908,7 +2940,7 @@ class Runner(object):
         for num_segs in num_segs_range:
             self.run_triangulate_single(num_segs)
 
-    def run_train_round(self, start_index, round_index, **kwargs):
+    def run_train_round(self, thread_index, round_index, **kwargs):
         """
         returns None: normal
         returns not None: abort
@@ -2917,13 +2949,13 @@ class Runner(object):
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
         restartable_jobs = \
-            self.queue_train_parallel(last_params_filename, start_index,
+            self.queue_train_parallel(last_params_filename, thread_index,
                                       round_index, **kwargs)
         restartable_jobs.wait()
 
         restartable_jobs = \
             self.queue_train_bundle(last_params_filename, curr_params_filename,
-                                    start_index, round_index,
+                                    thread_index, round_index,
                                     llStoreFile=self.log_likelihood_filename,
                                     **kwargs)
         restartable_jobs.wait()
@@ -2944,18 +2976,16 @@ class Runner(object):
 
         new = self.make_new_params
 
-        start_index = self.start_index
+        thread_index = self.thread_index
 
-        self.save_input_master(start_index, new)
-        self.set_params_filename(start_index, new)
-        self.set_log_likelihood_filename(start_index, new)
-        self.set_output_dirpaths(start_index)
+        self.save_input_master(thread_index, new)
+        self.set_params_filename(thread_index, new)
+        self.set_log_likelihood_filename(thread_index, new)
+        self.set_output_dirpaths(thread_index)
 
         last_log_likelihood = NINF
         log_likelihood = NINF
         round_index = 0
-
-        self.last_params_filename = None
 
         self.set_calc_info_criterion()
 
@@ -2967,7 +2997,7 @@ class Runner(object):
 
         while (round_index < self.max_em_iters and
                is_training_progressing(last_log_likelihood, log_likelihood)):
-            self.run_train_round(start_index, round_index, **kwargs)
+            self.run_train_round(thread_index, round_index, **kwargs)
 
             if self.dry_run:
                 return (None, None, None, None)
@@ -3073,7 +3103,7 @@ class Runner(object):
         # having a single-threaded version makes debugging much easier
         with Session() as session:
             self.session = session
-            self.start_index = 0
+            self.thread_index = 0
             start_params = [self.run_train_start()]
 
         self.session = None
@@ -3082,19 +3112,19 @@ class Runner(object):
 
     def run_train_multithread(self, num_segs_range):
         # XXX: Python 2.6 use itertools.product()
-        seg_start_indexes = xrange(self.random_starts)
-        enumerator = enumerate((num_seg, seg_start_index)
+        seg_thread_indexes = xrange(self.random_starts)
+        enumerator = enumerate((num_seg, seg_thread_index)
                                for num_seg in num_segs_range
-                               for seg_start_index in seg_start_indexes)
+                               for seg_thread_index in seg_thread_indexes)
 
         threads = []
         with Session() as session:
             try:
-                for start_index, (num_seg, seg_start_index) in enumerator:
+                for thread_index, (num_seg, seg_thread_index) in enumerator:
                     # print >>sys.stderr, (
-                    #    "start_index %s, num_seg %s, seg_start_index %s"
-                    #    % (start_index, num_seg, seg_start_index))
-                    thread = RandomStartThread(self, session, start_index,
+                    #    "thread_index %s, num_seg %s, seg_thread_index %s"
+                    #    % (thread_index, num_seg, seg_thread_index))
+                    thread = RandomStartThread(self, session, thread_index,
                                                num_seg)
                     thread.start()
                     threads.append(thread)
@@ -3375,7 +3405,8 @@ def parse_options(args):
         group.add_option("-s", "--structure", metavar="FILE",
                          help="use or create structure in FILE")
 
-        group.add_option("-p", "--trainable-params", metavar="FILE",
+        group.add_option("-p", "--trainable-params", action="append",
+                         default=[], metavar="FILE",
                          help="use or create trainable parameters in FILE")
 
         group.add_option("--dont-train", metavar="FILE",
