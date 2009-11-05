@@ -1,9 +1,11 @@
 0.1.17:
 
-
+* now requires genomedata >= 0.1.6
+* remove dumpnames.list
 
 0.1.16:
 
+* now requires GMTK version 20091016
 * segway: a change in the semantics of --trainable-params for
   training. If it is specified and the file exists, then it will be
   used as a parameter file in the first round of training. Before it
@@ -17,6 +19,7 @@
 
 0.1.15:
 
+* now requires GMTK version 20091016
 * segway: more informative error on memory progression failure
 * segway: now works on LSF even when LSF_UNIT_FOR_LIMITS has been changed
 * segway: add jobname to "queued" diagnostic messages
