@@ -428,11 +428,13 @@ def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
 
-def quote_spaced_str(text):
+def quote_spaced_str(item):
     """
     add quotes around text if it has spaces in it
     """
-    if " " in str(text):
+    text = str(item)
+
+    if " " in text:
         return '"%s"' % text
     else:
         return text
