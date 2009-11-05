@@ -29,6 +29,8 @@ SIZE_UNITS = dict((unit, globals()[unit])
 LSF_CONF_BASENAME = "lsf.conf"
 LSF_CONF_FILEPATH = path(environ["LSF_ENVDIR"]) / LSF_CONF_BASENAME
 
+# XXX: this can be more robustly handled with the LSLIB function
+# ls_readconfenv() and ctypes instead
 LSF_CONF = OneSectionRawConfigParser(dict(LSF_UNIT_FOR_LIMITS="KB"))
 LSF_CONF.read(LSF_CONF_FILEPATH)
 

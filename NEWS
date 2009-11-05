@@ -2,6 +2,7 @@
 
 * now requires genomedata >= 0.1.6
 * remove dumpnames.list
+* by default check all jobs every 30 min instead of every 54 min
 
 0.1.16:
 

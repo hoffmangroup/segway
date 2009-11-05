@@ -348,10 +348,10 @@ FAILED = JobState.FAILED
 DONE = JobState.DONE
 
 # CLEAN_PERIOD in lsb.params, after which jobs are removed from
-# mbatchd's memory default is 3600, multiplying by 0.9 for a margin of
+# mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
 # error
 # XXX: check lsb.params for real value
-CLEAN_SAFE_TIME = int(3600 * 0.9)
+CLEAN_SAFE_TIME = int(3600 * 0.5)
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
