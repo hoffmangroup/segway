@@ -432,7 +432,7 @@ def quote_spaced_str(text):
     """
     add quotes around text if it has spaces in it
     """
-    if " " in text:
+    if " " in str(text):
         return '"%s"' % text
     else:
         return text
@@ -3503,8 +3503,7 @@ def parse_options(args):
     options, args = parser.parse_args(args)
 
     if not len(args) == 1:
-        parser.print_usage()
-        sys.exit(1)
+        parser.error("Expected only one argument.")
 
     return options, args
 

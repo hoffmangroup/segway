@@ -7,6 +7,9 @@
 * segway: allow multiple sets of parameters with --trainable-params,
   one for each random start. This together with the previous change
   will allow for the easy continuation of a multithread training run.
+* segway: changed error text when wrong number of arguments provided
+* segway: fixed bug that causes failure in command-line logging during
+  identify phase
 
 0.1.15:
 
