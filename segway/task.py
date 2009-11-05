@@ -151,7 +151,9 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
     track_indexes = make_track_indexes(track_indexes_text)
 
     with Genome(genomedata_dirname) as genome:
-        supercontig = genome[chrom][start:end]
+        supercontigs = genome[chrom].supercontigs[start:end]
+        assert len(supercontigs) == 1
+        supercontig = supercontigs[0]
 
         continuous_cells = _make_continuous_cells(supercontig, start, end,
                                                   track_indexes)

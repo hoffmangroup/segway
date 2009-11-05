@@ -327,6 +327,8 @@ def _save_observations_chunk(float_filename, int_filename, float_data,
     int_data = column_stack(int_blocks)
     int_data.tofile(int_filename)
 
+# XXX: there is a new genomedata interface that should be able to
+# replace the callers to this
 def _make_continuous_cells(supercontig, start, end, track_indexes):
     continuous = supercontig.continuous
     if continuous is None:
