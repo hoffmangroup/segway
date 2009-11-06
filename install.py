@@ -13,6 +13,7 @@ code.
 (c) 2009: Orion Buske <orion.buske@gmail.com>
 
 """
+import platform
 
 ####################### BEGIN COMMON CODE HEADER #####################
 
@@ -26,14 +27,12 @@ from urllib import urlretrieve
 from site import addsitedir
 from string import Template
 from subprocess import call, PIPE, Popen
+from tempfile import gettempdir
 
 assert sys.version_info >= (2, 4)
 
 MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
-
-# Should match download URLs below (displayed to user)
-HDF5_DOWNLOAD_VERSION = "1.8.2"
 
 HDF5_URL = "http://www.hdfgroup.org/ftp/HDF5/prev-releases/hdf5-1.8.2/src/hdf5-1.8.2.tar.gz"
 EZ_SETUP_URL = "http://peak.telecommunity.com/dist/ez_setup.py"
@@ -57,6 +56,7 @@ script_dir = $scripts
 
 # One command per line
 HDF5_INSTALL_SCRIPT = """
+cd $tmpdir
 if [ ! -e $file ]; then wget $url -O $file; fi
 if [ ! -d $filebase ]; then tar -xzf $file; fi
 cd $filebase
@@ -64,7 +64,6 @@ cd $filebase
 make
 make install
 cd ..
-rm -f $file
 """
 
 ####################### END COMMON CODE HEADER #####################
@@ -74,19 +73,49 @@ MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
 MIN_DRMAA_VERSION = "0.4a3"
 
-# Should match download URLs below (displayed to user)
-LSF_DRMAA_DOWNLOAD_VERSION = "1.0.3"
 LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa\
 /lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
 
+GMTK_VERSION_FILENAME = "gmtk.version"
+GMTK_USER = "segway"
+GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz"
+
 LSF_DRMAA_INSTALL_SCRIPT = """
+cd $tmpdir
 if [ ! -e $file ]; then wget $url -O $file; fi
 if [ ! -d $filebase ]; then tar -xzf $file; fi
 cd $filebase
 ./configure --prefix=$dir
 make
 make install
-rm -f $file
+"""
+
+# also has keywords: user, password, OPTFLAGS, ARCH_GCC, SSELEVEL
+GMTK_INSTALL_SCRIPT = """
+cd $tmpdir
+wget --user=$user --password=$password $url -O $file
+if [ ! -d $filebase ]; then tar -xzf $file; fi
+cd $filebase
+
+mkdir -p "$dir/bin"
+mkdir tksrc/bin 2>/dev/null || true
+
+if [ "$(find . -name "*.a" -print0)" ]; \
+then find . -name "*.a" -print0 | xargs -0 rm; \
+fi
+
+make clean "OPTFLAGS=$OPTFLAGS"
+make linux "OPTFLAGS=$OPTFLAGS"
+make depend "OPTFLAGS=$OPTFLAGS"
+
+make "OPTFLAGS=$OPTFLAGS"
+make -C featureFileIO install "OPTFLAGS=$OPTFLAGS"\
+    "INSTALL=install" "install_prefix=$dir"
+make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
+
+mkdir -p "$dir/etc"
+declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
+echo "$version" > "$dir/etc/gmtk.version"
 """
 
 SEGWAY_INSTALL_SCRIPT = """
@@ -102,6 +131,60 @@ class DependencyError(Exception):
 
 class InstallationError(Exception):
     pass
+
+class InteractiveShell(object):
+    """Class to manage running scripts through an interactive shell
+
+    Executes each command in a separate shell
+    """
+
+    def __init__(self, env={}):
+        self.env = dict(os.environ)
+        self.env.update(env)
+        self.old_cwd = os.getcwd()
+
+    def execute(self, command, verbose=False):
+        """Execute the given string command and return the retcode."""
+
+        if verbose:
+            print >>sys.stderr, ">> %s" % command
+
+        # Trap calls to `cd`
+        if command.strip().startswith("cd"):
+            try:
+                dest = command.strip().split()[1]
+                if dest == "-":
+                    dest = self.old_cwd
+            except IndexError:
+                dest = os.expanduser("~")  # Defaults to $HOME
+
+            # Change directory
+            self.old_cwd = os.getcwd()  # Save for `cd -`
+            os.chdir(dest)
+            return 0
+        else:
+            return call(str(command), shell=True,
+                        env=self.env, cwd=os.getcwd())
+
+    def run_script(self, script, verbose=False):
+        """Runs each string command in a list, stopping if an error occurs
+
+        verbose: if true, each command is first echo'd to stderr
+
+        """
+        for line in script:
+            if len(line) == 0:
+                continue
+
+            retcode = self.execute(line, verbose=verbose)
+            if retcode != 0:
+                raise OSError("Command failed: %s" % line)
+
+    def run_block(self, block, verbose=False):
+        """Run each line of a multi-line string as a separate command"""
+        script = block.strip().split("\n")
+        self.run_script(script, verbose=verbose)
+
 
 class ShellManager(object):
     """Class to manage details of shells.
@@ -119,7 +202,7 @@ class ShellManager(object):
         """Creates a ShellManager given a shell string.
 
         If shell is None, tries to use environment variable SHELL.
-        self.name: basically same as shell, but if shell is None, self.name = ""
+        self.name: basically same as shell, but if shell is None, self.name=""
         """
         self.name = shell
         if shell is None:
@@ -252,16 +335,13 @@ def setup_script_home(arch_home=None):
     return script_home, default_script_home
 
 def setup_hdf5_installation(shell, arch_home):
-    if os.environ["HDF5_DIR"]:
+    if "HDF5_DIR" in os.environ:
         hdf5_bin_dir = os.path.join(os.environ["HDF5_DIR"], "bin")
         if not shell.in_env("PATH", hdf5_bin_dir):
             # Add hdf5 bin dir to path for now to use h52gif for version
             shell.add_to_env("PATH", hdf5_bin_dir)
             sys.path.append(hdf5_bin_dir)
 
-    print sys.path
-    print os.environ["HDF5_DIR"]
-    print os.environ["PATH"]
     hdf5_dir = prompt_install_hdf5(arch_home)
     if hdf5_dir:
         print >>sys.stderr, ("\nPyTables uses the environment variable"
@@ -289,12 +369,16 @@ def prompt_add_to_env(shell, variable, value):
             shell.add_to_rc_env(variable, value)
 
 def prompt_set_env(shell, variable, value):
-    shell.set_env(variable, value)
-    query = "\nMay I edit your %s to set your %s to %s?" % \
-        (shell.file, variable, value)
-    permission = prompt_yes_no(query)
-    if permission:
-        shell.set_rc_env(variable, value)
+    if variable in os.environ and os.environ[variable] == value:
+        print >>sys.stderr, "\nYour %s was already set to %s!" % \
+            (variable, value)
+    else:
+        shell.set_env(variable, value)
+        query = "\nMay I edit your %s to set your %s to %s?" % \
+            (shell.file, variable, value)
+        permission = prompt_yes_no(query)
+        if permission:
+            shell.set_rc_env(variable, value)
 
 def fix_path(path):
     # Put path in standard form
@@ -308,8 +392,11 @@ def make_dir(dirname, verbose=True):
         if verbose:
             print >>sys.stderr, "Created directory: %s" % dirname
 
-def substitute_template(template, fields):
-    return Template(template).substitute(fields)
+def substitute_template(template, fields, safe=False, *args, **kwargs):
+    if safe:
+        return Template(template).safe_substitute(fields, *args, **kwargs)
+    else:
+        return Template(template).substitute(fields, *args, **kwargs)
 
 def check_executable_in_path(bin):
     """Checks if an executable of the given name is in the user's path.
@@ -392,10 +479,10 @@ def write_pydistutils_cfg(cfg_file, arch_home,
 def get_hdf5_version():
     """Returns HDF5 version as string or None if not found or installed
 
-    Only works if h52gif is installed and in current user path
+    Only works if h5repack is installed and in current user path
     """
     try:
-        cmd = Popen(["h52gif", "-V"], stdout=PIPE, stderr=PIPE)
+        cmd = Popen(["h5repack", "-V"], stdout=PIPE, stderr=PIPE)
         res = cmd.stdout.readlines()[0].strip()
         if "Version" in res:
             # HDF5 Found!
@@ -423,6 +510,28 @@ def get_setuptools_version():
     except (AttributeError, ImportError):
         return None
 
+def parse_download_url(url):
+    """Returns a dict of URL components"""
+    dir, filename = os.path.split(url)
+    # Remove extensions
+    filebase = filename
+    if filebase.endswith(".gz"):
+        filebase = filebase[:-3]
+    if filebase.endswith(".tar"):
+        filebase = filebase[:-4]
+    if filebase.endswith(".tgz"):
+        filebase = filebase[:-4]
+
+    assert "-" in filebase
+    filebase_tokens = filebase.split("-")
+    version = filebase_tokens[-1]
+    program = "-".join(filebase_tokens[:-1])
+    return {"dirname": dir,
+            "file": filename,
+            "filebase": filebase,
+            "version": version,
+            "program": program}
+
 def str2version(ver):  # string to version object
     if ver.startswith("$Revision:"):
         ver = ver.split()[1]  # Get revision number
@@ -432,7 +541,7 @@ def str2version(ver):  # string to version object
 def prompt_install_hdf5(arch_home):
     return _installer("HDF5", install_hdf5, get_hdf5_version,
                       install_message=HDF5_INSTALL_MESSAGE, arch_home=arch_home,
-                      version=HDF5_DOWNLOAD_VERSION)
+                      url=HDF5_URL)
 
 def prompt_install_numpy(min_version=MIN_NUMPY_VERSION):
     return _installer("Numpy", install_numpy, get_numpy_version,
@@ -590,21 +699,27 @@ def easy_install(progname, min_version=None):
     else:
         return True
 
-def install_script(progname, prog_dir, script, **kwargs):
+def install_script(progname, prog_dir, script, safe=False, env=[], **kwargs):
     """Tries to install the specified program, given a script, url
 
     progname: string name of program being installed
 
     prog_dir: directory program is to be installed in
 
+    env: environment variables to be set during script execution
+
     script: multi-line string, where each line is a command to run in the
-    shell in order to install the program. Variables in this script
-    will be substituted with keywords in kwargs, as well as:
+    shell in order to install the program. Lines should be independent and
+    should use local variables not defined in the same line.
+    Variables in this script will be substituted with keywords in kwargs,
+    as well as:
     - dir: the program installation directory
     - file: the downloaded file (if url specified)
     - filebase: the basename of the downloaded file (if url specified)
+    - version: the downloaded file url (if url specified and in std form)
     - python: sys.executable (should be the python command used to call
       this program)
+    - tmpdir: a temporary directory for downloading files to
 
     Returns installation directory if installation is successful
     (or True if unknown), and None otherwise.
@@ -614,13 +729,10 @@ def install_script(progname, prog_dir, script, **kwargs):
     fields = {}
     fields["dir"] = prog_dir
     fields["python"] = sys.executable
+    fields["tmpdir"] = gettempdir()
     if "url" in kwargs:
-        filename = os.path.basename(kwargs["url"])
-        fields["file"] = filename
-        if filename.endswith(".tar.gz"):
-            fields["filebase"] = filename[:-7]  # minus .tar.gz
-        else:
-            fields["filebase"] = filename
+        url_fields = parse_download_url(kwargs["url"])
+        fields.update(url_fields)
 
     # Add in kwargs (overwriting if collision)
     fields.update(kwargs)
@@ -628,35 +740,12 @@ def install_script(progname, prog_dir, script, **kwargs):
     # Make dir absolute (even if specified as kwarg)
     fields["dir"] = fix_path(fields["dir"])
 
-    script = substitute_template(script, fields).strip().splitlines()
+    script = substitute_template(script, fields, safe=safe)
 
-    cwd = os.getcwd()  # Keep track of cwd state
+    # Setup shell
+    shell = InteractiveShell(env=env)
+    shell.run_block(script, verbose=True)
 
-    if prog_dir is not None:
-        os.chdir(prog_dir)  # Move to installation directory
-
-    for line in script:
-        line = line.strip()
-        print >>sys.stderr, ">> %s" % line
-        # Intercept cd lines and update directory state
-        if line.startswith("cd"):
-            try:
-                path = line.split()[1]
-                os.chdir(fix_path(path))
-                continue
-            except IndexError:
-                die("Invalid cd command: %s" % line)
-
-        # Run command in shell
-        proc = Popen(line, shell=True, stdout=None, stderr=None)
-        code = proc.wait()
-        if code != 0:
-            print >>sys.stderr, "Error installing: %s" % progname
-            print >>sys.stderr, "Command failed: %s" % line
-            os.chdir(cwd)
-            raise InstallationError()
-
-    os.chdir(cwd)
     return prog_dir
 
 ########################## PROGRAM TESTING ######################
@@ -692,10 +781,13 @@ def prompt_test_pytables(*args, **kwargs):
             raise InstallationError()
 
 ########################## USER INTERACTION #######################
-def prompt_install(progname, install_prompt = None,
+def prompt_install(progname, install_prompt=None, url=None,
                    version=None, default="Y", *args, **kwargs):
     if version is not None:
         info = "%s %s" % (progname, version)
+    elif url is not None:
+        url_info = parse_download_url(url)
+        info = "%s %s" % (progname, url_info["version"])
     else:
         info = "%s" % progname
 
@@ -805,6 +897,7 @@ def main(args=sys.argv[1:]):
 
     try:
         arch_home = setup_arch_home()
+        prompt_set_env(shell, "ARCHHOME", arch_home)
 
         python_home, default_python_home = setup_python_home(arch_home)
         # Add python_home to PYTHONPATH
@@ -822,7 +915,8 @@ def main(args=sys.argv[1:]):
 
         prompt_install_numpy()
 
-        check_executable_in_path("gmtkViterbi")
+        prompt_install_gmtk(arch_home)
+        #check_executable_in_path("gmtkViterbi")
 
         setup_drmaa_installation(shell, arch_home)
 
@@ -877,6 +971,28 @@ def get_drmaa_version():
     except (AttributeError, ImportError):
         return None
 
+def get_gmtk_version():
+    """Returns the version in the gmtk version file or None if not found"""
+    if "ARCHHOME" in os.environ:
+        gmtkdir = fix_path(os.environ["ARCHHOME"])
+    else:
+        cmd = Popen(["which", "gmtkViterbi"], stdout=PIPE, stderr=PIPE)
+        if cmd.poll() == 0:
+            stdout = cmd.communicate()[0].strip()
+            bindir = stdout[0]
+            gmtkdir = os.path.dirname(os.path.dirname(bindir))
+        else:
+            return None
+
+    version_filename = os.path.join(gmtkdir, "etc", GMTK_VERSION_FILENAME)
+    if os.path.isfile(version_filename):
+        ifp = open(version_filename)
+        version = ifp.readline().strip()
+        if len(version) > 0:
+            return version
+
+    return None
+
 ##################### SPECIFIC PROGRAM INSTALLERS ################
 def setup_drmaa_installation(shell, arch_home):
     return _abort_skip_install(prompt_drmaa_installation, shell, arch_home)
@@ -902,13 +1018,16 @@ system.\nPlease try reinstalling on a system with one of these installed.")
 
 def prompt_install_lsf_drmaa(arch_home):
     return _installer("FedStage DRMAA for LSF", install_lsf_drmaa,
-                      is_lsf_drmaa_installed,
-                      version=LSF_DRMAA_DOWNLOAD_VERSION,
+                      is_lsf_drmaa_installed, url=LSF_DRMAA_URL,
                       arch_home=arch_home)
 
 def prompt_install_drmaa():
     return _installer("drmaa-python", install_drmaa, get_drmaa_version,
                       install_prompt=EASY_INSTALL_PROMPT)
+
+def prompt_install_gmtk(arch_home):
+    return _installer("gmtk", install_gmtk, get_gmtk_version,
+                      arch_home=arch_home)
 
 def prompt_install_segway():
     return _installer("segway", install_segway, get_segway_version,
@@ -925,11 +1044,71 @@ def install_lsf_drmaa(arch_home, *args, **kwargs):
 def install_drmaa(min_version=MIN_DRMAA_VERSION, *args, **kwargs):
     return easy_install("drmaa", min_version=min_version)
 
+def install_gmtk(arch_home, *args, **kwargs):
+    query = "\nALERT: GMTK source code is password protected.\
+\n[Username: %s] Password: " % GMTK_USER
+    password = prompt_user(query)
+    progname = "GMTK"
+    optflags = get_gmtk_optflags()
+    env = {"OPTFLAGS": optflags}
+    return install_script(progname, arch_home, GMTK_INSTALL_SCRIPT,
+                          url=GMTK_URL, user=GMTK_USER, password=password,
+                          env=env, safe=True)
+
 def install_segway(*args, **kwargs):
     query = "Where is the segway source located?"
     segway_dir = prompt_path(query, default=".")
     return install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)
 
+######################### OTHER FUNCTIONS ########################
+def get_password(progname=None):
+    query = "Please enter the segway source password"
+    return prompt_user(query)
+
+def get_gmtk_optflags():
+    if "OPTFLAGS" in os.environ:
+        return os.environ["OPTFLAGS"]
+
+    if "ARCH" in os.environ:
+        arch = os.environ["ARCH"]
+    else:
+        arch = "-".join([platform.system(), platform.machine()])
+
+    arch_gcc = None
+    sselevel = None
+    if arch in ["Linux-i386", "Linux-x86_64"] or arch.startswith("CYGWIN"):
+        # Determine SSELEVEL
+        sselevel = 2  # default
+        cmd = Popen('grep "^flags" /proc/cpuinfo | cut -d : -f 2',
+                    shell=True, stdout=PIPE)
+        stdout, stderr = cmd.communicate()
+        for line in stdout.split("\n"):
+            tokens = line.strip().split()
+            if "bpni" in tokens:
+                sselevel = 3
+
+        # Determine ARCH_GCC
+        cmd = Popen('grep "^model name" /proc/cpuinfo | cut -d : -f 2',
+                    shell=True, stdout=PIPE)
+        cpu_model, stderr = cmd.communicate()
+        if "Opteron" in cpu_model:
+            arch_gcc = "opteron"
+        elif "Pentium" in cpu_model or "Xeon" in cpu_model:
+            if arch == "Linux-i386" or arch.startswith("CYGWIN"):
+                if sselevel == 3:
+                    arch_gcc = "prescott"
+                else:
+                    arch_gcc = "pentium4"
+            elif arch == "Linux-x86_64":
+                arch_gcc = "nocona"
+
+    optflags = "-g -O3 -D_TABLE"
+    if arch_gcc:
+        optflags += " -march=%s" % arch_gcc
+    if sselevel:
+        optflags += " -mfpmath=sse -msse%d" % sselevel
+
+    return optflags
 
 if __name__ == "__main__":
     sys.exit(main())

@@ -13,6 +13,7 @@ code.
 (c) 2009: Orion Buske <orion.buske@gmail.com>
 
 """
+import platform
 
 ${COMMON_CODE_HEADER}
 
@@ -20,19 +21,49 @@ MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
 MIN_DRMAA_VERSION = "0.4a3"
 
-# Should match download URLs below (displayed to user)
-LSF_DRMAA_DOWNLOAD_VERSION = "1.0.3"
 LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa\
 /lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
 
+GMTK_VERSION_FILENAME = "gmtk.version"
+GMTK_USER = "segway"
+GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz"
+
 LSF_DRMAA_INSTALL_SCRIPT = """
+cd $tmpdir
 if [ ! -e $file ]; then wget $url -O $file; fi
 if [ ! -d $filebase ]; then tar -xzf $file; fi
 cd $filebase
 ./configure --prefix=$dir
 make
 make install
-rm -f $file
+"""
+
+# also has keywords: user, password, OPTFLAGS, ARCH_GCC, SSELEVEL
+GMTK_INSTALL_SCRIPT = """
+cd $tmpdir
+wget --user=$user --password=$password $url -O $file
+if [ ! -d $filebase ]; then tar -xzf $file; fi
+cd $filebase
+
+mkdir -p "$dir/bin"
+mkdir tksrc/bin 2>/dev/null || true
+
+if [ "$(find . -name "*.a" -print0)" ]; \
+then find . -name "*.a" -print0 | xargs -0 rm; \
+fi
+
+make clean "OPTFLAGS=$OPTFLAGS"
+make linux "OPTFLAGS=$OPTFLAGS"
+make depend "OPTFLAGS=$OPTFLAGS"
+
+make "OPTFLAGS=$OPTFLAGS"
+make -C featureFileIO install "OPTFLAGS=$OPTFLAGS"\
+    "INSTALL=install" "install_prefix=$dir"
+make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
+
+mkdir -p "$dir/etc"
+declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
+echo "$version" > "$dir/etc/gmtk.version"
 """
 
 SEGWAY_INSTALL_SCRIPT = """
@@ -53,6 +84,7 @@ def main(args=sys.argv[1:]):
 
     try:
         arch_home = setup_arch_home()
+        prompt_set_env(shell, "ARCHHOME", arch_home)
 
         python_home, default_python_home = setup_python_home(arch_home)
         # Add python_home to PYTHONPATH
@@ -70,7 +102,8 @@ def main(args=sys.argv[1:]):
 
         prompt_install_numpy()
 
-        check_executable_in_path("gmtkViterbi")
+        prompt_install_gmtk(arch_home)
+        #check_executable_in_path("gmtkViterbi")
 
         setup_drmaa_installation(shell, arch_home)
 
@@ -125,6 +158,28 @@ def get_drmaa_version():
     except (AttributeError, ImportError):
         return None
 
+def get_gmtk_version():
+    """Returns the version in the gmtk version file or None if not found"""
+    if "ARCHHOME" in os.environ:
+        gmtkdir = fix_path(os.environ["ARCHHOME"])
+    else:
+        cmd = Popen(["which", "gmtkViterbi"], stdout=PIPE, stderr=PIPE)
+        if cmd.poll() == 0:
+            stdout = cmd.communicate()[0].strip()
+            bindir = stdout[0]
+            gmtkdir = os.path.dirname(os.path.dirname(bindir))
+        else:
+            return None
+
+    version_filename = os.path.join(gmtkdir, "etc", GMTK_VERSION_FILENAME)
+    if os.path.isfile(version_filename):
+        ifp = open(version_filename)
+        version = ifp.readline().strip()
+        if len(version) > 0:
+            return version
+
+    return None
+
 ##################### SPECIFIC PROGRAM INSTALLERS ################
 def setup_drmaa_installation(shell, arch_home):
     return _abort_skip_install(prompt_drmaa_installation, shell, arch_home)
@@ -150,13 +205,16 @@ system.\nPlease try reinstalling on a system with one of these installed.")
 
 def prompt_install_lsf_drmaa(arch_home):
     return _installer("FedStage DRMAA for LSF", install_lsf_drmaa,
-                      is_lsf_drmaa_installed,
-                      version=LSF_DRMAA_DOWNLOAD_VERSION,
+                      is_lsf_drmaa_installed, url=LSF_DRMAA_URL,
                       arch_home=arch_home)
 
 def prompt_install_drmaa():
     return _installer("drmaa-python", install_drmaa, get_drmaa_version,
                       install_prompt=EASY_INSTALL_PROMPT)
+
+def prompt_install_gmtk(arch_home):
+    return _installer("gmtk", install_gmtk, get_gmtk_version,
+                      arch_home=arch_home)
 
 def prompt_install_segway():
     return _installer("segway", install_segway, get_segway_version,
@@ -173,11 +231,71 @@ def install_lsf_drmaa(arch_home, *args, **kwargs):
 def install_drmaa(min_version=MIN_DRMAA_VERSION, *args, **kwargs):
     return easy_install("drmaa", min_version=min_version)
 
+def install_gmtk(arch_home, *args, **kwargs):
+    query = "\nALERT: GMTK source code is password protected.\
+\n[Username: %s] Password: " % GMTK_USER
+    password = prompt_user(query)
+    progname = "GMTK"
+    optflags = get_gmtk_optflags()
+    env = {"OPTFLAGS": optflags}
+    return install_script(progname, arch_home, GMTK_INSTALL_SCRIPT,
+                          url=GMTK_URL, user=GMTK_USER, password=password,
+                          env=env, safe=True)
+
 def install_segway(*args, **kwargs):
     query = "Where is the segway source located?"
     segway_dir = prompt_path(query, default=".")
     return install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)
 
+######################### OTHER FUNCTIONS ########################
+def get_password(progname=None):
+    query = "Please enter the segway source password"
+    return prompt_user(query)
+
+def get_gmtk_optflags():
+    if "OPTFLAGS" in os.environ:
+        return os.environ["OPTFLAGS"]
+
+    if "ARCH" in os.environ:
+        arch = os.environ["ARCH"]
+    else:
+        arch = "-".join([platform.system(), platform.machine()])
+
+    arch_gcc = None
+    sselevel = None
+    if arch in ["Linux-i386", "Linux-x86_64"] or arch.startswith("CYGWIN"):
+        # Determine SSELEVEL
+        sselevel = 2  # default
+        cmd = Popen('grep "^flags" /proc/cpuinfo | cut -d : -f 2',
+                    shell=True, stdout=PIPE)
+        stdout, stderr = cmd.communicate()
+        for line in stdout.split("\n"):
+            tokens = line.strip().split()
+            if "bpni" in tokens:
+                sselevel = 3
+
+        # Determine ARCH_GCC
+        cmd = Popen('grep "^model name" /proc/cpuinfo | cut -d : -f 2',
+                    shell=True, stdout=PIPE)
+        cpu_model, stderr = cmd.communicate()
+        if "Opteron" in cpu_model:
+            arch_gcc = "opteron"
+        elif "Pentium" in cpu_model or "Xeon" in cpu_model:
+            if arch == "Linux-i386" or arch.startswith("CYGWIN"):
+                if sselevel == 3:
+                    arch_gcc = "prescott"
+                else:
+                    arch_gcc = "pentium4"
+            elif arch == "Linux-x86_64":
+                arch_gcc = "nocona"
+
+    optflags = "-g -O3 -D_TABLE"
+    if arch_gcc:
+        optflags += " -march=%s" % arch_gcc
+    if sselevel:
+        optflags += " -mfpmath=sse -msse%d" % sselevel
+
+    return optflags
 
 if __name__ == "__main__":
     sys.exit(main())
