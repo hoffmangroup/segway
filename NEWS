@@ -1,6 +1,7 @@
 0.1.18:
 
-
+* LSF: now appends to output/error instead of overwriting
+* recommit dumpnames.list removal (bugfix)
 
 0.1.17:
 

@@ -231,7 +231,7 @@ SUBDIRNAME_AUX = "auxiliary"
 SUBDIRNAME_LIKELIHOOD = "likelihood"
 SUBDIRNAME_LOG = "log"
 SUBDIRNAME_OBS = "observations"
-SUBDIRNAME_PARAMS = "params" # XXX: final params should go into main directory
+SUBDIRNAME_PARAMS = "params"
 SUBDIRNAME_POSTERIOR = "posterior"
 SUBDIRNAME_VITERBI = "viterbi"
 
@@ -250,7 +250,6 @@ RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
-RES_DUMPNAMES = "dumpnames.list" # XXX: remove all dumpnames stuff from code
 RES_SEG_TABLE = "seg_table.tab"
 RES_WRAPPER = "segway-wrapper.sh"
 
@@ -1048,7 +1047,6 @@ class Runner(object):
         self.log_likelihood_log_filename = None
         self.dont_train_filename = None
 
-        self.dumpnames_filename = None
         self.viterbi_filenames = None
 
         self.obs_dirname = None
@@ -2422,10 +2420,6 @@ class Runner(object):
 
         self.posterior_filenames = map(make_posterior_filename, chunk_range)
 
-    def save_dumpnames(self):
-        self.dumpnames_filename = self.save_resource(RES_DUMPNAMES,
-                                                     SUBDIRNAME_AUX)
-
     def load_supervision(self):
         supervision_type = self.supervision_type
         if supervision_type == SUPERVISION_UNSUPERVISED:
@@ -2504,7 +2498,6 @@ class Runner(object):
 
         if identify or posterior:
             self.make_subdirs(SUBDIRNAMES_IDENTIFY)
-            self.save_dumpnames()
 
             # this requires the number of observations
             self.make_viterbi_filenames()

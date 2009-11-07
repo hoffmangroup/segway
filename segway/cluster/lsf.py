@@ -40,6 +40,17 @@ DIVISOR_FOR_LIMITS = SIZE_UNITS[UNIT_FOR_LIMITS]
 CORE_FILE_SIZE_LIMIT = 0
 
 class JobTemplateFactory(_JobTemplateFactory):
+    def __init__(self, template, *args, **kwargs):
+        # eliminate default overwrite behavior for DRMAA/LSF, go to
+        # append which is default for DRMAA/SGE
+        self.output_path = template.outputPath.lstrip(":")
+        self.error_path = template.errorPath.lstrip(":")
+
+        template.outputPath = ""
+        template.errorPath = ""
+
+        return _JobTemplateFactory.__init__(self, template, *args, **kwargs)
+
     def make_res_req(self, mem_usage):
         mem_usage_mb = ceildiv(mem_usage, MB)
 
@@ -49,15 +60,13 @@ class JobTemplateFactory(_JobTemplateFactory):
     def make_native_spec(self):
         mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)
 
-        # XXX: it would be good if this added -o and -e so that
-        # overwriting is not done as outputPath and errorPath do automatically
-
         # bsub -R: resource requirement
         # bsub -M: per-process memory limit
         # bsub -v: hard virtual memory limit for all processes
         # bsub -C: core file size limit
         res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec,
-                                    v=mem_limit_spec)
+                                    v=mem_limit_spec, o=self.output_path,
+                                    e=self.error_path)
 
         # XXX: -C does not work with DRMAA for LSF 1.03
         # wait for upstream fix:
