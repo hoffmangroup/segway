@@ -40,16 +40,9 @@ DIVISOR_FOR_LIMITS = SIZE_UNITS[UNIT_FOR_LIMITS]
 CORE_FILE_SIZE_LIMIT = 0
 
 class JobTemplateFactory(_JobTemplateFactory):
-    def __init__(self, template, *args, **kwargs):
-        # eliminate default overwrite behavior for DRMAA/LSF, go to
-        # append which is default for DRMAA/SGE
-        self.output_path = template.outputPath.lstrip(":")
-        self.error_path = template.errorPath.lstrip(":")
-
-        template.outputPath = ""
-        template.errorPath = ""
-
-        return _JobTemplateFactory.__init__(self, template, *args, **kwargs)
+    # eliminate default overwrite behavior for DRMAA/LSF, go to append
+    # which is default for DRMAA/SGE
+    set_template_output_error = False
 
     def make_res_req(self, mem_usage):
         mem_usage_mb = ceildiv(mem_usage, MB)

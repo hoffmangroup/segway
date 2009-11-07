@@ -2765,8 +2765,8 @@ class Runner(object):
 
         if output_filename is None:
             output_filename = self.output_dirpath / job_name
-        job_tmpl.outputPath = ":" + output_filename
-        job_tmpl.errorPath = ":" + (self.error_dirpath / job_name)
+        error_filename = self.error_dirpath / job_name
+
         job_tmpl.blockEmail = True
 
         job_tmpl.nativeSpecification = make_native_spec(*self.user_native_spec)
@@ -2774,7 +2774,9 @@ class Runner(object):
         set_cwd_job_tmpl(job_tmpl)
 
         job_tmpl_factory = JobTemplateFactory(job_tmpl,
-                                              self.mem_usage_progression)
+                                              self.mem_usage_progression,
+                                              output_filename,
+                                              error_filename)
 
         mem_usage_key = (prog.prog, self.num_segs, num_frames)
 

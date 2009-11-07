@@ -20,10 +20,22 @@ class JobError(RuntimeError):
     pass
 
 class _JobTemplateFactory(object):
-    def __init__(self, template, mem_usage_progression):
-        self.template = template
+    set_template_output_error = True
+
+    def __init__(self, template, mem_usage_progression, output_filename,
+                 error_filename):
         self.native_spec = template.nativeSpecification
         self.mem_usage_progression = mem_usage_progression
+
+        # set here so that it can be overridden for LSF
+        self.output_filename = output_filename
+        self.error_filename = error_filename
+
+        if self.set_template_output_error:
+            template.outputPath = ":" + output_filename
+            template.errorPath = ":" + error_filename
+
+        self.template = template
 
     def __call__(self, trial_index):
         res = self.template
