@@ -58,8 +58,8 @@ class JobTemplateFactory(_JobTemplateFactory):
         # bsub -v: hard virtual memory limit for all processes
         # bsub -C: core file size limit
         res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec,
-                                    v=mem_limit_spec, o=self.output_path,
-                                    e=self.error_path)
+                                    v=mem_limit_spec, o=self.output_filename,
+                                    e=self.error_filename)
 
         # XXX: -C does not work with DRMAA for LSF 1.03
         # wait for upstream fix:
