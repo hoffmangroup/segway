@@ -17,7 +17,9 @@
 #define CARD_SEGTRANSITION CARD_BOOLEAN
 
 % maximum number of frames
+#ifndef CARD_FRAMEINDEX
 #define CARD_FRAMEINDEX $card_frameIndex
+#endif
 
 % allow transition or not?
 #define CARD_RULER CARD_BOOLEAN

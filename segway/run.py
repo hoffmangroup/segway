@@ -675,26 +675,6 @@ def find_overlaps(start, end, include_coords, exclude_coords):
     else:
         return find_overlaps_exclude(res, exclude_coords)
 
-def make_cpp_options(input_params_filename=None, output_params_filename=None,
-                     card_seg=None):
-    directives = {}
-
-    if input_params_filename:
-        directives["INPUT_PARAMS_FILENAME"] = input_params_filename
-
-    if output_params_filename:
-        directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
-
-    if card_seg is not None:
-        directives["CARD_SEG"] = card_seg
-
-    res = " ".join(CPP_DIRECTIVE_FMT % item for item in directives.iteritems())
-
-    if res:
-        return res
-
-    # default: return None
-
 def make_spec(name, items):
     header_lines = ["%s_IN_FILE inline" % name, str(len(items)), ""]
 
@@ -1159,6 +1139,27 @@ class Runner(object):
         res.max_frames = options.split_sequences
 
         return res
+
+    def make_cpp_options(self, input_params_filename=None,
+                         output_params_filename=None):
+        directives = {}
+
+        if input_params_filename:
+            directives["INPUT_PARAMS_FILENAME"] = input_params_filename
+
+        if output_params_filename:
+            directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
+
+        directives["CARD_SEG"] = self.num_segs
+        directives["CARD_FRAMEINDEX"] = self.max_frames
+
+        res = " ".join(CPP_DIRECTIVE_FMT % item
+                       for item in directives.iteritems())
+
+        if res:
+            return res
+
+        # default: return None
 
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
@@ -2800,8 +2801,7 @@ class Runner(object):
 
     def queue_train_parallel(self, input_params_filename, thread_index,
                              round_index, **kwargs):
-        kwargs["cppCommandOptions"] = make_cpp_options(input_params_filename,
-                                                       card_seg=self.num_segs)
+        kwargs["cppCommandOptions"] = self.make_cpp_options(input_params_filename)
 
         res = RestartableJobDict(self.session, self.job_log_file)
 
@@ -2832,9 +2832,8 @@ class Runner(object):
         acc_filename = self.make_acc_filename(thread_index,
                                               GMTK_INDEX_PLACEHOLDER)
 
-        cpp_options = make_cpp_options(input_params_filename,
-                                       output_params_filename,
-                                       card_seg=self.num_segs)
+        cpp_options = self.make_cpp_options(input_params_filename,
+                                       output_params_filename)
 
         last_chunk = self.num_chunks - 1
 
@@ -2918,7 +2917,7 @@ class Runner(object):
 
         self.set_triangulation_filename(num_segs)
 
-        cpp_options = make_cpp_options(card_seg=num_segs)
+        cpp_options = self.make_cpp_options()
         kwargs = dict(strFile=self.structure_filename,
                       cppCommandOptions=cpp_options,
                       outputTriangulatedFile=self.triangulation_filename,
@@ -3209,8 +3208,7 @@ class Runner(object):
         restartable_jobs.queue(restartable_job)
 
     def get_identify_kwargs(self, chunk_index, extra_kwargs):
-        cpp_command_options = make_cpp_options(self.params_filename,
-                                               card_seg=self.num_segs)
+        cpp_command_options = self.make_cpp_options(self.params_filename)
 
         res = dict(inputMasterFile=self.input_master_filename,
                    cppCommandOptions=cpp_command_options,
