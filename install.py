@@ -80,14 +80,21 @@ GMTK_VERSION_FILENAME = "gmtk.version"
 GMTK_USER = "segway"
 GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz"
 
+SEGWAY_USER = "comp"
+SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/segway-0.1.18.tar.gz"
+
+
 LSF_DRMAA_INSTALL_SCRIPT = """
 cd $tmpdir
-if [ ! -e $file ]; then wget $url -O $file; fi
+wget $url -O $file
 if [ ! -d $filebase ]; then tar -xzf $file; fi
 cd $filebase
 ./configure --prefix=$dir
 make
 make install
+cd ..
+rm -rf $filebase
+rm -f $file
 """
 
 # also has keywords: user, password, OPTFLAGS, ARCH_GCC, SSELEVEL
@@ -116,11 +123,20 @@ make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
 mkdir -p "$dir/etc"
 declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
 echo "$version" > "$dir/etc/gmtk.version"
+cd ..
+rm -rf $filebase
+rm -f $file
 """
 
 SEGWAY_INSTALL_SCRIPT = """
-cd $dir
+cd $tmpdir
+wget --user=$user --password=$password $url -O $file
+if [ ! -d $filebase ]; then tar -xzf $file; fi
+cd $filebase
 $python setup.py install
+cd ..
+rm -rf $filebase
+rm -f $file
 """
 
 ####################### BEGIN COMMON CODE BODY #####################
@@ -611,7 +627,7 @@ def _abort_skip_install(func, *args, **kwargs):
     """
     try:
         return func(*args, **kwargs)
-    except InstallationError, e:
+    except Exception, e:
         e_str = str(e)
         if e_str:
             print >>sys.stderr, "Error: %s" % e_str  # print any error message
@@ -690,7 +706,7 @@ def easy_install(progname, min_version=None):
                              " there is a subdirectory named %s at your"
                              " current path.") % progname
 
-    print >>sys.stderr, ">> %s" % cmd
+    print >>sys.stderr, ">> %s" % "".join(cmd)
     code = call(cmd, stdout=None, stderr=None)
 
     if code != 0:
@@ -897,7 +913,7 @@ def main(args=sys.argv[1:]):
 
     try:
         arch_home = setup_arch_home()
-        prompt_set_env(shell, "ARCHHOME", arch_home)
+        prompt_set_env(shell, "ARCHHOME", fix_path(arch_home))
 
         python_home, default_python_home = setup_python_home(arch_home)
         # Add python_home to PYTHONPATH
@@ -1048,23 +1064,20 @@ def install_gmtk(arch_home, *args, **kwargs):
     query = "\nALERT: GMTK source code is password protected.\
 \n[Username: %s] Password: " % GMTK_USER
     password = prompt_user(query)
-    progname = "GMTK"
     optflags = get_gmtk_optflags()
     env = {"OPTFLAGS": optflags}
-    return install_script(progname, arch_home, GMTK_INSTALL_SCRIPT,
+    return install_script("GMTK", arch_home, GMTK_INSTALL_SCRIPT,
                           url=GMTK_URL, user=GMTK_USER, password=password,
                           env=env, safe=True)
 
 def install_segway(*args, **kwargs):
-    query = "Where is the segway source located?"
-    segway_dir = prompt_path(query, default=".")
-    return install_script("segway", segway_dir, SEGWAY_INSTALL_SCRIPT)
+    query = "\nALERT: Segway source code is password protected.\
+\n[Username: %s] Password: " % SEGWAY_USER
+    password = prompt_user(query)
+    return install_script("segway", ".", SEGWAY_INSTALL_SCRIPT,
+                          url=SEGWAY_URL, user=SEGWAY_USER, password=password)
 
 ######################### OTHER FUNCTIONS ########################
-def get_password(progname=None):
-    query = "Please enter the segway source password"
-    return prompt_user(query)
-
 def get_gmtk_optflags():
     if "OPTFLAGS" in os.environ:
         return os.environ["OPTFLAGS"]
