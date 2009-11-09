@@ -699,14 +699,14 @@ def easy_install(progname, min_version=None):
 
     cmd = ["easy_install", progname.lower()]
     if min_version is not None:  # Add version requirement
-        cmd.append('"%s>=%s"' % (progname, min_version))
+        cmd.append('%s>=%s' % (progname, min_version))
 
     if os.path.isdir(progname):
         print >>sys.stderr, ("\nWarning: installation may fail because"
                              " there is a subdirectory named %s at your"
                              " current path.") % progname
 
-    print >>sys.stderr, ">> %s" % "".join(cmd)
+    print >>sys.stderr, ">> %s" % " ".join(cmd)
     code = call(cmd, stdout=None, stderr=None)
 
     if code != 0:
