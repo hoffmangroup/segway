@@ -3438,9 +3438,9 @@ def parse_options(args):
                          help="randomize start parameters NUM times"
                          " (default %d)" % RANDOM_STARTS)
 
-        group.add_option("-N", "--num-segs", type=slice,
+        group.add_option("-N", "--num-labels", type=slice,
                          default=NUM_SEGS, metavar="SLICE",
-                         help="make SLICE segment classes"
+                         help="make SLICE segment labels"
                          " (default %d)" % NUM_SEGS)
 
         group.add_option("--resolution", type=int,

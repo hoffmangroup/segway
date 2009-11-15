@@ -2,6 +2,7 @@
 
 * segway: now set CARD_FRAMEINDEX dynamically to allow for
   --split-sequences to change between train and identify
+* segway: --num-segs now called --num-labels
 * LSF: fix bug related to: now appends to output/error instead of overwriting
 
 0.1.18:

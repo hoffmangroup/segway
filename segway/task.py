@@ -169,7 +169,8 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
 
     lines = output.splitlines()
 
-    return parse_viterbi_save_bed(coord, resolution, lines, outfilename, num_labels)
+    return parse_viterbi_save_bed(coord, resolution, lines, outfilename,
+                                  num_labels)
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed}
