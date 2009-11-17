@@ -15,6 +15,8 @@ code.
 """
 import platform
 
+SEGWAY_VERSION = "0.1.20"
+
 ####################### BEGIN COMMON CODE HEADER #####################
 
 import os
@@ -80,8 +82,8 @@ GMTK_VERSION_FILENAME = "gmtk.version"
 GMTK_USER = "segway"
 GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz"
 
-SEGWAY_USER = "comp"
-SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/segway-0.1.20.tar.gz"
+SEGWAY_USER = "segway"
+SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/segway-%s.tar.gz" % SEGWAY_VERSION
 
 
 LSF_DRMAA_INSTALL_SCRIPT = """
