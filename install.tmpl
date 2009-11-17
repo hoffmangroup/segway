@@ -131,7 +131,8 @@ def main(args=sys.argv[1:]):
         prompt_test_packages(python_home)
 
         print >>sys.stderr, "\n============ Installation complete! ==========="
-
+        print >>sys.stderr, ("* Source your ~/.*rc file to update your"
+                             " environment *")
     finally:  # Clean up
         shell.close()
 
@@ -152,12 +153,7 @@ def get_segway_version():
         del sys.path[index]
 
     try:
-        try:
-            ref = pkg_resources.Requirement.parse("segway")
-            data = pkg_resources.working_set.find(ref)
-            return data.version
-        except (AttributeError, ImportError):
-            return None
+        return get_module_version("segway")
     finally:
         if index is not None:
             sys.path.insert(index, dir)
@@ -170,11 +166,7 @@ def get_drmaa_version():
     """Returns drmaa-python version as a string or None if not found or
     installed
     """
-    try:
-        import drmaa
-        return drmaa.__version__
-    except (AttributeError, ImportError):
-        return None
+    return get_module_version("drmaa")
 
 def get_gmtk_version():
     """Returns the version in the gmtk version file or None if not found"""
@@ -267,6 +259,13 @@ def install_segway(*args, **kwargs):
                           url=SEGWAY_URL, user=SEGWAY_USER, password=password)
 
 ######################### OTHER FUNCTIONS ########################
+def get_module_version(module_name):
+    try:
+        ref = pkg_resources.Requirement.parse(module_name)
+        return pkg_resources.working_set.find(ref).version
+    except AttributeError:
+        return None
+
 def get_gmtk_optflags():
     if "OPTFLAGS" in os.environ:
         return os.environ["OPTFLAGS"]
