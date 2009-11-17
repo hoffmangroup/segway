@@ -1123,7 +1123,7 @@ class Runner(object):
         res.user_native_spec = sum([opt.split(" ")
                                     for opt in options.cluster_opt], [])
 
-        res.num_segs = options.num_segs
+        res.num_segs = options.num_labels
 
         mem_usage_list = map(float, options.mem_usage.split(","))
 
