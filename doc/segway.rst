@@ -278,7 +278,7 @@ XXX cover all of these options.
                           use DIST distribution
       -r NUM, --random-starts=NUM
                           randomize start parameters NUM times (default 1)
-      -N SLICE, --num-segs=SLICE
+      -N SLICE, --num-labels=SLICE
                           make SLICE segment classes (default 2)
       --resolution=RES    downsample to every RES bp (default 1)
       --ruler-scale=SCALE
@@ -373,7 +373,12 @@ Troubleshooting
 ===============
 
 Look in the output/e files to see what the cause of the underlying
-error was. XXX
+error was. Also log/jobs.tab lists all the jobs and whether they
+reported an error (nonzero exit status) XXX
+
+Are you failing in the bundle jobs? This might be because an
+accumulator file (written by individual job) is corrupted or
+truncated. This can happen when you run out of disk space.
 
 Recovery during training
 ========================
