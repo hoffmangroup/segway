@@ -81,7 +81,7 @@ GMTK_USER = "segway"
 GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz"
 
 SEGWAY_USER = "comp"
-SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/segway-0.1.18.tar.gz"
+SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/segway-0.1.20.tar.gz"
 
 
 LSF_DRMAA_INSTALL_SCRIPT = """
