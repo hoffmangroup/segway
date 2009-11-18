@@ -24,12 +24,12 @@ import pkg_resources
 import sys
 
 from distutils.spawn import find_executable
-from distutils.version import LooseVersion
-from urllib import urlretrieve
+from pkg_resources import parse_version
 from site import addsitedir
 from string import Template
 from subprocess import call, PIPE, Popen
 from tempfile import gettempdir
+from urllib import urlretrieve
 
 assert sys.version_info >= (2, 4)
 
@@ -551,9 +551,7 @@ def parse_download_url(url):
             "program": program}
 
 def str2version(ver):  # string to version object
-    if ver.startswith("$Revision:"):
-        ver = ver.split()[1]  # Get revision number
-    return LooseVersion(ver)
+    return parse_version(ver)
 
 ##################### SPECIFIC PROGRAM INSTALLERS ################
 def prompt_install_hdf5(arch_home):
