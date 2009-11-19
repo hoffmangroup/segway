@@ -16,15 +16,18 @@ code.
 import platform
 
 SEGWAY_VERSION = "0.1.20"
+GMTK_VERSION = "20091016"
 
 ####################### BEGIN COMMON CODE HEADER #####################
 
+## Known issue: cannot deal with installing setuptools into the
+##   lib directory of the python installation (site.py conflict)
+
 import os
-import pkg_resources
 import sys
 
 from distutils.spawn import find_executable
-from pkg_resources import parse_version
+from distutils.version import LooseVersion
 from site import addsitedir
 from string import Template
 from subprocess import call, PIPE, Popen
@@ -36,11 +39,18 @@ assert sys.version_info >= (2, 4)
 MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
 
-HDF5_URL = "http://www.hdfgroup.org/ftp/HDF5/prev-releases/hdf5-1.8.2/src/hdf5-1.8.2.tar.gz"
+HDF5_URL = "http://www.hdfgroup.org/ftp/HDF5/prev-releases/hdf5-1.8.2/" \
+    "src/hdf5-1.8.2.tar.gz"
 EZ_SETUP_URL = "http://peak.telecommunity.com/dist/ez_setup.py"
 
 EASY_INSTALL_PROMPT = "May I install %s and dependencies?"
-HDF5_INSTALL_MESSAGE = "\nHDF5 is very large and installation usually takes 5-10 minutes. Please be patient.\nIt is common to see many warnings during compilation."
+HDF5_INSTALL_MESSAGE = "\nHDF5 is very large and installation usually takes" \
+    " 5-10 minutes. Please be patient.\nIt is common to see many warnings" \
+    " during compilation."
+SETUPTOOLS_INSTALL_PROMPT = "Unable to find setuptools." \
+" It is used to download and install many of this program's prerequisites" \
+" and handle versioning. May I download and install %s?"
+
 
 # Template for cfg file contents
 CFG_FILE_TEMPLATE = """
@@ -75,15 +85,17 @@ MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
 MIN_DRMAA_VERSION = "0.4a3"
 
-LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa\
-/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
+LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa" \
+    "/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
 
-GMTK_VERSION_FILENAME = "gmtk.version"
 GMTK_USER = "segway"
-GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz"
+GMTK_VERSION_FILENAME = "gmtk.version"
+GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/" \
+    "gmtk-%s.tar.gz" % GMTK_VERSION
 
 SEGWAY_USER = "segway"
-SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/segway-%s.tar.gz" % SEGWAY_VERSION
+SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
+    "segway-%s.tar.gz" % SEGWAY_VERSION
 
 
 LSF_DRMAA_INSTALL_SCRIPT = """
@@ -335,7 +347,12 @@ def setup_python_home(arch_home=None):
     python_home = fix_path(prompt_user(query, default_python_home))
     make_dir(python_home)
     addsitedir(python_home)  # Load already-installed packages/eggs
-    reload(pkg_resources)  # Update working set
+    try:
+        import pkg_resources
+        reload(pkg_resources)  # Update working set
+    except (ImportError, NameError):
+        pass
+
     return python_home, default_python_home
 
 def get_default_python_home(arch_home):
@@ -494,6 +511,32 @@ def write_pydistutils_cfg(cfg_file, arch_home,
         ofp.close()
 
 ########################### GET VERSION ########################
+def get_egg_version(module_name, *args, **kwargs):
+    """Generic version finder for installed eggs
+
+    Temporarily removed '.' from sys.path to prevent getting confused by
+    a version of the module in the current directory (but uninstalled).
+
+    Useful for if the <module>.__version__ is a revision number
+    or does not exist.
+
+    """
+    dir = os.getcwd()
+    index = None
+    if dir in sys.path:
+        index = sys.path.index(dir)
+        del sys.path[index]
+
+    try:
+        try:
+            ref = pkg_resources.Requirement.parse(module_name)
+            return pkg_resources.working_set.find(ref).version
+        except AttributeError:
+            return None
+    finally:
+        if index is not None:
+            sys.path.insert(index, dir)
+
 def get_hdf5_version():
     """Returns HDF5 version as string or None if not found or installed
 
@@ -530,7 +573,9 @@ def get_setuptools_version():
 
 def parse_download_url(url):
     """Returns a dict of URL components"""
+    components = {}
     dir, filename = os.path.split(url)
+
     # Remove extensions
     filebase = filename
     if filebase.endswith(".gz"):
@@ -540,35 +585,48 @@ def parse_download_url(url):
     if filebase.endswith(".tgz"):
         filebase = filebase[:-4]
 
-    assert "-" in filebase
     filebase_tokens = filebase.split("-")
-    version = filebase_tokens[-1]
-    program = "-".join(filebase_tokens[:-1])
-    return {"dirname": dir,
-            "file": filename,
-            "filebase": filebase,
-            "version": version,
-            "program": program}
+    # Try to extract version from filename
+    #(Assumes form: <progname>-<version>.<ext>)
+    if "-" in filebase:
+        components["version"] = filebase_tokens[-1]
+        components["program"] = "-".join(filebase_tokens[:-1])
+    else:
+        components["program"] = filebase
+
+    components["dirname"] = dir
+    components["file"] = filename
+    components["filebase"] = filebase
+    return components
 
 def str2version(ver):  # string to version object
-    return parse_version(ver)
+    # If setuptools installed, use its versioning; else, use distutils'
+    try:
+        return pkg_resources.parse_version(ver)
+    except NameError:
+        return LooseVersion(ver)
 
 ##################### SPECIFIC PROGRAM INSTALLERS ################
 def prompt_install_hdf5(arch_home):
     return _installer("HDF5", install_hdf5, get_hdf5_version,
-                      install_message=HDF5_INSTALL_MESSAGE, arch_home=arch_home,
-                      url=HDF5_URL)
+                      install_message=HDF5_INSTALL_MESSAGE,
+                      arch_home=arch_home, url=HDF5_URL)
 
 def prompt_install_numpy(min_version=MIN_NUMPY_VERSION):
     return _installer("Numpy", install_numpy, get_numpy_version,
                       min_version=min_version,
                       install_prompt=EASY_INSTALL_PROMPT)
 
-def install_hdf5(arch_home, *args, **kwargs):
+def prompt_install_setuptools(python_home):
+    return _installer("setuptools", install_setuptools, get_setuptools_version,
+                      url=EZ_SETUP_URL, python_home=python_home,
+                      install_prompt=SETUPTOOLS_INSTALL_PROMPT)
+
+def install_hdf5(arch_home, url=HDF5_URL, *args, **kwargs):
     hdf5_dir = prompt_install_path("HDF5", arch_home)
     make_dir(hdf5_dir)
     install_dir = install_script("HDF5", hdf5_dir, HDF5_INSTALL_SCRIPT,
-                                 url=HDF5_URL)
+                                 url=url)
     return install_dir
 
 def install_numpy(min_version=MIN_NUMPY_VERSION, *args, **kwargs):
@@ -586,6 +644,30 @@ def install_numpy(min_version=MIN_NUMPY_VERSION, *args, **kwargs):
             # Make sure variable didn't return, and then replace variable
             assert "LDFLAGS" not in os.environ
             os.environ["LDFLAGS"] = env_old
+
+def install_setuptools(python_home, url=EZ_SETUP_URL, *args, **kwargs):
+    # Download ez_setup.py
+    url_components = parse_download_url(url)
+    save_path = fix_path(os.path.join(python_home, url_components["file"]))
+    if not os.path.isfile(save_path):  # Avoid duplicate downloads
+        urlretrieve(EZ_SETUP_URL, save_path)
+
+    # Run ez_setup.py to download setuptools
+    from ez_setup import download_setuptools
+    setuptools_path = download_setuptools(to_dir=python_home, delay=0)
+
+    # Execute setuptools egg to install easy_install
+    command = ["sh", "%s" % setuptools_path, "--prefix=%s" % python_home]
+    print >>sys.stderr, ">> %s" % " ".join(command)
+    code = call(command)
+    if code != 0:
+        raise InstallationError("Installation of setuptools failed.")
+    else:
+        addsitedir(python_home)  # Load new-installed packages/eggs/site.py
+
+    # Import pkg_resources from setuptools
+    import pkg_resources
+    return True
 
 #################### GENERIC INSTALL METHODS ###################
 def _installer(progname, install_func, version_func=None,
@@ -680,22 +762,9 @@ def _check_install(progname, version_func, min_version=None, *args, **kwargs):
 def easy_install(progname, min_version=None):
     """Easy-installs the given program (can specifiy minimum version).
     """
-    if get_setuptools_version() == None:
-        query = ("Unable to find setuptools. This is necessary to install"
-                 " this program and many of its dependencies. May I"
-                 " download and install %s?")
-        permission = prompt_install("setuptools", install_prompt=query)
-        if permission:
-            try:
-                urlretrieve(EZ_SETUP_URL)
-                from ez_setup import use_setuptools
-                use_setuptools(delay=0)
-            except:
-                print >>sys.stderr, ("Error occurred while trying to"
-                                     " install setuptools")
-                raise InstallationError()
-        else:
-            raise InstallationError()
+    # Make sure easy_install (setuptools) is installed
+    if get_setuptools_version() is None:
+        raise InstallationError("Setuptools necessary for easy_install")
 
     cmd = ["easy_install", progname.lower()]
     if min_version is not None:  # Add version requirement
@@ -799,12 +868,14 @@ def prompt_test_pytables(*args, **kwargs):
 ########################## USER INTERACTION #######################
 def prompt_install(progname, install_prompt=None, url=None,
                    version=None, default="Y", *args, **kwargs):
+    info = None
     if version is not None:
         info = "%s %s" % (progname, version)
     elif url is not None:
         url_info = parse_download_url(url)
-        info = "%s %s" % (progname, url_info["version"])
-    else:
+        if version in url_info:
+            info = "%s %s" % (progname, url_info["version"])
+    if info is None:
         info = "%s" % progname
 
     if install_prompt is None:
@@ -912,6 +983,7 @@ def main(args=sys.argv[1:]):
     shell = ShellManager(shell_name)
 
     try:
+
         arch_home = setup_arch_home()
         prompt_set_env(shell, "ARCHHOME", fix_path(arch_home))
 
@@ -926,6 +998,8 @@ def main(args=sys.argv[1:]):
         # Maybe create pydistutils.cfg
         prompt_create_cfg(arch_home, python_home, default_python_home,
                           script_home, default_script_home)
+
+        prompt_install_setuptools(python_home)
 
         setup_hdf5_installation(shell, arch_home)
 
@@ -951,23 +1025,10 @@ def main(args=sys.argv[1:]):
 def get_segway_version():
     """Returns segway version as a string or None if not found or installed
 
-    Temporarily removes '.' from sys.path during installation to prevent
-    finding segway in current directory (but uninstalled)
-
     Since segway __version__ is currently a revision number, get the full
     number from pkg_resources
     """
-    dir = os.getcwd()
-    index = None
-    if dir in sys.path:
-        index = sys.path.index(dir)
-        del sys.path[index]
-
-    try:
-        return get_module_version("segway")
-    finally:
-        if index is not None:
-            sys.path.insert(index, dir)
+    return get_egg_version("segway")
 
 def is_lsf_drmaa_installed():
     """Returns True if library found, None otherwise."""
@@ -977,7 +1038,7 @@ def get_drmaa_version():
     """Returns drmaa-python version as a string or None if not found or
     installed
     """
-    return get_module_version("drmaa")
+    return get_egg_version("drmaa")
 
 def get_gmtk_version():
     """Returns the version in the gmtk version file or None if not found"""
@@ -1070,13 +1131,6 @@ def install_segway(*args, **kwargs):
                           url=SEGWAY_URL, user=SEGWAY_USER, password=password)
 
 ######################### OTHER FUNCTIONS ########################
-def get_module_version(module_name):
-    try:
-        ref = pkg_resources.Requirement.parse(module_name)
-        return pkg_resources.working_set.find(ref).version
-    except AttributeError:
-        return None
-
 def get_gmtk_optflags():
     if "OPTFLAGS" in os.environ:
         return os.environ["OPTFLAGS"]

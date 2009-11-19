@@ -16,6 +16,7 @@ code.
 import platform
 
 SEGWAY_VERSION = "0.1.20"
+GMTK_VERSION = "20091016"
 
 ${COMMON_CODE_HEADER}
 
@@ -23,15 +24,17 @@ MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
 MIN_DRMAA_VERSION = "0.4a3"
 
-LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa\
-/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
+LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa" \
+    "/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
 
-GMTK_VERSION_FILENAME = "gmtk.version"
 GMTK_USER = "segway"
-GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz"
+GMTK_VERSION_FILENAME = "gmtk.version"
+GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/" \
+    "gmtk-%s.tar.gz" % GMTK_VERSION
 
 SEGWAY_USER = "segway"
-SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/segway-%s.tar.gz" % SEGWAY_VERSION
+SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
+    "segway-%s.tar.gz" % SEGWAY_VERSION
 
 
 LSF_DRMAA_INSTALL_SCRIPT = """
@@ -101,6 +104,7 @@ def main(args=sys.argv[1:]):
     shell = ShellManager(shell_name)
 
     try:
+
         arch_home = setup_arch_home()
         prompt_set_env(shell, "ARCHHOME", fix_path(arch_home))
 
@@ -115,6 +119,8 @@ def main(args=sys.argv[1:]):
         # Maybe create pydistutils.cfg
         prompt_create_cfg(arch_home, python_home, default_python_home,
                           script_home, default_script_home)
+
+        prompt_install_setuptools(python_home)
 
         setup_hdf5_installation(shell, arch_home)
 
@@ -140,23 +146,10 @@ def main(args=sys.argv[1:]):
 def get_segway_version():
     """Returns segway version as a string or None if not found or installed
 
-    Temporarily removes '.' from sys.path during installation to prevent
-    finding segway in current directory (but uninstalled)
-
     Since segway __version__ is currently a revision number, get the full
     number from pkg_resources
     """
-    dir = os.getcwd()
-    index = None
-    if dir in sys.path:
-        index = sys.path.index(dir)
-        del sys.path[index]
-
-    try:
-        return get_module_version("segway")
-    finally:
-        if index is not None:
-            sys.path.insert(index, dir)
+    return get_egg_version("segway")
 
 def is_lsf_drmaa_installed():
     """Returns True if library found, None otherwise."""
@@ -166,7 +159,7 @@ def get_drmaa_version():
     """Returns drmaa-python version as a string or None if not found or
     installed
     """
-    return get_module_version("drmaa")
+    return get_egg_version("drmaa")
 
 def get_gmtk_version():
     """Returns the version in the gmtk version file or None if not found"""
@@ -259,13 +252,6 @@ def install_segway(*args, **kwargs):
                           url=SEGWAY_URL, user=SEGWAY_USER, password=password)
 
 ######################### OTHER FUNCTIONS ########################
-def get_module_version(module_name):
-    try:
-        ref = pkg_resources.Requirement.parse(module_name)
-        return pkg_resources.working_set.find(ref).version
-    except AttributeError:
-        return None
-
 def get_gmtk_optflags():
     if "OPTFLAGS" in os.environ:
         return os.environ["OPTFLAGS"]
