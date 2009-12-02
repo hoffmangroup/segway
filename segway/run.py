@@ -903,7 +903,8 @@ class RestartableJobDict(dict):
         return dict.__init__(self, *args, **kwargs)
 
     def calc_sleep_time(self):
-        clean_safe_sleep_time = CLEAN_SAFE_TIME / len(self)
+        # +1 is to avoid dividing by zero when len(self) is 0
+        clean_safe_sleep_time = CLEAN_SAFE_TIME / (len(self)+1)
         sleep_time = min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
 
     def is_sleep_time_gt_min(self):
