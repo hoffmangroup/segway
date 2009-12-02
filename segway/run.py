@@ -3037,37 +3037,6 @@ class Runner(object):
         return (info_criterion, self.num_segs, self.input_master_filename,
                 self.last_params_filename, self.log_likelihood_filename)
 
-    def wait_job(self, jobid, kill_jobids=[]):
-        """
-        wait for bundle to finish
-        """
-        job_info = None
-        session = self.session
-        interrupt_event = self.interrupt_event
-
-        while not job_info:
-            job_info = session.wait(jobid, session.TIMEOUT_WAIT_FOREVER)
-
-            # if there is a nonzero exit status
-
-            # XXX: Change after drmaa is fixed:
-            # http://code.google.com/p/drmaa-python/issues/detail?id=4
-            if int(float(job_info.resourceUsage["exit_status"])):
-                if self.keep_going:
-                    return False
-                else:
-                    interrupt_event.set()
-                    raise ValueError("job failed")
-
-            if interrupt_event.isSet():
-                for jobid in kill_jobids + [jobid]:
-                    try:
-                        print >>sys.stderr, "killing job %s" % jobid
-                        session.control(jobid, TERMINATE)
-                    except BaseException, err:
-                        print >>sys.stderr, ("ignoring exception: %r" % err)
-                raise KeyboardInterrupt
-
     def run_train(self):
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
 
