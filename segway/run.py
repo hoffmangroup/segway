@@ -17,6 +17,7 @@ from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
+from heapq import heappop, heappush
 from itertools import count, izip, repeat
 from math import ceil, floor, frexp, ldexp, log, log10
 from operator import neg
@@ -349,12 +350,13 @@ DONE = JobState.DONE
 # CLEAN_PERIOD in lsb.params, after which jobs are removed from
 # mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
 # error
-# XXX: check lsb.params for real value
+# XXX: check lsb.params for real value of CLEAN_PERIOD
 CLEAN_SAFE_TIME = int(3600 * 0.5)
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
-JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
+MIN_JOB_WAIT_SLEEP_TIME = 5 # min time to wait between checking job status
+MAX_JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
 
 RESOLUTION = 1
 
@@ -852,6 +854,10 @@ class RestartableJob(object):
         self.global_mem_usage = global_mem_usage
         self.mem_usage_key = mem_usage_key
 
+        # (-num_segs, -num_frames) so minimum value will be largest
+        # num_segs, num_frames
+        self.sort_key = (-mem_usage_key[1], -mem_usage_key[2])
+
     def run(self):
         job_tmpl_factory = self.job_tmpl_factory
 
@@ -892,17 +898,37 @@ class RestartableJobDict(dict):
     def __init__(self, session, job_log_file, *args, **kwargs):
         self.session = session
         self.job_log_file = job_log_file
+        self.unqueued_jobs = []
 
         return dict.__init__(self, *args, **kwargs)
+
+    def calc_sleep_time(self):
+        clean_safe_sleep_time = CLEAN_SAFE_TIME / len(self)
+        sleep_time = min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
+
+    def is_sleep_time_gt_min(self):
+        return self.calc_sleep_time() > MIN_JOB_WAIT_SLEEP_TIME
+
+    def _queue_unconditional(self, restartable_job):
+        """queue unconditionally; don't do any checks"""
+        jobid = restartable_job.run()
+        self[jobid] = restartable_job
 
     def queue(self, restartable_job):
         # handle dry run case
         if restartable_job is None:
             return
 
-        jobid = restartable_job.run()
+        # protect against queuing more jobs than I want to poll
+        if self.is_sleep_time_gt_min():
+            self._queue_unconditional(restartable_job)
+        else:
+            sort_key = restartable_job.sort_key
+            heappush(self.unqueued_jobs, (sort_key, restartable_job))
 
-        self[jobid] = restartable_job
+    def queue_unqueued_jobs(self):
+        while self.unqueued_jobs and self.is_sleep_time_gt_min():
+            self._queue_unconditional(heappop(self.unqueued_jobs)[1])
 
     def wait(self):
         session = self.session
@@ -912,10 +938,7 @@ class RestartableJobDict(dict):
         while jobids:
             # check each job individually
             for jobid in jobids:
-                clean_safe_sleep_time = CLEAN_SAFE_TIME / len(self)
-                sleep_time = min(clean_safe_sleep_time, JOB_WAIT_SLEEP_TIME)
-
-                sleep(sleep_time)
+                sleep(self.calc_sleep_time())
 
                 try:
                     job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
@@ -936,6 +959,8 @@ class RestartableJobDict(dict):
                     # this happens when the exit status is unknown
                     exit_status = "noExit"
 
+                # if the job queue is already full, this will probably
+                # result in the job going to unqueued jobs for now
                 if exit_status != 0:
                     self.queue(self[jobid])
 
@@ -957,6 +982,8 @@ class RestartableJobDict(dict):
                 self.job_log_file.flush() # allow reading file now
 
                 del self[jobid]
+
+                self.queue_unqueued_jobs()
 
                 # XXX: should be able to check
                 # session.jobStatus(jobid) but this has problems
