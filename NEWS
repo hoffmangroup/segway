@@ -1,6 +1,9 @@
 0.1.20:
 
-
+* segway: limits the number of jobs dumped into the queuing system at
+  once to avoid overloading it
+* segway-task: bugfix: won't throw a nested exception when temporary
+  files were not created
 
 0.1.19:
 

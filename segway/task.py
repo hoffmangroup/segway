@@ -9,6 +9,7 @@ __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
 
+from errno import ENOENT
 import re
 import sys
 
@@ -164,8 +165,17 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
 
         output = VITERBI_PROG.getoutput(*args)
     finally:
-        path(float_filename).remove()
-        path(int_filename).remove()
+        # don't raise a nested exception of the file was never created
+        try:
+            path(float_filename).remove()
+        except OSError, err:
+            if err.errno == ENOENT:
+                pass
+        try:
+            path(int_filename).remove()
+        except OSError, err:
+            if err.errno == ENOENT:
+                pass
 
     lines = output.splitlines()
 
