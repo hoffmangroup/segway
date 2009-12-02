@@ -858,6 +858,9 @@ class RestartableJob(object):
         # num_segs, num_frames
         self.sort_key = (-mem_usage_key[1], -mem_usage_key[2])
 
+    def __repr__(self):
+        return "<RestartableJob '%s'>" % self.job_tmpl_factory.template.jobName
+
     def run(self):
         job_tmpl_factory = self.job_tmpl_factory
 
@@ -905,7 +908,8 @@ class RestartableJobDict(dict):
     def calc_sleep_time(self):
         # +1 is to avoid dividing by zero when len(self) is 0
         clean_safe_sleep_time = CLEAN_SAFE_TIME / (len(self)+1)
-        sleep_time = min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
+
+        return min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
 
     def is_sleep_time_gt_min(self):
         return self.calc_sleep_time() > MIN_JOB_WAIT_SLEEP_TIME
