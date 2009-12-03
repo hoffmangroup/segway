@@ -148,7 +148,7 @@ def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename
 
 def replace_args_filelistname(args, temp_filepaths, ext):
     option = EXT_OPTIONS[ext]
-    filelistname_index = args.index[option] + 1
+    filelistname_index = args.index(option) + 1
     filelistpath = make_filelistpath(TEMP_DIRPATH, ext)
 
     # side-effect on args, temp_filepaths
