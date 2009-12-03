@@ -78,7 +78,7 @@ class _JobTemplateFactory(object):
         wrap args with segway-wrapper.sh
         """
         # ulimit args are in kibibytes
-        mem_limit_kb = calc_mem_limit(self.mem_limit) // KB
+        mem_limit_kb = str(calc_mem_limit(self.mem_limit) // KB)
         wrapper_cmdline = [BASH_CMD, data_filename(RES_WRAPPER), mem_limit_kb]
 
         return wrapper_cmdline + self.args
