@@ -12,13 +12,15 @@ __version__ = "$Revision$"
 from errno import ENOENT
 import re
 import sys
+from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import array, zeros
 from path import path
 
-from ._util import (DTYPE_IDENTIFY, find_segment_starts, get_label_color,
-                    _make_continuous_cells, _save_observations_chunk,
+from ._util import (DTYPE_IDENTIFY, EXT_FLOAT, EXT_INT, 
+                    find_segment_starts, get_label_color,
+                    _make_continuous_cells, make_filelistpath, _save_observations_chunk,
                     VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
@@ -28,6 +30,12 @@ BED_STRAND = "."
 
 SCORE_MIN = 100
 SCORE_MAX = 1000
+
+TEMP_DIRPATH = path(gettempdir())
+
+EXT_OPTIONS = {}
+EXT_OPTIONS[EXT_INT] = "-of1"
+EXT_OPTIONS[EXT_FLOAT] = "-of2"
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
@@ -138,18 +146,41 @@ def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename
     return parse_viterbi_save_bed(coord, resolution, lines, outfilename,
                                   num_labels)
 
+def replace_args_filelistname(args, temp_filepaths, ext):
+    option = EXT_OPTIONS[ext]
+    filelistname_index = args.index[option] + 1
+    filelistpath = make_filelistpath(TEMP_DIRPATH, ext)
+
+    # side-effect on args, temp_filepaths
+    args[filelistname_index] = str(filelistpath)
+    temp_filepaths.append(filelistpath)
+
+    return filelistpath
+
+def print_to_filename(filename, line):
+    with open(filename, "w") as outfile:
+        print >>outfile, line
+
 def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
                          genomedata_dirname, float_filename, int_filename,
                          distribution, track_indexes_text, *args):
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
 
-    # XXX: it would be best if the name were chosen now rather than
-    # storing a bunch of /tmp files and using dcdrng
-
     (chrom, start, end) = coord
 
     track_indexes = make_track_indexes(track_indexes_text)
+
+    float_filepath = TEMP_DIRPATH / float_filename
+    int_filepath = TEMP_DIRPATH / int_filename
+
+    temp_filepaths = [float_filepath, int_filepath]
+
+    # XXX: should do something to ensure of1 matches with int, of2 with float
+    # XXX: use mktemp to eliminate race conditions
+    int_filelistpath = replace_args_filelistname(args, temp_filepaths, EXT_INT)
+    float_filelistpath = replace_args_filelistname(args, temp_filepaths,
+                                                   EXT_FLOAT)
 
     with Genome(genomedata_dirname) as genome:
         supercontigs = genome[chrom].supercontigs[start:end]
@@ -160,22 +191,26 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
                                                   track_indexes)
 
     try:
+        print_to_filename(float_filelistpath, float_filename)
+        print_to_filename(int_filelistpath, int_filename)
+
         _save_observations_chunk(float_filename, int_filename,
                                  continuous_cells, resolution, distribution)
 
+        # XXXopt: does this work? or do we need to use a subprocess to
+        # do the loading?
+        # remove from memory
+        del continuous_cells
+
         output = VITERBI_PROG.getoutput(*args)
     finally:
-        # don't raise a nested exception of the file was never created
-        try:
-            path(float_filename).remove()
-        except OSError, err:
-            if err.errno == ENOENT:
-                pass
-        try:
-            path(int_filename).remove()
-        except OSError, err:
-            if err.errno == ENOENT:
-                pass
+        for filepath in temp_filepaths:
+            # don't raise a nested exception if the file was never created
+            try:
+                filepath.remove()
+            except OSError, err:
+                if err.errno == ENOENT:
+                    pass
 
     lines = output.splitlines()
 

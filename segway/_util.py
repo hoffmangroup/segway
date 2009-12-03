@@ -40,6 +40,10 @@ except NameError:
 
 PKG_DATA = ".".join([PKG, "data"])
 
+EXT_LIST = "list"
+EXT_INT = "int"
+EXT_FLOAT = "float32"
+
 SUFFIX_GZ = extsep + EXT_GZ
 
 DTYPE_IDENTIFY = intc
@@ -80,6 +84,9 @@ OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
 
 VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
+
+def extjoin(*args):
+    return extsep.join(args)
 
 # NamedTemporaryDir is based somewhat on Python 2.5.2
 # tempfile._TemporaryFileWrapper
@@ -350,6 +357,9 @@ def _make_continuous_cells(supercontig, start, end, track_indexes):
 
     # extract only the tracks that are used correct for min_col offset
     return rows[..., track_indexes - min_col]
+
+def make_filelistpath(dirpath, ext):
+    return dirpath / extjoin(ext, EXT_LIST)
 
 def main(args=sys.argv[1:]):
     pass

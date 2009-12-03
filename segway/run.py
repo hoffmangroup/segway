@@ -46,11 +46,12 @@ from .bed import read_native
 from .cluster import Session, JobTemplateFactory, make_native_spec
 from ._util import (ceildiv, data_filename, data_string,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
-                    DISTRIBUTION_ASINH_NORMAL, EXT_GZ, GB, get_chrom_coords,
-                    get_label_color, gzip_open, is_empty_array, ISLAND_BASE_NA,
-                    ISLAND_LST_NA, load_coords, _make_continuous_cells, MB,
-                    NamedTemporaryDir, OptionBuilder_GMTK, PKG,
-                    _save_observations_chunk, VITERBI_PROG)
+                    DISTRIBUTION_ASINH_NORMAL, EXT_FLOAT, EXT_GZ, EXT_INT,
+                    extjoin, GB, get_chrom_coords, get_label_color, gzip_open,
+                    is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
+                    _make_continuous_cells, make_filelistpath, MB, NamedTemporaryDir,
+                    OptionBuilder_GMTK, PKG, _save_observations_chunk,
+                    VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
@@ -88,8 +89,6 @@ MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
 MAX_CHUNKS = 1000
-
-TEMP_DIRPATH = path("/tmp")
 
 ISLAND = True
 
@@ -170,7 +169,6 @@ NAME_BUNDLE_PLACEHOLDER = "bundle"
 
 # programs
 ENV_CMD = "/usr/bin/env"
-BASH_CMD = "bash"
 
 # XXX: need to differentiate this (prog) from prog.prog == progname throughout
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
@@ -179,16 +177,10 @@ POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 
 SPECIAL_TRACKNAMES = ["dinucleotide", "supervisionLabel"]
 
-def extjoin(*args):
-    return extsep.join(args)
-
 # extensions and suffixes
 EXT_BED = "bed"
 EXT_BIN = "bin"
 EXT_LIKELIHOOD = "ll"
-EXT_LIST = "list"
-EXT_FLOAT = "float32"
-EXT_INT = "int"
 EXT_LOG = "log"
 EXT_OUT = "out"
 EXT_PARAMS = "params"
@@ -220,7 +212,6 @@ PREFIX_JOB_NAME_TRAIN = "emt"
 PREFIX_JOB_NAME_VITERBI = "vit"
 PREFIX_JOB_NAME_POSTERIOR = "jt"
 
-SUFFIX_LIST = extsep + EXT_LIST
 SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
@@ -252,7 +243,6 @@ RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
 RES_SEG_TABLE = "seg_table.tab"
-RES_WRAPPER = "segway-wrapper.sh"
 
 DIRICHLET_FRAG = "dirichlet_segCountDown_seg_segTransition" \
     " 3 CARD_SEGCOUNTDOWN CARD_SEG CARD_SEGTRANSITION"
@@ -1482,7 +1472,7 @@ class Runner(object):
             self.make_subdir(subdirname)
 
     def make_obs_filelistpath(self, ext):
-        return self.obs_dirpath / extjoin(ext, EXT_LIST)
+        return make_filelistpath(self.obs_dirpath, ext)
 
     def make_obs_dir(self):
         obs_dirname = self.obs_dirname
@@ -1512,7 +1502,6 @@ class Runner(object):
         prefix = prefix_feature_tmpl % chunk_index
 
         if temp:
-            dirpath = TEMP_DIRPATH
             prefix = "".join([prefix, UUID, extsep])
         else:
             dirpath = self.obs_dirpath
@@ -2772,14 +2761,13 @@ class Runner(object):
     def queue_gmtk(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
-        wrapper_cmdline = [BASH_CMD, data_filename(RES_WRAPPER)]
 
         if prefix_args:
             # remove the command name itself from the passed arguments
             # XXX: this is ugly
-            args = wrapper_cmdline + prefix_args + gmtk_cmdline[1:]
+            args = prefix_args + gmtk_cmdline[1:]
         else:
-            args = wrapper_cmdline + gmtk_cmdline
+            args = gmtk_cmdline
 
         self.log_cmdline(gmtk_cmdline, args)
 
@@ -3213,7 +3201,6 @@ class Runner(object):
 
         res = dict(inputMasterFile=self.input_master_filename,
                    cppCommandOptions=cpp_command_options,
-                   dcdrng=chunk_index,
                    cliqueTableNormalize="0.0",
                    **self.make_gmtk_kwargs())
 

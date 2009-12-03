@@ -2,6 +2,8 @@
 
 * segway: limits the number of jobs dumped into the queuing system at
   once to avoid overloading it
+* segway: increase robustness by adding a ulimit wrapper script to
+  explicitly limit the memory used for each job and erase temporary files
 * segway-task: bugfix: won't throw a nested exception when temporary
   files were not created
 
