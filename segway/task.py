@@ -164,6 +164,8 @@ def print_to_filename(filename, line):
 def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
                          genomedata_dirname, float_filename, int_filename,
                          distribution, track_indexes_text, *args):
+    # convert from tuple
+    args = list(args)
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
 
