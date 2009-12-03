@@ -18,9 +18,9 @@ from genomedata import Genome
 from numpy import array, zeros
 from path import path
 
-from ._util import (DTYPE_IDENTIFY, EXT_FLOAT, EXT_INT, 
+from ._util import (DTYPE_IDENTIFY, EXT_FLOAT, EXT_INT, EXT_LIST,
                     find_segment_starts, get_label_color,
-                    _make_continuous_cells, make_filelistpath, _save_observations_chunk,
+                    _make_continuous_cells, _save_observations_chunk,
                     VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
@@ -149,7 +149,7 @@ def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename
 def replace_args_filelistname(args, temp_filepaths, ext):
     option = EXT_OPTIONS[ext]
     filelistname_index = args.index(option) + 1
-    filelistpath = make_filelistpath(TEMP_DIRPATH, ext)
+    filelistpath = mkstemp(EXT_LIST, ext)
 
     # side-effect on args, temp_filepaths
     args[filelistname_index] = str(filelistpath)
@@ -179,7 +179,6 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
     temp_filepaths = [float_filepath, int_filepath]
 
     # XXX: should do something to ensure of1 matches with int, of2 with float
-    # XXX: use mktemp to eliminate race conditions
     int_filelistpath = replace_args_filelistname(args, temp_filepaths, EXT_INT)
     float_filelistpath = replace_args_filelistname(args, temp_filepaths,
                                                    EXT_FLOAT)
