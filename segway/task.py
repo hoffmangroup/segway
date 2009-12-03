@@ -10,6 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
 
 from errno import ENOENT
+from os import fdopen
 import re
 import sys
 from tempfile import gettempdir, mkstemp
@@ -149,16 +150,17 @@ def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename
 def replace_args_filelistname(args, temp_filepaths, ext):
     option = EXT_OPTIONS[ext]
     filelistname_index = args.index(option) + 1
-    filelistpath = mkstemp(EXT_LIST, ext)
+    fd, filelistname = mkstemp(EXT_LIST, ext)
+    filelistpath = path(filelistname)
 
     # side-effect on args, temp_filepaths
-    args[filelistname_index] = str(filelistpath)
+    args[filelistname_index] = filelistname
     temp_filepaths.append(filelistpath)
 
-    return filelistpath
+    return fd
 
-def print_to_filename(filename, line):
-    with open(filename, "w") as outfile:
+def print_to_fd(fd, line):
+    with fdopen(fd, "w") as outfile:
         print >>outfile, line
 
 def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
@@ -179,8 +181,8 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
     temp_filepaths = [float_filepath, int_filepath]
 
     # XXX: should do something to ensure of1 matches with int, of2 with float
-    int_filelistpath = replace_args_filelistname(args, temp_filepaths, EXT_INT)
-    float_filelistpath = replace_args_filelistname(args, temp_filepaths,
+    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
+    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                    EXT_FLOAT)
 
     with Genome(genomedata_dirname) as genome:
@@ -192,8 +194,8 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
                                                   track_indexes)
 
     try:
-        print_to_filename(float_filelistpath, float_filename)
-        print_to_filename(int_filelistpath, int_filename)
+        print_to_fd(float_filelistfd, float_filename)
+        print_to_fd(int_filelistfd, int_filename)
 
         _save_observations_chunk(float_filename, int_filename,
                                  continuous_cells, resolution, distribution)
