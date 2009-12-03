@@ -12,7 +12,7 @@ __version__ = "$Revision$"
 from errno import ENOENT
 import re
 import sys
-from tempfile import gettempdir
+from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
 from numpy import array, zeros
