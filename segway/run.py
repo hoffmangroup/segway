@@ -26,6 +26,7 @@ import re
 from shutil import copy2
 from string import Template
 import sys
+from tempfile import gettempdir
 from threading import Event, Lock, Thread
 from time import sleep
 from uuid import uuid1
@@ -1503,6 +1504,7 @@ class Runner(object):
 
         if temp:
             prefix = "".join([prefix, UUID, extsep])
+            dirpath = path(gettempdir())
         else:
             dirpath = self.obs_dirpath
 
