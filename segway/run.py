@@ -346,8 +346,10 @@ CLEAN_SAFE_TIME = int(3600 * 0.5)
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
-MIN_JOB_WAIT_SLEEP_TIME = 5 # min time to wait between checking job status
+MIN_JOB_WAIT_SLEEP_TIME = 3 # min time to wait between checking job status
 MAX_JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
+
+# these settings limit job queueing to 360 at once
 
 RESOLUTION = 1
 
@@ -1044,6 +1046,7 @@ class Runner(object):
 
         self.params_filename = None # actual params filename for this instance
         self.params_filenames = None # list of possible params filenames
+        self.old_dirname = None
         self.dirname = None
         self.is_dirname_temp = False
         self.log_likelihood_filename = None
@@ -1113,6 +1116,7 @@ class Runner(object):
 
         res.genomedata_dirname = args[0]
         res.dirname = options.directory
+        res.old_dirname = options.old_directory
         res.obs_dirname = options.observations
         res.bed_filename = options.bed
 
@@ -2427,16 +2431,25 @@ class Runner(object):
         self.output_master_filename = self.save_resource(RES_OUTPUT_MASTER,
                                                          SUBDIRNAME_PARAMS)
 
-    def make_viterbi_filenames(self):
-        dirpath = self.dirpath / SUBDIRNAME_VITERBI
+    def _make_viterbi_filenames(self, dirpath):
+        viterbi_dirpath = dirpath / SUBDIRNAME_VITERBI
         num_chunks = self.num_chunks
 
         viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_chunks)
                                 + EXT_BED)
-        viterbi_filenames = [dirpath / viterbi_filename_fmt % index
-                             for index in xrange(num_chunks)]
+        return [viterbi_dirpath / viterbi_filename_fmt % index
+                for index in xrange(num_chunks)]
 
-        self.viterbi_filenames = viterbi_filenames
+    def make_viterbi_filenames(self):
+        self.viterbi_filenames = \
+            self._make_viterbi_filenames(self.dirpath)
+
+        old_dirpath = self.old_dirpath
+        if old_dirpath:
+            self.old_viterbi_filenames = \
+                self._make_viterbi_filenames(old_dirpath)
+        else:
+            self.old_viterbi_filenames = None
 
     def make_posterior_filenames(self):
         make_posterior_filename = self.make_posterior_filename
@@ -3164,6 +3177,41 @@ class Runner(object):
         for name, src_filename, dst_filename in zipper:
             self.copy_results(name, src_filename, dst_filename)
 
+    def is_viterbi_chunk_complete(self, chunk_index):
+        old_filenames = self.old_viterbi_filenames
+        if not old_filenames:
+            return False
+
+        old_filename = old_filenames[chunk_index]
+        try:
+            with open(old_filename) as oldfile:
+                lines = oldfile.readlines()
+        except OSError, err:
+            if err.errno == ENOENT:
+                return False
+            else:
+                raise
+
+        chunk_coords = self.chunk_coords[chunk_index]
+        (chunk_chrom, chunk_start, chunk_end) = chunk_coords
+
+        # XXX: duplicative
+        row, line_coords = parse_bed4(lines[0])
+        (line_chrom, line_start, line_end, seg) = line_coords
+        if line_chrom != chunk_chrom or line_start != chunk_start:
+            return False
+
+        row, line_coords = parse_bed4(lines[-1])
+        (line_chrom, line_start, line_end, seg) = line_coords
+        if line_chrom != chunk_chrom or line_end != chunk_end:
+            return False
+
+        # copy the old filename to where the job's output would have
+        # landed
+        path(old_filename).copy2(self.viterbi_filenames[chunk_index])
+
+        return True
+
     def _queue_identify(self, restartable_jobs, chunk_index, prefix_job_name,
                         prog, kwargs, output_filenames):
         prog = self.prog_factory(prog)
@@ -3219,6 +3267,7 @@ class Runner(object):
         self.make_posterior_filenames()
 
         viterbi_filenames = self.viterbi_filenames
+        old_viterbi_filenames = self.old_viterbi_filenames
         posterior_filenames = self.posterior_filenames
 
         # -: standard output, processed by segway-task
@@ -3241,7 +3290,8 @@ class Runner(object):
                 queue_identify_custom = partial(self._queue_identify,
                                                 restartable_jobs, chunk_index)
 
-                if self.identify:
+                if (self.identify
+                    and not self.is_viterbi_chunk_complete(chunk_index)):
                     queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
                                           VITERBI_PROG, viterbi_kwargs,
                                           viterbi_filenames)
@@ -3275,6 +3325,12 @@ class Runner(object):
         # XXXopt: use binary I/O to gmtk rather than ascii for parameters
 
         self.dirpath = path(self.dirname)
+
+        old_dirname = self.old_dirname
+        if old_dirname:
+            self.old_dirpath = path(old_dirname)
+        else:
+            self.old_dirpath = None
 
         self.make_subdir(SUBDIRNAME_LOG)
         cmdline_short_filename = self.make_filename(PREFIX_CMDLINE_SHORT,
@@ -3416,7 +3472,11 @@ def parse_options(args):
                           help="use or create observations in DIR")
 
         group.add_option("-d", "--directory", metavar="DIR",
-                          help="create all other files in DIR")
+                         help="create all other files in DIR")
+
+        group.add_option("--old-directory", metavar="DIR",
+                         help="continue from interrupted run in DIR"
+                         " (identify only)")
 
     with OptionGroup(parser, "Variables") as group:
         group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,

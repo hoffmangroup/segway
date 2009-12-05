@@ -10,7 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
 
 from errno import ENOENT
-from os import fdopen
+from os import extsep, fdopen
 import re
 import sys
 from tempfile import gettempdir, mkstemp
@@ -150,7 +150,7 @@ def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename
 def replace_args_filelistname(args, temp_filepaths, ext):
     option = EXT_OPTIONS[ext]
     filelistname_index = args.index(option) + 1
-    fd, filelistname = mkstemp(EXT_LIST, ext)
+    fd, filelistname = mkstemp(EXT_LIST + extsep, extsep + ext)
     filelistpath = path(filelistname)
 
     # side-effect on args, temp_filepaths
