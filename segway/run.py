@@ -3198,12 +3198,12 @@ class Runner(object):
         # XXX: duplicative
         row, line_coords = parse_bed4(lines[0])
         (line_chrom, line_start, line_end, seg) = line_coords
-        if line_chrom != chunk_chrom or line_start != chunk_start:
+        if line_chrom != chunk_chrom or int(line_start) != chunk_start:
             return False
 
         row, line_coords = parse_bed4(lines[-1])
         (line_chrom, line_start, line_end, seg) = line_coords
-        if line_chrom != chunk_chrom or line_end != chunk_end:
+        if line_chrom != chunk_chrom or int(line_end) != chunk_end:
             return False
 
         # copy the old filename to where the job's output would have
