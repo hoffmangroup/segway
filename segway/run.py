@@ -3186,7 +3186,7 @@ class Runner(object):
         try:
             with open(old_filename) as oldfile:
                 lines = oldfile.readlines()
-        except OSError, err:
+        except IOError, err:
             if err.errno == ENOENT:
                 return False
             else:
@@ -3209,6 +3209,8 @@ class Runner(object):
         # copy the old filename to where the job's output would have
         # landed
         path(old_filename).copy2(self.viterbi_filenames[chunk_index])
+
+        print >>sys.stderr, "chunk %d already complete" % chunk_index
 
         return True
 
