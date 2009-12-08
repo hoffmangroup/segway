@@ -15,7 +15,7 @@ code.
 """
 import platform
 
-SEGWAY_VERSION = "0.1.20"
+PKG_VERSION = "0.1.20"
 GMTK_VERSION = "20091016"
 
 ####################### BEGIN COMMON CODE HEADER #####################
