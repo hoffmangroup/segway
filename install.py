@@ -15,7 +15,7 @@ code.
 """
 import platform
 
-PKG_VERSION = "0.1.20"
+PKG_VERSION = "0.1.21"
 GMTK_VERSION = "20091016"
 
 ####################### BEGIN COMMON CODE HEADER #####################
@@ -95,7 +95,7 @@ GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/" \
 
 SEGWAY_USER = "segway"
 SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
-    "segway-%s.tar.gz" % SEGWAY_VERSION
+    "segway-%s.tar.gz" % PKG_VERSION
 
 
 LSF_DRMAA_INSTALL_SCRIPT = """

@@ -397,6 +397,16 @@ The new training run will start over with round index 0 for all
 threads, so the usual maximum of 100 rounds will take place after
 another 100 rounds rather than from the initial start.
 
+In the future, this will be replaced with :option:`--old-directory`\=\
+*dirname*.
+
+Recovery during identify
+========================
+The :option:`--old-directory`\=\ *dirname* allows recovery from an
+interrupted identify task.
+
+XXX
+
 Python interface
 ================
 I have designed Segway such that eventually one may call different
