@@ -355,6 +355,8 @@ RESOLUTION = 1
 
 INDEX_BED_START = 1
 
+SEGTRANSITION_WEIGHT_SCALE = 1.0
+
 ## exceptions
 class ChunkOverMemUsageLimit(Exception):
     pass
@@ -1137,6 +1139,7 @@ class Runner(object):
         res.distribution = options.distribution
         res.random_starts = options.random_starts
         res.len_seg_strength = options.prior_strength
+        res.segtransition_weight_scale = options.segtransition_weight_scale
         res.ruler_scale = options.ruler_scale
         res.resolution = options.resolution
 
@@ -1179,6 +1182,8 @@ class Runner(object):
 
         directives["CARD_SEG"] = self.num_segs
         directives["CARD_FRAMEINDEX"] = self.max_frames
+        directives["SEGTRANSITION_WEIGHT_SCALE"] = \
+            self.segtransition_weight_scale
 
         res = " ".join(CPP_DIRECTIVE_FMT % item
                        for item in directives.iteritems())
@@ -3480,7 +3485,7 @@ def parse_options(args):
                          help="continue from interrupted run in DIR"
                          " (identify only)")
 
-    with OptionGroup(parser, "Variables") as group:
+    with OptionGroup(parser, "Modeling variables") as group:
         group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
                          metavar="DIST", default=DISTRIBUTION_DEFAULT,
                          help="use DIST distribution")
@@ -3511,6 +3516,12 @@ def parse_options(args):
                          " the number of pseudocounts for the segment length"
                          " prior (default %d)" % PRIOR_STRENGTH)
 
+        group.add_option("--segtransition-weight-scale", type=float,
+                         default=SEGTRANSITION_WEIGHT_SCALE, metavar="SCALE",
+                         help="exponent for segment transition probability "
+                         " (default %d)" % SEGTRANSITION_WEIGHT_SCALE)
+
+    with OptionGroup(parser, "Technical variables") as group:
         group.add_option("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
                          metavar="PROGRESSION",
                          help="try each float in PROGRESSION as the number "
