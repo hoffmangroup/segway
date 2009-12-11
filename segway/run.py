@@ -85,6 +85,7 @@ COVAR_METHOD = COVAR_METHOD_ML
 MAX_WEIGHT_SCALE = 25
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
+NUM_SUBSEGS = 1
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
@@ -234,8 +235,10 @@ SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
 SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
 
 FLOAT_TAB_FIELDNAMES = ["filename", "chunk_index", "chrom", "start", "end"]
-JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs", "num_frames",
-                      "maxvmem", "cpu", "exit_status"]
+JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
+                      "num_frames", "maxvmem", "cpu", "exit_status"]
+# XXX: should add num_subsegs as well, but it's complicated to pass
+# that data into RestartableJobDict.wait()
 
 # templates and formats
 RES_STR_TMPL = "segway.str.tmpl"
@@ -260,28 +263,30 @@ DENSE_CPT_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG = \
 DENSE_CPT_SEG_DINUCLEOTIDE_FRAG = \
     "seg_dinucleotide 1 CARD_SEG CARD_DINUCLEOTIDE"
 
-MEAN_TMPL = "mean_${seg}_${track} 1 ${rand}"
+MEAN_TMPL = "mean_${seg}_${subseg}_${track} 1 ${rand}"
 
 COVAR_TMPL_TIED = "covar_${track} 1 ${rand}"
 # XXX: unused
-COVAR_TMPL_UNTIED = "covar_${seg}_${track} 1 ${rand}"
+COVAR_TMPL_UNTIED = "covar_${seg}_${subseg}_${track} 1 ${rand}"
 
-GAMMASCALE_TMPL = "gammascale_${seg}_${track} 1 1 ${rand}"
-GAMMASHAPE_TMPL = "gammashape_${seg}_${track} 1 1 ${rand}"
+GAMMASCALE_TMPL = "gammascale_${seg}_${subseg}_${track} 1 1 ${rand}"
+GAMMASHAPE_TMPL = "gammashape_${seg}_${subseg}_${track} 1 1 ${rand}"
 
 MC_NORM_TMPL = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-    " mc_${distribution}_${seg}_${track} mean_${seg}_${track} covar_${track}"
-MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${track}" \
-    " ${min_track} gammascale_${seg}_${track} gammashape_${seg}_${track}"
+    " mc_${distribution}_${seg}_${subseg}_${track}" \
+    " mean_${seg}_${subseg}_${track} covar_${track}"
+MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${subseg}_${track}" \
+    " ${min_track} gammascale_${seg}_${subseg}_${track}" \
+    " gammashape_${seg}_${subseg}_${track}"
 MC_TMPLS = {"norm": MC_NORM_TMPL,
             "gamma": MC_GAMMA_TMPL,
             "asinh_norm": MC_NORM_TMPL}
 
-MX_TMPL = "1 mx_${seg}_${track} 1 dpmf_always" \
-    " mc_${distribution}_${seg}_${track}"
+MX_TMPL = "1 mx_${seg}_${subseg}_${track} 1 dpmf_always" \
+    " mc_${distribution}_${seg}_${subseg}_${track}"
 
-NAME_COLLECTION_TMPL = "collection_seg_${track} ${num_segs}"
-NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${track}"
+NAME_COLLECTION_TMPL = "collection_seg_${track} ${fullnum_subsegs}"
+NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${subseg}_${track}"
 
 TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
@@ -314,7 +319,7 @@ COMMENT_POSTERIOR_TRIANGULATION = \
 
 FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%d step=%d span=%d"
 
-CARD_SEGTRANSITION = 2
+CARD_SEGTRANSITION = 3
 
 # training results
 # XXX: this should really be a namedtuple, yuck
@@ -704,25 +709,6 @@ def prob_transition_from_expected_len(length):
     # ("duration modeling")
     return length / (1 + length)
 
-def make_name_collection_spec(num_segs, tracknames):
-    substitute = Template(NAME_COLLECTION_TMPL).substitute
-    substitute_contents = Template(NAME_COLLECTION_CONTENTS_TMPL).substitute
-
-    items = []
-
-    for track_index, track in enumerate(tracknames):
-        mapping = dict(track=track, num_segs=num_segs)
-
-        contents = [substitute(mapping)]
-        for seg_index in xrange(num_segs):
-            seg = "seg%d" % seg_index
-            mapping = dict(seg=seg, track=track)
-
-            contents.append(substitute_contents(mapping))
-        items.append("\n".join(contents))
-
-    return make_spec("NAME_COLLECTION", items)
-
 re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
 def parse_posterior(iterable):
     """
@@ -813,6 +799,8 @@ def rewrite_cliques(rewriter, frame):
     # new clique
     rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
 
+    # XXX: add subseg as a clique
+
     return orig_num_cliques
 
 def make_mem_req(mem_usage):
@@ -829,6 +817,10 @@ def update_starts(starts, ends, new_starts, new_ends, thread_index):
 
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
+
+def format_indexed_strs(fmt, num):
+    full_fmt = fmt + "%d"
+    return [full_fmt % index for index in xrange(num)]
 
 class Mixin_Lockable(AddableMixin):
     def __init__(self, *args, **kwargs):
@@ -1088,6 +1080,7 @@ class Runner(object):
 
         # variables
         self.num_segs = NUM_SEGS
+        self.num_subsegs = NUM_SUBSEGS
         self.random_starts = RANDOM_STARTS
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
@@ -1103,9 +1096,6 @@ class Runner(object):
         self.identify = True # viterbi
         self.dry_run = False
         self.use_dinucleotide = None
-
-        # XXX: should be removed, it was for segway-res-usage
-        self.skip_large_mem_usage = False
 
         # functions
         self.train_prog = None
@@ -1154,6 +1144,7 @@ class Runner(object):
                                     for opt in options.cluster_opt], [])
 
         res.num_segs = options.num_labels
+        res.num_subsegs = options.num_sublabels
 
         mem_usage_list = map(float, options.mem_usage.split(","))
 
@@ -1181,6 +1172,7 @@ class Runner(object):
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
 
         directives["CARD_SEG"] = self.num_segs
+        directives["CARD_SUBSEG"] = self.num_subsegs
         directives["CARD_FRAMEINDEX"] = self.max_frames
         directives["SEGTRANSITION_WEIGHT_SCALE"] = \
             self.segtransition_weight_scale
@@ -1283,23 +1275,32 @@ class Runner(object):
         self.seg_countdowns_initial = seg_countdowns_initial
         self.card_seg_countdown = seg_countdowns_initial.max() + 1
 
-    def generate_tmpl_mappings(self, segnames=None, tracknames=None):
+    def generate_tmpl_mappings(self, segnames=None):
+        # need segnames because in the tied covariance case, the
+        # segnames are replaced by "any" (see Runner.make_covar_spec()),
+        # and only one mapping is produced
         if segnames is None:
-            segnames = ["seg%d" % seg_index
-                        for seg_index in xrange(self.num_segs)]
+            segnames = format_indexed_strs("seg", self.num_segs)
+            subsegnames = format_indexed_strs("subseg", self.num_segs)
+        elif segnames == ["any"]:
+            subsegnames = ["any"]
 
-        if tracknames is None:
-            tracknames = self.tracknames
+        tracknames = self.tracknames
 
         num_tracks = len(tracknames)
 
         for seg_index, segname in enumerate(segnames):
+            XXX iterate over subsegnames
             for track_index, trackname in enumerate(tracknames):
                 yield dict(seg=segname, track=trackname,
                            seg_index=seg_index, track_index=track_index,
                            index=num_tracks*seg_index + track_index,
                            distribution=self.distribution)
 
+                XXXXbookmarkXXXX
+        
+
+                
     def make_filename(self, *exts, **kwargs):
         filebasename = extjoin_not_none(*exts)
 
@@ -2139,6 +2140,7 @@ class Runner(object):
         card_seg_countdown = self.card_seg_countdown
 
         # by default, when segCountDown is high, never transition
+        XXXX probably going to have to change something here for new CARD_SEGTRANSITION
         res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
 
         # set probs_allow_transition
@@ -2354,10 +2356,38 @@ class Runner(object):
     def make_dt_spec(self):
         return make_spec("DT", self.make_items_dt())
 
+    def make_name_collection_spec(self):
+        num_segs = self.num_segs
+        num_subsegs = self.num_subsegs
+        tracknames = self.tracknames
+
+        substitute = Template(NAME_COLLECTION_TMPL).substitute
+        substitute_contents = Template(NAME_COLLECTION_CONTENTS_TMPL).substitute
+
+        items = []
+
+        fullnum_subsegs = num_segs * num_subsegs
+
+        for track_index, track in enumerate(tracknames):
+            mapping = dict(track=track, fullnum_subsegs=fullnum_subsegs)
+
+            contents = [substitute(mapping)]
+            for seg_index in xrange(num_segs):
+                seg = "seg%d" % seg_index
+
+                for subseg_index in xrange(num_subsegs):
+                    subseg = "subseg%d" % subseg_index
+                    mapping = dict(seg=seg, subseg=subseg, track=track)
+
+                    contents.append(substitute_contents(mapping))
+
+            items.append("\n".join(contents))
+
+        return make_spec("NAME_COLLECTION", items)
+
     def save_input_master(self, thread_index=None, new=False):
         num_free_params = 0
 
-        tracknames = self.tracknames
         num_segs = self.num_segs
         num_tracks = self.num_tracks
 
@@ -2410,7 +2440,7 @@ class Runner(object):
 
         mc_spec = self.make_mc_spec()
         mx_spec = self.make_mx_spec()
-        name_collection_spec = make_name_collection_spec(num_segs, tracknames)
+        name_collection_spec = self.make_name_collection_spec()
         card_seg = num_segs
 
         params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
@@ -3499,6 +3529,11 @@ def parse_options(args):
                          default=NUM_SEGS, metavar="SLICE",
                          help="make SLICE segment labels"
                          " (default %d)" % NUM_SEGS)
+
+        group.add_option("-N", "--num-sublabels", type=int,
+                         default=NUM_SEGS, metavar="NUM",
+                         help="make NUM segment sublabels"
+                         " (default %d)" % NUM_SUBSEGS)
 
         group.add_option("--resolution", type=int,
                          default=RESOLUTION, metavar="RES",

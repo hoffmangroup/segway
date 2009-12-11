@@ -13,6 +13,11 @@ frame: 0 {
      conditionalparents: nil using DenseCPT("start_seg");
    }
 
+   variable: subseg {
+     type: TYPE_SUBSEG;
+     conditionalparents: seg(0) using DenseCPT("seg_subseg");
+   }
+
 ${observations}}
 
 frame: 1 {
@@ -41,7 +46,16 @@ frame: 1 {
    variable: seg {
      type: TYPE_SEG;
      conditionalparents: seg(-1) using DeterministicCPT("seg_seg_copy")
+                         | seg(-1) using DeterministicCPT("seg_seg_copy")
                          | seg(-1) using DenseCPT("seg_seg");
+     switchingparents: segTransition(0) using mapping("map_parent");
+   }
+
+   variable: subseg {
+     type: TYPE_SUBSEG;
+     conditionalparents: subseg(-1) using DeterministicCPT("subseg_subseg_copy");
+                         | seg(0), subseg(-1) using DenseCPT("seg_subseg_subseg")
+                         | seg(0) using DenseCPT("seg_subseg");
      switchingparents: segTransition(0) using mapping("map_parent");
    }
 

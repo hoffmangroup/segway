@@ -14,7 +14,7 @@
 #define CARD_PRESENCE $card_presence
 
 % transition or not?
-#define CARD_SEGTRANSITION CARD_BOOLEAN
+#define CARD_SEGTRANSITION 3
 
 % maximum number of frames
 #ifndef CARD_FRAMEINDEX
@@ -34,6 +34,10 @@
 #define CARD_SEG $card_seg
 #endif
 
+#ifndef CARD_SUBSEG
+#define CARD_SUBSEG $card_subseg
+#endif
+
 % supervision label
 #define CARD_SUPERVISIONLABEL $card_supervisionLabel
 
@@ -44,6 +48,7 @@
 
 #define TYPE_SEGCOUNTDOWN discrete hidden cardinality CARD_SEGCOUNTDOWN
 #define TYPE_SEG discrete hidden cardinality CARD_SEG
+#define TYPE_SUBSEG discrete hidden cardinality CARD_SUBSEG
 
 %% conditionalparents
 
