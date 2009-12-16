@@ -15,9 +15,9 @@ DPMF_IN_FILE inline
 
 DETERMINISTIC_CPT_IN_FILE inline
 #if CARD_SUPERVISIONLABEL == -1
-4
-#else /* CARD_SUPERVISIONLABEL != -1 */
 5
+#else /* CARD_SUPERVISIONLABEL != -1 */
+6
 #endif /* CARD_SUPERVISIONLABEL == -1 */
 
 0 seg_segCountDown
@@ -40,8 +40,13 @@ map_segTransition_ruler_seg_segCountDown_segCountDown
 CARD_SEG CARD_SEG
 map_parent
 
+4 subseg_subseg_copy
+1
+CARD_SUBSEG CARD_SUBSEG
+map_parent
+
 #if CARD_SUPERVISIONLABEL != -1
-4 supervisionLabel_seg_alwaysTrue
+5 supervisionLabel_seg_alwaysTrue
 2
 CARD_SUPERVISIONLABEL CARD_SEG CARD_BOOLEAN
 map_supervisionLabel_seg_alwaysTrue

@@ -33,8 +33,9 @@ from uuid import uuid1
 
 from drmaa import ExitTimeoutException, JobControlAction, JobState
 from genomedata import Genome
-from numpy import (amin, amax, append, arange, arcsinh, array, diagflat, empty,
-                   finfo, float32, intc, NINF, ones, outer, sqrt, square, tile,
+from genomedata._util import fill_array
+from numpy import (amin, amax, append, arange, arcsinh, array, empty,
+                   finfo, float32, intc, NINF, outer, sqrt, square, tile,
                    vectorize, vstack, where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
@@ -114,7 +115,11 @@ LINEAR_MEM_USAGE_MULTIPLIER = 1
 MEM_USAGE_MULTIPLIER = 2
 
 JOIN_TIMEOUT = finfo(float).max
+
+# XXX: should be options
 LEN_SEG_EXPECTED = 100000
+LEN_SUBSEG_EXPECTED = 100
+
 SWAP_ENDIAN = False
 POSTERIOR_SCALE_FACTOR = 100.0
 
@@ -157,11 +162,9 @@ POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 RANDOM_STARTS = 1
 
 # self->self, self->other
-PROBS_FORCE_TRANSITION = array([0.0, 1.0])
-PROBS_PREVENT_TRANSITION = array([1.0, 0.0])
+PROBS_FORCE_TRANSITION = array([0.0, 0.0, 1.0])
 
-# replace NAN with SENTINEL to avoid warnings
-# XXX: replace with something negative and outlandish again
+# replace NAN with SENTINEL to avoid GMTK warnings
 SENTINEL = float32(9.87654321)
 
 CPP_DIRECTIVE_FMT = "-D%s=%s"
@@ -247,21 +250,6 @@ RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
 RES_SEG_TABLE = "seg_table.tab"
-
-DIRICHLET_FRAG = "dirichlet_segCountDown_seg_segTransition" \
-    " 3 CARD_SEGCOUNTDOWN CARD_SEG CARD_SEGTRANSITION"
-
-DENSE_CPT_START_SEG_FRAG = "start_seg 0 CARD_SEG"
-DENSE_CPT_SEG_SEG_FRAG = "seg_seg 1 CARD_SEG CARD_SEG"
-DIRICHLET_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG = \
-    "DirichletTable dirichlet_segCountDown_seg_segTransition"
-
-DENSE_CPT_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG = \
-    "segCountDown_seg_segTransition" \
-    " 2 CARD_SEGCOUNTDOWN CARD_SEG CARD_SEGTRANSITION"
-
-DENSE_CPT_SEG_DINUCLEOTIDE_FRAG = \
-    "seg_dinucleotide 1 CARD_SEG CARD_DINUCLEOTIDE"
 
 MEAN_TMPL = "mean_${seg}_${subseg}_${track} 1 ${rand}"
 
@@ -422,8 +410,10 @@ def make_wig_attrs(mapping):
 
     return "track %s" % res
 
-def vstack_tile(array_like, reps):
-    return tile(array_like, (reps, 1))
+def vstack_tile(array_like, *reps):
+    reps = list(reps) + [1]
+
+    return tile(array_like, reps)
 
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
@@ -508,15 +498,8 @@ def slice2range(s):
 def convert_chunks(attrs, name):
     supercontig_start = attrs.start
     edges_array = getattr(attrs, name) + supercontig_start
-    res = edges_array.tolist()
 
-    # XXX: this is a hack that was necessary due to a bugs in
-    # save_metadata.py <r295; you can remove it when all the data is
-    # reloaded
-    if isinstance(res, list):
-        return res
-    else:
-        return [res]
+    return edges_array.tolist()
 
 def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
@@ -695,9 +678,20 @@ def array2text(a):
         delimiter = "\n" * (ndim-1)
         return delimiter.join(array2text(row) for row in a)
 
-# XXX: consider making much of frag automatic
-def make_table_spec(frag, table):
-    return "\n".join([frag, array2text(table), ""])
+def make_table_spec(name, table, dirichlet=False):
+    """
+    if dirichlet is True, this table has a corresponding DirichletTable
+    automatically generated name
+    """
+    ndim = table.ndim - 1 # don't include output dim
+    items = [name, str(ndim)]
+    items.extend(map(str, table.shape))
+
+    if dirichlet:
+        items.append("DirichletTable dirichlet_%s" % name)
+
+    items.extend([array2text(table), ""])
+    return "\n".join(items)
 
 # def make_dt_spec(num_tracks):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
@@ -799,7 +793,7 @@ def rewrite_cliques(rewriter, frame):
     # new clique
     rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
 
-    # XXX: add subseg as a clique
+    # XXX: add subseg as a clique to report it in posterior
 
     return orig_num_cliques
 
@@ -1148,7 +1142,7 @@ class Runner(object):
 
         mem_usage_list = map(float, options.mem_usage.split(","))
 
-        # XXX: should do a ceil first
+        # XXX: should do a ceil first?
         res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int)
 
         res.clobber = options.clobber
@@ -1209,7 +1203,7 @@ class Runner(object):
 
         num_segs = self.num_segs
         if isinstance(num_segs, slice):
-            # XXX: wait, what if the step isn't 1?
+            assert num_segs.step == 1
             num_segs = num_segs.end-1
 
         table = zeros((num_segs, SEG_TABLE_WIDTH), dtype=int)
@@ -1287,20 +1281,24 @@ class Runner(object):
 
         tracknames = self.tracknames
 
+        num_subsegs = self.num_subsegs
         num_tracks = len(tracknames)
 
         for seg_index, segname in enumerate(segnames):
-            XXX iterate over subsegnames
-            for track_index, trackname in enumerate(tracknames):
-                yield dict(seg=segname, track=trackname,
-                           seg_index=seg_index, track_index=track_index,
-                           index=num_tracks*seg_index + track_index,
-                           distribution=self.distribution)
+            seg_offset = num_tracks * num_subsegs * seg_index
 
-                XXXXbookmarkXXXX
-        
+            for subseg_index, subsegname in enumerate(subsegnames):
+                subseg_offset = seg_offset + num_tracks * subseg_index
 
-                
+                for track_index, trackname in enumerate(tracknames):
+                    track_offset = subseg_offset + track_index
+
+                    # XXX: change name of index to track_offset in templates
+                    yield dict(seg=segname, subseg=subsegname, track=trackname,
+                               seg_index=seg_index, subseg_index=subseg_index,
+                               track_index=track_index, index=track_offset,
+                               distribution=self.distribution)
+
     def make_filename(self, *exts, **kwargs):
         filebasename = extjoin_not_none(*exts)
 
@@ -1559,6 +1557,7 @@ class Runner(object):
         ruler_scale_scaled = ruler_scale // resolution
 
         mapping = dict(card_seg=num_segs,
+                       card_subseg=self.num_subsegs,
                        card_presence=resolution+1,
                        card_segCountDown=self.card_seg_countdown,
                        card_supervisionLabel=self.card_supervision_label,
@@ -1593,9 +1592,12 @@ class Runner(object):
                               for index in xrange(resolution + 1))
 
     def make_conditionalparents_spec(self, track):
-        spec = ('seg(0) using mixture collection("collection_seg_%s") '
-                'mapping("map_parent")'
-                % track)
+        """
+        this defines the parents of every observation
+        """
+        spec = ('seg(0), subseg(0) '
+                'using mixture collection("collection_seg_%s") '
+                'mapping("map_seg_subseg_obs")' % track)
 
         return " | ".join(["CONDITIONALPARENTS_NIL_CONTINUOUS"] +
                           [spec] * self.resolution)
@@ -1914,7 +1916,7 @@ class Runner(object):
                     num_bases_chunk = end - start
                     num_frames = ceildiv(num_bases_chunk, self.resolution)
                     if not MIN_FRAMES <= num_frames:
-                        text = " skipping short segment of length %d" % num_frames
+                        text = " skipping short sequence of length %d" % num_frames
                         print >>sys.stderr, text
                         continue
 
@@ -2038,7 +2040,8 @@ class Runner(object):
 
             if data is not None:
                 seg_index = mapping["seg_index"]
-                mapping["rand"] = data[seg_index, track_index]
+                subseg_index = mapping["subseg_index"]
+                mapping["rand"] = data[seg_index, subseg_index, track_index]
 
             res.append(substitute(mapping))
 
@@ -2052,32 +2055,19 @@ class Runner(object):
 
         return zeros((num_segs, num_segs))
 
-    def make_linked_cpt(self):
-        """
-        has all of the seg0_0 -> seg0_1 links, etc.
-
-        also has a seg 0_f -> seg1_0 link which must be overwritten,
-        such as by add_cpt()
-        """
-        return diagflat(ones(self.num_segs-1), 1)
-
-    def add_final_probs_to_cpt(self, cpt):
-        """
-        modifies original input
-        """
-        num_segs = self.num_segs
-
+    # XXX: can be factored out of Runner
+    def make_zero_diagonal_table(self, length):
         prob_self_self = 0.0
-        prob_self_other = 1.0 / (num_segs - 1)
+        prob_self_other = (1.0 - prob_self_self) / (length - 1)
 
-        # set everywhere (including diagonals to be rewritten)
-        cpt[...] = prob_self_other
+        # set everywhere (diagonal to be rewritten)
+        res = fill_array(prob_self_other, (length, length))
 
         # set diagonal
-        range_cpt = xrange(num_segs)
-        cpt[range_cpt, range_cpt] = prob_self_self
+        range_cpt = xrange(length)
+        res[range_cpt, range_cpt] = prob_self_self
 
-        return cpt
+        return res
 
     def make_dirichlet_table(self):
         num_segs = self.num_segs
@@ -2098,22 +2088,32 @@ class Runner(object):
 
     def make_dirichlet_spec(self):
         dirichlet_table = self.make_dirichlet_table()
-        items = [make_table_spec(DIRICHLET_FRAG, dirichlet_table)]
+        items = [make_table_spec("dirichlet_segCountdown_seg_segTransition",
+                                 dirichlet_table)]
 
         return make_spec("DIRICHLET_TAB", items)
 
     def make_dense_cpt_start_seg_spec(self):
-        cpt = zeros((1, self.num_segs))
+        num_segs = self.num_segs
+        cpt = fill_array(1.0 / num_segs, num_segs)
 
-        cpt[0, :] = 1.0 / self.num_segs
+        return make_table_spec("start_seg", cpt)
 
-        return make_table_spec(DENSE_CPT_START_SEG_FRAG, cpt)
+    def make_dense_cpt_seg_subseg_spec(self):
+        num_subsegs = self.num_subsegs
+        cpt = fill_array(1.0 / num_subsegs, (self.num_segs, num_subsegs))
+
+        return make_table_spec("seg_subseg", cpt)
 
     def make_dense_cpt_seg_seg_spec(self):
-        num_segs = self.num_segs
+        cpt = self.make_zero_diagonal_table(self.num_segs)
 
-        cpt = self.add_final_probs_to_cpt(self.make_linked_cpt())
-        return make_table_spec(DENSE_CPT_SEG_SEG_FRAG, cpt)
+        return make_table_spec("seg_seg", cpt)
+
+    def make_dense_cpt_seg_subseg_subseg_spec(self):
+        cpt = self.make_zero_diagonal_table(self.num_subsegs)
+
+        return make_table_spec("subseg_subseg", cpt)
 
     def make_dinucleotide_table_row(self):
         # simple one-parameter model
@@ -2134,21 +2134,39 @@ class Runner(object):
         table = [self.make_dinucleotide_table_row()
                  for seg_index in xrange(self.num_segs)]
 
-        return make_table_spec(DENSE_CPT_SEG_DINUCLEOTIDE_FRAG, table)
+        return make_table_spec("seg_dinucleotide", table)
+
+    def calc_prob_transition_from_scaled_expected_len(self, length):
+        length_scaled = length // self.resolution
+
+        prob_self_self = prob_transition_from_expected_len(length_scaled)
+        prob_self_other = 1.0 - prob_self_self
+
+        return prob_self_self, prob_self_other
 
     def make_dense_cpt_segCountDown_seg_segTransition(self):
         card_seg_countdown = self.card_seg_countdown
 
         # by default, when segCountDown is high, never transition
-        XXXX probably going to have to change something here for new CARD_SEGTRANSITION
         res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
 
-        # set probs_allow_transition
-        len_seg_expected_scaled = LEN_SEG_EXPECTED // self.resolution
-        prob_self_self = \
-            prob_transition_from_expected_len(len_seg_expected_scaled)
-        prob_self_other = 1.0 - prob_self_self
-        probs_allow_transition = array([prob_self_self, prob_self_other])
+        prob_seg_self_self, prob_seg_self_other = \
+            self.calc_prob_transition_from_scaled_expected_len(LEN_SEG_EXPECTED)
+
+        prob_subseg_self_self, prob_subseg_self_other = \
+            self.calc_prob_transition_from_scaled_expected_len(LEN_SUBSEG_EXPECTED)
+
+        # 0: no transition
+        # 1: subseg transition
+        # 2: seg transition
+        probs_allow_transition = \
+            array([prob_seg_self_self * prob_subseg_self_self,
+                   prob_seg_self_self * prob_subseg_self_other,
+                   prob_seg_self_other])
+
+        probs_prevent_transition = array([prob_subseg_self_self,
+                                          prob_subseg_self_other,
+                                          0.0])
 
         # find the labels with maximum segment lengths and those without
         table = self.seg_table
@@ -2161,7 +2179,7 @@ class Runner(object):
 
         # labels without a maximum
         res[0, labels_without_maximum] = probs_allow_transition
-        res[1:, labels_without_maximum] = PROBS_PREVENT_TRANSITION
+        res[1:, labels_without_maximum] = probs_prevent_transition
 
         # labels with a maximum
         seg_countdowns_initial = self.seg_countdowns_initial
@@ -2174,26 +2192,23 @@ class Runner(object):
             seg_countdown_allow = seg_countdown_initial - minimum + 1
 
             res[1:seg_countdown_allow, label] = probs_allow_transition
-            res[seg_countdown_allow:, label] = PROBS_PREVENT_TRANSITION
+            res[seg_countdown_allow:, label] = probs_prevent_transition
 
         return res
 
     def make_dense_cpt_segCountDown_seg_segTransition_spec(self):
         cpt = self.make_dense_cpt_segCountDown_seg_segTransition()
 
-        if self.len_seg_strength > 0:
-            frag = "\n".join([DENSE_CPT_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG,
-                              DIRICHLET_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG])
-        else:
-            frag = DENSE_CPT_SEGCOUNTDOWN_SEG_SEGTRANSITION_FRAG
-
-        return make_table_spec(frag, cpt)
+        return make_table_spec("segCountDown_seg_segTransition", cpt,
+                               dirichlet=self.len_seg_strength > 0)
 
     def make_dense_cpt_spec(self):
         num_segs = self.num_segs
 
         items = [self.make_dense_cpt_start_seg_spec(),
+                 self.make_dense_cpt_seg_subseg_spec(),
                  self.make_dense_cpt_seg_seg_spec(),
+                 self.make_dense_cpt_seg_subseg_subseg_spec(),
                  self.make_dense_cpt_segCountDown_seg_segTransition_spec()]
 
         if self.use_dinucleotide:
@@ -2217,17 +2232,20 @@ class Runner(object):
 
     def make_means(self):
         num_segs = self.num_segs
+        num_subsegs = self.num_subsegs
         means = self.means
 
         if MEAN_METHOD == MEAN_METHOD_UNIFORM:
+            raise NotImplementedError # XXX: need subseg dimenstion
             return self.rand_means()
         elif MEAN_METHOD == MEAN_METHOD_ML_JITTER:
-            return jitter(vstack_tile(means, num_segs))
+            return jitter(vstack_tile(means, num_segs, num_subsegs))
         elif MEAN_METHOD == MEAN_METHOD_ML_JITTER_STD:
             stds = sqrt(self.vars)
 
-            means_tiled = vstack_tile(means, num_segs)
-            stds_tiled = vstack_tile(stds, num_segs)
+            # tile the means of each track (num_segs, num_subsegs times)
+            means_tiled = vstack_tile(means, num_segs, num_subsegs)
+            stds_tiled = vstack_tile(stds, num_segs, num_subsegs)
 
             noise = uniform(-JITTER_STD_BOUND, JITTER_STD_BOUND,
                              stds_tiled.shape)
@@ -2241,14 +2259,15 @@ class Runner(object):
 
     def make_covars(self):
         num_segs = self.num_segs
+        num_subsegs = self.num_subsegs
 
         if COVAR_METHOD == COVAR_METHOD_MAX_RANGE:
             ranges = self.maxs - self.mins
-            return vstack_tile(ranges, num_segs)
+            return vstack_tile(ranges, num_segs, num_subsegs)
         elif COVAR_METHOD == COVAR_METHOD_ML_JITTER:
-            return jitter(vstack_tile(self.vars, num_segs))
+            return jitter(vstack_tile(self.vars, num_segs, num_subsegs))
         elif COVAR_METHOD == COVAR_METHOD_ML:
-            return vstack_tile(self.vars, num_segs)
+            return vstack_tile(self.vars, num_segs, num_subsegs)
 
         raise ValueError("unsupported COVAR_METHOD")
 
@@ -2283,7 +2302,6 @@ class Runner(object):
 
         res = []
         for mapping in self.generate_tmpl_mappings():
-            seg_index = mapping["seg_index"]
             track_index = mapping["track_index"]
             index = mapping["index"] * 2
 
@@ -2341,6 +2359,7 @@ class Runner(object):
         res.append(data_string("map_frameIndex_ruler.dt.txt"))
         res.append(self.make_map_seg_segCountDown_dt_spec())
         res.append(self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec())
+        res.append(data_string("map_seg_subseg_obs.dt.txt"))
 
         supervision_type = self.supervision_type
         if supervision_type == SUPERVISION_SEMISUPERVISED:
@@ -2389,7 +2408,9 @@ class Runner(object):
         num_free_params = 0
 
         num_segs = self.num_segs
+        num_subsegs = self.num_subsegs
         num_tracks = self.num_tracks
+        fullnum_subsegs = num_segs * num_subsegs
 
         include_filename = self.gmtk_include_filename_relative
 
@@ -2408,10 +2429,10 @@ class Runner(object):
         dense_cpt_spec = self.make_dense_cpt_spec()
 
         # seg_seg
-        num_free_params += num_segs * (num_segs - 1)
+        num_free_params += fullnum_subsegs * (fullnum_subsegs - 1)
 
         # segCountDown_seg_segTransition
-        num_free_params += num_segs
+        num_free_params += fullnum_subsegs
 
         self.calc_means_vars()
 
@@ -2422,9 +2443,9 @@ class Runner(object):
             gamma_spec = ""
 
             if COVAR_TIED:
-                num_free_params += (num_segs + 1) * num_tracks
+                num_free_params += (fullnum_subsegs + 1) * num_tracks
             else:
-                num_free_params += (num_segs * 2) * num_tracks
+                num_free_params += (fullnum_subsegs * 2) * num_tracks
         elif distribution == DISTRIBUTION_GAMMA:
             mean_spec = ""
             covar_spec = ""
@@ -2434,14 +2455,13 @@ class Runner(object):
             # mean and converting
             gamma_spec = self.make_gamma_spec()
 
-            num_free_params += (num_segs * 2) * num_tracks
+            num_free_params += (fullnum_subsegs * 2) * num_tracks
         else:
             raise ValueError("distribution %s not supported" % distribution)
 
         mc_spec = self.make_mc_spec()
         mx_spec = self.make_mx_spec()
         name_collection_spec = self.make_name_collection_spec()
-        card_seg = num_segs
 
         params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
 
@@ -2963,17 +2983,21 @@ class Runner(object):
 
         return res
 
-    def set_triangulation_filename(self, num_segs=None):
+    def set_triangulation_filename(self, num_segs=None, num_subsegs=None):
         if num_segs is None:
             num_segs = self.num_segs
+
+        if num_subsegs is None:
+            num_subsegs = self.num_subsegs
 
         if (self.triangulation_filename_is_new
             or not self.triangulation_filename):
             self.triangulation_filename_is_new = True
 
             structure_filebasename = path(self.structure_filename).name
-            triangulation_filebasename = extjoin(structure_filebasename,
-                                                 str(num_segs), EXT_TRIFILE)
+            triangulation_filebasename = \
+                extjoin(structure_filebasename, str(num_segs),
+                        str(num_subsegs), EXT_TRIFILE)
 
             self.triangulation_filename = (self.triangulation_dirpath
                                            / triangulation_filebasename)
@@ -2981,11 +3005,11 @@ class Runner(object):
         # print >>sys.stderr, ("setting triangulation_filename = %s"
         #                     % self.triangulation_filename)
 
-    def run_triangulate_single(self, num_segs):
+    def run_triangulate_single(self, num_segs, num_subsegs=None):
         # print >>sys.stderr, "running triangulation"
         prog = self.prog_factory(TRIANGULATE_PROG)
 
-        self.set_triangulation_filename(num_segs)
+        self.set_triangulation_filename(num_segs, num_subsegs)
 
         cpp_options = self.make_cpp_options()
         kwargs = dict(strFile=self.structure_filename,
@@ -3531,7 +3555,7 @@ def parse_options(args):
                          " (default %d)" % NUM_SEGS)
 
         group.add_option("-N", "--num-sublabels", type=int,
-                         default=NUM_SEGS, metavar="NUM",
+                         default=NUM_SUBSEGS, metavar="NUM",
                          help="make NUM segment sublabels"
                          " (default %d)" % NUM_SUBSEGS)
 
