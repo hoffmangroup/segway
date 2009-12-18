@@ -10,7 +10,7 @@ This script is designed to be downloaded and run independently, and
 will guide the process of downloading and installing all other source
 code.
 
-(c) 2009: Orion Buske <orion.buske@gmail.com>
+(c) 2009: Orion Buske <stasis {at} uw {dot} edu>
 
 """
 import platform
