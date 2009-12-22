@@ -15,7 +15,7 @@ code.
 """
 import platform
 
-__version__ = "0.2.0"
+PKG_VERSION = "0.2.0"
 GMTK_VERSION = "20091016"
 
 ####################### BEGIN COMMON CODE HEADER #####################
