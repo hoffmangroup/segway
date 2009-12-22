@@ -53,7 +53,7 @@ frame: 1 {
 
    variable: subseg {
      type: TYPE_SUBSEG;
-     conditionalparents: subseg(-1) using DeterministicCPT("subseg_subseg_copy");
+     conditionalparents: subseg(-1) using DeterministicCPT("subseg_subseg_copy")
                          | seg(0), subseg(-1) using DenseCPT("seg_subseg_subseg")
                          | seg(0) using DenseCPT("seg_subseg");
      switchingparents: segTransition(0) using mapping("map_parent");

@@ -309,6 +309,9 @@ FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%d step=%d span=%d"
 
 CARD_SEGTRANSITION = 3
 
+# here to avoid duplication
+NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
+
 # training results
 # XXX: this should really be a namedtuple, yuck
 OFFSET_NUM_SEGS = 1
@@ -349,10 +352,6 @@ RESOLUTION = 1
 INDEX_BED_START = 1
 
 SEGTRANSITION_WEIGHT_SCALE = 1.0
-
-## exceptions
-class ChunkOverMemUsageLimit(Exception):
-    pass
 
 ## functions
 try:
@@ -678,20 +677,37 @@ def array2text(a):
         delimiter = "\n" * (ndim-1)
         return delimiter.join(array2text(row) for row in a)
 
+def make_dirichlet_name(name):
+    return "dirichlet_%s" % name
+
+def _make_table_spec(name, table, ndim, extra_rows=[]):
+    header_rows = [name, ndim]
+    header_rows.extend(table.shape)
+
+    rows = [" ".join(map(str, header_rows))]
+    rows.extend(extra_rows)
+    rows.extend([array2text(table), ""])
+
+    return "\n".join(rows)
+
 def make_table_spec(name, table, dirichlet=False):
     """
     if dirichlet is True, this table has a corresponding DirichletTable
     automatically generated name
     """
     ndim = table.ndim - 1 # don't include output dim
-    items = [name, str(ndim)]
-    items.extend(map(str, table.shape))
 
     if dirichlet:
-        items.append("DirichletTable dirichlet_%s" % name)
+        extra_rows = ["DirichletTable %s" % make_dirichlet_name(name)]
+    else:
+        extra_rows = []
 
-    items.extend([array2text(table), ""])
-    return "\n".join(items)
+    return _make_table_spec(name, table, ndim, extra_rows)
+
+def make_dirichlet_table_spec(name, table):
+    dirichlet_name = make_dirichlet_name(name)
+
+    return _make_table_spec(dirichlet_name, table, table.ndim)
 
 # def make_dt_spec(num_tracks):
 #     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
@@ -1275,7 +1291,7 @@ class Runner(object):
         # and only one mapping is produced
         if segnames is None:
             segnames = format_indexed_strs("seg", self.num_segs)
-            subsegnames = format_indexed_strs("subseg", self.num_segs)
+            subsegnames = format_indexed_strs("subseg", self.num_subsegs)
         elif segnames == ["any"]:
             subsegnames = ["any"]
 
@@ -1391,8 +1407,7 @@ class Runner(object):
         # unspecified, then it won't be passed to gmtkViterbiNew
 
         # these are unexpected corner cases for now
-        assert not ((thread_index is not None and not new)
-                    or (thread_index is None and new))
+        assert not (thread_index is None and new)
 
         params_filenames = self.params_filenames
         num_params_filenames = len(params_filenames)
@@ -1835,7 +1850,7 @@ class Runner(object):
         else:
             raise ValueError("sequence too short for supercontig")
 
-    def prep_observations(self):
+    def prep_observations(self, genome):
         # XXX: this function is way too long, try to get it to fit
         # inside a screen on your enormous monitor
 
@@ -1853,13 +1868,9 @@ class Runner(object):
         use_dinucleotide = "dinucleotide" in self.include_tracknames
         self.use_dinucleotide = use_dinucleotide
 
-        # XXX: move this outside this function so self.genome can be
-        # reused, and have a with statement
-
         # XXX: use groupby(include_coords) and then access chromosomes
         # randomly rather than iterating through them all
-        self.genome = Genome(self.genomedata_dirname)
-        for chromosome in self.genome:
+        for chromosome in genome:
             chrom = chromosome.name
 
             chr_include_coords = get_chrom_coords(include_coords, chrom)
@@ -2048,7 +2059,9 @@ class Runner(object):
         return res
 
     def make_spec_multiseg(self, name, *args, **kwargs):
-        return make_spec(name, self.make_items_multiseg(*args, **kwargs))
+        items = self.make_items_multiseg(*args, **kwargs)
+
+        return make_spec(name, items)
 
     def make_empty_cpt(self):
         num_segs = self.num_segs
@@ -2057,6 +2070,9 @@ class Runner(object):
 
     # XXX: can be factored out of Runner
     def make_zero_diagonal_table(self, length):
+        if length == 1:
+            return array([1.0]) # always return to self
+
         prob_self_self = 0.0
         prob_self_other = (1.0 - prob_self_self) / (length - 1)
 
@@ -2088,8 +2104,9 @@ class Runner(object):
 
     def make_dirichlet_spec(self):
         dirichlet_table = self.make_dirichlet_table()
-        items = [make_table_spec("dirichlet_segCountdown_seg_segTransition",
-                                 dirichlet_table)]
+        # XXX: duplicative name
+        items = [make_dirichlet_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
+                                           dirichlet_table)]
 
         return make_spec("DIRICHLET_TAB", items)
 
@@ -2111,9 +2128,10 @@ class Runner(object):
         return make_table_spec("seg_seg", cpt)
 
     def make_dense_cpt_seg_subseg_subseg_spec(self):
-        cpt = self.make_zero_diagonal_table(self.num_subsegs)
+        cpt_seg = self.make_zero_diagonal_table(self.num_subsegs)
+        cpt = vstack_tile(cpt_seg, self.num_segs, 1)
 
-        return make_table_spec("subseg_subseg", cpt)
+        return make_table_spec("seg_subseg_subseg", cpt)
 
     def make_dinucleotide_table_row(self):
         # simple one-parameter model
@@ -2199,7 +2217,7 @@ class Runner(object):
     def make_dense_cpt_segCountDown_seg_segTransition_spec(self):
         cpt = self.make_dense_cpt_segCountDown_seg_segTransition()
 
-        return make_table_spec("segCountDown_seg_segTransition", cpt,
+        return make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION, cpt,
                                dirichlet=self.len_seg_strength > 0)
 
     def make_dense_cpt_spec(self):
@@ -2405,6 +2423,9 @@ class Runner(object):
         return make_spec("NAME_COLLECTION", items)
 
     def save_input_master(self, thread_index=None, new=False):
+        # the locals of this function are used as the template mapping
+        # use caution before deleting or renaming any variables
+        # check that they are not used in the input.master template
         num_free_params = 0
 
         num_segs = self.num_segs
@@ -2462,6 +2483,7 @@ class Runner(object):
         mc_spec = self.make_mc_spec()
         mx_spec = self.make_mx_spec()
         name_collection_spec = self.make_name_collection_spec()
+        card_seg = num_segs
 
         params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
 
@@ -2555,55 +2577,45 @@ class Runner(object):
 
         self.load_supervision()
 
+        # XXX: decrease the amount of time this file is open
+        with Genome(self.genomedata_dirname) as genome:
         # do first, because it sets self.num_tracks and self.tracknames
-        self.prep_observations()
+            self.prep_observations(genome)
 
-        # sets self.chunk_lens, needed for save_structure() to do
-        # Dirichlet stuff (but rewriting structure is unnecessary)
-        self.make_chunk_lens()
+            # sets self.chunk_lens, needed for save_structure() to do
+            # Dirichlet stuff (but rewriting structure is unnecessary)
+            self.make_chunk_lens()
 
-        self.load_seg_table()
+            self.load_seg_table()
 
-        self.save_include()
-        self.save_structure()
-        self.set_params_filename()
+            self.save_include()
+            self.save_structure()
+            self.set_params_filename()
 
-        train = self.train
-        identify = self.identify
-        posterior = self.posterior
+            train = self.train
+            identify = self.identify
+            posterior = self.posterior
 
-        if train or identify or posterior:
-            self.set_jt_info_filename()
+            if train or identify or posterior:
+                self.set_jt_info_filename()
 
-        if train:
-            self.make_subdirs(SUBDIRNAMES_TRAIN)
+            if train:
+                self.make_subdirs(SUBDIRNAMES_TRAIN)
 
-            if not self.dont_train_filename:
-                self.save_dont_train()
+                if not self.dont_train_filename:
+                    self.save_dont_train()
 
-            self.save_output_master()
+                self.save_output_master()
 
-            # might turn off self.train, if the params already exist
-            self.set_log_likelihood_filename()
+                # might turn off self.train, if the params already exist
+                self.set_log_likelihood_filename()
 
-        self.save_observations()
+            self.save_observations()
 
         if identify or posterior:
             self.make_subdirs(SUBDIRNAMES_IDENTIFY)
 
             # this requires the number of observations
-            self.make_viterbi_filenames()
-
-    def resave_params(self):
-        """
-        repeats necessary parts after an adjustment to self.mem_per_obs
-        """
-        self.prep_observations()
-        self.make_chunk_lens()
-        self.save_observations(clobber=True)
-
-        if self.identify or self.posterior:
-            # overwrite previous
             self.make_viterbi_filenames()
 
     def copy_results(self, name, src_filename, dst_filename):
@@ -3152,7 +3164,7 @@ class Runner(object):
 
         if self.make_new_params:
             self.proc_train_results(start_params, dst_filenames)
-        else:
+        elif not self.dry_run:
             # only one random start: always overwrite params.params
             assert len(start_params) == 1
             copy2(start_params[0][OFFSET_PARAMS_FILENAME],
@@ -3448,13 +3460,7 @@ class Runner(object):
                             if not self.posterior_triangulation_filename:
                                 self.save_posterior_triangulation()
 
-                        try:
-                            self.run_identify_posterior()
-                        except ChunkOverMemUsageLimit:
-                            self.resave_params()
-
-                            # erase old output
-                            self.run_identify_posterior(clobber=True)
+                        self.run_identify_posterior()
 
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
@@ -3554,7 +3560,7 @@ def parse_options(args):
                          help="make SLICE segment labels"
                          " (default %d)" % NUM_SEGS)
 
-        group.add_option("-N", "--num-sublabels", type=int,
+        group.add_option("--num-sublabels", type=int,
                          default=NUM_SUBSEGS, metavar="NUM",
                          help="make NUM segment sublabels"
                          " (default %d)" % NUM_SUBSEGS)
