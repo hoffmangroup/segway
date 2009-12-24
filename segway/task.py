@@ -21,7 +21,7 @@ from path import path
 
 from ._util import (DTYPE_IDENTIFY, EXT_FLOAT, EXT_INT, EXT_LIST,
                     find_segment_starts, get_label_color,
-                    _make_continuous_cells, _save_observations_chunk,
+                    _make_continuous_cells, _save_observations_window,
                     VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
@@ -197,7 +197,7 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
         print_to_fd(float_filelistfd, float_filename)
         print_to_fd(int_filelistfd, int_filename)
 
-        _save_observations_chunk(float_filename, int_filename,
+        _save_observations_window(float_filename, int_filename,
                                  continuous_cells, resolution, distribution)
 
         # XXXopt: does this work? or do we need to use a subprocess to

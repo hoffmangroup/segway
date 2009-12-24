@@ -52,7 +52,7 @@ from ._util import (ceildiv, data_filename, data_string,
                     extjoin, GB, get_chrom_coords, get_label_color, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     _make_continuous_cells, make_filelistpath, MB, NamedTemporaryDir,
-                    OptionBuilder_GMTK, PKG, _save_observations_chunk,
+                    OptionBuilder_GMTK, PKG, _save_observations_window,
                     VITERBI_PROG)
 
 # set once per file run
@@ -91,7 +91,7 @@ RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
 COVAR_TIED = True # would need to expand to MC, MX to change
-MAX_CHUNKS = 1000
+MAX_WINDOWS = 1000
 
 ISLAND = True
 
@@ -208,7 +208,7 @@ PREFIX_POSTERIOR = "posterior"
 
 PREFIX_VITERBI = "viterbi"
 PREFIX_LIKELIHOOD = "likelihood"
-PREFIX_CHUNK = "chunk"
+PREFIX_WINDOW = "window"
 PREFIX_PARAMS = "params"
 PREFIX_JT_INFO = "jt_info"
 PREFIX_JOB_LOG = "jobs"
@@ -237,7 +237,7 @@ SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
                      SUBDIRNAME_PARAMS]
 SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
 
-FLOAT_TAB_FIELDNAMES = ["filename", "chunk_index", "chrom", "start", "end"]
+FLOAT_TAB_FIELDNAMES = ["filename", "window_index", "chrom", "start", "end"]
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
                       "num_frames", "maxvmem", "cpu", "exit_status"]
 # XXX: should add num_subsegs as well, but it's complicated to pass
@@ -392,7 +392,7 @@ def make_fixedstep_header(chrom, start, resolution):
     start_1based = start+1
 
     # XXX: if there is an overhang of less than resolution, then
-    # having step/span = resolution means the last datum in a chunk
+    # having step/span = resolution means the last datum in a window
     # will actually extend too far. There's no point in fixing this
     # now, since we want to switch to bedGraph eventually anyway
     return FIXEDSTEP_HEADER % (chrom, start_1based, resolution, resolution)
@@ -494,7 +494,7 @@ def slice2range(s):
 
     return xrange(start, stop, step)
 
-def convert_chunks(attrs, name):
+def convert_windows(attrs, name):
     supercontig_start = attrs.start
     edges_array = getattr(attrs, name) + supercontig_start
 
@@ -1080,9 +1080,9 @@ class Runner(object):
         self.global_mem_usage = LockableDefaultDict(int)
 
         # data
-        # a "chunk" is what GMTK calls a segment
-        self.num_chunks = None
-        self.chunk_coords = None
+        # a "window" is what GMTK calls a segment
+        self.num_windows = None
+        self.window_coords = None
         self.mins = None
         self.maxs = None
         self.tracknames = None
@@ -1521,9 +1521,9 @@ class Runner(object):
     def make_obs_filepath(self, dirpath, prefix, suffix):
         return dirpath / (prefix + suffix)
 
-    def make_obs_filepaths(self, chrom, chunk_index, temp=False):
-        prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_CHUNKS))
-        prefix = prefix_feature_tmpl % chunk_index
+    def make_obs_filepaths(self, chrom, window_index, temp=False):
+        prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_WINDOWS))
+        prefix = prefix_feature_tmpl % window_index
 
         if temp:
             prefix = "".join([prefix, UUID, extsep])
@@ -1623,7 +1623,7 @@ class Runner(object):
         num_datapoints = self.num_datapoints
 
         if self.use_dinucleotide:
-            max_num_datapoints_track = sum(self.chunk_lens)
+            max_num_datapoints_track = sum(self.window_lens)
         else:
             max_num_datapoints_track = num_datapoints.max()
 
@@ -1680,9 +1680,9 @@ class Runner(object):
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
                           self.dirname, self.clobber)
 
-    def save_observations_chunk(self, float_filename, int_filename, float_data,
+    def save_observations_window(self, float_filename, int_filename, float_data,
                                 seq_data=None, supervision_data=None):
-        return _save_observations_chunk(float_filename, int_filename,
+        return _save_observations_window(float_filename, int_filename,
                                         float_data, self.resolution,
                                         self.distribution, seq_data,
                                         supervision_data)
@@ -1764,18 +1764,18 @@ class Runner(object):
         print_obs_filepaths_custom = partial(self.print_obs_filepaths,
                                              float_filelist, int_filelist,
                                              temp=self.identify)
-        save_observations_chunk = self.save_observations_chunk
+        save_observations_window = self.save_observations_window
 
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
 
-        zipper = izip(count(), self.used_supercontigs, self.chunk_coords)
+        zipper = izip(count(), self.used_supercontigs, self.window_coords)
 
-        for chunk_index, supercontig, (chrom, start, end) in zipper:
+        for window_index, supercontig, (chrom, start, end) in zipper:
             float_filepath, int_filepath = \
-                print_obs_filepaths_custom(chrom, chunk_index)
+                print_obs_filepaths_custom(chrom, window_index)
 
-            row = [float_filepath, str(chunk_index), chrom, str(start),
+            row = [float_filepath, str(window_index), chrom, str(start),
                    str(end)]
             float_tabwriter.writerow(row)
             print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
@@ -1799,7 +1799,7 @@ class Runner(object):
                 continuous_cells = \
                     self.make_continuous_cells(supercontig, start, end)
 
-                save_observations_chunk(float_filepath, int_filepath,
+                save_observations_window(float_filepath, int_filepath,
                                         continuous_cells, seq_cells,
                                         supervision_cells)
 
@@ -1837,16 +1837,16 @@ class Runner(object):
         seq = supercontig.seq
         len_seq = len(seq)
 
-        # chunk_start: relative to the beginning of the
+        # window_start: relative to the beginning of the
         # supercontig
-        chunk_start = start - supercontig.start
-        chunk_end = end - supercontig.start
+        window_start = start - supercontig.start
+        window_end = end - supercontig.start
 
-        if chunk_end < len_seq:
-            return seq[chunk_start:chunk_end+1]
-        elif chunk_end == len(seq):
-            seq_chunk = seq[chunk_start:chunk_end]
-            return append(seq_chunk, ord("N"))
+        if window_end < len_seq:
+            return seq[window_start:window_end+1]
+        elif window_end == len(seq):
+            seq_window = seq[window_start:window_end]
+            return append(seq_window, ord("N"))
         else:
             raise ValueError("sequence too short for supercontig")
 
@@ -1859,8 +1859,8 @@ class Runner(object):
         exclude_coords = self.exclude_coords
 
         num_tracks = None # this is before any subsetting
-        chunk_index = 0
-        chunk_coords = []
+        window_index = 0
+        window_coords = []
         num_bases = 0
         used_supercontigs = [] # continuous objects
         max_frames = self.max_frames
@@ -1902,10 +1902,10 @@ class Runner(object):
                     ends = [supercontig.end]
                 else:
                     attrs = supercontig.attrs
-                    starts = convert_chunks(attrs, "chunk_starts")
-                    ends = convert_chunks(attrs, "chunk_ends")
+                    starts = convert_windows(attrs, "window_starts")
+                    ends = convert_windows(attrs, "window_ends")
 
-                ## iterate through chunks and write
+                ## iterate through windows and write
                 ## izip so it can be modified in place
                 for thread_index, start, end in izip(count(), starts, ends):
                     if include_coords or exclude_coords:
@@ -1924,8 +1924,8 @@ class Runner(object):
                                           thread_index)
                             continue # consider the newly split sequences next
 
-                    num_bases_chunk = end - start
-                    num_frames = ceildiv(num_bases_chunk, self.resolution)
+                    num_bases_window = end - start
+                    num_frames = ceildiv(num_bases_window, self.resolution)
                     if not MIN_FRAMES <= num_frames:
                         text = " skipping short sequence of length %d" % num_frames
                         print >>sys.stderr, text
@@ -1951,18 +1951,18 @@ class Runner(object):
                         continue
 
                     # start: relative to beginning of chromosome
-                    chunk_coords.append((chrom, start, end))
+                    window_coords.append((chrom, start, end))
                     used_supercontigs.append(supercontig)
 
-                    num_bases += num_bases_chunk
+                    num_bases += num_bases_window
 
-                    chunk_index += 1
+                    window_index += 1
 
         self.subset_metadata()
 
-        self.num_chunks = chunk_index # already has +1 added to it
+        self.num_windows = window_index # already has +1 added to it
         self.num_bases = num_bases
-        self.chunk_coords = chunk_coords
+        self.window_coords = window_coords
 
         self.used_supercontigs = used_supercontigs
 
@@ -2510,12 +2510,12 @@ class Runner(object):
 
     def _make_viterbi_filenames(self, dirpath):
         viterbi_dirpath = dirpath / SUBDIRNAME_VITERBI
-        num_chunks = self.num_chunks
+        num_windows = self.num_windows
 
-        viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_chunks)
+        viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_windows)
                                 + EXT_BED)
         return [viterbi_dirpath / viterbi_filename_fmt % index
-                for index in xrange(num_chunks)]
+                for index in xrange(num_windows)]
 
     def make_viterbi_filenames(self):
         self.viterbi_filenames = \
@@ -2530,9 +2530,9 @@ class Runner(object):
 
     def make_posterior_filenames(self):
         make_posterior_filename = self.make_posterior_filename
-        chunk_range = xrange(self.num_chunks)
+        window_range = xrange(self.num_windows)
 
-        self.posterior_filenames = map(make_posterior_filename, chunk_range)
+        self.posterior_filenames = map(make_posterior_filename, window_range)
 
     def load_supervision(self):
         supervision_type = self.supervision_type
@@ -2582,9 +2582,9 @@ class Runner(object):
         # do first, because it sets self.num_tracks and self.tracknames
             self.prep_observations(genome)
 
-            # sets self.chunk_lens, needed for save_structure() to do
+            # sets self.window_lens, needed for save_structure() to do
             # Dirichlet stuff (but rewriting structure is unnecessary)
-            self.make_chunk_lens()
+            self.make_window_lens()
 
             self.load_seg_table()
 
@@ -2720,7 +2720,7 @@ class Runner(object):
         range_num_segs = xrange(self.num_segs)
         wig_filenames = map(self.make_posterior_wig_filename, range_num_segs)
 
-        zipper = izip(infilenames, self.chunk_coords)
+        zipper = izip(infilenames, self.window_coords)
 
         wig_files_unentered = [gzip_open(wig_filename, "w")
                                for wig_filename in wig_filenames]
@@ -2729,8 +2729,8 @@ class Runner(object):
             for seg_index, wig_file in enumerate(wig_files):
                 print >>wig_file, self.make_wig_header_posterior(seg_index)
 
-            for infilename, chunk_coord in zipper:
-                load_posterior_write_wig(chunk_coord, self.resolution,
+            for infilename, window_coord in zipper:
+                load_posterior_write_wig(window_coord, self.resolution,
                                          self.num_segs, infilename, wig_files)
 
         # delete original input files because they are enormous
@@ -2746,21 +2746,21 @@ class Runner(object):
 
         return prog
 
-    def make_acc_filename(self, thread_index, chunk_index):
-        return self.make_filename(PREFIX_ACC, thread_index, chunk_index,
+    def make_acc_filename(self, thread_index, window_index):
+        return self.make_filename(PREFIX_ACC, thread_index, window_index,
                                   EXT_BIN, subdirname=SUBDIRNAME_ACC)
 
-    def make_posterior_filename(self, chunk_index):
-        return self.make_filename(PREFIX_POSTERIOR, chunk_index, EXT_TXT,
+    def make_posterior_filename(self, window_index):
+        return self.make_filename(PREFIX_POSTERIOR, window_index, EXT_TXT,
                                   subdirname=SUBDIRNAME_POSTERIOR)
 
-    def make_job_name_train(self, thread_index, round_index, chunk_index):
+    def make_job_name_train(self, thread_index, round_index, window_index):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, thread_index,
-                                     round_index, chunk_index,
+                                     round_index, window_index,
                                      self.dirpath.name, UUID)
 
-    def make_job_name_identify(self, prefix, chunk_index):
-        return "%s%d.%s.%s" % (prefix, chunk_index, self.dirpath.name,
+    def make_job_name_identify(self, prefix, window_index):
+        return "%s%d.%s.%s" % (prefix, window_index, self.dirpath.name,
                                UUID)
 
     def make_gmtk_kwargs(self):
@@ -2798,25 +2798,25 @@ class Runner(object):
 
         return res
 
-    def make_chunk_lens(self):
-        self.chunk_lens = [end - start
-                           for chr, start, end in self.chunk_coords]
+    def make_window_lens(self):
+        self.window_lens = [end - start
+                           for chr, start, end in self.window_coords]
 
-    def chunk_lens_sorted(self, reverse=True):
+    def window_lens_sorted(self, reverse=True):
         """
-        yields (chunk_index, chunk_mem_usage)
+        yields (window_index, window_mem_usage)
 
-        if reverse: sort chunks by decreasing size, so the most
-        difficult chunks are dropped in the queue first
+        if reverse: sort windows by decreasing size, so the most
+        difficult windows are dropped in the queue first
         """
-        chunk_lens = self.chunk_lens
+        window_lens = self.window_lens
 
         # XXX: use key=itemgetter(2) and enumerate instead of this silliness
-        zipper = sorted(izip(chunk_lens, count()), reverse=reverse)
+        zipper = sorted(izip(window_lens, count()), reverse=reverse)
 
         # XXX: use itertools instead of a generator
-        for chunk_len, chunk_index in zipper:
-            yield chunk_index, chunk_len
+        for window_len, window_index in zipper:
+            yield window_index, window_len
 
     def calc_bayesian_info_criterion(self, log_likelihood):
         """
@@ -2827,7 +2827,7 @@ class Runner(object):
         n: # of bases
         N: # of sequences
         """
-        model_penalty = (self.num_free_params * log(self.num_chunks))
+        model_penalty = (self.num_free_params * log(self.num_windows))
         #print >>sys.stderr, "num_free_params = %s; num_bases = %s; model_penalty = %s" \
         #    % (self.num_free_params, self.num_bases, model_penalty)
 
@@ -2886,7 +2886,7 @@ class Runner(object):
         return RestartableJob(session, job_tmpl_factory, self.global_mem_usage,
                               mem_usage_key)
 
-    def queue_train(self, thread_index, round_index, chunk_index, num_frames=0,
+    def queue_train(self, thread_index, round_index, window_index, num_frames=0,
                     **kwargs):
         """
         this calls Runner.queue_gmtk()
@@ -2897,7 +2897,7 @@ class Runner(object):
         kwargs["inputMasterFile"] = self.input_master_filename
 
         prog = self.train_prog
-        name = self.make_job_name_train(thread_index, round_index, chunk_index)
+        name = self.make_job_name_train(thread_index, round_index, window_index)
 
         return self.queue_gmtk(prog, kwargs, name, num_frames)
 
@@ -2908,21 +2908,21 @@ class Runner(object):
         res = RestartableJobDict(self.session, self.job_log_file)
 
         make_acc_filename_custom = partial(self.make_acc_filename, thread_index)
-        num_chunks = self.num_chunks
+        num_windows = self.num_windows
 
-        for chunk_index, chunk_len in self.chunk_lens_sorted():
-            acc_filename = make_acc_filename_custom(chunk_index)
-            kwargs_chunk = dict(trrng=chunk_index, storeAccFile=acc_filename,
+        for window_index, window_len in self.window_lens_sorted():
+            acc_filename = make_acc_filename_custom(window_index)
+            kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
                                 **kwargs)
 
-            # -dirichletPriors T only on the first chunk
-            kwargs_chunk["dirichletPriors"] = (chunk_index == 0)
+            # -dirichletPriors T only on the first window
+            kwargs_window["dirichletPriors"] = (window_index == 0)
 
-            num_frames = self.chunk_lens[chunk_index]
+            num_frames = self.window_lens[window_index]
 
             restartable_job = self.queue_train(thread_index, round_index,
-                                               chunk_index, num_frames,
-                                               **kwargs_chunk)
+                                               window_index, num_frames,
+                                               **kwargs_window)
             res.queue(restartable_job)
 
         return res
@@ -2937,12 +2937,12 @@ class Runner(object):
         cpp_options = self.make_cpp_options(input_params_filename,
                                        output_params_filename)
 
-        last_chunk = self.num_chunks - 1
+        last_window = self.num_windows - 1
 
         kwargs = dict(outputMasterFile=self.output_master_filename,
                       cppCommandOptions=cpp_options,
                       trrng="nil",
-                      loadAccRange="0:%s" % last_chunk,
+                      loadAccRange="0:%s" % last_window,
                       loadAccFile=acc_filename,
                       **kwargs)
 
@@ -3248,12 +3248,12 @@ class Runner(object):
         for name, src_filename, dst_filename in zipper:
             self.copy_results(name, src_filename, dst_filename)
 
-    def is_viterbi_chunk_complete(self, chunk_index):
+    def is_viterbi_window_complete(self, window_index):
         old_filenames = self.old_viterbi_filenames
         if not old_filenames:
             return False
 
-        old_filename = old_filenames[chunk_index]
+        old_filename = old_filenames[window_index]
         try:
             with open(old_filename) as oldfile:
                 lines = oldfile.readlines()
@@ -3263,46 +3263,46 @@ class Runner(object):
             else:
                 raise
 
-        chunk_coords = self.chunk_coords[chunk_index]
-        (chunk_chrom, chunk_start, chunk_end) = chunk_coords
+        window_coords = self.window_coords[window_index]
+        (window_chrom, window_start, window_end) = window_coords
 
         # XXX: duplicative
         row, line_coords = parse_bed4(lines[0])
         (line_chrom, line_start, line_end, seg) = line_coords
-        if line_chrom != chunk_chrom or int(line_start) != chunk_start:
+        if line_chrom != window_chrom or int(line_start) != window_start:
             return False
 
         row, line_coords = parse_bed4(lines[-1])
         (line_chrom, line_start, line_end, seg) = line_coords
-        if line_chrom != chunk_chrom or int(line_end) != chunk_end:
+        if line_chrom != window_chrom or int(line_end) != window_end:
             return False
 
         # copy the old filename to where the job's output would have
         # landed
-        path(old_filename).copy2(self.viterbi_filenames[chunk_index])
+        path(old_filename).copy2(self.viterbi_filenames[window_index])
 
-        print >>sys.stderr, "chunk %d already complete" % chunk_index
+        print >>sys.stderr, "window %d already complete" % window_index
 
         return True
 
-    def _queue_identify(self, restartable_jobs, chunk_index, prefix_job_name,
+    def _queue_identify(self, restartable_jobs, window_index, prefix_job_name,
                         prog, kwargs, output_filenames):
         prog = self.prog_factory(prog)
-        job_name = self.make_job_name_identify(prefix_job_name, chunk_index)
-        output_filename = output_filenames[chunk_index]
+        job_name = self.make_job_name_identify(prefix_job_name, window_index)
+        output_filename = output_filenames[window_index]
 
-        kwargs = self.get_identify_kwargs(chunk_index, kwargs)
+        kwargs = self.get_identify_kwargs(window_index, kwargs)
 
         if prog == VITERBI_PROG:
-            chunk_coord = self.chunk_coords[chunk_index]
-            chunk_chrom, chunk_start, chunk_end = chunk_coord
+            window_coord = self.window_coords[window_index]
+            window_chrom, window_start, window_end = window_coord
 
             float_filepath, int_filepath = \
-                self.make_obs_filepaths(chunk_chrom, chunk_index, temp=True)
+                self.make_obs_filepaths(window_chrom, window_index, temp=True)
 
             prefix_args = [find_executable("segway-task"), "run", "viterbi",
-                           output_filename, chunk_chrom, chunk_start,
-                           chunk_end, self.resolution, self.num_segs,
+                           output_filename, window_chrom, window_start,
+                           window_end, self.resolution, self.num_segs,
                            self.genomedata_dirname, float_filepath,
                            int_filepath, self.distribution,
                            self.track_indexes_text]
@@ -3310,7 +3310,7 @@ class Runner(object):
         else:
             prefix_args = []
 
-        num_frames = self.chunk_lens[chunk_index]
+        num_frames = self.window_lens[window_index]
 
         restartable_job = self.queue_gmtk(prog, kwargs, job_name,
                                           num_frames,
@@ -3319,7 +3319,7 @@ class Runner(object):
 
         restartable_jobs.queue(restartable_job)
 
-    def get_identify_kwargs(self, chunk_index, extra_kwargs):
+    def get_identify_kwargs(self, window_index, extra_kwargs):
         cpp_command_options = self.make_cpp_options(self.params_filename)
 
         res = dict(inputMasterFile=self.input_master_filename,
@@ -3359,12 +3359,12 @@ class Runner(object):
 
             restartable_jobs = RestartableJobDict(session, self.job_log_file)
 
-            for chunk_index, chunk_len in self.chunk_lens_sorted():
+            for window_index, window_len in self.window_lens_sorted():
                 queue_identify_custom = partial(self._queue_identify,
-                                                restartable_jobs, chunk_index)
+                                                restartable_jobs, window_index)
 
                 if (self.identify
-                    and not self.is_viterbi_chunk_complete(chunk_index)):
+                    and not self.is_viterbi_window_complete(window_index)):
                     queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
                                           VITERBI_PROG, viterbi_kwargs,
                                           viterbi_filenames)

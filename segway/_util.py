@@ -285,7 +285,7 @@ def make_dinucleotide_int_data(seq):
     # column_stacking at the end
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
 
-def _save_observations_chunk(float_filename, int_filename, float_data,
+def _save_observations_window(float_filename, int_filename, float_data,
                              resolution, distribution, seq_data=None,
                              supervision_data=None):
     # this is now a naked function so that it can be called by task.py
@@ -341,9 +341,9 @@ def _make_continuous_cells(supercontig, start, end, track_indexes):
     if continuous is None:
         return
 
-    # chunk_start: relative to the beginning of the supercontig
-    chunk_start = start - supercontig.start
-    chunk_end = end - supercontig.start
+    # window_start: relative to the beginning of the supercontig
+    window_start = start - supercontig.start
+    window_end = end - supercontig.start
 
     # XXXopt: reading all the extra tracks is probably quite wasteful
     # given the genomedata striping pattern; it is probably better to
@@ -353,7 +353,7 @@ def _make_continuous_cells(supercontig, start, end, track_indexes):
 
     # first, extract a contiguous subset of the tracks in the dataset,
     # which is a superset of the tracks that are used
-    rows = continuous[chunk_start:chunk_end, min_col:max_col]
+    rows = continuous[window_start:window_end, min_col:max_col]
 
     # extract only the tracks that are used correct for min_col offset
     return rows[..., track_indexes - min_col]

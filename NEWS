@@ -1,6 +1,8 @@
 0.2.0:
 
 * segway: add hierarchical segmentation
+* segway: fix bug where only one random start is allowed
+* segway: change "chunk" to "window" to avoid confusion with GMTK usage of chunk
 
 0.1.21:
 
