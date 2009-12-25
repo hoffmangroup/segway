@@ -1902,8 +1902,8 @@ class Runner(object):
                     ends = [supercontig.end]
                 else:
                     attrs = supercontig.attrs
-                    starts = convert_windows(attrs, "window_starts")
-                    ends = convert_windows(attrs, "window_ends")
+                    starts = convert_windows(attrs, "chunk_starts")
+                    ends = convert_windows(attrs, "chunk_ends")
 
                 ## iterate through windows and write
                 ## izip so it can be modified in place
