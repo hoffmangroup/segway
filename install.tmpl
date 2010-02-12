@@ -74,8 +74,8 @@ make -C featureFileIO install "OPTFLAGS=$OPTFLAGS" \
 make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
 
 mkdir -p "$dir/etc"
-echo "$version" > "$dir/etc/gmtk.version"
 declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
+echo "$version" > "$dir/etc/gmtk.version"
 cd ..
 rm -rf $filebase
 rm -f $file
