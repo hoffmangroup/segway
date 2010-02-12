@@ -3,6 +3,8 @@
 * segway: add hierarchical segmentation
 * segway: fix bug where only one random start is allowed
 * segway: change "chunk" to "window" to avoid confusion with GMTK usage of chunk
+* GMTK-installation: fixed default shell to be /bin/bash as 'declare' call in
+  installation script caused GMTK installation to fail.
 
 0.1.21:
 
