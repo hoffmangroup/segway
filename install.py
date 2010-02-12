@@ -130,13 +130,13 @@ make linux "OPTFLAGS=$OPTFLAGS"
 make depend "OPTFLAGS=$OPTFLAGS"
 
 make "OPTFLAGS=$OPTFLAGS"
-make -C featureFileIO install "OPTFLAGS=$OPTFLAGS"\
+make -C featureFileIO install "OPTFLAGS=$OPTFLAGS" \
     "INSTALL=install" "install_prefix=$dir"
 make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
 
 mkdir -p "$dir/etc"
-declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
 echo "$version" > "$dir/etc/gmtk.version"
+declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
 cd ..
 rm -rf $filebase
 rm -f $file
@@ -173,7 +173,7 @@ class InteractiveShell(object):
         self.env.update(env)
         self.old_cwd = os.getcwd()
 
-    def execute(self, command, verbose=False):
+    def execute(self, command, shell="/bin/bash", verbose=False):
         """Execute the given string command and return the retcode."""
 
         if verbose:
@@ -193,7 +193,7 @@ class InteractiveShell(object):
             os.chdir(dest)
             return 0
         else:
-            return call(str(command), shell=True,
+            return call(str(command), executable=shell, shell=True,
                         env=self.env, cwd=os.getcwd())
 
     def run_script(self, script, verbose=False):
@@ -896,7 +896,6 @@ def prompt_yes_no(query, default="Y"):
     while True:
         # Query user and get response
         print >>sys.stderr, "%s (Y/n) [%s] " % (query, default),
-        sys.stdin.flush()
         response = raw_input().strip().lower()
         if len(response) == 0:
             response = default.strip().lower()
@@ -932,7 +931,6 @@ def prompt_user(query, default=None, choices=None):
             msg = "%s [%s] " % (prompt, default)
 
         print >>sys.stderr, msg,
-        sys.stdin.flush()
         response = raw_input().strip()
 
         if len(response) == 0:  # User didn't enter a response

@@ -69,13 +69,13 @@ make linux "OPTFLAGS=$OPTFLAGS"
 make depend "OPTFLAGS=$OPTFLAGS"
 
 make "OPTFLAGS=$OPTFLAGS"
-make -C featureFileIO install "OPTFLAGS=$OPTFLAGS"\
+make -C featureFileIO install "OPTFLAGS=$OPTFLAGS" \
     "INSTALL=install" "install_prefix=$dir"
 make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
 
 mkdir -p "$dir/etc"
-declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
 echo "$version" > "$dir/etc/gmtk.version"
+declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
 cd ..
 rm -rf $filebase
 rm -f $file
