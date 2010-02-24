@@ -85,8 +85,7 @@ MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
 MIN_DRMAA_VERSION = "0.4a3"
 
-LSF_DRMAA_URL = "http://softlayer.dl.sourceforge.net/project/lsf-drmaa" \
-    "/lsf_drmaa/1.0.3/lsf_drmaa-1.0.3.tar.gz"
+LSF_DRMAA_URL = "http://fury.man.poznan.pl/~mmamonski/lsf_drmaa-1.0.4.tar.gz"
 
 GMTK_USER = "segway"
 GMTK_VERSION_FILENAME = "gmtk.version"
