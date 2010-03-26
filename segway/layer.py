@@ -121,7 +121,10 @@ def layer(infilename, outfilename, mnemonic_filename=None):
             end = segments_array.max()
 
             for label in labels_sorted:
-                color = colors[label]
+                try:
+                    color = colors[label]
+                except KeyError:
+                    continue  # Label that wasn't in segmentation
 
                 segments_label_rows = segments_array[:, OFFSET_LABEL] == label
                 segments_label = segments_array[segments_label_rows,

@@ -6,7 +6,9 @@ __version__ = "$Revision$"
 # Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
+from contextlib import closing
 from functools import partial
+from gzip import open as _gzip_open
 from itertools import repeat
 from os import extsep
 import shutil
@@ -20,17 +22,12 @@ from numpy import (add, append, arcsinh, array, column_stack, diff, empty,
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
 from pkg_resources import resource_filename, resource_string
-from tables import openFile
+from tables import Filters, openFile
 
 # XXX: check that these are all in use
-# XXX: should not use underscore imports from other packages
 
 # these are loaded by other modules indirectly
 # ignore PyFlakes warnings here
-from genomedata._util import (EXT_GZ, fill_array, FILTERS_GZIP, get_tracknames,
-                              gzip_open, init_num_obs, LightIterator,
-                              new_extrema, walk_supercontigs,
-                              walk_continuous_supercontigs)
 
 try:
     # Python 2.6
@@ -40,9 +37,12 @@ except NameError:
 
 PKG_DATA = ".".join([PKG, "data"])
 
+FILTERS_GZIP = Filters(complevel=1)
+
 EXT_LIST = "list"
 EXT_INT = "int"
 EXT_FLOAT = "float32"
+EXT_GZ = "gz"
 
 SUFFIX_GZ = extsep + EXT_GZ
 
@@ -131,6 +131,20 @@ def get_label_color(label):
 
     return ",".join(map(str, color))
 
+# XXX: suggest as default
+def fill_array(scalar, shape, dtype=None, *args, **kwargs):
+    if dtype is None:
+        dtype = array(scalar).dtype
+
+    res = empty(shape, dtype, *args, **kwargs)
+    res.fill(scalar)
+
+    return res
+
+# XXX: suggest as default
+def gzip_open(*args, **kwargs):
+    return closing(_gzip_open(*args, **kwargs))
+
 def maybe_gzip_open(filename, *args, **kwargs):
     if filename.endswith(SUFFIX_GZ):
         return gzip_open(filename, *args, **kwargs)
@@ -144,6 +158,39 @@ def constant(val):
     return repeat(val).next
 
 array_factory = constant(array([]))
+
+# XXX: replace with genomedata.Chromosome.tracknames_continuous
+def get_tracknames(chromosome):
+    return chromosome.root._v_attrs.tracknames.tolist()
+
+def init_num_obs(num_obs, continuous):
+    curr_num_obs = continuous.shape[1]
+    assert num_obs is None or num_obs == curr_num_obs
+
+    return curr_num_obs
+
+def new_extrema(func, data, extrema):
+    curr_extrema = func(data, 0)
+
+    return func([extrema, curr_extrema], 0)
+
+# XXX: replace with iter(genomedata.Chromosome)
+def walk_supercontigs(h5file):
+    root = h5file.root
+
+    for supercontig in h5file.walkGroups():
+        if supercontig == root:
+            continue
+
+        yield supercontig
+
+# XXX: replace with genomedata.Chromosome.itercontinuous
+def walk_continuous_supercontigs(h5file):
+    for supercontig in walk_supercontigs(h5file):
+        try:
+            yield supercontig, supercontig.continuous
+        except NoSuchNodeError:
+            continue
 
 # XXX: duplicates bed.py?
 def load_coords(filename):
