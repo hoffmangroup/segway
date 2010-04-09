@@ -49,8 +49,8 @@ def load_mnemonics(filename):
     if filename is not None:
         with open(filename) as infile:
             for row in DictReader(infile):
-                mnemonics[row["index"]] = row["mnemonic"]
-                ordering.append(int(row["index"]))
+                mnemonics[row["old"]] = row["new"]
+                ordering.append(int(row["old"]))
 
     return mnemonics, ordering
 
