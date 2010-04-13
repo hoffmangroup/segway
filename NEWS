@@ -3,6 +3,8 @@
 * segway: add hierarchical segmentation
 * segway: fix bug where only one random start is allowed
 * segway: change "chunk" to "window" to avoid confusion with GMTK usage of chunk
+* segway: updated system check to consider GE* _and SGE*_ systems as SGE.
+* segway: removed dependence upon genomedata._util
 * GMTK-installation: fixed default shell to be /bin/bash as 'declare' call in
   installation script caused GMTK installation to fail.
 

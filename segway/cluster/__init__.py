@@ -12,7 +12,7 @@ from drmaa import Session
 def get_driver_name(session):
     drms_info = session.drmsInfo
 
-    if drms_info.startswith("GE"):
+    if drms_info.startswith("GE") or drms_info.startswith("SGE"):
         return "sge"
     elif drms_info.startswith("Platform LSF"):
         return "lsf"
