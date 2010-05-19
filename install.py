@@ -445,7 +445,7 @@ class Environment(object):
             query = """
 May I create %s?
 It will be used by distutils to install new Python modules
-into this directory (and subdirectories) automatically.""" % cfg_file)
+into this directory (and subdirectories) automatically.""" % cfg_file
             permission = prompt_yes_no(query)
             if permission:
                 self._write_pydistutils_cfg(cfg_path)
