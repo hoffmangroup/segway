@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 """
-install.py
-
 General installation script for the segway package. Interacts with
 the user to configure the environment to download and install all
 dependencies and the segway package.
@@ -35,20 +33,6 @@ SEGWAY_USER = "segway"
 SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
     "segway-%s.tar.gz" % PKG_VERSION
 
-
-LSF_DRMAA_INSTALL_SCRIPT = """
-cd $tmpdir
-wget $url -O $file
-if [ ! -d $filebase ]; then tar -xzf $file; fi
-cd $filebase
-./configure --prefix=$dir
-make
-make install
-cd ..
-rm -rf $filebase
-rm -f $file
-"""
-
 # also has keywords: user, password, OPTFLAGS, ARCH_GCC, SSELEVEL
 GMTK_INSTALL_SCRIPT = """
 cd $tmpdir
@@ -75,9 +59,16 @@ make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
 mkdir -p "$dir/etc"
 declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
 echo "$version" > "$dir/etc/gmtk.version"
-cd ..
-rm -rf $filebase
-rm -f $file
+"""
+
+LSF_DRMAA_INSTALL_SCRIPT = """
+cd $tmpdir
+wget $url -O $file
+if [ ! -d $filebase ]; then tar -xzf $file; fi
+cd $filebase
+./configure --prefix=$dir
+make
+make install
 """
 
 SEGWAY_INSTALL_SCRIPT = """
@@ -86,215 +77,201 @@ wget --user=$user --password=$password $url -O $file
 if [ ! -d $filebase ]; then tar -xzf $file; fi
 cd $filebase
 $python setup.py install
-cd ..
-rm -rf $filebase
-rm -f $file
 """
 
 ${COMMON_CODE_BODY}
 
+class GmtkInstaller(ScriptInstaller):
+    name = "GMTK"
+    min_version = GMTK_VERSION
+    url = GMTK_URL
+    install_script = GMTK_INSTALL_SCRIPT
+
+    def __init__(self, env):
+        self.env = env
+        super(self.__class__, self).__init__()
+
+    def get_version_file(self, gmtkdir):
+        return os.path.join(gmtkdir, "etc", GMTK_VERSION_FILENAME)
+
+    def get_version(self):
+        """Returns the version in the gmtk version file or None if not found"""
+        version_file = self.get_version_file(self.env.arch_home)
+        if not os.path.isfile(version_file):
+            cmd = Popen(["which", "gmtkViterbi"], stdout=PIPE, stderr=PIPE)
+            if cmd.poll() == 0:
+                stdout = cmd.communicate()[0].strip()
+                bindir = stdout[0]
+                gmtkdir = os.path.dirname(os.path.dirname(bindir))
+                version_file = self.get_version_file(gmtkdir)
+            else:
+                return None
+
+        if version_file and os.path.isfile(version_file):
+            ifp = open(version_file)
+            try:
+                version = ifp.readline().strip()
+            finally:
+                ifp.close()
+
+            if len(version) > 0:
+                return version
+
+        return None
+
+    def install(self):
+        query = "\nALERT: GMTK source code is password protected.\
+    \n[Username: %s] Password: " % GMTK_USER
+        password = prompt_user(query)
+
+        optflags = self.get_optflags()
+        env = {"OPTFLAGS": optflags}
+        self.script_install(dir=self.env.arch_home, safe=True, env=env,
+                            user=GMTK_USER, password=password)
+
+    def get_optflags(self):
+        if "OPTFLAGS" in os.environ:
+            return os.environ["OPTFLAGS"]
+
+        if "ARCH" in os.environ:
+            arch = os.environ["ARCH"]
+        else:
+            arch = "-".join([platform.system(), platform.machine()])
+
+        arch_gcc = None
+        sselevel = None
+        if arch in ["Linux-i386", "Linux-x86_64"] or arch.startswith("CYGWIN"):
+            # Determine SSELEVEL
+            sselevel = 2  # default
+            cmd = Popen('grep "^flags" /proc/cpuinfo | cut -d : -f 2',
+                        shell=True, stdout=PIPE)
+            stdout, stderr = cmd.communicate()
+            for line in stdout.split("\n"):
+                tokens = line.strip().split()
+                if "bpni" in tokens:
+                    sselevel = 3
+
+            # Determine ARCH_GCC
+            cmd = Popen('grep "^model name" /proc/cpuinfo | cut -d : -f 2',
+                        shell=True, stdout=PIPE)
+            cpu_model, stderr = cmd.communicate()
+            if "Opteron" in cpu_model:
+                arch_gcc = "opteron"
+            elif "Pentium" in cpu_model or "Xeon" in cpu_model:
+                if arch == "Linux-i386" or arch.startswith("CYGWIN"):
+                    if sselevel == 3:
+                        arch_gcc = "prescott"
+                    else:
+                        arch_gcc = "pentium4"
+                elif arch == "Linux-x86_64":
+                    arch_gcc = "nocona"
+
+        optflags = "-g -O3 -D_TABLE"
+        if arch_gcc:
+            optflags += " -march=%s" % arch_gcc
+        if sselevel:
+            optflags += " -mfpmath=sse -msse%d" % sselevel
+
+        return optflags
+
+
+class LsfDrmaaInstaller(ScriptInstaller):
+    name = "FedStage DRMAA for LSF"
+    url = LSF_DRMAA_URL
+    install_script = LSF_DRMAA_INSTALL_SCRIPT
+
+    def __init__(self, env):
+        self.env = env
+        super(self.__class__, self).__init__()
+
+    def get_version(self):
+        """Returns True if library found, None otherwise."""
+        return can_find_library("libdrmaa.so")
+
+    def install(self):
+        drmaa_dir = self.prompt_install_path(self.env.arch_home)
+        self.script_install(dir=drmaa_dir)
+        self.drmaa_dir = drmaa_dir
+
+    def cleanup(self, success):
+        if success and self.drmaa_dir:
+            # Save environment variable for drmaa-python
+            self.env.shell.save_to_var("DRMAA_LIBRARY_PATH", self.drmaa_dir)
+
+        super(self.__class__, self).cleanup(success)
+
+
+class DrmaaInstaller(EasyInstaller):
+    name = "drmaa"
+    min_version = MIN_DRMAA_VERSION
+    get_version = EasyInstaller.get_egg_version
+
+    def __init__(self, env):
+        self.env = env
+        super(self.__class__, self).__init__()
+
+    def start_install(self):
+        print >>sys.stderr, "\nSearching for LSF or SGE...",
+        lsf_found = self.env.has_lsf()
+        sge_found = self.env.has_sge()
+        if not (lsf_found or sge_found):
+            print >>sys.stderr, "not found."
+            print >> sys.stderr, """
+Segway can only be run where there is a cluster management system.
+I was unable to find either an LSF or SGE system.
+Please try reinstalling on a system with one of these installed.
+"""
+            return False
+
+        print >>sys.stderr, "found!"
+        if lsf_found and not sge_found:
+            # Need to download and install FedStage lsf-drmaa
+            installer = LsfDrmaaInstaller(self.env)
+            success = installer.run()
+            if not success:
+                print >>sys.stderr, "%s is required for %s" % \
+                    (installer.name, self.name)
+                return False
+
+        return True
+
+
+class SegwayInstaller(ScriptInstaller, EasyInstaller):
+    name = "Segway"
+    min_version = PKG_VERSION
+    url = SEGWAY_URL
+    install_script = SEGWAY_INSTALL_SCRIPT
+    get_version = EasyInstaller.get_egg_version
+
+    def install(self):
+        query = "\nALERT: Segway source code is password protected.\
+\n[Username: %s] Password: " % SEGWAY_USER
+        password = prompt_user(query)
+        self.script_install(user=SEGWAY_USER, password=password)
+
+
 ############################## MAIN #########################
 def main(args=sys.argv[1:]):
-    # Set up shell details
-    try:
-        shell_name = os.path.basename(os.environ["SHELL"])
-    except KeyError:
-        shell_name = None
-    shell = ShellManager(shell_name)
+    env = Environment()
+    env.initialize()
 
-    try:
+    installers = [SetuptoolsInstaller(env),
+                  Hdf5Installer(env),
+                  NumpyInstaller(),
+                  DrmaaInstaller(env),
+                  GmtkInstaller(env),
+                  SegwayInstaller()]
 
-        arch_home = setup_arch_home()
-        prompt_set_env(shell, "ARCHHOME", fix_path(arch_home))
+    for installer in installers:
+        installer.run()
+        # Next step may need just-installed eggs, so update site list
+        env.refresh_packages()
 
-        python_home, default_python_home = setup_python_home(arch_home)
-        # Add python_home to PYTHONPATH
-        prompt_add_to_env(shell, "PYTHONPATH", python_home)
+    # DONE: Test package installations?
+    TestSuite().run([PytablesTester()])
 
-        script_home, default_script_home = setup_script_home(arch_home)
-        # Add script_home to PATH
-        prompt_add_to_env(shell, "PATH", script_home)
+    env.close()
 
-        # Maybe create pydistutils.cfg
-        prompt_create_cfg(arch_home, python_home, default_python_home,
-                          script_home, default_script_home)
-
-        prompt_install_setuptools(python_home)
-
-        setup_hdf5_installation(shell, arch_home)
-
-        prompt_install_numpy()
-
-        prompt_install_gmtk(arch_home)
-        #check_executable_in_path("gmtkViterbi")
-
-        setup_drmaa_installation(shell, arch_home)
-
-        prompt_install_segway()
-
-        # Test package installations
-        prompt_test_packages(python_home)
-
-        print >>sys.stderr, "\n============ Installation complete! ==========="
-        print >>sys.stderr, ("* Source your ~/.*rc file to update your"
-                             " environment *")
-    finally:  # Clean up
-        shell.close()
-
-########################### GET VERSION ########################
-def get_segway_version():
-    """Returns segway version as a string or None if not found or installed
-
-    Since segway __version__ is currently a revision number, get the full
-    number from pkg_resources
-    """
-    return get_egg_version("segway")
-
-def is_lsf_drmaa_installed():
-    """Returns True if library found, None otherwise."""
-    return can_find_library("libdrmaa.so")
-
-def get_drmaa_version():
-    """Returns drmaa-python version as a string or None if not found or
-    installed
-    """
-    return get_egg_version("drmaa")
-
-def get_gmtk_version():
-    """Returns the version in the gmtk version file or None if not found"""
-    if "ARCHHOME" in os.environ:
-        gmtkdir = fix_path(os.environ["ARCHHOME"])
-    else:
-        cmd = Popen(["which", "gmtkViterbi"], stdout=PIPE, stderr=PIPE)
-        if cmd.poll() == 0:
-            stdout = cmd.communicate()[0].strip()
-            bindir = stdout[0]
-            gmtkdir = os.path.dirname(os.path.dirname(bindir))
-        else:
-            return None
-
-    version_filename = os.path.join(gmtkdir, "etc", GMTK_VERSION_FILENAME)
-    if os.path.isfile(version_filename):
-        ifp = open(version_filename)
-        version = ifp.readline().strip()
-        if len(version) > 0:
-            return version
-
-    return None
-
-##################### SPECIFIC PROGRAM INSTALLERS ################
-def setup_drmaa_installation(shell, arch_home):
-    return _abort_skip_install(prompt_drmaa_installation, shell, arch_home)
-
-def prompt_drmaa_installation(shell, arch_home):
-    print >>sys.stderr, "\nSearching for LSF or SGE...",
-    lsf_found = has_lsf()
-    sge_found = has_sge()
-    if not (lsf_found or sge_found):
-        print >>sys.stderr, "not found."
-        raise InstallationError("Segway can only be run where there is \
-a cluster management system.\nI was unable to find either an LSF or SGE \
-system.\nPlease try reinstalling on a system with one of these installed.")
-
-    print >>sys.stderr, "found!"
-    if lsf_found and not sge_found:
-        # Need to download and install FedStage lsf-drmaa
-        lsf_drmaa_dir = prompt_install_lsf_drmaa(arch_home)
-        if lsf_drmaa_dir:
-            prompt_add_to_env(shell, "DRMAA_LIBRARY_PATH", lsf_drmaa_dir)
-
-    return prompt_install_drmaa()
-
-def prompt_install_lsf_drmaa(arch_home):
-    return _installer("FedStage DRMAA for LSF", install_lsf_drmaa,
-                      is_lsf_drmaa_installed, url=LSF_DRMAA_URL,
-                      arch_home=arch_home)
-
-def prompt_install_drmaa():
-    return _installer("drmaa-python", install_drmaa, get_drmaa_version,
-                      install_prompt=EASY_INSTALL_PROMPT)
-
-def prompt_install_gmtk(arch_home):
-    return _installer("gmtk", install_gmtk, get_gmtk_version,
-                      arch_home=arch_home)
-
-def prompt_install_segway():
-    return _installer("segway", install_segway, get_segway_version,
-                      install_prompt=EASY_INSTALL_PROMPT)
-
-def install_lsf_drmaa(arch_home, *args, **kwargs):
-    progname = "FedStage DRMAA for LSF"
-    drmaa_dir = prompt_install_path(progname, arch_home)
-    install_dir = install_script(progname, drmaa_dir,
-                                 LSF_DRMAA_INSTALL_SCRIPT,
-                                 url=LSF_DRMAA_URL)
-    return install_dir
-
-def install_drmaa(min_version=MIN_DRMAA_VERSION, *args, **kwargs):
-    return easy_install("drmaa", min_version=min_version)
-
-def install_gmtk(arch_home, *args, **kwargs):
-    query = "\nALERT: GMTK source code is password protected.\
-\n[Username: %s] Password: " % GMTK_USER
-    password = prompt_user(query)
-    optflags = get_gmtk_optflags()
-    env = {"OPTFLAGS": optflags}
-    return install_script("GMTK", arch_home, GMTK_INSTALL_SCRIPT,
-                          url=GMTK_URL, user=GMTK_USER, password=password,
-                          env=env, safe=True)
-
-def install_segway(*args, **kwargs):
-    query = "\nALERT: Segway source code is password protected.\
-\n[Username: %s] Password: " % SEGWAY_USER
-    password = prompt_user(query)
-    return install_script("segway", ".", SEGWAY_INSTALL_SCRIPT,
-                          url=SEGWAY_URL, user=SEGWAY_USER, password=password)
-
-######################### OTHER FUNCTIONS ########################
-def get_gmtk_optflags():
-    if "OPTFLAGS" in os.environ:
-        return os.environ["OPTFLAGS"]
-
-    if "ARCH" in os.environ:
-        arch = os.environ["ARCH"]
-    else:
-        arch = "-".join([platform.system(), platform.machine()])
-
-    arch_gcc = None
-    sselevel = None
-    if arch in ["Linux-i386", "Linux-x86_64"] or arch.startswith("CYGWIN"):
-        # Determine SSELEVEL
-        sselevel = 2  # default
-        cmd = Popen('grep "^flags" /proc/cpuinfo | cut -d : -f 2',
-                    shell=True, stdout=PIPE)
-        stdout, stderr = cmd.communicate()
-        for line in stdout.split("\n"):
-            tokens = line.strip().split()
-            if "bpni" in tokens:
-                sselevel = 3
-
-        # Determine ARCH_GCC
-        cmd = Popen('grep "^model name" /proc/cpuinfo | cut -d : -f 2',
-                    shell=True, stdout=PIPE)
-        cpu_model, stderr = cmd.communicate()
-        if "Opteron" in cpu_model:
-            arch_gcc = "opteron"
-        elif "Pentium" in cpu_model or "Xeon" in cpu_model:
-            if arch == "Linux-i386" or arch.startswith("CYGWIN"):
-                if sselevel == 3:
-                    arch_gcc = "prescott"
-                else:
-                    arch_gcc = "pentium4"
-            elif arch == "Linux-x86_64":
-                arch_gcc = "nocona"
-
-    optflags = "-g -O3 -D_TABLE"
-    if arch_gcc:
-        optflags += " -march=%s" % arch_gcc
-    if sselevel:
-        optflags += " -mfpmath=sse -msse%d" % sselevel
-
-    return optflags
 
 if __name__ == "__main__":
     sys.exit(main())
