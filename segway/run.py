@@ -3572,7 +3572,8 @@ def parse_options(args):
 
         group.add_option("-o", "--observations", metavar="DIR",
                           help="use or create observations in DIR"
-                         " (default %s)" % DIRPATH_WORKDIR_HELP / SUBDIRNAME_OBS)
+                         " (default %s)" %
+                         (DIRPATH_WORKDIR_HELP / SUBDIRNAME_OBS))
 
         group.add_option("--old-directory", metavar="DIR",
                          help="continue from interrupted run in DIR"
