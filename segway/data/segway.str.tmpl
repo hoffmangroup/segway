@@ -13,10 +13,12 @@ frame: 0 {
      conditionalparents: nil using DenseCPT("start_seg");
    }
 
+#if CARD_SUBSEG > 1
    variable: subseg {
      type: TYPE_SUBSEG;
      conditionalparents: seg(0) using DenseCPT("seg_subseg");
    }
+#endif
 
 ${observations}}
 
@@ -51,6 +53,7 @@ frame: 1 {
      switchingparents: segTransition(0) using mapping("map_parent");
    }
 
+#if CARD_SUBSEG > 1
    variable: subseg {
      type: TYPE_SUBSEG;
      conditionalparents: subseg(-1) using DeterministicCPT("subseg_subseg_copy")
@@ -58,6 +61,7 @@ frame: 1 {
                          | seg(0) using DenseCPT("seg_subseg");
      switchingparents: segTransition(0) using mapping("map_parent");
    }
+#endif
 
 ${observations}}
 

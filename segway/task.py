@@ -198,7 +198,7 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
         print_to_fd(int_filelistfd, int_filename)
 
         _save_observations_window(float_filename, int_filename,
-                                 continuous_cells, resolution, distribution)
+                                  continuous_cells, resolution, distribution)
 
         # XXXopt: does this work? or do we need to use a subprocess to
         # do the loading?

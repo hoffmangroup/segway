@@ -338,11 +338,16 @@ DONE = JobState.DONE
 # mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
 # error
 # XXX: check lsb.params for real value of CLEAN_PERIOD
-CLEAN_SAFE_TIME = int(3600 * 0.5)
+CLEAN_SAFE_TIME = int(3600 * 0.9)
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
 MIN_JOB_WAIT_SLEEP_TIME = 3 # min time to wait between checking job status
+
+## credited for min time so that there is some buffer when considering
+## whether to submit more jobs or not
+
+NOMINAL_MIN_JOB_WAIT_SLEEP_TIME = MIN_JOB_WAIT_SLEEP_TIME + 1
 MAX_JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
 
 # these settings limit job queueing to 360 at once
@@ -352,6 +357,8 @@ RESOLUTION = 1
 INDEX_BED_START = 1
 
 SEGTRANSITION_WEIGHT_SCALE = 1.0
+
+DIRPATH_WORKDIR_HELP = path("WORKDIR")
 
 ## functions
 try:
@@ -509,6 +516,17 @@ def is_training_progressing(last_ll, curr_ll,
 def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
 
+def make_default_filename(resource, dirname="WORKDIR"):
+    resource_part = resource.rpartition(".tmpl")
+    stem = resource_part[0] or resource_part[2]
+    stem_part = stem.rpartition(extsep)
+    prefix = stem_part[0]
+    ext = stem_part[2]
+
+    filebasename = extjoin_not_none(prefix, thread_index, ext)
+
+    return path(dirname) / filebasename
+
 def make_template_filename(filename, resource, dirname=None, clobber=False,
                            thread_index=None):
     """
@@ -519,15 +537,7 @@ def make_template_filename(filename, resource, dirname=None, clobber=False,
             return filename, False
         # else filename is unchanged
     else:
-        resource_part = resource.rpartition(".tmpl")
-        stem = resource_part[0] or resource_part[2]
-        stem_part = stem.rpartition(extsep)
-        prefix = stem_part[0]
-        ext = stem_part[2]
-
-        filebasename = extjoin_not_none(prefix, thread_index, ext)
-
-        filename = path(dirname) / filebasename
+        filename = make_default_filename(resource, dirname)
 
     return filename, True
 
@@ -903,13 +913,22 @@ class RestartableJobDict(dict):
         return dict.__init__(self, *args, **kwargs)
 
     def calc_sleep_time(self):
+        # it's not a good idea to keep increasing the amount of sleep
+        # time just because you have completed jobs. The problem is
+        # that this can result in it taking more than 3600 seconds to
+        # check a job again
+
+        # XXX: we should calculate this against the maximum number of
+        # submitted jobs rather than the current number. But for now
+        # we should just stick to MIN_JOB_WAIT_SLEEP_TIME
+
         # +1 is to avoid dividing by zero when len(self) is 0
         clean_safe_sleep_time = CLEAN_SAFE_TIME / (len(self)+1)
 
         return min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
 
     def is_sleep_time_gt_min(self):
-        return self.calc_sleep_time() > MIN_JOB_WAIT_SLEEP_TIME
+        return self.calc_sleep_time() > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
 
     def _queue_unconditional(self, restartable_job):
         """queue unconditionally; don't do any checks"""
@@ -940,7 +959,8 @@ class RestartableJobDict(dict):
         while jobids:
             # check each job individually
             for jobid in jobids:
-                sleep(self.calc_sleep_time())
+                # XXX: should be an improved RestartableJobDict.calc_sleep_time()
+                sleep(MIN_JOB_WAIT_SLEEP_TIME)
 
                 try:
                     job_info = session.wait(jobid, session.TIMEOUT_NO_WAIT)
@@ -1610,9 +1630,10 @@ class Runner(object):
         """
         this defines the parents of every observation
         """
-        spec = ('seg(0), subseg(0) '
+
+        spec = ('CONDITIONALPARENTS_OBS '
                 'using mixture collection("collection_seg_%s") '
-                'mapping("map_seg_subseg_obs")' % track)
+                'MAPPING_OBS' % track)
 
         return " | ".join(["CONDITIONALPARENTS_NIL_CONTINUOUS"] +
                           [spec] * self.resolution)
@@ -2660,7 +2681,7 @@ class Runner(object):
         last_start = None
         last_vals = (None, None, None) # (chrom, coord, seg)
 
-        with gzip_open(bed_filename, "w") as bed_file:
+        with maybe_gzip_open(bed_filename, "w") as bed_file:
             # XXX: add in browser track line (see SVN revisions
             # previous to 195)
             print >>bed_file, self.make_wig_header_viterbi()
@@ -3491,7 +3512,7 @@ def parse_options(args):
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
 
-    with OptionGroup(parser, "Input selection") as group:
+    with OptionGroup(parser, "Data selection") as group:
         group.add_option("-t", "--track", action="append", default=[],
                          metavar="TRACK",
                          help="append TRACK to list of tracks to use"
@@ -3500,55 +3521,73 @@ def parse_options(args):
         # This is a 0-based file.
         # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
         group.add_option("--include-coords", metavar="FILE",
-                         help="limit to genomic coordinates in FILE")
+                         help="limit to genomic coordinates in FILE"
+                         " (default all)")
 
         # exclude goes after all includes
         group.add_option("--exclude-coords", metavar="FILE",
-                         help="filter out genomic coordinates in FILE")
+                         help="filter out genomic coordinates in FILE"
+                         " (default none)")
+
+        group.add_option("--resolution", type=int,
+                         default=RESOLUTION, metavar="RES",
+                         help="downsample to every RES bp (default %d)" %
+                         RESOLUTION)
 
     with OptionGroup(parser, "Model files") as group:
         group.add_option("-i", "--input-master", metavar="FILE",
-                         help="use or create input master in FILE")
+                         help="use or create input master in FILE"
+                         " (default %s)" %
+                         make_default_filename(RES_INPUT_MASTER_TMPL,
+                                               DIRPATH_WORKDIR_HELP / SUBDIRNAME_PARAMS)
 
         group.add_option("-s", "--structure", metavar="FILE",
-                         help="use or create structure in FILE")
+                         help="use or create structure in FILE"
+                         " (default %s)" %
+                         make_default_filename(RES_STR_TMPL))
 
         group.add_option("-p", "--trainable-params", action="append",
                          default=[], metavar="FILE",
-                         help="use or create trainable parameters in FILE")
+                         help="use or create trainable parameters in FILE"
+                         " (default WORKDIR/params/params.params)")
 
         group.add_option("--dont-train", metavar="FILE",
-                         help="use FILE as list of parameters not to train")
+                         help="use FILE as list of parameters not to train"
+                         " (default %s)" %
+                         make_default_filename(RES_DONT_TRAIN,
+                                               DIRPATH_WORKDIR_HELP / SUBDIRNAME_AUX))
 
         group.add_option("--seg-table", metavar="FILE",
-                         help="load segment hyperparameters from FILE")
+                         help="load segment hyperparameters from FILE"
+                         " (default none)")
 
         group.add_option("--semisupervised", metavar="FILE",
                          help="semisupervised segmentation with labels in "
-                         "FILE")
-
-    with OptionGroup(parser, "Output files") as group:
-        group.add_option("-b", "--bed", metavar="FILE",
-                          help="create bed track in FILE")
+                         "FILE (default none)")
 
     with OptionGroup(parser, "Intermediate files") as group:
-        # XXX: consider removing this option
-        # this probably isn't necessary as observations are written
-        # out pretty quickly now
-        group.add_option("-o", "--observations", metavar="DIR",
-                          help="use or create observations in DIR")
+        group.add_option("-d", "--directory", metavar="WORKDIR",
+                         help="create all other files in WORKDIR"
+                         " (default temporary)")
 
-        group.add_option("-d", "--directory", metavar="DIR",
-                         help="create all other files in DIR")
+        group.add_option("-o", "--observations", metavar="DIR",
+                          help="use or create observations in DIR"
+                         " (default %s)" % DIRPATH_WORKDIR_HELP / SUBDIRNAME_OBS)
 
         group.add_option("--old-directory", metavar="DIR",
                          help="continue from interrupted run in DIR"
-                         " (identify only)")
+                         " (for identify only)")
+
+    with OptionGroup(parser, "Output files") as group:
+        group.add_option("-b", "--bed", metavar="FILE",
+                          help="create identification BED track in FILE"
+                         " (default WORKDIR/%s)" % BED_FILEBASENAME)
 
     with OptionGroup(parser, "Modeling variables") as group:
         group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
                          metavar="DIST", default=DISTRIBUTION_DEFAULT,
-                         help="use DIST distribution")
+                         help="use DIST distribution"
+                         " (default %s)" % DISTRIBUTION_DEFAULT)
 
         group.add_option("-r", "--random-starts", type=int,
                          default=RANDOM_STARTS, metavar="NUM",
@@ -3564,11 +3603,6 @@ def parse_options(args):
                          default=NUM_SUBSEGS, metavar="NUM",
                          help="make NUM segment sublabels"
                          " (default %d)" % NUM_SUBSEGS)
-
-        group.add_option("--resolution", type=int,
-                         default=RESOLUTION, metavar="RES",
-                         help="downsample to every RES bp (default %d)" %
-                         RESOLUTION)
 
         group.add_option("--ruler-scale", type=int,
                          default=RULER_SCALE, metavar="SCALE",
@@ -3600,7 +3634,8 @@ def parse_options(args):
 
         group.add_option("-v", "--verbosity", type=int, default=VERBOSITY,
                          metavar="NUM",
-                         help="show messages with verbosity NUM")
+                         help="show messages with verbosity NUM"
+                         " (default %d)" % VERBOSITY)
 
         group.add_option("--cluster-opt", action="append", default=[],
                          metavar="OPT",

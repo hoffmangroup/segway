@@ -16,7 +16,7 @@ die ()
     exit 200
 }
 
-trap die 15 10 12 2 1
+trap die 15 10 12 3 2 1
 
 "$@"
 RETVAL="$?"
