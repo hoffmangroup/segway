@@ -51,9 +51,9 @@ from ._util import (ceildiv, data_filename, data_string,
                     DISTRIBUTION_ASINH_NORMAL, EXT_FLOAT, EXT_GZ, EXT_INT,
                     extjoin, GB, get_chrom_coords, get_label_color, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
-                    _make_continuous_cells, make_filelistpath, MB, NamedTemporaryDir,
-                    OptionBuilder_GMTK, PKG, _save_observations_window,
-                    VITERBI_PROG)
+                    _make_continuous_cells, make_filelistpath, maybe_gzip_open,
+                    MB, NamedTemporaryDir, OptionBuilder_GMTK, PKG,
+                    _save_observations_window, VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
@@ -516,7 +516,7 @@ def is_training_progressing(last_ll, curr_ll,
 def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
 
-def make_default_filename(resource, dirname="WORKDIR"):
+def make_default_filename(resource, dirname="WORKDIR", thread_index=None):
     resource_part = resource.rpartition(".tmpl")
     stem = resource_part[0] or resource_part[2]
     stem_part = stem.rpartition(extsep)
@@ -537,7 +537,7 @@ def make_template_filename(filename, resource, dirname=None, clobber=False,
             return filename, False
         # else filename is unchanged
     else:
-        filename = make_default_filename(resource, dirname)
+        filename = make_default_filename(resource, dirname, thread_index)
 
     return filename, True
 
@@ -3539,7 +3539,7 @@ def parse_options(args):
                          help="use or create input master in FILE"
                          " (default %s)" %
                          make_default_filename(RES_INPUT_MASTER_TMPL,
-                                               DIRPATH_WORKDIR_HELP / SUBDIRNAME_PARAMS)
+                                               DIRPATH_WORKDIR_HELP / SUBDIRNAME_PARAMS))
 
         group.add_option("-s", "--structure", metavar="FILE",
                          help="use or create structure in FILE"
