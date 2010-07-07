@@ -37,13 +37,13 @@ SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
 GMTK_INSTALL_SCRIPT = """
 cd $tmpdir
 wget --user=$user --password=$password $url -O $file
-if [ ! -d $filebase ]; then tar -xzf $file; fi
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 
 mkdir -p "$dir/bin"
 mkdir tksrc/bin 2>/dev/null || true
 
-if [ "$(find . -name "*.a" -print0)" ]; \
+if [[ "$(find . -name "*.a" -print0)" ]]; \
 then find . -name "*.a" -print0 | xargs -0 rm; \
 fi
 
@@ -64,7 +64,7 @@ echo "$version" > "$dir/etc/gmtk.version"
 LSF_DRMAA_INSTALL_SCRIPT = """
 cd $tmpdir
 wget $url -O $file
-if [ ! -d $filebase ]; then tar -xzf $file; fi
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 ./configure --prefix=$dir
 make
@@ -74,7 +74,7 @@ make install
 SEGWAY_INSTALL_SCRIPT = """
 cd $tmpdir
 wget --user=$user --password=$password $url -O $file
-if [ ! -d $filebase ]; then tar -xzf $file; fi
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 $python setup.py install
 """
@@ -255,7 +255,7 @@ def main(args=sys.argv[1:]):
     env = Environment()
     env.initialize()
 
-    installers = [SetuptoolsInstaller(env),
+    installers = [SetuptoolsInstaller(),
                   Hdf5Installer(env),
                   NumpyInstaller(),
                   DrmaaInstaller(env),

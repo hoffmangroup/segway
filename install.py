@@ -18,9 +18,6 @@ GMTK_VERSION = "20091016"
 
 ####################### BEGIN COMMON CODE HEADER #####################
 
-## Known issue: cannot deal with installing setuptools into the
-##   lib directory of the python installation (site.py conflict)
-
 import os
 import sys
 
@@ -45,14 +42,13 @@ EZ_SETUP_URL = "http://peak.telecommunity.com/dist/ez_setup.py"
 CFG_FILE_TEMPLATE = """
 [install]
 prefix = $prefix
-exec_prefix = $prefix
-install_platlib = $platlib
-install_purelib = $platlib
-install_scripts = $scripts
+install-lib = $platlib
+install-scripts = $scripts
 
 [easy_install]
-install_dir = $platlib
-script_dir = $scripts
+prefix = $prefix
+install-dir = $platlib
+script-dir = $scripts
 """
 
 # One command per line
@@ -64,7 +60,6 @@ cd $filebase
 ./configure --prefix=$dir
 make
 make install
-cd ..
 """
 
 ####################### END COMMON CODE HEADER #####################
@@ -89,13 +84,13 @@ SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
 GMTK_INSTALL_SCRIPT = """
 cd $tmpdir
 wget --user=$user --password=$password $url -O $file
-if [ ! -d $filebase ]; then tar -xzf $file; fi
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 
 mkdir -p "$dir/bin"
 mkdir tksrc/bin 2>/dev/null || true
 
-if [ "$(find . -name "*.a" -print0)" ]; \
+if [[ "$(find . -name "*.a" -print0)" ]]; \
 then find . -name "*.a" -print0 | xargs -0 rm; \
 fi
 
@@ -116,7 +111,7 @@ echo "$version" > "$dir/etc/gmtk.version"
 LSF_DRMAA_INSTALL_SCRIPT = """
 cd $tmpdir
 wget $url -O $file
-if [ ! -d $filebase ]; then tar -xzf $file; fi
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 ./configure --prefix=$dir
 make
@@ -126,7 +121,7 @@ make install
 SEGWAY_INSTALL_SCRIPT = """
 cd $tmpdir
 wget --user=$user --password=$password $url -O $file
-if [ ! -d $filebase ]; then tar -xzf $file; fi
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 $python setup.py install
 """
@@ -289,6 +284,7 @@ be printed to the terminal)?""" % (shell, file)
             print >>sys.stderr, "\nYour %s is already %s!" % (variable, value)
         else:
             self.write_var(variable, value)
+            self.set_var(variable, value)
 
     def save_to_var(self, variable, value):
         """Prepend the value to the variable in the shell rc file"""
@@ -346,16 +342,10 @@ class Environment(object):
     def __init__(self):
         self.shell = ShellManager()
 
-        # Load defaults
-        self.default_arch_home = self._get_default_arch_home()
-        self.default_python_home = os.path.join(self.default_arch_home, "lib",
-                                                "python%s" % sys.version[:3])
-        self.default_script_home = os.path.join(self.default_arch_home, "bin")
-
-        # Start with defaults
-        self.arch_home = self.default_arch_home
-        self.python_home = self.default_python_home
-        self.script_home = self.default_script_home
+        self.setup_arch_home()
+        self.setup_python_home()
+        self.setup_script_home()
+        self.setup_cfg()
 
     def close(self):
         lines = ["INSTALLATION COMPLETE"]
@@ -374,7 +364,9 @@ class Environment(object):
 
     def refresh_packages(self):
         """Refresh list of packages/eggs that can be imported"""
-        addsitedir(self.python_home)
+        print >>sys.stderr, "Updating list of packages/eggs in %s" % \
+            self.python_home
+        addsitedir(fix_path(self.python_home))
 
     def has_lsf(self):
         return "LSF_ENVDIR" in os.environ
@@ -385,24 +377,28 @@ class Environment(object):
     ##### HOME SETUP ######
     def initialize(self):
         """Default initialization (arch, python, script homes; cfg file)"""
-        self.setup_arch_home()
-        self.setup_python_home()
-        self.setup_script_home()
-        self.setup_cfg()
 
-    def setup_arch_home(self):
+    def setup_arch_home(self, default=None):
+        if default is None:
+            default = self.get_default_arch_home()
+
         query = "\nWhere should platform-specific files be installed?"
-        self.arch_home = prompt_user(query, self.arch_home)
+        self.arch_home = prompt_user(query, default)
+
         arch_home_path = fix_path(self.arch_home)
         self.check_spaces(arch_home_path)
 
         make_dir(arch_home_path)
-        self.shell.save_var("ARCH_HOME", arch_home_path)
+        self.shell.save_var("ARCHHOME", arch_home_path)
         return arch_home_path
 
-    def setup_python_home(self):
+    def setup_python_home(self, default=None):
+        if default is None:
+            default = self.get_default_python_home()
+
         query = "\nWhere should new Python packages be installed?"
-        self.python_home = prompt_user(query, self.python_home)
+        self.python_home = prompt_user(query, default)
+
         python_home_path = fix_path(self.python_home)
         self.check_spaces(python_home_path)
 
@@ -411,9 +407,13 @@ class Environment(object):
         self.shell.save_to_var("PYTHONPATH", python_home_path)
         return python_home_path
 
-    def setup_script_home(self):
+    def setup_script_home(self, default=None):
+        if default is None:
+            default = self.get_default_script_home()
+
         query = "\nWhere should new scripts and executables be installed?"
-        self.script_home = prompt_user(query, self.script_home)
+        self.script_home = prompt_user(query, default)
+
         script_home_path = fix_path(self.script_home)
         self.check_spaces(script_home_path)
 
@@ -421,7 +421,7 @@ class Environment(object):
         self.shell.save_to_var("PATH", script_home_path)
         return script_home_path
 
-    def _get_default_arch_home(self):
+    def get_default_arch_home(self, root="~"):
         if "ARCHHOME" in os.environ:
             return os.environ["ARCHHOME"]
         elif "ARCH" in os.environ:
@@ -430,9 +430,28 @@ class Environment(object):
             (sysname, nodename, release, version, machine) = os.uname()
             arch = "-".join([sysname, machine])
 
-        arch = os.path.expanduser("~/arch/%s" % arch)
-        arch.replace(" ", "_")  # Spaces cause issues
+        arch = os.path.expanduser("%s/arch/%s" % (root, arch))
+        arch = arch.replace(" ", "_")  # Spaces cause issues
         return arch
+
+    def get_default_python_home(self, root=None):
+        if root is None:
+            root = self.arch_home
+
+        dir = os.path.join(root, "lib", "python%s" % sys.version[:3])
+        # If there is a python installation here,
+        # use the site-packages subdirectory instead
+        alternate_dir = os.path.join(dir, "site-packages")
+        if os.path.samefile(sys.prefix, fix_path(root)) or \
+                os.path.isdir(fix_path(alternate_dir)):
+            return alternate_dir
+        else:
+            return dir
+
+    def get_default_script_home(self, root=None):
+        if root is None:
+            root = self.arch_home
+        return os.path.join(root, "bin")
 
     ##### CFG FILE #####
     def setup_cfg(self, cfg_file="~/.pydistutils.cfg"):
@@ -452,21 +471,17 @@ into this directory (and subdirectories) automatically.""" % cfg_file
 
     def _write_pydistutils_cfg(self, cfg_path):
         """Write a pydistutils.cfg file based upon homes set up"""
-        fields = {}
-        fields["prefix"] = fix_path(self.arch_home)
-
+        arch_home = fix_path(self.arch_home)
         python_home = fix_path(self.python_home)
-        if python_home == fix_path(self.default_python_home):
-            platlib = "$platbase/lib/python$py_version_short"
-        else:
-            platlib = python_home
+        script_home = fix_path(self.script_home)
+
+        fields = {}
+        fields["prefix"] = arch_home
+
+        platlib = python_home
         fields["platlib"] = platlib
 
-        script_home = fix_path(self.script_home)
-        if script_home == fix_path(self.default_script_home):
-            scripts = "$platbase/bin"
-        else:
-            scripts = script_home
+        scripts = script_home
         fields["scripts"] = scripts
 
         cfg_file_contents = substitute_template(CFG_FILE_TEMPLATE, fields)
@@ -653,7 +668,7 @@ class EasyInstaller(Installer):
         value.
 
     """
-    install_prompt = "May I install %s and dependencies?"
+    install_prompt = "May I install %s (or later) and dependencies?"
     version_requirement = None
 
     def install(self):
@@ -800,6 +815,52 @@ class ScriptInstaller(Installer):
                 rmtree(fields["tmpdir"])
 
 
+class SetuptoolsInstaller(Installer):
+    name = "setuptools"
+    url = EZ_SETUP_URL
+    install_prompt = """Unable to find setuptools. \
+It is used to download and install many of this program's prerequisites \
+and handle versioning. May I download and install %s?"""
+
+    def get_version(self):
+        try:
+            return __import__(self.name.lower()).__version__
+        except (AttributeError, ImportError):
+            return None
+
+    def download(self, save_dir=os.curdir):
+        # Download ez_setup.py
+        url_components = self.parse_url()
+        filename = url_components["file"]
+        save_path = fix_path(os.path.join(save_dir, filename))
+        if not os.path.isfile(save_path):  # Avoid duplicate downloads
+            urlretrieve(self.url, save_path)
+
+        return save_path
+
+    def install(self):
+        old_sys_path = sys.path
+        try:
+            save_path = self.download()
+            sys.path.insert(0, save_path)
+            # Run ez_setup.py to install setuptools
+            from ez_setup import main
+            try:
+                main([])
+            except SystemExit, e:
+                if e.code != 0:
+                    raise InstallationError("Setuptools installation failed.")
+
+            # Load previously-installed packages/eggs in new python dir
+            addsitedir(os.path.dirname(save_path))
+        finally:
+            sys.path = old_sys_path
+            if save_path and os.path.exists(save_path):
+                os.unlink(save_path)
+            pyc_path = "%sc" % save_path
+            if os.path.exists(pyc_path):
+                os.unlink(pyc_path)
+
 class Hdf5Installer(ScriptInstaller):
     name = "HDF5"
     min_version = MIN_HDF5_VERSION
@@ -890,45 +951,6 @@ class NumpyInstaller(EasyInstaller):
                 # Make sure variable didn't return, and then replace variable
                 assert "LDFLAGS" not in os.environ
                 os.environ["LDFLAGS"] = env_old
-
-
-class SetuptoolsInstaller(Installer):
-    name = "setuptools"
-    url = EZ_SETUP_URL
-    install_prompt = """Unable to find setuptools. \
-It is used to download and install many of this program's prerequisites \
-and handle versioning. May I download and install %s?"""
-
-    def __init__(self, env):
-        self.env = env
-        super(self.__class__, self).__init__()
-
-    def get_version(self):
-        try:
-            return __import__(self.name.lower()).__version__
-        except (AttributeError, ImportError):
-            return None
-
-    def install(self):
-        # Download ez_setup.py
-        url_components = self.parse_url()
-        python_home = self.env.python_home
-        save_path = fix_path(os.path.join(python_home, url_components["file"]))
-        if not os.path.isfile(save_path):  # Avoid duplicate downloads
-            urlretrieve(EZ_SETUP_URL, save_path)
-
-        # Run ez_setup.py to download setuptools
-        from ez_setup import download_setuptools
-        setuptools_path = download_setuptools(to_dir=python_home, delay=0)
-
-        # Execute setuptools egg to install easy_install
-        command = ["sh", "%s" % setuptools_path, "--prefix=%s" % python_home]
-        print >>sys.stderr, ">> %s" % " ".join(command)
-        code = call(command)
-        if code != 0:
-            raise InstallationError("Installation of setuptools failed.")
-        else:
-            addsitedir(python_home)  # Load new-installed packages/eggs/site.py
 
 class Tester(object):
     """Skeleton for package tester
@@ -1291,7 +1313,7 @@ def main(args=sys.argv[1:]):
     env = Environment()
     env.initialize()
 
-    installers = [SetuptoolsInstaller(env),
+    installers = [SetuptoolsInstaller(),
                   Hdf5Installer(env),
                   NumpyInstaller(),
                   DrmaaInstaller(env),
