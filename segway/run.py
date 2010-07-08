@@ -930,7 +930,7 @@ class RestartableJobDict(dict):
     def is_sleep_time_gt_min(self):
         sleep_time = self.calc_sleep_time()
         print >>sys.stderr, "sleep_time: %s, len: %d" % (sleep_time, len(self))
-        return self_time > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
+        return sleep_time > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
 
     def _queue_unconditional(self, restartable_job):
         """queue unconditionally; don't do any checks"""
