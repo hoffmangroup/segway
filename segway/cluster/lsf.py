@@ -47,8 +47,12 @@ class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage):
         mem_usage_mb = ceildiv(mem_usage, MB)
 
-        # return a quoted string
-        return '"select[mem>%s] rusage[mem=%s]"' % (mem_usage_mb, mem_usage_mb)
+        # XXX: should be set elsewhere besides environment variable
+        tmp_usage_mb = environ["TMP_NEEDED_MB"]
+
+        # returns a quoted string
+        return ('"select[mem>%s && tmp>%s] rusage[mem=%s, tmp=%s]"'
+                % (mem_usage_mb, tmp_usage_mb, mem_usage_mb, tmp_usage_mb))
 
     def make_native_spec(self):
         mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)

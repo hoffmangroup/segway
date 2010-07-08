@@ -347,7 +347,7 @@ MIN_JOB_WAIT_SLEEP_TIME = 3 # min time to wait between checking job status
 ## credited for min time so that there is some buffer when considering
 ## whether to submit more jobs or not
 
-NOMINAL_MIN_JOB_WAIT_SLEEP_TIME = MIN_JOB_WAIT_SLEEP_TIME + 1
+NOMINAL_MIN_JOB_WAIT_SLEEP_TIME = MIN_JOB_WAIT_SLEEP_TIME + 3
 MAX_JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
 
 # these settings limit job queueing to 360 at once
@@ -928,7 +928,9 @@ class RestartableJobDict(dict):
         return min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
 
     def is_sleep_time_gt_min(self):
-        return self.calc_sleep_time() > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
+        sleep_time = self.calc_sleep_time()
+        print >>sys.stderr, "sleep_time: %s, len: %d" % (sleep_time, len(self))
+        return self_time > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
 
     def _queue_unconditional(self, restartable_job):
         """queue unconditionally; don't do any checks"""
