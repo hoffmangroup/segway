@@ -342,7 +342,12 @@ CLEAN_SAFE_TIME = int(3600 * 0.9)
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
-MIN_JOB_WAIT_SLEEP_TIME = 3 # min time to wait between checking job status
+
+# XXX: should be an option
+try:
+    MIN_JOB_WAIT_SLEEP_TIME = float(environ["MIN_JOB_WAIT_SLEEP_TIME"])
+except KeyError:
+    MIN_JOB_WAIT_SLEEP_TIME = 3.0 # min time to wait between checking job status
 
 ## credited for min time so that there is some buffer when considering
 ## whether to submit more jobs or not
@@ -2905,6 +2910,12 @@ class Runner(object):
                                               error_filename)
 
         mem_usage_key = (prog.prog, self.num_segs, num_frames)
+
+        # XXXopt: should be able to calculate exactly the first
+        # trial_index to start with, need to at least be able to load
+        # data into RAM
+
+        # XXX: should not have MemoryErrors
 
         return RestartableJob(session, job_tmpl_factory, self.global_mem_usage,
                               mem_usage_key)
