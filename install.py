@@ -69,7 +69,7 @@ MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
 MIN_DRMAA_VERSION = "0.4a3"
 
-LSF_DRMAA_URL = "http://fury.man.poznan.pl/~mmamonski/lsf_drmaa-1.0.4.tar.gz"
+LSF_DRMAA_URL = "http://downloads.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.4/lsf_drmaa-1.0.4.tar.gz"
 
 GMTK_USER = "segway"
 GMTK_VERSION_FILENAME = "gmtk.version"
@@ -431,7 +431,7 @@ class Environment(object):
             arch = "-".join([sysname, machine])
 
         arch = os.path.expanduser("%s/arch/%s" % (root, arch))
-        arch = arch.replace(" ", "_")  # Spaces cause issues
+        arch.replace(" ", "_")  # Spaces cause issues
         return arch
 
     def get_default_python_home(self, root=None):
@@ -1251,10 +1251,13 @@ class LsfDrmaaInstaller(ScriptInstaller):
         self.script_install(dir=drmaa_dir)
         self.drmaa_dir = drmaa_dir
 
+    # XXX: save_to_var should be renamed save_var_path
+    # but this is not a PATH in that sense
     def cleanup(self, success):
         if success and self.drmaa_dir:
             # Save environment variable for drmaa-python
-            self.env.shell.save_to_var("DRMAA_LIBRARY_PATH", self.drmaa_dir)
+            filename = os.path.join(self.drmaa_dir, "libdrmaa.so")
+            self.env.shell.save_var("DRMAA_LIBRARY_PATH", filename)
 
         super(self.__class__, self).cleanup(success)
 
