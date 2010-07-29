@@ -7,7 +7,7 @@ layer: convert flattened Viterbi BED files to a layered thick/thin bed file
 
 __version__ = "$Revision$"
 
-# Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009-2010 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
 import re
@@ -27,6 +27,9 @@ OFFSET_START = 0
 OFFSET_END = 1
 OFFSET_LABEL = 2
 
+TRACKLINE_DEFAULT = ["track", 'description="segway-layer output"',
+                     "visibility=full"]
+
 class PassThroughDict(dict):
     def __missing__(self, key):
         return key
@@ -42,6 +45,14 @@ class IncrementingDefaultDict(defaultdict):
 
         return value
 
+def inverse_dict(d):
+    """Given a dict, returns the inverse of the dict (val -> key)"""
+    res = {}
+    for k, v in d.iteritems():
+        assert v not in res
+        res[v] = k
+    return res
+
 def load_mnemonics(filename):
     mnemonics = PassThroughDict()
     ordering = []
@@ -50,7 +61,7 @@ def load_mnemonics(filename):
         with open(filename) as infile:
             for row in DictReader(infile):
                 mnemonics[row["old"]] = row["new"]
-                ordering.append(int(row["old"]))
+                ordering.append(row["old"])
 
     return mnemonics, ordering
 
@@ -74,34 +85,57 @@ def recolor(mnemonics):
 
     stem_colors = IncrementingDefaultDict()
 
-    for label_index in sorted(mnemonics.iterkeys()):
-        mnemonic = mnemonics[label_index]
+    for label in sorted(mnemonics.iterkeys()):
+        mnemonic = mnemonics[label]
         stem = get_stem(mnemonic)
 
-        res[int(label_index)] = get_label_color(stem_colors[stem])
+        res[label] = get_label_color(stem_colors[stem])
 
     return res
 
 # XXX: it would be better to not define the coordinates in non-contiguous areas
-def layer(infilename, outfilename, mnemonic_filename=None):
+def layer(infilename="-", outfilename="-", mnemonic_filename=None):
     # dict of lists of tuples of ints
     segments_dict = defaultdict(list)
     colors = {} # overwritten each time
+    label_dict = {}
 
     mnemonics, ordering = load_mnemonics(mnemonic_filename)
 
     with maybe_gzip_open(infilename) as infile:
         trackline, reader = get_trackline_and_reader_native(infile)
+        if not trackline:
+            trackline = TRACKLINE_DEFAULT[:]
+
         for datum in reader:
-            assert datum.strand in ACCEPTABLE_STRANDS
+            try:
+                assert datum.strand in ACCEPTABLE_STRANDS
+            except AttributeError:
+                pass
 
-            # XXX: need to support non-integer names
-            label = int(datum.name)
+            label = datum.name
 
-            segment = (datum.chromStart, datum.chromEnd, label)
+            # XXX: somewhat duplicative of segtools.__init__.Annotations
+            try:  # Lookup label key
+                label_key = label_dict[label]
+            except KeyError:  # Map new label to key
+                label_key = len(label_dict)
+                label_dict[label] = label_key
+
+            labels = inverse_dict(label_dict)
+
+            segment = (datum.chromStart, datum.chromEnd, label_key)
             segments_dict[datum.chrom].append(segment)
 
-            colors[label] = datum.itemRgb
+            try:
+                colors[label] = datum.itemRgb
+            except AttributeError:
+                try:
+                    label_int = int(label)
+                except ValueError:
+                    label_int = label_key
+
+                colors[label] = get_label_color(label_int)
 
     for word_index, word in enumerate(trackline):
         if word == "visibility=dense":
@@ -121,27 +155,28 @@ def layer(infilename, outfilename, mnemonic_filename=None):
             end = segments_array.max()
 
             for label in labels_sorted:
+                label_key = label_dict[label]
                 try:
                     color = colors[label]
                 except KeyError:
                     continue  # Label that wasn't in segmentation
 
-                segments_label_rows = segments_array[:, OFFSET_LABEL] == label
-                segments_label = segments_array[segments_label_rows,
+                segments_label_key_rows = segments_array[:, OFFSET_LABEL] == label_key
+                segments_label_key = segments_array[segments_label_key_rows,
                                                 OFFSET_START:OFFSET_END+1]
 
                 # XXX: this will probably break when there is a zero
                 # in the data
-                segments_label_augmented = vstack([(0, 0), segments_label,
+                segments_label_key_augmented = vstack([(0, 0), segments_label_key,
                                                    (end-1, end)])
 
-                block_count = str(len(segments_label_augmented))
+                block_count = str(len(segments_label_key_augmented))
 
                 # XXX: repetitive _str
-                block_sizes = diff(segments_label_augmented).ravel()
+                block_sizes = diff(segments_label_key_augmented).ravel()
                 block_sizes_str = ",".join(map(str, block_sizes))
 
-                block_starts = segments_label_augmented[:, 0]
+                block_starts = segments_label_key_augmented[:, 0]
                 block_starts_str = ",".join(map(str, block_starts))
 
                 # just passes through the label itself if there are no mnemonics
@@ -156,7 +191,7 @@ def layer(infilename, outfilename, mnemonic_filename=None):
 def parse_options(args):
     from optparse import OptionParser
 
-    usage = "%prog [OPTION]... INFILE OUTFILE"
+    usage = "%prog [OPTION]... [INFILE] [OUTFILE]"
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
     parser.add_option("-m", "--mnemonic-file", metavar="FILE",
@@ -165,7 +200,7 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
-    if not len(args) == 2:
+    if not len(args) <= 2:
         parser.print_usage()
         sys.exit(1)
 

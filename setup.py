@@ -26,9 +26,6 @@ long_description = "\n".join(doclines[2:])
 url = "http://noble.gs.washington.edu/~mmh1/software/%s/" % name.lower()
 download_url = "%s%s-%s.tar.gz" % (url, name, __version__)
 
-# XXX: remove these when the upstream packages are updated to fix these issues
-dependency_links = ["http://pypi.python.org/packages/source/p/path.py/path-2.2.zip"]
-
 classifiers = ["Natural Language :: English",
                "Programming Language :: Python"]
 
@@ -53,7 +50,7 @@ gtf2bed = segway.gtf2bed:main
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
 install_requires = ["genomedata>0.1.5", "textinput", "optbuild>0.1.6",
-                    "optplus>0.1.0", "tables>2.0.4", "numpy", "path",
+                    "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
                     "colorbrewer"]
 
 # XXX: ask if there is a way to specify this at the command-line
@@ -69,7 +66,6 @@ if __name__ == "__main__":
           download_url=download_url,
           classifiers=classifiers,
           long_description=long_description,
-          dependency_links=dependency_links,
           install_requires=install_requires,
           extras_require=extras_require,
           zip_safe=False, # XXX: change back, this is just for better tracebacks

@@ -5,8 +5,13 @@
 * segway: change "chunk" to "window" to avoid confusion with GMTK usage of chunk
 * segway: updated system check to consider GE* _and SGE*_ systems as SGE.
 * segway: removed dependence upon genomedata._util
+* everything: anything that supported gzipped I/O now may support "-" to mean stdin/stdout
+* segway-layer: now supports no arguments, which means use stdin/stdout
+* segway-layer: now supports input files with no track line
+* segway-layer: now supports non-integer segment labels
 * GMTK-installation: fixed default shell to be /bin/bash as 'declare' call in
   installation script caused GMTK installation to fail.
+* installation: move from path.py to forked-path
 
 0.1.21:
 

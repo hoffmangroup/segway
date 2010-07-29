@@ -43,6 +43,9 @@ def make_track_indexes(text):
 
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 def parse_viterbi(lines):
+    """
+    returns: numpy.ndarray of size (num_frames,), type DTYPE_IDENTIFY
+    """
     lines = iter(lines)
 
     # Segment 0, after Island[...]

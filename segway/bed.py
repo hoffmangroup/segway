@@ -3,8 +3,9 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2008 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2010 Michael M. Hoffman <mmh1@washington.edu>
 
+from itertools import chain
 import sys
 
 FIELDNAMES = ["chrom", "chromStart", "chromEnd", # required
@@ -52,9 +53,14 @@ def read_native(*args, **kwargs):
 def get_trackline_and_reader(iterator, datum_cls=Datum):
     line = iterator.next()
 
-    assert line.startswith("track")
+    if line.startswith("track"):
+        trackline = line.split()
+        reader = read(iterator, datum_cls)
+    else:
+        trackline = []
+        reader = read(chain([line], iterator), datum_cls)
 
-    return line.split(), read(iterator, datum_cls)
+    return trackline, reader
 
 def get_trackline_and_reader_native(*args, **kwargs):
     return get_trackline_and_reader(datum_cls=NativeDatum, *args, **kwargs)

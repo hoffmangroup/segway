@@ -145,11 +145,24 @@ def fill_array(scalar, shape, dtype=None, *args, **kwargs):
 def gzip_open(*args, **kwargs):
     return closing(_gzip_open(*args, **kwargs))
 
-def maybe_gzip_open(filename, *args, **kwargs):
+def maybe_gzip_open(filename, mode="r", *args, **kwargs):
+    if filename == "-":
+        if mode.startswith("U"):
+            raise NotImplementedError("U mode not implemented")
+        elif mode.startswith("w") or mode.startswith("a"):
+            return sys.stdout
+        elif mode.startswith("r"):
+            if "+" in mode:
+                raise NotImplementedError("+ mode not implemented")
+            else:
+                return sys.stdin
+        else:
+            raise ValueError("mode string must begin with one of 'r', 'w', or 'a'")
+
     if filename.endswith(SUFFIX_GZ):
-        return gzip_open(filename, *args, **kwargs)
-    else:
-        return open(filename, *args, **kwargs)
+        return gzip_open(filename, mode, *args, **kwargs)
+
+    return open(filename, mode, *args, **kwargs)
 
 def constant(val):
     """
