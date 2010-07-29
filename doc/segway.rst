@@ -698,7 +698,7 @@ For example::
 
   GENOMEDATA_DIRNAME = "genomedata"
 
-  run.main("--no-identify", GENOMEDATA_DIRNAME)
+  run.main(["--no-identify", GENOMEDATA_DIRNAME])
 
 All other interfaces (the ones that do not use a ``main()`` function)
 to Segway code are undocumented and should not be used. If you do use
