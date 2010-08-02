@@ -33,9 +33,11 @@ assert sys.version_info >= (2, 4)
 
 MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
+PYTABLES_VERSION = ">2.0.4,<2.2a0"
 
-HDF5_URL = "http://www.hdfgroup.org/ftp/HDF5/prev-releases/hdf5-1.8.2/" \
-    "src/hdf5-1.8.2.tar.gz"
+HDF5_URL = "ftp://ftp.hdfgroup.org/HDF5/prev-releases/hdf5-1.8.4-patch1/" \
+    "src/hdf5-1.8.4-patch1.tar.gz"
+PYTABLES_LINKS = ["http://www.pytables.org/download/pytables-2.1.2/"]
 EZ_SETUP_URL = "http://peak.telecommunity.com/dist/ez_setup.py"
 
 # Template for cfg file contents
@@ -431,7 +433,7 @@ class Environment(object):
             arch = "-".join([sysname, machine])
 
         arch = os.path.expanduser("%s/arch/%s" % (root, arch))
-        arch.replace(" ", "_")  # Spaces cause issues
+        arch = arch.replace(" ", "_")  # Spaces cause issues
         return arch
 
     def get_default_python_home(self, root=None):
@@ -507,15 +509,16 @@ class Installer(object):
       start_install(): returns True or False
         if True, installation continues
         if False, installation halts and returns False
-      get_version(): returns True, False, None, or version information
-        if True, program is considered installed
-        if False or None, program is not considered installed
-        else, version information should be supplied as a string or tuple
-      check_version(version): return True or False
+      check_version(): return True or False
         if True
           installation stops and returns True
         else
           installation continues
+        calls get_version() by default
+      get_version(): returns True, False, None, or version information
+        if True, program is considered installed
+        if False or None, program is not considered installed
+        else, version information should be supplied as a string or tuple
       prompt_install(): same as start_install()
         calls get_install_version() by default
       announce_install(): opportunity to print any final message before install
@@ -566,12 +569,13 @@ class Installer(object):
         if filebase.endswith(".tgz"):
             filebase = filebase[:-4]
 
-        filebase_tokens = filebase.split("-")
+        filebase_tokens = filebase.split("-", 1)
         # Try to extract version from filename
+        # Let version contain '-'s, but not progname
         #(Assumes form: <progname>-<version>.<ext>)
         if "-" in filebase:
-            components["version"] = filebase_tokens[-1]
-            components["program"] = "-".join(filebase_tokens[:-1])
+            components["version"] = "-".join(filebase_tokens[1:])
+            components["program"] = filebase_tokens[0]
         else:
             components["program"] = filebase
 
@@ -588,10 +592,12 @@ class Installer(object):
             url_info = self.parse_url()
             return url_info.get("version", None)
 
-    def check_version(self, version):
+    def check_version(self):
         """Checks version and returns True if version is adequate"""
         print >>sys.stderr, ("\nSearching for an installation of %s..."
                              % self.name),
+
+        version = self.get_version()
         if not version:
             print >>sys.stderr, "not found."
             return False
@@ -635,8 +641,7 @@ class Installer(object):
         if not permission:
             return False
 
-        version = self.get_version()
-        if self.check_version(version):
+        if self.check_version():
             return True
 
         permission = self.prompt_install()
@@ -661,23 +666,37 @@ class Installer(object):
 class EasyInstaller(Installer):
     """An installer that uses easy_install
 
-    New attribute:
+    New attributes:
       version_requirment: None or a string that specifies version requirement
         for easy_install. These requirements will be appended to the default
         requirement of '>=min_version'. Thus, '!=1.2' would be a reasonable
         value.
+      pkg_name: Name of package to easy_install. Defaults to self.name.lower().
+      links: List of URLs to also search for package source. Uses
+        easy_install's '-f' option.
 
     """
     install_prompt = "May I install %s (or later) and dependencies?"
     version_requirement = None
+    pkg_name = None  # Replaced by self.name.lower() in __init__
+    links = []
+
+    def __init__(self):
+        if self.pkg_name is None:
+            self.pkg_name = self.name.lower()
 
     def install(self):
         """Easy-installs the program
 
         uses:
           self.name
+          self.pkg_name
           self.get_install_version()
           self.version_requirement
+          self.links
+
+        if self.url is set, easy_install is run on that url instead of the
+          program name and version requirement
 
         """
         # Make sure easy_install (setuptools) is installed
@@ -686,22 +705,29 @@ class EasyInstaller(Installer):
         except ImportError:
             raise InstallationError("Setuptools necessary for easy_install")
 
-        name = self.name.lower()
         version = self.get_install_version()
 
         cmd = ["easy_install"]
-        requirements = []
-        if version:
-            requirements.append(">=%s" % version)
-        if self.version_requirement:
-            requirements.append(self.version_requirement)
 
-        cmd.append("%s%s" % (name, ",".join(requirements)))
+        if self.links:
+            for link in self.links:
+                cmd.append("--find-links=%s" % link)
 
-        if os.path.isdir(name):
+        if self.url is None:
+            requirements = []
+            if version:
+                requirements.append(">=%s" % version)
+            if self.version_requirement:
+                requirements.append(self.version_requirement)
+
+            cmd.append("%s%s" % (self.pkg_name, ",".join(requirements)))
+        else:
+            cmd.append(self.url)
+
+        if os.path.isdir(self.pkg_name):
             print >>sys.stderr, ("\nWarning: installation may fail because"
                                  " there is a subdirectory named %s at your"
-                                 " current path.") % name
+                                 " current path.") % self.pkg_name
 
         print >>sys.stderr, ">> %s" % " ".join(cmd)
         code = call(cmd, stdout=None, stderr=None)
@@ -713,7 +739,7 @@ class EasyInstaller(Installer):
     def get_version(self):
         """Return the package version, assuming normal Python conventions"""
         try:
-            return __import__(self.name.lower()).__version__
+            return __import__(self.pkg_name).__version__
         except (AttributeError, ImportError):
             return None
 
@@ -742,7 +768,7 @@ class EasyInstaller(Installer):
         try:
             try:
                 import pkg_resources
-                ref = pkg_resources.Requirement.parse(self.name.lower())
+                ref = pkg_resources.Requirement.parse(self.pkg_name)
                 return pkg_resources.working_set.find(ref).version
             except (AttributeError, ImportError):
                 return None
@@ -951,6 +977,14 @@ class NumpyInstaller(EasyInstaller):
                 # Make sure variable didn't return, and then replace variable
                 assert "LDFLAGS" not in os.environ
                 os.environ["LDFLAGS"] = env_old
+
+class PytablesInstaller(EasyInstaller):
+    name = "PyTables"
+    pkg_name = "tables"
+    get_version = EasyInstaller.get_egg_version
+    links = PYTABLES_LINKS
+    version_requirement = PYTABLES_VERSION
+
 
 class Tester(object):
     """Skeleton for package tester
@@ -1321,6 +1355,7 @@ def main(args=sys.argv[1:]):
                   NumpyInstaller(),
                   DrmaaInstaller(env),
                   GmtkInstaller(env),
+                  PytablesInstaller(),
                   SegwayInstaller()]
 
     for installer in installers:

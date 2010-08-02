@@ -263,6 +263,7 @@ def main(args=sys.argv[1:]):
                   NumpyInstaller(),
                   DrmaaInstaller(env),
                   GmtkInstaller(env),
+                  PytablesInstaller(),
                   SegwayInstaller()]
 
     for installer in installers:
