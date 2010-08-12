@@ -938,7 +938,11 @@ class RestartableJobDict(dict):
         return sleep_time > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
 
     def _queue_unconditional(self, restartable_job):
-        """queue unconditionally; don't do any checks"""
+        """queue unconditionally; don't do any checks
+
+        if you unconditionally queue more jobs than you can poll on
+        time, then we will lose track of jobs
+        """
         jobid = restartable_job.run()
         self[jobid] = restartable_job
 

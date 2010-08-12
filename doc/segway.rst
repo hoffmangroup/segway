@@ -429,6 +429,12 @@ piecewise.
 
 XXX same options for specifying model and parameters as identify
 
+Creating layered output
+=======================
+XXX describe segway-layer here
+XXX describe mnemonic files
+XXX works with stdin/stdout
+
 Technical matters
 =================
 
@@ -817,7 +823,16 @@ specified and version information when :option:`--version` is specified.
                           in another
       -n, --dry-run       write all files, but do not run any executables
 
-XXXcomp add other commands (segway-layer)
+::
+
+  Usage: segway-layer [OPTION]... [INFILE] [OUTFILE]
+
+  Options:
+    --version             show program's version number and exit
+    -h, --help            show this help message and exit
+    -m FILE, --mnemonic-file=FILE
+                          specify tab-delimited file with mnemonic replacement
+                          identifiers for segment labels
 
 Helpful commands
 ================

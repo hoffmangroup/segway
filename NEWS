@@ -1,6 +1,8 @@
 0.2.1:
 
-
+* docs: fix errors
+* add sge_setup.py
+* installation: add explicit PyTables installer
 
 0.2.0:
 
