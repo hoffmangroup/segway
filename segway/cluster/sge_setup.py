@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import division, with_statement
 
 """
 sge_setup: setup mem_requested on each node
@@ -13,7 +13,7 @@ import sys
 from tempfile import NamedTemporaryFile
 
 from optbuild import OptionBuilder_ShortOptWithSpace
-from path import path
+# from path import path
 
 QCONF_PROG = OptionBuilder_ShortOptWithSpace("qconf")
 QSTAT_PROG = OptionBuilder_ShortOptWithSpace("qstat")
@@ -27,13 +27,15 @@ OUTPUT_RECORD_SEPARATOR = \
     "----------------------------------------------------------------------------\n"
 
 def sge_setup():
-    try:
-        tempfile = NamedTemporaryFile("w", suffix=".txt", prefix="qconf.",
-                                      delete=False)
-        print >>tempfile, "mem_requested\tmr\tMEMORY\t<=\tYES\tYES\t0\t10"
-        QCONF_PROG(Mc=tempfile.name)
-    finally:
-        path(tempfile.name).unlink()
+    tempfile = NamedTemporaryFile("w", suffix=".txt", prefix="qconf.")
+
+    print >>tempfile, "mem_requested\tmr\tMEMORY\t<=\tYES\tYES\t0\t10"
+    # XXX: after Python 2.6, use tempfile.close() with NamedTemporaryFile(delete=False)
+    tempfile.flush()
+
+    QCONF_PROG(Mc=tempfile.name)
+
+    # path(tempfile.name).unlink()
 
     stat_texts_text = QSTAT_PROG.getoutput(F="hostname,mem_total", u=USERNAME)
     stat_texts = stat_texts_text.split(OUTPUT_RECORD_SEPARATOR)
