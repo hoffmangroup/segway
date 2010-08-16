@@ -435,6 +435,14 @@ XXX describe segway-layer here
 XXX describe mnemonic files
 XXX works with stdin/stdout
 
+Setup
+=====
+Should be ready to go on LSF out of the box.
+
+On SGE, XXX mem_requested
+
+The cluster manager must run python -m segway.cluster.sge_setup
+
 Technical matters
 =================
 

@@ -29,6 +29,8 @@ OUTPUT_RECORD_SEPARATOR = \
 def sge_setup():
     tempfile = NamedTemporaryFile("w", suffix=".txt", prefix="qconf.")
 
+    prior_complex_text = QCONF_PROG.getoutput(sc=True)
+    print >>tempfile, prior_complex_text
     print >>tempfile, "mem_requested\tmr\tMEMORY\t<=\tYES\tYES\t0\t10"
     # XXX: after Python 2.6, use tempfile.close() with NamedTemporaryFile(delete=False)
     tempfile.flush()
@@ -60,7 +62,9 @@ def sge_setup():
         QCONF_PROG("-mattr", "exechost", "complex_values",
                    "mem_requested=%s" % mem_total, hostname)
 
-    print >>sys.stderr, """\
+    # extra newline at beginning to space from qconf messages
+    print >>sys.stderr, """
+===========================================================================
 The mem_requested resource is now configured on your cluster. While
 Segway uses this resource to control its own jobs, we recommend
 setting a default allocation for all other jobs by editing the default
@@ -74,6 +78,11 @@ $SGE_ROOT/$SGE_CELL/common/sge_request to add this line:
 This will request 2 GiB of RAM for an otherwise unspecfied job, which
 is usually a good idea on a cluster where hosts have, say, 8 cores and
 16 GiB of RAM.
+
+It's also a good idea to verify the configuration by running:
+
+qhost -F mem_requested
+===========================================================================
 """
 
 def parse_options(args):
