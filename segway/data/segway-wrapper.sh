@@ -10,17 +10,11 @@ shift
 
 export TMPDIR="$(mktemp -dt segway.XXXXXXXXXX)"
 
-die ()
+on_exit ()
 {
     rm -rf "$TMPDIR"
-    exit 200
 }
 
-trap die 15 10 12 3 2 1
+trap on_exit EXIT
 
 "$@"
-RETVAL="$?"
-
-rm -rf "$TMPDIR"
-
-exit "$RETVAL"
