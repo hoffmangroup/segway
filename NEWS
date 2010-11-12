@@ -1,6 +1,9 @@
 0.2.2:
 
-
+* increase task wrapper robustness
+* bug fixes
+* docs fixes
+* setup.py changes
 
 0.2.1:
 
