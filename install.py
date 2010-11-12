@@ -13,7 +13,7 @@ code.
 """
 import platform
 
-PKG_VERSION = "0.2.2"
+PKG_VERSION = "0.2.3"
 GMTK_VERSION = "20091016"
 
 ####################### BEGIN COMMON CODE HEADER #####################
