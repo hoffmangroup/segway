@@ -7,7 +7,7 @@ LONG_DESCRIPTION
 
 __version__ = "0.2.2"
 
-# Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2010 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
@@ -23,7 +23,7 @@ doclines = __doc__.splitlines()
 name, short_description = doclines[0].split(": ")
 long_description = "\n".join(doclines[2:])
 
-url = "http://noble.gs.washington.edu/~mmh1/software/%s/" % name.lower()
+url = "http://noble.gs.washington.edu/proj/%s/" % name.lower()
 download_url = "%s%s-%s.tar.gz" % (url, name, __version__)
 
 classifiers = ["Natural Language :: English",
@@ -61,7 +61,7 @@ if __name__ == "__main__":
           version=__version__,
           description=short_description,
           author="Michael Hoffman",
-          author_email="mmh1@washington.edu",
+          author_email="mmh1@uw.edu",
           url=url,
           download_url=download_url,
           classifiers=classifiers,

@@ -1,21 +1,62 @@
 ======================
  Segway documentation
 ======================
+:Homepage: http://noble.gs.washington.edu/proj/segway
 :Author: Michael M. Hoffman <mmh1 at uw dot edu>
 :Organization: University of Washington
 :Address: Department of Genome Sciences, PO Box 355065, Seattle, WA 98195-5065, United States of America
 :Copyright: 2009-2010 Michael M. Hoffman
+:Last updated: |today|
+
 
 .. include:: <isogrk3.txt>
 
 For a conceptual overview see the paper:
 
-  Michael M. Hoffman, Orion J. Buske, Jeff A. Bilmes, William Stafford
-  Noble. Segway: a dynamic Bayesian network for genomic segmentation.
-  In preparation.
+  Michael M. Hoffman, Orion J. Buske, Zhiping Weng, Jeff A. Bilmes,
+  William Stafford Noble. Segway: a dynamic Bayesian network for
+  genomic segmentation. In preparation.
 
 Michael <mmh1 at uw dot edu> can send you a copy of the latest
 manuscript.
+
+Installation
+============
+
+XXX
+
+> 2) By default, Segway installs itself just for the current
+>   user. However, this is not very efficient if multiple users on
+>   the same machine use Segway. What is the recommended way to
+>   install it system wide?
+
+I would recommend using ``pip install segway`` or ``easy_install
+segway`` without configuring ~/.pydistutils.cfg to install in your
+home directory. This should install many of the prerequisites as well.
+
+> 3) What is the full list of prerequisites? I would prefer to install
+>   them myself before starting the Segway installation.
+
+You need either SGE, or LSF (plus FedStage DRMAA for LSF).
+
+You need GMTK, which you can get at
+<http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz>
+with user: segway, pass: genome.
+
+You probably need to install NumPy separately.
+
+You will need these Python packages, which will probably be installed
+automatically by ``pip install segway`` or ``easy_install segway``
+
+genomedata>0.1.5
+textinput
+optbuild>0.1.6
+optplus>0.1.0
+tables>2.0.4
+forked-path
+colorbrewer
+segway
+drmaa>=0.4a3
 
 The workflow
 ============
@@ -189,6 +230,14 @@ being tried. If you specify :option:`--num-starts`\=\ *starts*, then
 there will be *starts* different threads for each of the *labels*
 labels tried.
 
+XXX The question of finding the right number of labels is a difficult one.
+Mathematical criteria would usually suggest using higher numbers of
+labels. However, the results are difficult for a human to interpret in
+this case. This is why we usually use ~25 labels for a segmentation of
+dozens of input tracks. If you use a small number of input tracks you
+can probably use a smaller number of labels. XXX
+
+
 There is an experimental :option:`--num-sublabels`\=\ *sublabels*
 option that enables hierarchical segmentation, where each segment
 label is divided into a number of segment sublabels. This may require
@@ -300,9 +349,20 @@ the generation of a parameter file like ``params.3.params.18`` where
 a particular thread continues until at least one of these criteria is
 met:
 
-* the likelihood from one round is only a small improvment from the
+* the likelihood from one round is only a small improvement from the
   previous round; or
 * 100 rounds have completed.
+
+Specifically, the "small improvement" is defined in terms of the
+current likelihood :math:`L_n` and the log likelihood from the
+previous round :math:`L_{n-1}`, such that training continues while
+
+.. math::
+
+   \left| \dfrac{\log L_n - \log L_{n-1}}{\log L_{n-1}} \right| \ge 10^{-5}.
+
+This constant will likely become an option in a future version of
+Segway.
 
 As EM training produces diminishing returns over time, it is likely
 that one can obtain acceptably trained parameters well before these
@@ -439,9 +499,11 @@ Setup
 =====
 Should be ready to go on LSF out of the box.
 
-On SGE, XXX mem_requested
-
-The cluster manager must run python -m segway.cluster.sge_setup
+If you are using SGE, someone with cluster manager privileges on your
+cluster must have Segway installed within their PYTHONPATH or
+systemwide and then run ``python -m segway.cluster.sge_setup``. This
+sets up a consumable mem_requested attribute for every host on your
+cluster for more efficient memory use.
 
 Technical matters
 =================
@@ -554,8 +616,11 @@ status is useful for determining whether the job succeeded (status 0)
 or failed (any other value, which is sometimes numeric, and sometimes
 text, depending on the clustering system used). XXXcomp describe columns
 
-The ``likelihood.*.tab`` files each track the prgoression of
-likelihood during a single thread of EM training. XXXcomp describe columns
+The ``likelihood.*.tab`` files each track the progression of
+likelihood during a single thread of EM training. The file has two
+columns. Each row represents a round of training. The first column is
+the log likelihood, and the second column is a way of calculating the
+Bayesian Information Criterion.
 
 GMTK reports
 ~~~~~~~~~~~~
@@ -845,6 +910,23 @@ specified and version information when :option:`--version` is specified.
 Helpful commands
 ================
 Here are some short bash scripts or one-liners that are useful:
+
+Generate the command-line arguments necessary to continue Segway from
+an interrupted training run using `$NUM_THREADS` threads::
+
+    OLDTRAINSPEC="$(
+        for ((X=0; X < NUM_THREADS; X++)); do
+            OLDPARAMSFILENAMES=$(ls \
+                                 $OLDTRAINDIRNAME/params/params.$X.params.*
+                                 \
+                                 2>/dev/null)
+            if [ "$OLDPARAMSFILENAMES" ]; then
+                printf "%s $OLDTRAINDIRNAME/params/%s\n" -p \
+                    $(echo $OLDPARAMSFILENAMES \
+                      | xargs -n 1 basename \
+                      | sort -t . -k 4,4rn | head -n 1);
+            fi
+        done)"
 
 Rename winning parameters when a training run is cut short::
 

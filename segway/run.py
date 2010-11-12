@@ -1248,10 +1248,8 @@ class Runner(object):
         if filename is None:
             filename = data_filename("seg_table.tab")
 
-        num_segs = self.num_segs
-        if isinstance(num_segs, slice):
-            assert num_segs.step == 1
-            num_segs = num_segs.end-1
+        # always the last element of the range
+        num_segs = slice2range(self.num_segs)[-1]
 
         table = zeros((num_segs, SEG_TABLE_WIDTH), dtype=int)
         ruler_scale = self.ruler_scale
@@ -2118,8 +2116,6 @@ class Runner(object):
         return res
 
     def make_dirichlet_table(self):
-        num_segs = self.num_segs
-
         probs = self.make_dense_cpt_segCountDown_seg_segTransition()
 
         # XXX: the ratio is not exact as num_bases is not the same as
@@ -2253,8 +2249,6 @@ class Runner(object):
                                dirichlet=self.len_seg_strength > 0)
 
     def make_dense_cpt_spec(self):
-        num_segs = self.num_segs
-
         items = [self.make_dense_cpt_start_seg_spec(),
                  self.make_dense_cpt_seg_subseg_spec(),
                  self.make_dense_cpt_seg_seg_spec(),
@@ -2380,7 +2374,6 @@ class Runner(object):
 
     def make_segCountDown_tree_spec(self, resourcename):
         num_segs = self.num_segs
-        table = self.seg_table
         seg_countdowns_initial = self.seg_countdowns_initial
 
         header = ([str(num_segs)] +
@@ -2946,7 +2939,6 @@ class Runner(object):
         res = RestartableJobDict(self.session, self.job_log_file)
 
         make_acc_filename_custom = partial(self.make_acc_filename, thread_index)
-        num_windows = self.num_windows
 
         for window_index, window_len in self.window_lens_sorted():
             acc_filename = make_acc_filename_custom(window_index)
@@ -3378,7 +3370,6 @@ class Runner(object):
         self.make_posterior_filenames()
 
         viterbi_filenames = self.viterbi_filenames
-        old_viterbi_filenames = self.old_viterbi_filenames
         posterior_filenames = self.posterior_filenames
 
         # -: standard output, processed by segway-task
@@ -3391,7 +3382,6 @@ class Runner(object):
                                 **self.get_posterior_clique_print_ranges())
 
         # XXX: kill submitted jobs on exception
-        jobids = []
         with Session() as session:
             self.session = session
 

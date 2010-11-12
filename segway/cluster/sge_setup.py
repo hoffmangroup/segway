@@ -85,6 +85,8 @@ qhost -F mem_requested
 ===========================================================================
 """
 
+# XXX: a dry-run option would be good
+
 def parse_options(args):
     from optparse import OptionParser
 
