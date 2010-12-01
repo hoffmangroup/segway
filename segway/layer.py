@@ -45,14 +45,6 @@ class IncrementingDefaultDict(defaultdict):
 
         return value
 
-def inverse_dict(d):
-    """Given a dict, returns the inverse of the dict (val -> key)"""
-    res = {}
-    for k, v in d.iteritems():
-        assert v not in res
-        res[v] = k
-    return res
-
 def load_mnemonics(filename):
     mnemonics = PassThroughDict()
     ordering = []
@@ -122,8 +114,6 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None):
                 label_key = len(label_dict)
                 label_dict[label] = label_key
 
-            labels = inverse_dict(label_dict)
-
             segment = (datum.chromStart, datum.chromEnd, label_key)
             segments_dict[datum.chrom].append(segment)
 
@@ -141,7 +131,12 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None):
         if word == "visibility=dense":
             trackline[word_index] = "visibility=full"
 
-    labels_sorted = uniquify(ordering + sorted(colors.iterkeys()))
+    # pick out only those parts of ordering that are actually used here
+    label_keys = set(label_dict.keys())
+    ordering_used = [label_key for label_key in ordering
+                       if label_key in label_keys]
+
+    labels_sorted = uniquify(ordering_used + sorted(colors.iterkeys()))
 
     if len(mnemonics) == len(colors):
         colors = recolor(mnemonics)
