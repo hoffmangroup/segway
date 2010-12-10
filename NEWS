@@ -1,6 +1,7 @@
 0.2.3:
 
-
+* segway: new --tracks-from option allows specification of a filename
+* segway-layer: fix bug where not all segment labels were in an input file
 
 0.2.2:
 

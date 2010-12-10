@@ -131,12 +131,7 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None):
         if word == "visibility=dense":
             trackline[word_index] = "visibility=full"
 
-    # pick out only those parts of ordering that are actually used here
-    label_keys = set(label_dict.keys())
-    ordering_used = [label_key for label_key in ordering
-                       if label_key in label_keys]
-
-    labels_sorted = uniquify(ordering_used + sorted(colors.iterkeys()))
+    labels_sorted = uniquify(ordering + sorted(colors.iterkeys()))
 
     if len(mnemonics) == len(colors):
         colors = recolor(mnemonics)
@@ -150,11 +145,12 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None):
             end = segments_array.max()
 
             for label in labels_sorted:
-                label_key = label_dict[label]
                 try:
-                    color = colors[label]
+                    label_key = label_dict[label]
                 except KeyError:
                     continue  # Label that wasn't in segmentation
+
+                color = colors[label]
 
                 segments_label_key_rows = segments_array[:, OFFSET_LABEL] == label_key
                 segments_label_key = segments_array[segments_label_key_rows,

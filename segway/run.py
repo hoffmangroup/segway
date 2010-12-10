@@ -7,7 +7,7 @@ run: main Segway implementation
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2010 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
 from collections import defaultdict
@@ -3524,6 +3524,11 @@ def parse_options(args):
                          metavar="TRACK",
                          help="append TRACK to list of tracks to use"
                          " (default all)")
+
+        group.add_option("--tracks-from", action="load", metavar="FILE",
+                         dest="track",
+                         help="append tracks from newline-delimited FILE to"
+                         " list of tracks to use")
 
         # This is a 0-based file.
         # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
