@@ -3641,7 +3641,7 @@ def parse_options(args):
                          "(default %s)" % MEM_USAGE_PROGRESSION)
 
         group.add_option("-S", "--split-sequences", metavar="SIZE",
-                         default=MAX_FRAMES,
+                         default=MAX_FRAMES, type=int,
                          help="split up sequences that are larger than SIZE "
                          "bp (default %s)" % MAX_FRAMES)
 

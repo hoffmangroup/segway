@@ -2,6 +2,7 @@
 
 * segway: new --tracks-from option allows specification of a filename
 * segway-layer: fix bug where not all segment labels were in an input file
+* segway: fix bug where --split-sequences was ignored
 
 0.2.2:
 
