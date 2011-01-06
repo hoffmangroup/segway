@@ -1912,6 +1912,7 @@ class Runner(object):
 
             # if there is no metadata, then skip the chromosome
             if not self.accum_metadata_chromosome(chromosome):
+                # XXX: when does that condition happen?
                 continue
 
             track_indexes = self.set_tracknames(chromosome)
