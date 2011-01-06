@@ -2,6 +2,9 @@
 
 * segway: new --tracks-from option allows specification of a filename
 * segway-layer: fix bug where not all segment labels were in an input file
+* segway: with --distribution=asinh_normal, starting covariance
+  parameters are now asinh(variance). This fixes a bug with negative
+  variances
 * segway: fix bug where --split-sequences was ignored
 * segway: use Genomedata-reported metadata for whole genome rather
   than accumulating by chromosome

@@ -34,9 +34,9 @@ from uuid import uuid1
 from drmaa import ExitTimeoutException, JobControlAction, JobState
 from genomedata import Genome
 from genomedata._util import fill_array
-from numpy import (amin, amax, append, arange, arcsinh, array, empty,
-                   finfo, float32, intc, NINF, outer, sqrt, square, tile,
-                   vectorize, vstack, where, zeros)
+from numpy import (append, arange, arcsinh, array, empty, finfo, float32, intc,
+                   NINF, outer, sqrt, square, tile, vectorize, vstack, where,
+                   zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
@@ -1980,10 +1980,6 @@ class Runner(object):
     def calc_means_vars(self):
         num_datapoints = self.num_datapoints
         means = self.sums / num_datapoints
-        distribution = self.distribution
-
-        if distribution == DISTRIBUTION_ASINH_NORMAL:
-            means = arcsinh(means)
 
         # this is an unstable way of calculating the variance,
         # but it should be good enough
@@ -1991,11 +1987,14 @@ class Runner(object):
         # XXX: best would be to switch to the pairwise parallel method
         # (see Wikipedia)
         sums_squares_normalized = self.sums_squares / num_datapoints
-        if distribution == DISTRIBUTION_ASINH_NORMAL:
-            sums_squares_normalized = arcsinh(sums_squares_normalized)
+        variances = sums_squares_normalized - square(means)
 
-        self.means = means
-        self.vars = sums_squares_normalized - square(means)
+        if distribution == DISTRIBUTION_ASINH_NORMAL:
+            self.means = arcsinh(means)
+            self.vars = arcsinh(variances)
+        else:
+            self.means = means
+            self.vars = variances
 
     def get_track_lt_min(self, track_index):
         """
