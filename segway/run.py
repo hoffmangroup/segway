@@ -367,6 +367,7 @@ DIRPATH_WORKDIR_HELP = path("WORKDIR")
 
 ## functions
 try:
+    # XXX: new in version ???
     from itertools import permutations
 except ImportError:
     # copied from
@@ -1989,7 +1990,7 @@ class Runner(object):
         sums_squares_normalized = self.sums_squares / num_datapoints
         variances = sums_squares_normalized - square(means)
 
-        if distribution == DISTRIBUTION_ASINH_NORMAL:
+        if self.distribution == DISTRIBUTION_ASINH_NORMAL:
             self.means = arcsinh(means)
             self.vars = arcsinh(variances)
         else:
