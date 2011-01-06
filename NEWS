@@ -3,6 +3,9 @@
 * segway: new --tracks-from option allows specification of a filename
 * segway-layer: fix bug where not all segment labels were in an input file
 * segway: fix bug where --split-sequences was ignored
+* segway: use Genomedata-reported metadata for whole genome rather
+  than accumulating by chromosome
+* prereqs: optbuild must now be >= 0.1.10
 
 0.2.2:
 

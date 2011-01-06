@@ -1098,8 +1098,6 @@ class Runner(object):
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
-        self.metadata_done = False
-
         self.triangulation_filename_is_new = None
 
         self.supervision_coords = None
@@ -1717,63 +1715,21 @@ class Runner(object):
                                         self.distribution, seq_data,
                                         supervision_data)
 
-    def subset_metadata_attr(self, name):
-        subset_array = getattr(self, name)[self.track_indexes]
+    def subset_metadata_attr(self, genome, name):
+        subset_array = getattr(genome, name)[self.track_indexes]
 
         setattr(self, name, subset_array)
 
-    def subset_metadata(self):
+    def subset_metadata(self, genome):
         """
         limits all the metadata attributes to only tracks that are used
         """
-        if self.metadata_done:
-            return
-
         subset_metadata_attr = self.subset_metadata_attr
-        subset_metadata_attr("mins")
-        subset_metadata_attr("maxs")
-        subset_metadata_attr("sums")
-        subset_metadata_attr("sums_squares")
-        subset_metadata_attr("num_datapoints")
-
-        self.metadata_done = True # avoid repetition
-
-    def accum_metadata(self, mins, maxs, sums, sums_squares, num_datapoints):
-        if self.mins is None:
-            self.mins = mins
-            self.maxs = maxs
-            self.sums = sums
-            self.sums_squares = sums_squares
-            self.num_datapoints = num_datapoints
-        else:
-            self.mins = amin([mins, self.mins], 0)
-            self.maxs = amax([maxs, self.maxs], 0)
-            self.sums += sums
-            self.sums_squares += sums_squares
-            self.num_datapoints += num_datapoints
-
-    def accum_metadata_chromosome(self, chromosome):
-        """
-        accumulate metadata for a chromsome to the Runner instance
-
-        returns True if there is metadata
-        returns False if there is not
-        """
-
-        try:
-            mins = chromosome.mins
-            maxs = chromosome.maxs
-            sums = chromosome.sums
-            sums_squares = chromosome.sums_squares
-            num_datapoints = chromosome.num_datapoints
-        except AttributeError:
-            # this means there is no data for that chromosome
-            return False
-
-        if not self.metadata_done:
-            self.accum_metadata(mins, maxs, sums, sums_squares, num_datapoints)
-
-        return True
+        subset_metadata_attr(genome, "mins")
+        subset_metadata_attr(genome, "maxs")
+        subset_metadata_attr(genome, "sums")
+        subset_metadata_attr(genome, "sums_squares")
+        subset_metadata_attr(genome, "num_datapoints")
 
     def get_progs_used(self):
         res = []
@@ -1910,11 +1866,6 @@ class Runner(object):
                 and is_empty_array(chr_include_coords)):
                 continue
 
-            # if there is no metadata, then skip the chromosome
-            if not self.accum_metadata_chromosome(chromosome):
-                # XXX: when does that condition happen?
-                continue
-
             track_indexes = self.set_tracknames(chromosome)
             num_tracks = len(track_indexes)
 
@@ -1989,7 +1940,7 @@ class Runner(object):
 
                     window_index += 1
 
-        self.subset_metadata()
+        self.subset_metadata(genome)
 
         self.num_windows = window_index # already has +1 added to it
         self.num_bases = num_bases

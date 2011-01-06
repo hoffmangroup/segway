@@ -5,7 +5,7 @@
 :Author: Michael M. Hoffman <mmh1 at uw dot edu>
 :Organization: University of Washington
 :Address: Department of Genome Sciences, PO Box 355065, Seattle, WA 98195-5065, United States of America
-:Copyright: 2009-2010 Michael M. Hoffman
+:Copyright: 2009-2011 Michael M. Hoffman
 :Last updated: |today|
 
 
@@ -207,6 +207,11 @@ specification language and the GMTK master parameter file format. Both
 of these are described more fully in the GMTK documentation (cite),
 and the default structure and starting parameters are described more
 fully in the Segway article.
+
+The starting parameters are generated using data from the whole
+genome, which can be quickly found in the Genomedata archive. Even if
+you are training on a subset of the genome, this information is not
+used.
 
 You can tell Segway just to generate these files and not to perform
 any inference using the :option:`--dry-run` option.

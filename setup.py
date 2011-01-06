@@ -49,7 +49,7 @@ gtf2bed = segway.gtf2bed:main
 # need optbuild>0.1.5 for Mixin_UseFullProgPath
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
-install_requires = ["genomedata>0.1.5", "textinput", "optbuild>0.1.6",
+install_requires = ["genomedata>0.1.5", "textinput", "optbuild>=0.1.10",
                     "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
                     "colorbrewer"]
 
