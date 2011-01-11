@@ -39,6 +39,8 @@ DIVISOR_FOR_LIMITS = SIZE_UNITS[UNIT_FOR_LIMITS]
 
 CORE_FILE_SIZE_LIMIT = 0
 
+PREEXEC_CMDLINE = "/bin/true"
+
 class JobTemplateFactory(_JobTemplateFactory):
     # eliminate default overwrite behavior for DRMAA/LSF, go to append
     # which is default for DRMAA/SGE
@@ -61,12 +63,13 @@ class JobTemplateFactory(_JobTemplateFactory):
         # bsub -C: core file size limit
         res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec,
                                     v=mem_limit_spec, o=self.output_filename,
-                                    e=self.error_filename)
+                                    e=self.error_filename, E=PREEXEC_CMDLINE)
 
         # XXX: -C does not work with DRMAA for LSF 1.03
         # wait for upstream fix:
         # https://sourceforge.net/tracker/?func=detail&aid=2882034&group_id=206321&atid=997191
         #                            C=CORE_FILE_SIZE_LIMIT)
+        # XXX: need to ping this
 
         return " ".join([self.native_spec, res_spec])
 

@@ -1,6 +1,9 @@
 0.2.4:
 
-
+* segway: print error filename when failing due to end of memory progression
+* segway: LSF: add -E /bin/true to submissions to avoid trivial job
+  failures on broken hosts
+* docs: fix a mistake on description of explicit length distribution
 
 0.2.3:
 
