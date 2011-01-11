@@ -46,6 +46,7 @@ class _JobTemplateFactory(object):
             template.errorPath = ":" + error_filename
 
         self.template = template
+        self.tmp_usage = tmp_usage
 
     def __call__(self, trial_index):
         """
