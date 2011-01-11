@@ -287,8 +287,7 @@ decreasing the precision with which the segment duration model acts.
 Essentially, it allows the duration model to switch the behavior of
 the rest of the model only after a multiple of *scale* bp has passed.
 Using ``4:`` for a label means all labels 4 or higher, and they are
-set to a minimum segment length of 200 and a maximum segment length of
-2200.
+set to a minimum segment length of 200 and no maximum segment length.
 
 Due to the lack of an epilogue in the model, it is possible to get one
 segment per sequence that actually does not meet. This is expected and
