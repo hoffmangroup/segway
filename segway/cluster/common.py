@@ -3,8 +3,9 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# common stuff
-# Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
+# common stuff: needs to be in a different file from __init__ because
+# it is imported by lsf.py and sge.py
+# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
@@ -30,8 +31,8 @@ class _JobTemplateFactory(object):
     # this might be overridden by a subclass
     set_template_output_error = True
 
-    def __init__(self, template, mem_usage_progression, output_filename,
-                 error_filename):
+    def __init__(self, template, tmp_usage, mem_usage_progression,
+                 output_filename, error_filename):
         self.args = template.args
         self.native_spec = template.nativeSpecification
         self.mem_usage_progression = mem_usage_progression
@@ -62,14 +63,14 @@ class _JobTemplateFactory(object):
             raise RuntimeError(MSG_EDGE)
 
         self.mem_limit = int(mem_usage)
-        self.res_req = self.make_res_req(mem_usage)
+        self.res_req = self.make_res_req(mem_usage, self.tmp_usage)
 
         res.args = self.make_args()
         res.nativeSpecification = self.make_native_spec()
 
         return res
 
-    def make_res_req(self, mem_usage):
+    def make_res_req(self, mem_usage, tmp_usage):
         # pure virtual function
         raise NotImplementedError
 

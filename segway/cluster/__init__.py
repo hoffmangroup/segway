@@ -10,9 +10,7 @@ from os import environ
 import sys
 from time import sleep
 
-from drmaa import ExitTimeoutException, JobControlAction, JobState, Session
-
-TERMINATE = JobControlAction.TERMINATE
+from drmaa import ExitTimeoutException, JobState, Session
 
 FAILED = JobState.FAILED
 DONE = JobState.DONE
@@ -23,11 +21,12 @@ DONE = JobState.DONE
 # XXX: check lsb.params for real value of CLEAN_PERIOD
 CLEAN_SAFE_TIME = int(3600 * 0.9)
 
+# min time to wait between checking job status
 # XXX: should be an option
 try:
     MIN_JOB_WAIT_SLEEP_TIME = float(environ["MIN_JOB_WAIT_SLEEP_TIME"])
 except KeyError:
-    MIN_JOB_WAIT_SLEEP_TIME = 3.0 # min time to wait between checking job status
+    MIN_JOB_WAIT_SLEEP_TIME = 3.0
 
 ## credited for min time so that there is some buffer when considering
 ## whether to submit more jobs or not

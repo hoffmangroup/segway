@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
 
 from math import ceil
 import sys
@@ -15,7 +15,8 @@ from .common import _JobTemplateFactory, make_native_spec
 NATIVE_SPEC_DEFAULT = dict(w="n")
 
 class JobTemplateFactory(_JobTemplateFactory):
-    def make_res_req(self, mem_usage):
+    def make_res_req(self, mem_usage, tmp_usage):
+        # tmp_usage unused on SGE
         return [make_single_res_req("mem_requested", mem_usage),
                 make_single_res_req("h_vmem", self.mem_limit)]
 

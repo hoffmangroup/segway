@@ -132,7 +132,9 @@ TINY_FLOAT32 = FINFO_FLOAT32.tiny
 
 SIZEOF_FLOAT32 = float32().nbytes
 SIZEOF_DTYPE_OBS_INT = DTYPE_OBS_INT().nbytes
-SIZEOF_INTC = intc().nbytes
+
+# sizeof tmp space used per frame
+SIZEOF_FRAME_TMP = (SIZEOF_FLOAT32 + SIZEOF_DTYPE_OBS_INT)
 
 JITTER_STD_BOUND = 0.2
 FUDGE_EP = -17 # ldexp(1, -17) = ~1e-6
@@ -154,6 +156,8 @@ MIN_FRAMES = 2
 MAX_FRAMES = 2000000 # 2 million
 MEM_USAGE_BUNDLE = 100*MB # XXX: should start using this again
 MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
+
+TMP_USAGE_BASE = 10*MB # just a guess
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -178,6 +182,8 @@ ENV_CMD = "/usr/bin/env"
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
+
+TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
 SPECIAL_TRACKNAMES = ["dinucleotide", "supervisionLabel"]
 
@@ -2614,6 +2620,14 @@ class Runner(object):
         _log_cmdline(self.cmdline_short_file, cmdline)
         _log_cmdline(self.cmdline_long_file, args)
 
+    def calc_tmp_usage(self, num_frames, prog):
+        if prog in TMP_OBS_PROGS:
+            tmp_usage_obs = num_frames * self.num_tracks * SIZEOF_FRAME_TMP
+        else:
+            tmp_usage_obs = 0
+
+        return tmp_usage_obs + TMP_USAGE_BASE
+
     def queue_gmtk(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
@@ -2650,7 +2664,10 @@ class Runner(object):
 
         set_cwd_job_tmpl(job_tmpl)
 
+        tmp_usage = self.calc_tmp_usage(num_frames, prog)
+
         job_tmpl_factory = JobTemplateFactory(job_tmpl,
+                                              tmp_usage,
                                               self.mem_usage_progression,
                                               output_filename,
                                               error_filename)

@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
 
 from os import environ
 import sys
@@ -14,8 +14,8 @@ from .._configparser import OneSectionRawConfigParser
 from .._util import ceildiv
 from .common import _JobTemplateFactory, make_native_spec
 
-# use SI prefixes. I can't find any documentation for this but Tim
-# Cutts seems to assume this is how it works
+# use SI (not binary) prefixes. I can't find any documentation for
+# this but Tim Cutts seems to assume this is how it works
 KB = 10**3
 MB = 10**6
 GB = 10**9
@@ -44,11 +44,9 @@ class JobTemplateFactory(_JobTemplateFactory):
     # which is default for DRMAA/SGE
     set_template_output_error = False
 
-    def make_res_req(self, mem_usage):
+    def make_res_req(self, mem_usage, tmp_usage):
         mem_usage_mb = ceildiv(mem_usage, MB)
-
-        # XXX: should be set elsewhere besides environment variable
-        tmp_usage_mb = environ["TMP_NEEDED_MB"]
+        tmp_usage_mb = ceildiv(tmp_usage, MB)
 
         # returns a quoted string
         return ('"select[mem>%s && tmp>%s] rusage[mem=%s, tmp=%s]"'

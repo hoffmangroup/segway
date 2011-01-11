@@ -1,6 +1,8 @@
 0.2.3:
 
 * segway: new --tracks-from option allows specification of a filename
+* segway: LSF: now selects and declares tmp disk space usage. This
+  perhaps could be extended to SGE with some cluster administrator effort.
 * segway-layer: fix bug where not all segment labels were in an input file
 * segway: with --distribution=asinh_normal, starting covariance
   parameters are now asinh(variance). This fixes a bug with negative
