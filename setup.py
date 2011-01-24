@@ -5,7 +5,7 @@
 LONG_DESCRIPTION
 """
 
-__version__ = "0.2.4"
+__version__ = "0.2.5"
 
 # Copyright 2008-2010 Michael M. Hoffman <mmh1@washington.edu>
 
