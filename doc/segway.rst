@@ -466,7 +466,8 @@ be helpful in speeding access to parts of a segmentation.
 Recovery
 --------
 The :option:`--old-directory`\=\ *dirname* allows recovery from an
-interrupted identify task.
+interrupted identify task. Segway will requeue jobs that never
+completed before, skipping any windows that have already completed.
 
 Posterior task
 ==============
@@ -614,11 +615,12 @@ and convert GMTK's output ot BED, among other things.
 Summary reports
 ~~~~~~~~~~~~~~~
 
-The ``jobs.tab`` file contains a tab-delimited file  with each job
-Segway dispatched in a different row, reporting on XXXcomp. The exit
-status is useful for determining whether the job succeeded (status 0)
-or failed (any other value, which is sometimes numeric, and sometimes
-text, depending on the clustering system used). XXXcomp describe columns
+The ``jobs.tab`` file contains a tab-delimited file with each job
+Segway dispatched in a different row, reporting on XXXcomp. Jobs are
+written as they are completed. The exit status is useful for
+determining whether the job succeeded (status 0) or failed (any other
+value, which is sometimes numeric, and sometimes text, depending on
+the clustering system used). XXXcomp describe columns
 
 The ``likelihood.*.tab`` files each track the progression of
 likelihood during a single thread of EM training. The file has two
@@ -953,3 +955,11 @@ Rsync parameters from one host to another::
 Print all last likelihoods::
 
     for X in likelihood.*.tab; do dc -e "8 k $(tail -n 2 $X | cut -f 1 | xargs echo | sed -e 's/-//g') sc sl ll lc - ll / p"; done
+
+Recover as much as possible from an incomplete identification run
+without completing it. Note that this does not combine adjacent lines
+of same segment. BEDTools might have something to do that with. You
+will have to create your own header.txt with appropriate track lines::
+
+    cat header.txt <(find viterbi -type f | sort | xargs cat) | gzip -c > segway.bed.gz
+
