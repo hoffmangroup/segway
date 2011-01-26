@@ -669,10 +669,15 @@ repeatedly. Look in the ``output/e`` files to see what the cause of
 the underlying error was. Also ``log/jobs.tab`` lists all the jobs and
 whether they reported an error in the form of nonzero exit status.
 
-Are you failing in the bundle jobs? This might be because an
-accumulator file (written by individual job) is corrupted or
-truncated. This can happen when you run out of disk space.
+Are your bundle jobs failing? This might be because an accumulator
+file (written by individual job) is corrupted or truncated. This can
+happen when you run out of disk space.
 
+If it is not immediately apparent why a job is failing, it is probably
+useful to look in ``log/run.sh`` to find the command line that Segway
+uses to call GMTK. Try running that to see if it gives you any clues.
+You may want to switch the GMTK option -verbosity 0 to -verbosity 30
+to get more information.
 
 Names used by Segway
 ====================

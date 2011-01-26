@@ -1,6 +1,9 @@
 0.2.5:
 
-
+* segway: fix bug where aborted jobs were not returning maxvmem/vmem info
+* segway: make RuntimeError for edge of memory usage progression print
+  troubleshooting information below traceback
+* docs: add more troubleshooting info
 
 0.2.4:
 

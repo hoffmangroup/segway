@@ -22,8 +22,8 @@ MEM_GUARD = 10*MB
 BASH_CMD = "bash"
 RES_WRAPPER = "segway-wrapper.sh"
 
-MSG_EDGE = "Edge of memory usage progression reached without success."
-TEXT_EDGE = MSG_EDGE + """
+MSG_EDGE = """
+Edge of memory usage progression reached without success.
 Check for errors in %s.
 See the Troubleshooting section of the Segway documentation."""
 
@@ -61,8 +61,7 @@ class _JobTemplateFactory(object):
         try:
             mem_usage = self.mem_usage_progression[trial_index]
         except IndexError:
-            print >>sys.stderr, TEXT_EDGE % self.error_filename
-            raise RuntimeError(MSG_EDGE)
+            raise RuntimeError(MSG_EDGE % self.error_filename)
 
         self.mem_limit = int(mem_usage)
         self.res_req = self.make_res_req(mem_usage, self.tmp_usage)

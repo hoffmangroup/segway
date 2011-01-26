@@ -5,6 +5,7 @@ __version__ = "$Revision$"
 
 # Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
 
+from collections import defaultdict
 from heapq import heappop, heappush
 from os import environ
 import sys
@@ -12,8 +13,12 @@ from time import sleep
 
 from drmaa import ExitTimeoutException, JobState, Session
 
+from .._util import constant
+
 FAILED = JobState.FAILED
 DONE = JobState.DONE
+
+NA_FACTORY = constant("NA")
 
 # CLEAN_PERIOD in lsb.params, after which jobs are removed from
 # mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
@@ -204,9 +209,10 @@ class RestartableJobDict(dict):
 
                 prog, num_segs, num_frames = restartable_job.mem_usage_key
 
-                resource_usage = job_info.resourceUsage
+                resource_usage_orig = job_info.resourceUsage
+                resource_usage = defaultdict(NA_FACTORY, resource_usage_orig)
                 try: # SGE
-                    maxvmem = resource_usage["maxvmem"]
+                    maxvmem = resource_usage_orig["maxvmem"]
                 except KeyError: # LSF
                     maxvmem = resource_usage["vmem"]
 
