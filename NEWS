@@ -1,3 +1,7 @@
+0.2.6:
+
+
+
 0.2.5:
 
 * segway: fix bug where aborted jobs were not returning maxvmem/vmem info
