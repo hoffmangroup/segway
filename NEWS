@@ -1,6 +1,7 @@
 0.2.6:
 
-
+* segway: SGE: fix bug where Viterbi jobs would immediately crash with
+  a pthreads error when using recent versions of PyTables/numexpr
 
 0.2.5:
 
