@@ -1,3 +1,7 @@
+0.2.7:
+
+
+
 0.2.6:
 
 * segway: SGE: fix bug where Viterbi jobs would immediately crash with
