@@ -7,7 +7,7 @@ run: main Segway implementation
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2010 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2011 Michael M. Hoffman <mmh1@washington.edu>
 
 from cStringIO import StringIO
 from collections import defaultdict
@@ -33,8 +33,8 @@ from uuid import uuid1
 from genomedata import Genome
 from genomedata._util import fill_array
 from numpy import (append, arange, arcsinh, array, empty, finfo, float32, intc,
-                   NINF, outer, sqrt, square, tile, vectorize, vstack, where,
-                   zeros)
+                   int64, NINF, outer, sqrt, square, tile, vectorize, vstack,
+                   where, zeros)
 from numpy.random import uniform
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
@@ -347,7 +347,7 @@ THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
 
 ## functions
 try:
-    # XXX: new in version ???
+    # XXX: new in version 2.6? 2.7?
     from itertools import permutations
 except ImportError:
     # copied from
@@ -992,7 +992,9 @@ class Runner(object):
         mem_usage_list = map(float, options.mem_usage.split(","))
 
         # XXX: should do a ceil first?
-        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int)
+        # int64 in case you run this on a 32-bit machine to control
+        # 64-bit compute nodes
+        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
 
         res.clobber = options.clobber
         res.train = not options.no_train

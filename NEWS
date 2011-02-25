@@ -1,6 +1,10 @@
 0.2.7:
 
-
+* segway-layer: add --track-line-set option
+* segway-layer: produce layers for every specified mnemonic, even if empty
+* segway-layer: reverse previous ordering, so lines show up in genome
+  browser in same order as mnemonics file
+* segway-layer: ignores lines that start with #
 
 0.2.6:
 

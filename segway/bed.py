@@ -3,9 +3,10 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2010 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2011 Michael M. Hoffman <mmh1@washington.edu>
 
 from itertools import chain
+import re
 import sys
 
 FIELDNAMES = ["chrom", "chromStart", "chromEnd", # required
@@ -50,11 +51,14 @@ def read(iterator, datum_cls=Datum):
 def read_native(*args, **kwargs):
     return read(datum_cls=NativeDatum, *args, **kwargs)
 
+re_trackline_split = re.compile(r"(?:[^ =]+=([\"'])[^\1]+?\1(?= |$)|[^ ]+)")
 def get_trackline_and_reader(iterator, datum_cls=Datum):
     line = iterator.next()
 
     if line.startswith("track"):
-        trackline = line.split()
+        # retrieves group 1 of re_trackline_split match, which is the whole item
+        trackline = [match.group(0)
+                     for match in re_trackline_split.finditer(line)]
         reader = read(iterator, datum_cls)
     else:
         trackline = []

@@ -14,8 +14,8 @@
 For a conceptual overview see the paper:
 
   Michael M. Hoffman, Orion J. Buske, Zhiping Weng, Jeff A. Bilmes,
-  William Stafford Noble. Segway: a dynamic Bayesian network for
-  genomic segmentation. In preparation.
+  William Stafford Noble. Unsupervised pattern discovery in human
+  chromatin structure through genomic segmentation. In preparation.
 
 Michael <mmh1 at uw dot edu> can send you a copy of the latest
 manuscript.
@@ -23,60 +23,65 @@ manuscript.
 Installation
 ============
 
-XXX
+Segway requires the following prerequisites:
 
-> 2) By default, Segway installs itself just for the current
->   user. However, this is not very efficient if multiple users on
->   the same machine use Segway. What is the recommended way to
->   install it system wide?
-
-I would recommend using ``pip install segway`` or ``easy_install
-segway`` without configuring ~/.pydistutils.cfg to install in your
-home directory. This should install many of the prerequisites as well.
-
-> 3) What is the full list of prerequisites? I would prefer to install
->   them myself before starting the Segway installation.
-
-You need either SGE, or LSF (plus FedStage DRMAA for LSF).
-
-You need GMTK, which you can get at
-<http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz>
-with user: segway, pass: genome.
-
+You need either SGE, or LSF and FedStage DRMAA for LSF. You need GMTK,
+which you can get at
+<http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz>.
 You probably need to install NumPy separately.
 
 You will need these Python packages, which will probably be installed
 automatically by ``pip install segway`` or ``easy_install segway``
 
-genomedata>0.1.5
-textinput
-optbuild>0.1.6
-optplus>0.1.0
-tables>2.0.4
-forked-path
-colorbrewer
-segway
-drmaa>=0.4a3
+* genomedata>0.1.5
+* textinput
+* optbuild>0.1.6
+* optplus>0.1.0
+* tables>2.0.4
+* forked-path
+* colorbrewer
+* segway
+* drmaa>=0.4a3
+
+If you are installing as an individual user, we have developed an
+``install.py`` script that should make this easy.
+
+If you are installing as a system administrator, we recommend using
+``pip install segway`` or ``easy_install segway`` without configuring
+~/.pydistutils.cfg to install in your home directory. This should
+install many of the prerequisites as well.
+
+Cluster configuration
+---------------------
+If FedStage DRMAA for LSF is installed, Segway should be ready to go
+on LSF out of the box.
+
+If you are using SGE, someone with cluster manager privileges on your
+cluster must have Segway installed within their PYTHONPATH or
+systemwide and then run ``python -m segway.cluster.sge_setup``. This
+sets up a consumable mem_requested attribute for every host on your
+cluster for more efficient memory use.
 
 The workflow
 ============
-Segway accomplishes four major tasks from a single command-line. It--
+Segway accomplishes three major tasks from a single command-line. It--
 
   1. **generates** an unsupervised segmentation model and initial
      parameters appropriate for this data;
-  2. **trains** parameters of the model starting with the initial parameters;
-  3. **identifies** segments in this data with the model; and
-  4. calculates **posterior** probability for each possible segment label
+  2. **trains** parameters of the model starting with the initial
+     parameters; and
+  3. **identifies** segments in this data with the model.
+..  4. calculates **posterior** probability for each possible segment label
      at each position.
 
 .. TODO: block diagram
 
-By default, the **generate**, **train**, and **identify** tasks are
-run (for now, **posterior** is as well, but this will change), but it
-is possible to run each of these steps independently. For example, you
-may want to specify your own model (including models for tasks quite
-unlike segmentation), train it on one dataset, and then perform
-posterior decoding on another dataset, skipping the identify stage.
+.. By default, the **generate**, **train**, and **identify** tasks are
+   run (for now, **posterior** is as well, but this will change), but it
+   is possible to run each of these steps independently. For example, you
+   may want to specify your own model (including models for tasks quite
+   unlike segmentation), train it on one dataset, and then perform
+   posterior decoding on another dataset, skipping the identify stage.
 
 Technical description
 ---------------------
@@ -95,9 +100,9 @@ More specifically, Segway performs the following steps:
   7. Convert the GMTK Viterbi results into BED format
      (``segway.bed.gz``) for use in a genome browser, or by
      ``segtools``, or other tools
-  8. Call GMTK to perform posterior decoding of the observations
+..  8. Call GMTK to perform posterior decoding of the observations
      using the generated model and discovered parameters
-  9. Convert the GMTK posterior results into wiggle format
+..  9. Convert the GMTK posterior results into wiggle format
      (``posterior.seg*.wig.gz``) for use in a genome browser or
      other tools
   10. Use a distributed computing system to parallelize all of the
@@ -109,8 +114,8 @@ More specifically, Segway performs the following steps:
       <http://noble.gs.washington.edu/proj/segtools/> for a more
       comprehensive report and plots on the resulting segmentation.
 
-The **identify** and **posterior** tasks can run simultaneously, as
-they depend only on the results of **train**, and not each other.
+.. The **identify** and **posterior** tasks can run simultaneously, as
+   they depend only on the results of **train**, and not each other.
 
 Data selection
 ==============
@@ -173,12 +178,15 @@ regions in this format at
 For human whole-genome studies, these regions have nice properties
 since they mark 1 percent of the genome, and were carefully picked to
 include a variety of different gene densities, and a number of more
-limited studies provide data just for these regions. There is a file
-containing only nine of these regions at
-<http://noble.gs.washington.edu/proj/segway/data/regions.manual.1.tab>,
-which covers 0.15% of the human genome, and is useful for training.
-All coordinates are in terms of the NCBI36 assembly of the human
-reference genome (also called ``hg18`` by UCSC).
+limited studies provide data just for these regions. All coordinates
+are in terms of the GRCh37 assembly of the human reference genome
+(also called ``hg19`` by UCSC).
+
+.. TODO: convert to hg19
+.. There is a file containing only nine of these regions at
+   <http://noble.gs.washington.edu/proj/segway/data/regions.manual.1.tab>,
+   which covers 0.15% of the human genome, and is useful for training.
+
 
 After reading in data from a Genomedata archive, and selecting a
 smaller subset with :option:`--exclude-coords` and
@@ -235,13 +243,13 @@ being tried. If you specify :option:`--num-starts`\=\ *starts*, then
 there will be *starts* different threads for each of the *labels*
 labels tried.
 
-XXX The question of finding the right number of labels is a difficult one.
-Mathematical criteria would usually suggest using higher numbers of
-labels. However, the results are difficult for a human to interpret in
-this case. This is why we usually use ~25 labels for a segmentation of
-dozens of input tracks. If you use a small number of input tracks you
-can probably use a smaller number of labels. XXX
-
+The question of finding the right number of labels is a difficult one.
+Mathematical criteria, such as the Bayesian information criterion,
+would usually suggest using higher numbers of labels. However, the
+results are difficult for a human to interpret in this case. This is
+why we usually use ~25 labels for a segmentation of dozens of input
+tracks. If you use a small number of input tracks you can probably use
+a smaller number of labels.
 
 There is an experimental :option:`--num-sublabels`\=\ *sublabels*
 option that enables hierarchical segmentation, where each segment
@@ -336,7 +344,7 @@ By default, XXX :option:`--no-train` XXX :option:`--no-identify` XXX
 The use of :option:`--dry-run` will cause Segway to generate
 appropriate model and observation files but not to actually perform
 any inference or queue any jobs. This can be useful when
-troubleshooting a model or task.
+troubleshooting a model or task. XXX Train implies generate
 
 Train task
 ==========
@@ -375,8 +383,7 @@ wish to train only on a subset of your data, as described in
 :ref:`positions`.
 
 When all threads are complete, Segway picks the parameter set with the
-best likelihood and copies it to ``params.params``. This file is used
-for the identify and posterior tasks if they are enabled.
+best likelihood and copies it to ``params.params``.
 
 There are two different modes of training available, unsupervised and
 semisupervised.
@@ -401,7 +408,7 @@ one can enforce that those positions will have label 2. You might do
 this if you had specific reason to believe that these regions were
 enhancers and wanted to find similar patterns in your data tracks.
 Using smaller labels first (such as 0) is probably better. Supervision
-labels are not enforced during the identify or posterior tracks.
+labels are not enforced during the identify task.
 
 To simulate fully supervised training, simply supply supervision
 labels for the entire training region.
@@ -469,46 +476,49 @@ The :option:`--old-directory`\=\ *dirname* allows recovery from an
 interrupted identify task. Segway will requeue jobs that never
 completed before, skipping any windows that have already completed.
 
-Posterior task
-==============
-The **posterior** inference task of Segway estimates for each position
-of interest the probability that the model has a particular segment
-label given the data. This information is delivered in a series of
-numbered wiggle files, one for each segment label. The individual
-values will vary from 0 to 100, showing the percentage probability at
-each position for the label in that file. In most positions, the value
-will be 0 or 100, and substantially reproduce the Viterbi path
-determined from the **identify** task.
+.. Posterior task
+.. ==============
+.. The **posterior** inference task of Segway estimates for each position
+.. of interest the probability that the model has a particular segment
+.. label given the data. This information is delivered in a series of
+.. numbered wiggle files, one for each segment label. The individual
+.. values will vary from 0 to 100, showing the percentage probability at
+.. each position for the label in that file. In most positions, the value
+.. will be 0 or 100, and substantially reproduce the Viterbi path
+.. determined from the **identify** task.
 
-Posterior results can be useful in determining regions of ambiguous
-labeling or in diagnosing new models. The mostly binary nature of the
-posterior assignments is a consequence of the design of the default
-Segway model, and it is possible to design a model that does not have
-this feature. Doing so is left as an exercise to the reader.
+.. Posterior results can be useful in determining regions of ambiguous
+.. labeling or in diagnosing new models. The mostly binary nature of the
+.. posterior assignments is a consequence of the design of the default
+.. Segway model, and it is possible to design a model that does not have
+.. this feature. Doing so is left as an exercise to the reader.
 
-XXXcomp name the files
+.. XXXcomp name the files
 
-You may find you need to convert the wiggle files to bigWig format
-first to allow small portions to be uploaded to a genome browser
-piecewise.
+.. You may find you need to convert the wiggle files to bigWig format
+.. first to allow small portions to be uploaded to a genome browser
+.. piecewise.
 
-XXX same options for specifying model and parameters as identify
+.. XXX same options for specifying model and parameters as identify
 
 Creating layered output
 =======================
-XXX describe segway-layer here
+
+Segway produces BED Files as output with the segment label in the name
+field. While this is the most sensible way of interchanging the
+segmentation with other programs, it can be difficult to visualize. We
+supply a ``segway-label`` program that transforms segmentation BED
+files into "layered" BED files with rows for each possible Segment
+label and thick boxes at the location of each label. This is what we
+show in the screenshot figure of the Segway article. This is much
+easier to see at low levels of magnification. The layers are also
+labeled, removing the need to distinguish them exclusively by color.
+
 XXX describe mnemonic files
+
 XXX works with stdin/stdout
 
-Setup
-=====
-Should be ready to go on LSF out of the box.
-
-If you are using SGE, someone with cluster manager privileges on your
-cluster must have Segway installed within their PYTHONPATH or
-systemwide and then run ``python -m segway.cluster.sge_setup``. This
-sets up a consumable mem_requested attribute for every host on your
-cluster for more efficient memory use.
+XXXcomp --help here (can Sphinx do this automatically?)
 
 Technical matters
 =================
@@ -723,12 +733,10 @@ XXX table with short description of each of these
     input.*.master
     params.*.params.*
     params.*
-  posterior
   segway.bed.gz
   segway.str
   triangulation
     segway.str.*.*.trifile
-    XXXcomp there's another file created for the posterior task
   viterbi
 
 Job names
@@ -755,14 +763,16 @@ On LSF, use::
 
   bkill -J "*.ed03201cea2047399d4cbcc4b62f9827"
 
-Jobs created in the identify (``vit``) or posterior (``jt``) tasks are
+Jobs created in the identify (``vit``) task are
 named similarly::
 
   vit34.identifydir.4f32630d53724f08b34a8fc58793307d
-  jt34.identifydir.4f32630d53724f08b34a8fc58793307d
 
-Of course, there are no threads or rounds for the identify or
-posterior tasks, so only the sequence index is reported.
+..  jt34.identifydir.4f32630d53724f08b34a8fc58793307d
+.. or posterior (``jt``)
+
+Of course, there are no threads or rounds for the identify task, so
+only the sequence index is reported.
 
 Tracks
 ------

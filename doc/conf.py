@@ -11,7 +11,7 @@
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-import sys, os
+import sys
 
 sys.path.insert(0, "..")
 
@@ -42,14 +42,14 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Segway'
-copyright = u'2009-2010, Michael M. Hoffman'
+copyright = u'2009-2011, Michael M. Hoffman'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
 # built documents.
 #
 # The short X.Y version.
-version = '0.1'
+version = release.rsplit(".", 1)[0]
 # The full version, including alpha/beta/rc tags.
 # release = '0.1.11'
 
@@ -63,12 +63,9 @@ version = '0.1'
 # Else, today_fmt is used as the format for a strftime call.
 #today_fmt = '%B %d, %Y'
 
-# List of documents that shouldn't be included in the build.
-#unused_docs = []
-
-# List of directories, relative to source directory, that shouldn't be searched
-# for source files.
-exclude_trees = ['_build']
+# List of patterns, relative to source directory, that match files and
+# directories to ignore when looking for source files.
+exclude_patterns = ['_build']
 
 # The reST default role (used for this markup: `text`) to use for all documents.
 #default_role = None
@@ -93,8 +90,8 @@ pygments_style = 'sphinx'
 
 # -- Options for HTML output ---------------------------------------------------
 
-# The theme to use for HTML and HTML Help pages.  Major themes that come with
-# Sphinx are currently 'default' and 'sphinxdoc'.
+# The theme to use for HTML and HTML Help pages.  See the documentation for
+# a list of builtin themes.
 html_theme = 'default'
 
 # Theme options are theme-specific and customize the look and feel of a theme
@@ -142,7 +139,7 @@ html_static_path = ['_static']
 #html_additional_pages = {}
 
 # If false, no module index is generated.
-#html_use_modindex = True
+#html_domain_indices = True
 
 # If false, no index is generated.
 #html_use_index = True
@@ -153,13 +150,19 @@ html_static_path = ['_static']
 # If true, links to the reST sources are added to the pages.
 #html_show_sourcelink = True
 
+# If true, "Created using Sphinx" is shown in the HTML footer. Default is True.
+#html_show_sphinx = True
+
+# If true, "(C) Copyright ..." is shown in the HTML footer. Default is True.
+#html_show_copyright = True
+
 # If true, an OpenSearch description file will be output, and all pages will
 # contain a <link> tag referring to it.  The value of this option must be the
 # base URL from which the finished HTML is served.
 #html_use_opensearch = ''
 
-# If nonempty, this is the file name suffix for HTML files (e.g. ".xhtml").
-#html_file_suffix = ''
+# This is the file name suffix for HTML files (e.g. ".xhtml").
+#html_file_suffix = None
 
 # Output file base name for HTML help builder.
 htmlhelp_basename = 'Segwaydoc'
@@ -188,6 +191,12 @@ latex_documents = [
 # not chapters.
 #latex_use_parts = False
 
+# If true, show page references after internal links.
+#latex_show_pagerefs = False
+
+# If true, show URL addresses after external links.
+#latex_show_urls = False
+
 # Additional stuff for the LaTeX preamble.
 #latex_preamble = ''
 
@@ -195,4 +204,13 @@ latex_documents = [
 #latex_appendices = []
 
 # If false, no module index is generated.
-#latex_use_modindex = True
+#latex_domain_indices = True
+
+# -- Options for manual page output --------------------------------------------
+
+# One entry per manual page. List of tuples
+# (source start file, name, description, authors, manual section).
+man_pages = [
+    ('index', 'segway', u'Segway Documentation',
+     [u'Michael M. Hoffman'], 1)
+]
