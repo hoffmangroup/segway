@@ -196,7 +196,7 @@ def parse_options(args):
                       "replacement identifiers for segment labels")
     parser.add_option("-s", "--track-line-set", metavar="ATTR VALUE",
                       action="update", help="set ATTR to VALUE in track line",
-                      default=[])
+                      default={})
 
     options, args = parser.parse_args(args)
 
