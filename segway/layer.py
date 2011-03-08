@@ -195,7 +195,8 @@ def parse_options(args):
                       help="specify tab-delimited file with mnemonic "
                       "replacement identifiers for segment labels")
     parser.add_option("-s", "--track-line-set", metavar="ATTR VALUE",
-                      action="update", help="set ATTR to VALUE in track line")
+                      action="update", help="set ATTR to VALUE in track line",
+                      default=[])
 
     options, args = parser.parse_args(args)
 
