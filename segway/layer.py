@@ -60,7 +60,9 @@ def load_mnemonics(filename):
                 mnemonics[row["old"]] = row["new"]
                 ordering.append(row["old"])
 
-    return mnemonics, reversed(ordering)
+    ordering.reverse()
+
+    return mnemonics, ordering
 
 def uniquify(seq):
     """
