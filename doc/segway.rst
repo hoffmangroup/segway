@@ -780,6 +780,7 @@ segway.str
 triangulation/
   segway.str.*.*.trifile
 viterbi/
+==========               =============
 
 Job names
 ---------
