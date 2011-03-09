@@ -977,6 +977,8 @@ Here are some short bash scripts or one-liners that are useful:
 Generate the command-line arguments necessary to continue Segway from
 an interrupted training run using `$NUM_ITERATIONS` iterations::
 
+    NUM_ITERATIONS=<define number of threads here>
+    OLDTRAINDIRNAME=<define old workdir here>
     OLDTRAINSPEC="$(
         for ((X=0; X < NUM_ITERATIONS; X++)); do
             OLDPARAMSFILENAMES=$(ls \
@@ -990,6 +992,9 @@ an interrupted training run using `$NUM_ITERATIONS` iterations::
                       | sort -t . -k 4,4rn | head -n 1);
             fi
         done)"
+
+Then you can add `$OLDTRAINSPEC` into your Segway command-line to
+specify all of the previous parameter files as starting values.
 
 Rename winning parameters when a training run is cut short::
 
