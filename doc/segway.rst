@@ -8,14 +8,15 @@
 :Copyright: 2009-2011 Michael M. Hoffman
 :Last updated: |today|
 
-
 .. include:: <isogrk3.txt>
+.. |---| unicode:: U+2014  .. em dash, trimming surrounding whitespace
+   :trim:
 
 For a conceptual overview see the paper:
 
   Michael M. Hoffman, Orion J. Buske, Zhiping Weng, Jeff A. Bilmes,
   William Stafford Noble. Unsupervised pattern discovery in human
-  chromatin structure through genomic segmentation. In preparation.
+  chromatin structure through genomic segmentation. Submitted.
 
 Michael <mmh1 at uw dot edu> can send you a copy of the latest
 manuscript.
@@ -25,30 +26,23 @@ Installation
 
 Segway requires the following prerequisites:
 
-You need either SGE, or LSF and FedStage DRMAA for LSF. You need GMTK,
-which you can get at
+You need either Sun Grid Engine (SGE; now called Oracle Grid Engine),
+or Platform Load Sharing Facility (LSF) and FedStage DRMAA for LSF.
+You need Graphical Models Toolkit (GMTK), which you can get at
 <http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz>.
 You probably need to install NumPy separately.
 
 You will need these Python packages, which will probably be installed
-automatically by ``pip install segway`` or ``easy_install segway``
-
-* genomedata>0.1.5
-* textinput
-* optbuild>0.1.6
-* optplus>0.1.0
-* tables>2.0.4
-* forked-path
-* colorbrewer
-* segway
-* drmaa>=0.4a3
+automatically by ``pip install segway`` or ``easy_install segway``:
+``genomedata>0.1.5``, ``textinput``, ``optbuild>0.1.6``, ``optplus>0.1.0``,
+``tables>2.0.4``, ``forked-path``, ``colorbrewer``, ``segway``, ``drmaa>=0.4a3``.
 
 If you are installing as an individual user, we have developed an
 ``install.py`` script that should make this easy.
 
 If you are installing as a system administrator, we recommend using
 ``pip install segway`` or ``easy_install segway`` without configuring
-~/.pydistutils.cfg to install in your home directory. This should
+``~/.pydistutils.cfg`` to install in your home directory. This should
 install many of the prerequisites as well.
 
 Cluster configuration
@@ -99,7 +93,7 @@ More specifically, Segway performs the following steps:
      using the generated model and discovered parameters
   7. Convert the GMTK Viterbi results into BED format
      (``segway.bed.gz``) for use in a genome browser, or by
-     ``segtools``, or other tools
+     Segtools <http://noble.gs.washington.edu/proj/segtools/>, or other tools
 ..  8. Call GMTK to perform posterior decoding of the observations
      using the generated model and discovered parameters
 ..  9. Convert the GMTK posterior results into wiggle format
@@ -110,9 +104,9 @@ More specifically, Segway performs the following steps:
       consumption to maximize efficiency
   11. Generate reports on the established likelihood at each round of
       training (``likelihood.*.tab``)
-  12. (not implemented) Call ``segtools``
-      <http://noble.gs.washington.edu/proj/segtools/> for a more
-      comprehensive report and plots on the resulting segmentation.
+..  12. (not implemented) Call Segtools
+..      <http://noble.gs.washington.edu/proj/segtools/> for a more
+..      comprehensive report and plots on the resulting segmentation.
 
 .. The **identify** and **posterior** tasks can run simultaneously, as
    they depend only on the results of **train**, and not each other.
@@ -240,7 +234,7 @@ number of segment labels to use in the model (default 2). You can set
 this to a single number or a range with Python slice notation. For
 example, ``--num-labels=5:20:5`` will result in 5, 10, and 15 labels
 being tried. If you specify :option:`--num-starts`\=\ *starts*, then
-there will be *starts* different threads for each of the *labels*
+there will be *starts* different iterations for each of the *labels*
 labels tried.
 
 The question of finding the right number of labels is a difficult one.
@@ -339,26 +333,29 @@ function of both :option:`--segtransition-weight-scale` and
 
 Task selection
 ==============
-By default, XXX :option:`--no-train` XXX :option:`--no-identify` XXX
-:option:`--no-posterior` XXX
+By default, Segway performs model generation, training, and
+identification after each other. Usually, usersw will want to perform
+training and identification separately, so that they can train on a
+subset of the genome. To train only, use the :option:`--no-identify`
+option. To perform identification only, use the :option:`--no-train` option.
 The use of :option:`--dry-run` will cause Segway to generate
 appropriate model and observation files but not to actually perform
 any inference or queue any jobs. This can be useful when
-troubleshooting a model or task. XXX Train implies generate
+troubleshooting a model or task.
 
 Train task
 ==========
 Most users will generate the model at training time, but to specify
 your own model there are the :option:`--structure`\=\ *filename* and
 :option:`--input-master`\=\ *filename* options. You can simultaneously
-run multiple *threads* of EM training in parallel, specified with the
-:option:`--random-starts`\=\ *threads* option. Each thread consists of
-a number fo rounds, which are broken down into individual tasks for
+run multiple *iterations* of EM training in parallel, specified with the
+:option:`--random-starts`\=\ *iterations* option. Each iteration consists of
+a number of rounds, which are broken down into individual tasks for
 each training region. The results from each region for a particular
-thread and round are combined in a quick *bundle* task. It results in
+iteration and round are combined in a quick *bundle* task. It results in
 the generation of a parameter file like ``params.3.params.18`` where
-``3`` is the thread index and ``18`` is the round index. Training for
-a particular thread continues until at least one of these criteria is
+``3`` is the iteration index and ``18`` is the round index. Training for
+a particular iteration continues until at least one of these criteria is
 met:
 
 * the likelihood from one round is only a small improvement from the
@@ -382,7 +379,7 @@ criteria are met. Training can be a time-consuming process. You may
 wish to train only on a subset of your data, as described in
 :ref:`positions`.
 
-When all threads are complete, Segway picks the parameter set with the
+When all iterations are complete, Segway picks the parameter set with the
 best likelihood and copies it to ``params.params``.
 
 There are two different modes of training available, unsupervised and
@@ -421,7 +418,7 @@ General options
 The :option:`--dont-train`\=\ *file* option specifies a file with a
 newline-delimited list of parameters not to train. By default, this
 includes the XXXcomp parameters. You are unlikely to use this unless
-you are building your own models by hand.
+you are generating your own models manually.
 
 Recovery
 --------
@@ -436,14 +433,14 @@ incomplete training run.
 You can recover from a previously completed training run by specifying
 multiple :option:`--input-master` and :option:`--trainable-params`
 files. They will be matched to each other in order. If there are more
-threads specfiied than master and parameter files, then new ones will
-be generated automatically for the remaining threads. The final
+iterations specfiied than master and parameter files, then new ones will
+be generated automatically for the remaining iterations. The final
 parameters file is generated in *workdir*\ ``/params/params.params``
-
-XXXcomp include snippet to find all jobs
+The Helpful Commands section of this manual contains some short
+scripts useful for this process
 
 The new training run will start over with round index 0 for all
-threads, so the usual maximum of 100 rounds will take place after
+iterations, so the usual maximum of 100 rounds will take place after
 another 100 rounds rather than from the initial start.
 
 In the future, this will be replaced with :option:`--old-directory`\=\
@@ -507,18 +504,55 @@ Creating layered output
 Segway produces BED Files as output with the segment label in the name
 field. While this is the most sensible way of interchanging the
 segmentation with other programs, it can be difficult to visualize. We
-supply a ``segway-label`` program that transforms segmentation BED
+supply a ``segway-layer`` program that transforms segmentation BED
 files into "layered" BED files with rows for each possible Segment
 label and thick boxes at the location of each label. This is what we
 show in the screenshot figure of the Segway article. This is much
 easier to see at low levels of magnification. The layers are also
 labeled, removing the need to distinguish them exclusively by color.
+``segway-layer`` supports the use of standard input and output by
+using ``-`` as a filename, following a common Unix convention.
 
-XXX describe mnemonic files
+The mnemonic files used by Segway and Segtools have a simple format.
+They are tab-delimited files with a header that has the following
+columns: ``old``, ``new``, and ``description``. The ``old`` column
+specifies the original label in the BED file, which is always produced
+as an integer by Segway. The ``new`` column allows the specification
+of a short alphanumeric mnemonic for the label. The ``description``
+column is unused by ``segway-label``, but you can use it to add
+helpful annotations for humans examining the list of  labels,
+or to save label mnemonics you used previously. The row order of the
+mnemonic file matters, as the layers will be laid down in a similar
+order. Mnemonics sharing the same alphabetical prefix (for example,
+``A0`` and ``A1``) or characters before a period (for example, ``0.0``
+and ``0.1``) will be rendered with the same color.
 
-XXX works with stdin/stdout
+``segtools-gmtk-parameters`` in the Segtools package can automatically
+identify an initial hierarchical labeling of segmentation parameters.
+This can be very useful as a first approximation of assigning meaning
+to segment labels.
 
-XXXcomp --help here (can Sphinx do this automatically?)
+A simple mnemonic file appears below::
+
+  old	new	description
+  0	TSS	transcription start site
+  2	GE	gene end
+  1	D	dead zone
+
+Synopsis of ``segway-layer``:
+
+  Usage: segway-layer [OPTION]... [INFILE] [OUTFILE]
+
+  Options:
+    --version             show program's version number and exit
+    -h, --help            show this help message and exit
+    -m FILE, --mnemonic-file=FILE
+                          specify tab-delimited file with mnemonic replacement
+                          identifiers for segment labels
+    -s ATTR VALUE, --track-line-set=ATTR VALUE
+                          set ATTR to VALUE in track line
+
+.. TODO: can Sphinx do this automatically?
 
 Technical matters
 =================
@@ -573,9 +607,11 @@ now you must have a clustering system. Try installing the free SGE on
 your workstation if you want to run Segway without a full clustering
 system.
 
-XXX :option:`--cluster-opt`
+The :option:`--cluster-opt` option allows the specification of native
+options to your clustering system |---| those options you might pass
+to ``qsub`` (SGE) or ``bsub`` (LSF).
 
-XXXcomp include SGE and LSF cluster-opt demos
+.. TODO comp include SGE and LSF cluster-opt demos
 
 Memory usage
 ------------
@@ -601,7 +637,8 @@ the input sequences somewhat because larger sequences make more
 difficult work units (greater memory and run time costs) and thereby
 impede efficient parallelization. The :option:`--split-sequences`\=\
 *size* option will split up sequences into windows with *size* frames
-each. The default *size* is 2,000,000.
+each. The default *size* is 2,000,000. Decreasing to 500,000 will
+greatly improve speed at the cost of more artefacts at split boundaries.
 
 Reporting
 ---------
@@ -633,7 +670,7 @@ value, which is sometimes numeric, and sometimes text, depending on
 the clustering system used). XXXcomp describe columns
 
 The ``likelihood.*.tab`` files each track the progression of
-likelihood during a single thread of EM training. The file has two
+likelihood during a single iteration of EM training. The file has two
 columns. Each row represents a round of training. The first column is
 the log likelihood, and the second column is a way of calculating the
 Bayesian Information Criterion.
@@ -647,13 +684,17 @@ to use it.
 Task output
 ~~~~~~~~~~~
 
-The ``output`` directory contains XXX
-
-XXX ``e`` and XXX ``o``
-
-XXX :option:`--verbosity`\=\ *verbosity*. See the GMTK documentation
-for a description of various levels of verbosity. Keep in mind that
-very high values (above 60) will produce tons of output--maybe
+The ``output`` directory contains the output of the actual GMTK
+commands run by Segway. The ``o`` directory contains standard output
+and the ``e`` directory contains standard error. If a job fails and
+repeats, the output from the new job is appended to the old. The
+:option:`--verbosity`\=\ *verbosity* option controls how much
+diagnostic information that GMTK writes into these files. The default
+and minimum value is ``0``. Raise this value for more information, and
+see the GMTK documentation for a description of various levels of
+verbosity. Setting :option:`verbosity`\=\ ``30`` can be particularly
+helpful in diagnosing model problems. Keep in mind that very high
+values (above ``60``) will produce tons of output |---| maybe
 terabytes.
 
 Performance
@@ -668,7 +709,8 @@ The longest region forms a bottleneck during training because Segway
 cannot start the next round of training before all regions in the
 previous round are done. So if you specify three regions, one of which
 is 10 Mbp long, and the other are 100 kbp, the 10 Mbp region is going
-to be a limiting factor.
+to be a limiting factor. You can use :option:`--split-sequences` (see
+above) to put an upper bound on region size.
 
 Troubleshooting
 ===============
@@ -698,46 +740,46 @@ Files
 Segway expects to be able to create many of these files anew. To avoid
 data loss, it will quit if they already exist. For you can use the
 experimental :option:`--clobber` option to allow overwriting of the
-files instead, but it isn't fully tested. Rather than test it, it will
-probably be removed in the future.
+files instead, but it isn't fully tested. It will probably be removed
+in the future.
 
-XXX table with short description of each of these
-
-::
-
-  accumulators
-    acc.*.*.bin
-  auxiliary
-    dont_train.list
-    segway.inc
-  likelihood
-    likelihood.*.ll
-  log
-    details.sh
-    jobs.tab
-    jt_info.txt
-    likelihood.*.tab
-    run.sh
-    segway.sh
-  observations
-    *.*.float32
-    *.*.int
-    float32.list
-    int.list
-    observations.tab
-  output
-  output/e
-  output/e/0,1,2,3,4,5,...,identify
-  output/o
-  params
-    input.*.master
-    params.*.params.*
-    params.*
-  segway.bed.gz
-  segway.str
-  triangulation
-    segway.str.*.*.trifile
-  viterbi
+==========               =============
+ Filename                 Description
+==========               =============
+accumulators/            intermediate files used to pass E-step results to the M-step of EM training
+acc.*.*.bin              accumulator for a particular iteration and region (reused each round)
+auxiliary/               misclelaneous model files
+  dont_train.list        defines list of hidden random variables that are not trained
+  segway.inc             C preprocessor (``cpp``) include file used in structure
+likelihood/              GMTK's report of the log likelihood for the most recent M-step of EM training
+  likelihood.*.ll        contains text of the last log likelihood value for an iteration. Segway uses this to decide when to stop training
+log/                     diagnostic information
+  details.sh             script file that includes the exact command-lines queued by Segway, with wrapper scripts
+  jobs.tab               tab-delimeted sumary of jobs queued, including resource informatoin and exit status
+  jt_info.txt            log file used by GMTK when creating a junction tree
+  likelihood.*.tab       tab-delimited summary of likelihood and a measure of Bayesian information criterion by training iteration; can be used to examine how fast training converges
+  run.sh                 list of commands run by Segway, not including wrappers that create and clean up temporary files such as observations used during identification
+  segway.sh              reports the command-line used to run Segway itself
+observations/            decompressed, and potentially large raw observation files created from a Genomedata archive located elsewhere
+  *.*.float32            continuous data for a particular region
+  *.*.int                indicator data (present/absent) for a particular region
+  float32.list           list of continuous data files
+  int.list               list of indicator data files
+  observations.tab       tab-delimited description of observations used. Used to check that an existing directory specified with :option:`--observations` matches the data specified at the command-line
+output/                  diagnostic output of individual GMTK jobs
+output/e/                stderr
+output/e/0,1,...         stderr for a particular training iteration (0, 1, ...)
+output/e/identify        stderr for identification
+output/o/                stdout
+params/                  generated and trained parameters
+  input.*.master
+  params.*.params.*
+  params.*
+segway.bed.gz
+segway.str
+triangulation/
+  segway.str.*.*.trifile
+viterbi/
 
 Job names
 ---------
@@ -749,7 +791,7 @@ look like this::
   emt0.1.34.traindir.ed03201cea2047399d4cbcc4b62f9827
 
 In this example, ``emt`` means expectation maximization training, the
-``0`` means thread 0, the ``1`` means round 1, and the ``34`` means
+``0`` means iteration 0, the ``1`` means round 1, and the ``34`` means
 window 34. The name of the training directory is ``traindir``, and
 ``ed03201cea2047399d4cbcc4b62f9827`` is a universally unique
 identifier for this particular Segway run. This can be useful if you
@@ -771,7 +813,7 @@ named similarly::
 ..  jt34.identifydir.4f32630d53724f08b34a8fc58793307d
 .. or posterior (``jt``)
 
-Of course, there are no threads or rounds for the identify task, so
+Of course, there are no iterations or rounds for the identify task, so
 only the sequence index is reported.
 
 Tracks
@@ -913,7 +955,7 @@ specified and version information when :option:`--version` is specified.
       -T, --no-train      do not train model
       -I, --no-identify   do not identify segments
       -P, --no-posterior  do not identify probability of segments
-      -k, --keep-going    keep going in some threads even when you have errors
+      -k, --keep-going    keep going in some iterations even when you have errors
                           in another
       -n, --dry-run       write all files, but do not run any executables
 
@@ -933,10 +975,10 @@ Helpful commands
 Here are some short bash scripts or one-liners that are useful:
 
 Generate the command-line arguments necessary to continue Segway from
-an interrupted training run using `$NUM_THREADS` threads::
+an interrupted training run using `$NUM_ITERATIONS` iterations::
 
     OLDTRAINSPEC="$(
-        for ((X=0; X < NUM_THREADS; X++)); do
+        for ((X=0; X < NUM_ITERATIONS; X++)); do
             OLDPARAMSFILENAMES=$(ls \
                                  $OLDTRAINDIRNAME/params/params.$X.params.*
                                  \
@@ -952,10 +994,10 @@ an interrupted training run using `$NUM_THREADS` threads::
 Rename winning parameters when a training run is cut short::
 
      TRAINDIRNAME=<define workdir here>
-     WINNING_THREAD=$(fgrep "" $TRAINDIRNAME/log/likelihood.*.tab | perl -pe 's#^.*/likelihood.(\d+).tab:#\1\t#' | sort -k 2,2g | tail -n 1 | cut -f 1)
-     cp -v $(ls $TRAINDIRNAME/params/params.${WINNING_THREAD}.params.* \
+     WINNING_ITERATION=$(fgrep "" $TRAINDIRNAME/log/likelihood.*.tab | perl -pe 's#^.*/likelihood.(\d+).tab:#\1\t#' | sort -k 2,2g | tail -n 1 | cut -f 1)
+     cp -v $(ls $TRAINDIRNAME/params/params.${WINNING_ITERATION}.params.* \
          | sort -t . -k 4,4rn | head -n 1) "$TRAINDIRNAME/params/params.params"
-     cp -v "$TRAINDIRNAME/params/input.${WINNING_THREAD}.master" "$TRAINDIRNAME/params/input.master" 
+     cp -v "$TRAINDIRNAME/params/input.${WINNING_ITERATION}.master" "$TRAINDIRNAME/params/input.master" 
 
 Make a tarball of parameters and models from various directories::
 

@@ -502,19 +502,19 @@ def is_training_progressing(last_ll, curr_ll,
 def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
 
-def make_default_filename(resource, dirname="WORKDIR", thread_index=None):
+def make_default_filename(resource, dirname="WORKDIR", iteration_index=None):
     resource_part = resource.rpartition(".tmpl")
     stem = resource_part[0] or resource_part[2]
     stem_part = stem.rpartition(extsep)
     prefix = stem_part[0]
     ext = stem_part[2]
 
-    filebasename = extjoin_not_none(prefix, thread_index, ext)
+    filebasename = extjoin_not_none(prefix, iteration_index, ext)
 
     return path(dirname) / filebasename
 
 def make_template_filename(filename, resource, dirname=None, clobber=False,
-                           thread_index=None):
+                           iteration_index=None):
     """
     returns (filename, is_new)
     """
@@ -523,17 +523,17 @@ def make_template_filename(filename, resource, dirname=None, clobber=False,
             return filename, False
         # else filename is unchanged
     else:
-        filename = make_default_filename(resource, dirname, thread_index)
+        filename = make_default_filename(resource, dirname, iteration_index)
 
     return filename, True
 
 def save_template(filename, resource, mapping, dirname=None,
-                  clobber=False, thread_index=None):
+                  clobber=False, iteration_index=None):
     """
     creates a temporary file if filename is None or empty
     """
     filename, is_new = make_template_filename(filename, resource, dirname,
-                                              clobber, thread_index)
+                                              clobber, iteration_index)
 
     if is_new:
         with open(filename, "w+") as outfile:
@@ -815,8 +815,8 @@ def make_mem_req(mem_usage):
 
     return "%dG" % mem_usage_gibibytes
 
-def update_starts(starts, ends, new_starts, new_ends, thread_index):
-    next_index = thread_index + 1
+def update_starts(starts, ends, new_starts, new_ends, iteration_index):
+    next_index = iteration_index + 1
 
     starts[next_index:next_index] = new_starts
     ends[next_index:next_index] = new_ends
@@ -836,21 +836,21 @@ class Mixin_Lockable(AddableMixin):
 LockableDefaultDict = Mixin_Lockable + defaultdict
 
 class RandomStartThread(Thread):
-    def __init__(self, runner, session, thread_index, num_segs):
+    def __init__(self, runner, session, iteration_index, num_segs):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
         self.runner = copy(runner)
 
         self.session = session
         self.num_segs = num_segs
-        self.thread_index = thread_index
+        self.iteration_index = iteration_index
 
         Thread.__init__(self)
 
     def run(self):
         self.runner.session = self.session
         self.runner.num_segs = self.num_segs
-        self.runner.thread_index = self.thread_index
+        self.runner.iteration_index = self.iteration_index
         self.result = self.runner.run_train_start()
 
 def maybe_quote_arg(text):
@@ -1232,7 +1232,7 @@ class Runner(object):
             # set. And this will only happen from the master thread.
             self.last_params_filename = None
 
-    def set_params_filename(self, thread_index=None, new=False):
+    def set_params_filename(self, iteration_index=None, new=False):
         """
         None means the final params file, not for any particular thread
         """
@@ -1240,17 +1240,17 @@ class Runner(object):
         # unspecified, then it won't be passed to gmtkViterbiNew
 
         # these are unexpected corner cases for now
-        assert not (thread_index is None and new)
+        assert not (iteration_index is None and new)
 
         params_filenames = self.params_filenames
         num_params_filenames = len(params_filenames)
 
-        if thread_index is None and num_params_filenames == 1:
+        if iteration_index is None and num_params_filenames == 1:
             # special case if there is only one param filename set
             # otherwise generate "params.params" anew
             params_filename = params_filenames[0]
-        elif thread_index is not None and num_params_filenames > thread_index:
-            params_filename = params_filenames[thread_index]
+        elif iteration_index is not None and num_params_filenames > iteration_index:
+            params_filename = params_filenames[iteration_index]
         else:
             params_filename = None
 
@@ -1261,22 +1261,22 @@ class Runner(object):
         if (new or not params_filename
             or (self.train and path(params_filename).exists())):
             params_filename = \
-                self.make_filename(PREFIX_PARAMS, thread_index, EXT_PARAMS,
+                self.make_filename(PREFIX_PARAMS, iteration_index, EXT_PARAMS,
                                    subdirname=SUBDIRNAME_PARAMS)
 
         self.params_filename = params_filename
 
-    def set_log_likelihood_filename(self, thread_index=None, new=False):
+    def set_log_likelihood_filename(self, iteration_index=None, new=False):
         if new or not self.log_likelihood_filename:
             log_likelihood_filename = \
-                self.make_filename(PREFIX_LIKELIHOOD, thread_index,
+                self.make_filename(PREFIX_LIKELIHOOD, iteration_index,
                                    EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
 
             self.log_likelihood_filename = log_likelihood_filename
 
             self.log_likelihood_log_filename = \
-                self.make_filename(PREFIX_LIKELIHOOD, thread_index, EXT_TAB,
+                self.make_filename(PREFIX_LIKELIHOOD, iteration_index, EXT_TAB,
                                    subdirname=SUBDIRNAME_LOG)
 
     def make_triangulation_dirpath(self):
@@ -1285,15 +1285,15 @@ class Runner(object):
 
         self.triangulation_dirpath = res
 
-    def make_output_dirpath(self, dirname, thread_index, clobber=None):
-        res = self.dirpath / "output" / dirname / str(thread_index)
+    def make_output_dirpath(self, dirname, iteration_index, clobber=None):
+        res = self.dirpath / "output" / dirname / str(iteration_index)
         self.make_dir(res, clobber)
 
         return res
 
-    def set_output_dirpaths(self, thread_index, clobber=None):
+    def set_output_dirpaths(self, iteration_index, clobber=None):
         make_output_dirpath_custom = partial(self.make_output_dirpath,
-                                             thread_index=thread_index,
+                                             iteration_index=iteration_index,
                                              clobber=clobber)
 
         self.output_dirpath = make_output_dirpath_custom("o")
@@ -1695,7 +1695,7 @@ class Runner(object):
 
                 ## iterate through windows and write
                 ## izip so it can be modified in place
-                for thread_index, start, end in izip(count(), starts, ends):
+                for iteration_index, start, end in izip(count(), starts, ends):
                     if include_coords or exclude_coords:
                         overlaps = find_overlaps(start, end,
                                                  chr_include_coords,
@@ -1709,7 +1709,7 @@ class Runner(object):
                         else:
                             new_starts, new_ends = zip(*overlaps)
                             update_starts(starts, ends, new_starts, new_ends,
-                                          thread_index)
+                                          iteration_index)
                             continue # consider the newly split sequences next
 
                     num_bases_window = end - start
@@ -1735,7 +1735,7 @@ class Runner(object):
                         new_ends = append(new_starts[1:], end)
 
                         update_starts(starts, ends, new_starts, new_ends,
-                                      thread_index)
+                                      iteration_index)
                         continue
 
                     # start: relative to beginning of chromosome
@@ -2204,7 +2204,7 @@ class Runner(object):
 
         return make_spec("NAME_COLLECTION", items)
 
-    def save_input_master(self, thread_index=None, new=False):
+    def save_input_master(self, iteration_index=None, new=False):
         # the locals of this function are used as the template mapping
         # use caution before deleting or renaming any variables
         # check that they are not used in the input.master template
@@ -2272,7 +2272,7 @@ class Runner(object):
         self.input_master_filename, input_master_filename_is_new = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
                           locals(), params_dirpath, self.clobber,
-                          thread_index)
+                          iteration_index)
 
         # print >>sys.stderr, "input_master_filename = %s; is_new = %s" \
         #     % (self.input_master_filename, input_master_filename_is_new)
@@ -2528,16 +2528,16 @@ class Runner(object):
 
         return prog
 
-    def make_acc_filename(self, thread_index, window_index):
-        return self.make_filename(PREFIX_ACC, thread_index, window_index,
+    def make_acc_filename(self, iteration_index, window_index):
+        return self.make_filename(PREFIX_ACC, iteration_index, window_index,
                                   EXT_BIN, subdirname=SUBDIRNAME_ACC)
 
     def make_posterior_filename(self, window_index):
         return self.make_filename(PREFIX_POSTERIOR, window_index, EXT_TXT,
                                   subdirname=SUBDIRNAME_POSTERIOR)
 
-    def make_job_name_train(self, thread_index, round_index, window_index):
-        return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, thread_index,
+    def make_job_name_train(self, iteration_index, round_index, window_index):
+        return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, iteration_index,
                                      round_index, window_index,
                                      self.dirpath.name, UUID)
 
@@ -2685,7 +2685,7 @@ class Runner(object):
         return RestartableJob(session, job_tmpl_factory, self.global_mem_usage,
                               mem_usage_key)
 
-    def queue_train(self, thread_index, round_index, window_index, num_frames=0,
+    def queue_train(self, iteration_index, round_index, window_index, num_frames=0,
                     **kwargs):
         """
         this calls Runner.queue_gmtk()
@@ -2696,17 +2696,17 @@ class Runner(object):
         kwargs["inputMasterFile"] = self.input_master_filename
 
         prog = self.train_prog
-        name = self.make_job_name_train(thread_index, round_index, window_index)
+        name = self.make_job_name_train(iteration_index, round_index, window_index)
 
         return self.queue_gmtk(prog, kwargs, name, num_frames)
 
-    def queue_train_parallel(self, input_params_filename, thread_index,
+    def queue_train_parallel(self, input_params_filename, iteration_index,
                              round_index, **kwargs):
         kwargs["cppCommandOptions"] = self.make_cpp_options(input_params_filename)
 
         res = RestartableJobDict(self.session, self.job_log_file)
 
-        make_acc_filename_custom = partial(self.make_acc_filename, thread_index)
+        make_acc_filename_custom = partial(self.make_acc_filename, iteration_index)
 
         for window_index, window_len in self.window_lens_sorted():
             acc_filename = make_acc_filename_custom(window_index)
@@ -2718,7 +2718,7 @@ class Runner(object):
 
             num_frames = self.window_lens[window_index]
 
-            restartable_job = self.queue_train(thread_index, round_index,
+            restartable_job = self.queue_train(iteration_index, round_index,
                                                window_index, num_frames,
                                                **kwargs_window)
             res.queue(restartable_job)
@@ -2726,10 +2726,10 @@ class Runner(object):
         return res
 
     def queue_train_bundle(self, input_params_filename, output_params_filename,
-                           thread_index, round_index, **kwargs):
+                           iteration_index, round_index, **kwargs):
         """bundle step: take parallel accumulators and combine them
         """
-        acc_filename = self.make_acc_filename(thread_index,
+        acc_filename = self.make_acc_filename(iteration_index,
                                               GMTK_INDEX_PLACEHOLDER)
 
         cpp_options = self.make_cpp_options(input_params_filename,
@@ -2744,7 +2744,7 @@ class Runner(object):
                       loadAccFile=acc_filename,
                       **kwargs)
 
-        restartable_job = self.queue_train(thread_index, round_index,
+        restartable_job = self.queue_train(iteration_index, round_index,
                                            NAME_BUNDLE_PLACEHOLDER, **kwargs)
 
         res = RestartableJobDict(self.session, self.job_log_file)
@@ -2840,7 +2840,7 @@ class Runner(object):
         for num_segs in num_segs_range:
             self.run_triangulate_single(num_segs)
 
-    def run_train_round(self, thread_index, round_index, **kwargs):
+    def run_train_round(self, iteration_index, round_index, **kwargs):
         """
         returns None: normal
         returns not None: abort
@@ -2849,13 +2849,13 @@ class Runner(object):
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
         restartable_jobs = \
-            self.queue_train_parallel(last_params_filename, thread_index,
+            self.queue_train_parallel(last_params_filename, iteration_index,
                                       round_index, **kwargs)
         restartable_jobs.wait()
 
         restartable_jobs = \
             self.queue_train_bundle(last_params_filename, curr_params_filename,
-                                    thread_index, round_index,
+                                    iteration_index, round_index,
                                     llStoreFile=self.log_likelihood_filename,
                                     **kwargs)
         restartable_jobs.wait()
@@ -2876,12 +2876,12 @@ class Runner(object):
 
         new = self.make_new_params
 
-        thread_index = self.thread_index
+        iteration_index = self.iteration_index
 
-        self.save_input_master(thread_index, new)
-        self.set_params_filename(thread_index, new)
-        self.set_log_likelihood_filename(thread_index, new)
-        self.set_output_dirpaths(thread_index)
+        self.save_input_master(iteration_index, new)
+        self.set_params_filename(iteration_index, new)
+        self.set_log_likelihood_filename(iteration_index, new)
+        self.set_output_dirpaths(iteration_index)
 
         last_log_likelihood = NINF
         log_likelihood = NINF
@@ -2897,7 +2897,7 @@ class Runner(object):
 
         while (round_index < self.max_em_iters and
                is_training_progressing(last_log_likelihood, log_likelihood)):
-            self.run_train_round(thread_index, round_index, **kwargs)
+            self.run_train_round(iteration_index, round_index, **kwargs)
 
             if self.dry_run:
                 return (None, None, None, None)
@@ -2972,7 +2972,7 @@ class Runner(object):
         # having a single-threaded version makes debugging much easier
         with Session() as session:
             self.session = session
-            self.thread_index = 0
+            self.iteration_index = 0
             start_params = [self.run_train_start()]
 
         self.session = None
@@ -2981,19 +2981,19 @@ class Runner(object):
 
     def run_train_multithread(self, num_segs_range):
         # XXX: Python 2.6 use itertools.product()
-        seg_thread_indexes = xrange(self.random_starts)
-        enumerator = enumerate((num_seg, seg_thread_index)
+        seg_iteration_indexes = xrange(self.random_starts)
+        enumerator = enumerate((num_seg, seg_iteration_index)
                                for num_seg in num_segs_range
-                               for seg_thread_index in seg_thread_indexes)
+                               for seg_iteration_index in seg_iteration_indexes)
 
         threads = []
         with Session() as session:
             try:
-                for thread_index, (num_seg, seg_thread_index) in enumerator:
+                for iteration_index, (num_seg, seg_iteration_index) in enumerator:
                     # print >>sys.stderr, (
-                    #    "thread_index %s, num_seg %s, seg_thread_index %s"
-                    #    % (thread_index, num_seg, seg_thread_index))
-                    thread = RandomStartThread(self, session, thread_index,
+                    #    "iteration_index %s, num_seg %s, seg_iteration_index %s"
+                    #    % (iteration_index, num_seg, seg_iteration_index))
+                    thread = RandomStartThread(self, session, iteration_index,
                                                num_seg)
                     thread.start()
                     threads.append(thread)
@@ -3038,7 +3038,7 @@ class Runner(object):
         src_filenames = min_params[OFFSET_FILENAMES:]
 
         if None in src_filenames:
-            raise ValueError("all training threads failed")
+            raise ValueError("all training iterations failed")
 
         assert LEN_TRAIN_ATTRNAMES == len(src_filenames) == len(dst_filenames)
 
@@ -3372,8 +3372,8 @@ def parse_options(args):
 
         group.add_option("-r", "--random-starts", type=int,
                          default=RANDOM_STARTS, metavar="NUM",
-                         help="randomize start parameters NUM times"
-                         " (default %d)" % RANDOM_STARTS)
+                         help="randomize start parameters NUM times;"
+                         " run NUM iterations (default %d)" % RANDOM_STARTS)
 
         group.add_option("-N", "--num-labels", type=slice,
                          default=NUM_SEGS, metavar="SLICE",
@@ -3433,7 +3433,7 @@ def parse_options(args):
         group.add_option("-P", "--no-posterior", action="store_true",
                          help="do not identify probability of segments")
         group.add_option("-k", "--keep-going", action="store_true",
-                         help="keep going in some threads even when you have"
+                         help="keep going in some iterations even when you have"
                          " errors in another")
         group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
