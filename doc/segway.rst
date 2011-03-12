@@ -9,8 +9,6 @@
 :Last updated: |today|
 
 .. include:: <isogrk3.txt>
-.. |---| unicode:: U+2014  .. em dash, trimming surrounding whitespace
-   :trim:
 
 For a conceptual overview see the paper:
 
@@ -612,7 +610,7 @@ your workstation if you want to run Segway without a full clustering
 system.
 
 The :option:`--cluster-opt` option allows the specification of native
-options to your clustering system |---| those options you might pass
+options to your clustering system---those options you might pass
 to ``qsub`` (SGE) or ``bsub`` (LSF).
 
 .. TODO comp include SGE and LSF cluster-opt demos
@@ -701,7 +699,7 @@ and minimum value is ``0``. Raise this value for more information, and
 see the GMTK documentation for a description of various levels of
 verbosity. Setting :option:`verbosity`\=\ ``30`` can be particularly
 helpful in diagnosing model problems. Keep in mind that very high
-values (above ``60``) will produce tons of output |---| maybe
+values (above ``60``) will produce tons of output---maybe
 terabytes.
 
 Performance
