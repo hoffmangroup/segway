@@ -553,10 +553,10 @@ Synopsis of ``segway-layer``:
     -m FILE, --mnemonic-file=FILE
                           specify tab-delimited file with mnemonic replacement
                           identifiers for segment labels
-    -s ATTR\ VALUE, --track-line-set=ATTR\ VALUE
+    -s ATTRVALUE, --track-line-set=ATTRVALUE
                           set ATTR to VALUE in track line
 
-
+.. XXXcomp: how to get spaces in above?
 .. TODO: can Sphinx pull in option list automatically?
 
 Technical matters
@@ -808,7 +808,7 @@ segway.str
 triangulation/            
   segway.str.*.*.trifile  
 viterbi/                  
-========================= ======================================================
+========================= =======================================================
 
 Job names
 ---------
