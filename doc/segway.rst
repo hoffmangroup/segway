@@ -65,8 +65,8 @@ Segway accomplishes three major tasks from a single command-line. It--
   2. **trains** parameters of the model starting with the initial
      parameters; and
   3. **identifies** segments in this data with the model.
-..  4. calculates **posterior** probability for each possible segment label
-     at each position.
+.. 4. calculates **posterior** probability for each possible segment
+.. label at each position.
 
 .. TODO: block diagram
 
@@ -95,10 +95,10 @@ More specifically, Segway performs the following steps:
      (``segway.bed.gz``) for use in a genome browser, or by
      Segtools <http://noble.gs.washington.edu/proj/segtools/>, or other tools
 ..  8. Call GMTK to perform posterior decoding of the observations
-     using the generated model and discovered parameters
+..   using the generated model and discovered parameters
 ..  9. Convert the GMTK posterior results into wiggle format
-     (``posterior.seg*.wig.gz``) for use in a genome browser or
-     other tools
+..     (``posterior.seg*.wig.gz``) for use in a genome browser or
+..     other tools
   10. Use a distributed computing system to parallelize all of the
       GMTK tasks listed above, and track and predict their resource
       consumption to maximize efficiency
@@ -417,8 +417,9 @@ General options
 ---------------
 The :option:`--dont-train`\=\ *file* option specifies a file with a
 newline-delimited list of parameters not to train. By default, this
-includes the XXXcomp parameters. You are unlikely to use this unless
-you are generating your own models manually.
+includes the ``dpmf_always``, ``start_seg``, and all GMTK
+DeterministicCPT parameters. You are unlikely to use this unless you
+are generating your own models manually.
 
 Recovery
 --------
@@ -552,6 +553,7 @@ Synopsis of ``segway-layer``:
     -s ATTR VALUE, --track-line-set=ATTR VALUE
                           set ATTR to VALUE in track line
 
+
 .. TODO: can Sphinx do this automatically?
 
 Technical matters
@@ -585,14 +587,13 @@ options (:option:`--track`, :option:`--include-coords`,
 :option:`--exclude-coords`) must be exactly the same when sharing
 observation files. Otherwise you are likely to get unexplained failures.
 
-XXXcomp add a check in observation directory to make sure tracks and
-coords are same
-XXXcomp add a lock file to eliminate race condition.
+.. XXXcomp add a check in observation directory to make sure tracks and coords are same
+.. XXXcomp add a lock file to eliminate race condition.
 
 You will find a full description of all the working files in the
 **Files** section
 
-XXXcomp above should be a link, not bold
+.. XXXcomp above should be a link, not bold
 
 Distributed computing
 ---------------------
@@ -663,11 +664,14 @@ Summary reports
 ~~~~~~~~~~~~~~~
 
 The ``jobs.tab`` file contains a tab-delimited file with each job
-Segway dispatched in a different row, reporting on XXXcomp. Jobs are
-written as they are completed. The exit status is useful for
-determining whether the job succeeded (status 0) or failed (any other
-value, which is sometimes numeric, and sometimes text, depending on
-the clustering system used). XXXcomp describe columns
+Segway dispatched in a different row, reporting on job identifier
+(``jobid``), job name (``jobname``), GMTK program (``prog``), number
+of segment labels (``num_segs``), number of frames (``num_frames``),
+maximum memory usage (``maxvmem``), CPU time (``cpu``) and exit/error
+status (``exit_status``). Jobs are written as they are completed. The
+exit status is useful for determining whether the job succeeded
+(status 0) or failed (any other value, which is sometimes numeric, and
+sometimes text, depending on the clustering system used).
 
 The ``likelihood.*.tab`` files each track the progression of
 likelihood during a single iteration of EM training. The file has two
@@ -743,29 +747,50 @@ experimental :option:`--clobber` option to allow overwriting of the
 files instead, but it isn't fully tested. It will probably be removed
 in the future.
 
-==========               =============
+=======================  ======================================================
  Filename                 Description
-==========               =============
-accumulators/            intermediate files used to pass E-step results to the M-step of EM training
-acc.*.*.bin              accumulator for a particular iteration and region (reused each round)
+=======================  ======================================================
+accumulators/            intermediate files used to pass E-step
+                         results to the M-step of EM training
+
+acc.*.*.bin              accumulator for a particular iteration and
+                         region (reused each round)
 auxiliary/               misclelaneous model files
-  dont_train.list        defines list of hidden random variables that are not trained
-  segway.inc             C preprocessor (``cpp``) include file used in structure
-likelihood/              GMTK's report of the log likelihood for the most recent M-step of EM training
-  likelihood.*.ll        contains text of the last log likelihood value for an iteration. Segway uses this to decide when to stop training
+  dont_train.list        defines list of hidden random variables that
+                         are not trained
+  segway.inc             C preprocessor (``cpp``) include file used in
+                         structure
+likelihood/              GMTK's report of the log likelihood for the
+                         most recent M-step of EM training
+  likelihood.*.ll        contains text of the last log likelihood value for an
+                         iteration. Segway uses this to decide when to
+                         stop training
 log/                     diagnostic information
-  details.sh             script file that includes the exact command-lines queued by Segway, with wrapper scripts
-  jobs.tab               tab-delimeted sumary of jobs queued, including resource informatoin and exit status
+  details.sh             script file that includes the exact
+                         command-lines queued by Segway, with wrapper scripts
+  jobs.tab               tab-delimeted sumary of jobs queued,
+                         including resource informatoin and exit status
   jt_info.txt            log file used by GMTK when creating a junction tree
-  likelihood.*.tab       tab-delimited summary of likelihood and a measure of Bayesian information criterion by training iteration; can be used to examine how fast training converges
-  run.sh                 list of commands run by Segway, not including wrappers that create and clean up temporary files such as observations used during identification
+  likelihood.*.tab       tab-delimited summary of likelihood and a measure of
+                         Bayesian information criterion by training
+                         iteration; can be used to examine  how fast
+                         training converges
+  run.sh                 list of commands run by Segway, not including wrappers
+                         that create and clean up temporary files such as
+                         observations used during identification
   segway.sh              reports the command-line used to run Segway itself
-observations/            decompressed, and potentially large raw observation files created from a Genomedata archive located elsewhere
+observations/            decompressed, and potentially large raw observation
+                         files created from a Genomedata archive located
+                         elsewhere
   *.*.float32            continuous data for a particular region
-  *.*.int                indicator data (present/absent) for a particular region
+  *.*.int                indicator data (present/absent) for a particular
+                         region
   float32.list           list of continuous data files
   int.list               list of indicator data files
-  observations.tab       tab-delimited description of observations used. Used to check that an existing directory specified with :option:`--observations` matches the data specified at the command-line
+  observations.tab       tab-delimited description of observations used. Used
+                         to check that an existing directory specified with
+                         :option:`--observations` matches the data specified
+                         at the command-line
 output/                  diagnostic output of individual GMTK jobs
 output/e/                stderr
 output/e/0,1,...         stderr for a particular training iteration (0, 1, ...)
@@ -780,7 +805,7 @@ segway.str
 triangulation/
   segway.str.*.*.trifile
 viterbi/
-==========               =============
+======================== ======================================================
 
 Job names
 ---------
@@ -828,10 +853,9 @@ distribution specified in the form of a conditional probability table.
 Python interface
 ================
 I have designed Segway such that eventually one may call different
-components directly from within Python. To do so, import the following
-module:
+components directly from within Python.
 
-XXXcomp table here (from the setup.py)
+.. To do so, import the following module: XXXcomp table here (from the setup.py)
 
 You can then call the appropriate module through its ``main()``
 function with the same arguments you would use at the command line.
