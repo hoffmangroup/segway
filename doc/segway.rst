@@ -65,6 +65,7 @@ Segway accomplishes three major tasks from a single command-line. It--
   2. **trains** parameters of the model starting with the initial
      parameters; and
   3. **identifies** segments in this data with the model.
+
 .. 4. calculates **posterior** probability for each possible segment
 .. label at each position.
 
@@ -94,6 +95,7 @@ More specifically, Segway performs the following steps:
   7. Convert the GMTK Viterbi results into BED format
      (``segway.bed.gz``) for use in a genome browser, or by
      Segtools <http://noble.gs.washington.edu/proj/segtools/>, or other tools
+
 ..  8. Call GMTK to perform posterior decoding of the observations
 ..   using the generated model and discovered parameters
 ..  9. Convert the GMTK posterior results into wiggle format
@@ -104,6 +106,7 @@ More specifically, Segway performs the following steps:
       consumption to maximize efficiency
   11. Generate reports on the established likelihood at each round of
       training (``likelihood.*.tab``)
+
 ..  12. (not implemented) Call Segtools
 ..      <http://noble.gs.washington.edu/proj/segtools/> for a more
 ..      comprehensive report and plots on the resulting segmentation.
