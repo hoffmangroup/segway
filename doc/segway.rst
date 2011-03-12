@@ -553,11 +553,11 @@ Synopsis of ``segway-layer``:
     -m FILE, --mnemonic-file=FILE
                           specify tab-delimited file with mnemonic replacement
                           identifiers for segment labels
-    -s ATTR VALUE, --track-line-set=ATTR VALUE
+    -s ATTR\ VALUE, --track-line-set=ATTR\ VALUE
                           set ATTR to VALUE in track line
 
 
-.. TODO: can Sphinx do this automatically?
+.. TODO: can Sphinx pull in option list automatically?
 
 Technical matters
 =================
@@ -750,65 +750,65 @@ experimental :option:`--clobber` option to allow overwriting of the
 files instead, but it isn't fully tested. It will probably be removed
 in the future.
 
-=======================  ======================================================
- Filename                 Description
-=======================  ======================================================
-accumulators/            intermediate files used to pass E-step
-                         results to the M-step of EM training
-
-acc.*.*.bin              accumulator for a particular iteration and
-                         region (reused each round)
-auxiliary/               misclelaneous model files
-  dont_train.list        defines list of hidden random variables that
-                         are not trained
-  segway.inc             C preprocessor (``cpp``) include file used in
-                         structure
-likelihood/              GMTK's report of the log likelihood for the
-                         most recent M-step of EM training
-  likelihood.*.ll        contains text of the last log likelihood value for an
-                         iteration. Segway uses this to decide when to
-                         stop training
-log/                     diagnostic information
-  details.sh             script file that includes the exact
-                         command-lines queued by Segway, with wrapper scripts
-  jobs.tab               tab-delimeted sumary of jobs queued,
-                         including resource informatoin and exit status
-  jt_info.txt            log file used by GMTK when creating a junction tree
-  likelihood.*.tab       tab-delimited summary of likelihood and a measure of
-                         Bayesian information criterion by training
-                         iteration; can be used to examine  how fast
-                         training converges
-  run.sh                 list of commands run by Segway, not including wrappers
-                         that create and clean up temporary files such as
-                         observations used during identification
-  segway.sh              reports the command-line used to run Segway itself
-observations/            decompressed, and potentially large raw observation
-                         files created from a Genomedata archive located
-                         elsewhere
-  *.*.float32            continuous data for a particular region
-  *.*.int                indicator data (present/absent) for a particular
-                         region
-  float32.list           list of continuous data files
-  int.list               list of indicator data files
-  observations.tab       tab-delimited description of observations used. Used
-                         to check that an existing directory specified with
-                         :option:`--observations` matches the data specified
-                         at the command-line
-output/                  diagnostic output of individual GMTK jobs
-output/e/                stderr
-output/e/0,1,...         stderr for a particular training iteration (0, 1, ...)
-output/e/identify        stderr for identification
-output/o/                stdout
-params/                  generated and trained parameters
-  input.*.master
-  params.*.params.*
-  params.*
-segway.bed.gz
-segway.str
-triangulation/
-  segway.str.*.*.trifile
-viterbi/
-======================== ======================================================
+========================= =======================================================
+ Filename                  Description
+========================= =======================================================
+accumulators/             intermediate files used to pass E-step
+                          results to the M-step of EM training
+                          
+acc.*.*.bin               accumulator for a particular iteration and
+                          region (reused each round)
+auxiliary/                misclelaneous model files
+  dont_train.list         defines list of hidden random variables that
+                          are not trained
+  segway.inc              C preprocessor (``cpp``) include file used in
+                          structure
+likelihood/               GMTK's report of the log likelihood for the
+                          most recent M-step of EM training
+  likelihood.*.ll         contains text of the last log likelihood value for an
+                          iteration. Segway uses this to decide when to
+                          stop training
+log/                      diagnostic information
+  details.sh              script file that includes the exact
+                          command-lines queued by Segway, with wrapper scripts
+  jobs.tab                tab-delimeted sumary of jobs queued,
+                          including resource informatoin and exit status
+  jt_info.txt             log file used by GMTK when creating a junction tree
+  likelihood.*.tab        tab-delimited summary of likelihood and a measure of
+                          Bayesian information criterion by training
+                          iteration; can be used to examine  how fast
+                          training converges
+  run.sh                  list of commands run by Segway, not including wrappers
+                          that create and clean up temporary files such as
+                          observations used during identification
+  segway.sh               reports the command-line used to run Segway itself
+observations/             decompressed, and potentially large raw observation
+                          files created from a Genomedata archive located
+                          elsewhere
+  *.*.float32             continuous data for a particular region
+  *.*.int                 indicator data (present/absent) for a particular
+                          region
+  float32.list            list of continuous data files
+  int.list                list of indicator data files
+  observations.tab        tab-delimited description of observations used. Used
+                          to check that an existing directory specified with
+                          :option:`--observations` matches the data specified
+                          at the command-line
+output/                   diagnostic output of individual GMTK jobs
+output/e/                 stderr
+output/e/0,1,...          stderr for a particular training iteration (0, 1, ...)
+output/e/identify         stderr for identification
+output/o/                 stdout
+params/                   generated and trained parameters
+  input.*.master          
+  params.*.params.*       
+  params.*                
+segway.bed.gz             
+segway.str                
+triangulation/            
+  segway.str.*.*.trifile  
+viterbi/                  
+========================= ======================================================
 
 Job names
 ---------
