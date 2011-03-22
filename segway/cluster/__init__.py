@@ -10,8 +10,19 @@ from heapq import heappop, heappush
 from os import environ
 import sys
 from time import sleep
+from traceback import format_exception_only, print_stack, print_tb
 
-from drmaa import ExitTimeoutException, JobState, Session
+try:
+    from drmaa import ExitTimeoutException, JobState, Session
+except RuntimeError:
+    print >>sys.stderr, 'Traceback (most recent call last):'
+    typ, val, tb = sys.exc_info()
+    print_stack(tb.tb_frame.f_back)
+    print_tb(tb)
+    print >>sys.stderr, " ".join(format_exception_only(typ, val))
+    print >>sys.stderr
+    print >>sys.stderr, "Hint: you must run Segway on a cluster with DRMAA installed."
+    sys.exit(3)
 
 from .._util import constant
 

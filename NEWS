@@ -1,5 +1,6 @@
 0.2.7:
 
+* all: display hint when trying to run on cluster
 * segway-layer: add --track-line-set option
 * segway-layer: produce layers for every specified mnemonic, even if empty
 * segway-layer: reverse previous ordering, so lines show up in genome

@@ -1,13 +1,15 @@
-======================
- Segway documentation
-======================
+================================
+ Segway |version| documentation
+================================
 :Homepage: http://noble.gs.washington.edu/proj/segway
 :Author: Michael M. Hoffman <mmh1 at uw dot edu>
 :Organization: University of Washington
-:Address: Department of Genome Sciences, PO Box 355065, Seattle, WA 98195-5065, United States of America
+:Address: Department of Genome Sciences, PO Box 355065
+          Seattle, WA 98195-5065, United States of America
 :Copyright: 2009-2011 Michael M. Hoffman
 :Last updated: |today|
 
+.. currentmodule:: segway
 .. include:: <isogrk3.txt>
 
 For a conceptual overview see the paper:
@@ -32,8 +34,9 @@ You probably need to install NumPy separately.
 
 You will need these Python packages, which will probably be installed
 automatically by ``pip install segway`` or ``easy_install segway``:
-``genomedata>0.1.5``, ``textinput``, ``optbuild>0.1.6``, ``optplus>0.1.0``,
-``tables>2.0.4``, ``forked-path``, ``colorbrewer``, ``segway``, ``drmaa>=0.4a3``.
+``genomedata>0.1.5``, ``textinput``, ``optbuild>0.1.6``,
+``optplus>0.1.0``, ``tables>2.0.4``, ``forked-path``, ``colorbrewer``,
+``segway``, ``drmaa>=0.4a3``.
 
 If you are installing as an individual user, we have developed an
 ``install.py`` script that should make this easy.
@@ -67,7 +70,7 @@ Segway accomplishes three major tasks from a single command-line. It--
 .. 4. calculates **posterior** probability for each possible segment
 .. label at each position.
 
-.. TODO: block diagram
+.. todo: : block diagram
 
 .. By default, the **generate**, **train**, and **identify** tasks are
    run (for now, **posterior** is as well, but this will change), but it
@@ -154,6 +157,8 @@ exclusions are then taken out of the included regions.
 
 .. using warning rather than note because it works with multi-para stuff in LaTeX
 
+.. todo: is this still the case?
+
 .. warning::
 
   BED format uses zero-based half-open coordinates, just like
@@ -169,15 +174,17 @@ exclusions are then taken out of the included regions.
 For example, the ENCODE Data Coordination Center at University of
 California Santa Cruz keeps the coordinates of the ENCODE pilot
 regions in this format at
-<http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/encodeRegions.txt.gz>.
-For human whole-genome studies, these regions have nice properties
-since they mark 1 percent of the genome, and were carefully picked to
-include a variety of different gene densities, and a number of more
-limited studies provide data just for these regions. All coordinates
-are in terms of the GRCh37 assembly of the human reference genome
-(also called ``hg19`` by UCSC).
+<http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/referenceSequences/encodePilotRegions.hg19.bed>
+(GRCh37/hg19) and
+<http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/encodeRegions.txt.gz>
+(NCBI36/hg18). For human whole-genome studies, these regions have nice
+properties since they mark 1 percent of the genome, and were carefully
+picked to include a variety of different gene densities, and a number
+of more limited studies provide data just for these regions. All
+coordinates are in terms of the GRCh37 assembly of the human reference
+genome (also called ``hg19`` by UCSC).
 
-.. TODO: convert to hg19
+.. todo: convert to hg19
 .. There is a file containing only nine of these regions at
    <http://noble.gs.washington.edu/proj/segway/data/regions.manual.1.tab>,
    which covers 0.15% of the human genome, and is useful for training.
@@ -492,13 +499,13 @@ completed before, skipping any windows that have already completed.
 .. Segway model, and it is possible to design a model that does not have
 .. this feature. Doing so is left as an exercise to the reader.
 
-.. XXXcomp name the files
+.. todo: name the files
 
 .. You may find you need to convert the wiggle files to bigWig format
 .. first to allow small portions to be uploaded to a genome browser
 .. piecewise.
 
-.. XXX same options for specifying model and parameters as identify
+.. todo: same options for specifying model and parameters as identify
 
 Creating layered output
 =======================
@@ -541,22 +548,6 @@ A simple mnemonic file appears below::
   2	GE	gene end
   1	D	dead zone
 
-Synopsis of ``segway-layer``:
-
-  Usage: segway-layer [OPTION]... [INFILE] [OUTFILE]
-
-  Options:
-    --version             show program's version number and exit
-    -h, --help            show this help message and exit
-    -m FILE, --mnemonic-file=FILE
-                          specify tab-delimited file with mnemonic replacement
-                          identifiers for segment labels
-    -s ATTRVALUE, --track-line-set=ATTRVALUE
-                          set ATTR to VALUE in track line
-
-.. XXXcomp: how to get spaces in above?
-.. TODO: can Sphinx pull in option list automatically?
-
 Technical matters
 =================
 
@@ -588,13 +579,13 @@ options (:option:`--track`, :option:`--include-coords`,
 :option:`--exclude-coords`) must be exactly the same when sharing
 observation files. Otherwise you are likely to get unexplained failures.
 
-.. XXXcomp add a check in observation directory to make sure tracks and coords are same
-.. XXXcomp add a lock file to eliminate race condition.
+.. todo: comp add a check in observation directory to make sure tracks and coords are same
+.. todo: comp add a lock file to eliminate race condition.
 
 You will find a full description of all the working files in the
 **Files** section
 
-.. XXXcomp above should be a link, not bold
+.. todo: comp above should be a link, not bold
 
 Distributed computing
 ---------------------
@@ -613,7 +604,7 @@ The :option:`--cluster-opt` option allows the specification of native
 options to your clustering system---those options you might pass
 to ``qsub`` (SGE) or ``bsub`` (LSF).
 
-.. TODO comp include SGE and LSF cluster-opt demos
+.. todo:  comp include SGE and LSF cluster-opt demos
 
 Memory usage
 ------------
@@ -905,96 +896,9 @@ All programs in the Segway distribution will report a brief synopsis
 of expected arguments and options when the :option:`--help` option is
 specified and version information when :option:`--version` is specified.
 
-::
+.. include:: _build/cmdline-help/segway.help.txt
 
-  Usage: segway [OPTION]... GENOMEDATADIR
-
-  Options:
-    --version             show program's version number and exit
-    -h, --help            show this help message and exit
-
-    Input selection:
-      -t TRACK, --track=TRACK
-                          append TRACK to list of tracks to use (default all)
-      --include-coords=FILE
-                          limit to genomic coordinates in FILE
-      --exclude-coords=FILE
-                          filter out genomic coordinates in FILE
-
-    Model files:
-      -i FILE, --input-master=FILE
-                          use or create input master in FILE
-      -s FILE, --structure=FILE
-                          use or create structure in FILE
-      -p FILE, --trainable-params=FILE
-                          use or create trainable parameters in FILE
-      --dont-train=FILE   use FILE as list of parameters not to train
-      --seg-table=FILE    load segment hyperparameters from FILE
-      --semisupervised=FILE
-                          semisupervised segmentation with labels in FILE
-
-    Output files:
-      -b FILE, --bed=FILE
-                          create bed track in FILE
-
-    Intermediate files:
-      -o DIR, --observations=DIR
-                          use or create observations in DIR
-      -d DIR, --directory=DIR
-                          create all other files in DIR
-      --old-directory=DIR
-                          continue from interrupted run in DIR (identify only)
-
-    Modeling variables:
-      -D DIST, --distribution=DIST
-                          use DIST distribution
-      -r NUM, --random-starts=NUM
-                          randomize start parameters NUM times (default 1)
-      -N SLICE, --num-labels=SLICE
-                          make SLICE segment labels (default 2)
-      --num-sublabels=NUM
-                          make NUM segment sublabels (default 1)
-      --resolution=RES    downsample to every RES bp (default 1)
-      --ruler-scale=SCALE
-                          ruler marking every SCALE bp (default 10)
-      --prior-strength=RATIO
-                          use RATIO times the number of data counts as the
-                          number of pseudocounts for the segment length prior
-                          (default 0)
-      --segtransition-weight-scale=SCALE
-                          exponent for segment transition probability  (default
-                          1)
-
-    Technical variables:
-      -m PROGRESSION, --mem-usage=PROGRESSION
-                          try each float in PROGRESSION as the number of
-                          gibibytes of memory to allocate in turn (default
-                          2,3,4,6,8,10,12,14,15)
-      -S SIZE, --split-sequences=SIZE
-                          split up sequences that are larger than SIZE bp
-                          (default 2000000)
-      -v NUM, --verbosity=NUM
-                          show messages with verbosity NUM
-      --cluster-opt=OPT   specify an option to be passed to the cluster manager
-
-    Flags:
-      -T, --no-train      do not train model
-      -I, --no-identify   do not identify segments
-      -P, --no-posterior  do not identify probability of segments
-      -k, --keep-going    keep going in some iterations even when you have errors
-                          in another
-      -n, --dry-run       write all files, but do not run any executables
-
-::
-
-  Usage: segway-layer [OPTION]... [INFILE] [OUTFILE]
-
-  Options:
-    --version             show program's version number and exit
-    -h, --help            show this help message and exit
-    -m FILE, --mnemonic-file=FILE
-                          specify tab-delimited file with mnemonic replacement
-                          identifiers for segment labels
+.. include:: _build/cmdline-help/segway-layer.help.txt
 
 Helpful commands
 ================
