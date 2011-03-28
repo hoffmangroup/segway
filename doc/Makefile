@@ -43,6 +43,7 @@ $(CMDLINEHELPDIR)/%.help.txt:
 	@mkdir -p $(@D)
 	python gethelp.py $* | sed -e 's/ATTR VALUE/<ATTR VALUE>/g' > $@
 
+# XXX: these dependencies could probably be automated
 cmdline-help: $(CMDLINEHELPDIR)/segway.help.txt $(CMDLINEHELPDIR)/segway-layer.help.txt
 
 html: $(PREREQS)

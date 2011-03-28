@@ -256,7 +256,12 @@ a smaller number of labels.
 There is an experimental :option:`--num-sublabels`\=\ *sublabels*
 option that enables hierarchical segmentation, where each segment
 label is divided into a number of segment sublabels. This may require
-some manipulation of model parameter files to actually be useful.
+some manipulation of model parameter files to actually be useful. The
+output segmentation will be defined in terms of individual sublabels,
+where the output label number is equal to the (super) segment label
+times the number of sublabels per label plus the sublabel number.
+
+.. TODO: reword last sentences so they are more clear
 
 Segway allows multiple models of the values of a continuous
 observation tracks using three different probability distributions: a
