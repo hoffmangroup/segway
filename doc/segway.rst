@@ -744,12 +744,11 @@ experimental :option:`--clobber` option to allow overwriting of the
 files instead, but it isn't fully tested. It will probably be removed
 in the future.
 
-========================= =======================================================
+========================= =====================================================
  Filename                  Description
-========================= =======================================================
+========================= =====================================================
 accumulators/             intermediate files used to pass E-step
                           results to the M-step of EM training
-                          
 acc.*.*.bin               accumulator for a particular iteration and
                           region (reused each round)
 auxiliary/                misclelaneous model files
@@ -772,7 +771,8 @@ log/                      diagnostic information
                           Bayesian information criterion by training
                           iteration; can be used to examine  how fast
                           training converges
-  run.sh                  list of commands run by Segway, not including wrappers
+  run.sh                  list of commands run by Segway, not
+                          including wrappers
                           that create and clean up temporary files such as
                           observations used during identification
   segway.sh               reports the command-line used to run Segway itself
@@ -790,19 +790,20 @@ observations/             decompressed, and potentially large raw observation
                           at the command-line
 output/                   diagnostic output of individual GMTK jobs
 output/e/                 stderr
-output/e/0,1,...          stderr for a particular training iteration (0, 1, ...)
+output/e/0,1,...          stderr for a particular training iteration
+                          (0, 1, ...)
 output/e/identify         stderr for identification
 output/o/                 stdout
 params/                   generated and trained parameters
-  input.*.master          
-  params.*.params.*       
-  params.*                
-segway.bed.gz             
-segway.str                
-triangulation/            
-  segway.str.*.*.trifile  
-viterbi/                  
-========================= =======================================================
+  input.*.master          .
+  params.*.params.*       .
+  params.*                .
+segway.bed.gz             .
+segway.str                .
+triangulation/            .
+  segway.str.*.*.trifile  .
+viterbi/                  .
+========================= =====================================================
 
 Job names
 ---------
