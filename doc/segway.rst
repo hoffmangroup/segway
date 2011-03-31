@@ -11,7 +11,7 @@
 
 .. currentmodule:: segway
 .. include:: <isogrk3.txt>
-.. include:: <isopub.txt>
+.. include:: <isonum.txt>
 
 For a conceptual overview see the paper:
 
@@ -745,68 +745,71 @@ experimental :option:`--clobber` option to allow overwriting of the
 files instead, but it isn't fully tested. It will probably be removed
 in the future.
 
-.. tabularcolumns:: lp{5in}
+.. tabularcolumns:: lp{4.5in}
 
-===================================== =====================================================
- Filename                              Description
-===================================== =====================================================
-``accumulators/``                     intermediate files used to pass E-step results to
-                                      the M-step of EM training
-. ``acc.*.bin``                       accumulator for a particular iteration and
-                                      region (reused each round)
-``auxiliary/``                        miscelaneous model files
-. ``dont_train.list``                 defines list of hidden random variables
-                                      that are not trained
-. ``segway.inc``                      C preprocessor (``cpp``) include file
-                                      used in structure
-``likelihood/``                       GMTK's report of the log likelihood for
-                                      the most recent M-step of EM training
-. ``likelihood.*.ll``                 contains text of the last log likelihood value for an
-                                      iteration. Segway uses this to decide when to
-                                      stop training
-``log/``                              diagnostic information
-. ``details.sh``                      script file that includes the exact
-                                      command-lines queued by Segway, with wrapper scripts
-. ``jobs.tab``                        tab-delimeted sumary of jobs queued,
-                                      including resource informatoin and exit status
-. ``jt_info.txt``                     log file used by GMTK when creating a junction tree
-. ``likelihood.*.tab``                tab-delimited summary of likelihood and a measure of
-                                      Bayesian information criterion by training
-                                      iteration; can be used to examine  how fast
-                                      training converges
-. ``run.sh``                          list of commands run by Segway, not
-                                      including wrappers
-                                      that create and clean up temporary files such as
-                                      observations used during identification
-. ``segway.sh``                       reports the command-line used to run Segway itself
-``observations/``                     decompressed, and potentially large raw observation
-                                      files created from a Genomedata archive located
-                                      elsewhere
-. ``*.*.float32``                     continuous data for a particular region
-. ``*.*.int``                         indicator data (present/absent) for a particular
-                                      region
-. ``float32.list``                    list of continuous data files
-. ``int.list``                        list of indicator data files
-. ``observations.tab``                tab-delimited description of observations used. Used
-                                      to check that an existing directory specified with
-                                      :option:`--observations` matches the data specified
-                                      at the command-line
-``output/``                           diagnostic output of individual GMTK jobs
-``output/e/``                         stderr
-``output/e/0,1,``...                  stderr for a particular training iteration (0, 1,
-                                      ...)
-``output/e/identify``                 stderr for identification
-``output/o/``                         stdout
-``params/``                           generated and trained parameters
-. ``input.*.master``                  .
-. ``params.*.params.*``               .
-. ``params.*``                        .
-``segway.bed.gz``                     .
-``segway.str``                        .
-``triangulation/``                    .
-. ``segway.str.*.*.trifile``          .
-``viterbi/``                          .
-===================================== =====================================================
+=================================================== =====================================================
+ Filename                                            Description
+=================================================== =====================================================
+``accumulators/``                                   intermediate files used to pass E-step results to
+                                                    the M-step of EM training
+|rarr| ``acc.``\ \*\ ``.bin``                       accumulator for a particular iteration and
+                                                    region (reused each round)
+``auxiliary/``                                      miscelaneous model files
+|rarr| ``dont_train.list``                          defines list of hidden random variables
+                                                    that are not trained
+|rarr| ``segway.inc``                               C preprocessor (``cpp``) include file
+                                                    used in structure
+``likelihood/``                                     GMTK's report of the log likelihood for
+                                                    the most recent M-step of EM training
+|rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
+                                                    iteration|rarr| Segway uses this to decide when to
+                                                    stop training
+``log/``                                            diagnostic information
+|rarr| ``details.sh``                               script file that includes the exact
+                                                    command-lines queued by Segway, with wrapper scripts
+|rarr| ``jobs.tab``                                 tab-delimeted sumary of jobs queued,
+                                                    including resource informatoin and exit status
+|rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
+|rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of likelihood and a measure of
+                                                    Bayesian information criterion by training
+                                                    iteration; can be used to examine  how fast
+                                                    training converges
+|rarr| ``run.sh``                                   list of commands run by Segway, not
+                                                    including wrappers
+                                                    that create and clean up temporary files such as
+                                                    observations used during identification
+|rarr| ``segway.sh``                                reports the command-line used to run Segway itself
+``observations/``                                   decompressed, and potentially large raw observation
+                                                    files created from a Genomedata archive located
+                                                    elsewhere
+|rarr| \*\ ``.``\ \*\ ``.float32``                  continuous data for a particular region
+|rarr| \*\ ``.``\ \*\ ``.int``                      indicator data (present/absent) for a particular
+                                                    region
+|rarr| ``float32.list``                             list of continuous data files
+|rarr| ``int.list``                                 list of indicator data files
+|rarr| ``observations.tab``                         tab-delimited description of observations used|rarr| Used
+                                                    to check that an existing directory specified with
+                                                    :option:`--observations` matches the data specified
+                                                    at the command-line
+``output/``                                         diagnostic output of individual GMTK jobs
+``output/e/``                                       stderr
+``output/e/0,1,``...                                stderr for a particular training iteration (0, 1,
+                                                    ...)
+``output/e/identify``                               stderr for identification
+``output/o/``                                       stdout
+``params/``                                         generated and trained parameters for a given iteration
+|rarr| ``input.``\ \*\ ``.master``                  generated hyperparameters and starting parameters
+|rarr| ``input.master``                             best set of hyperparameters and starting parameters
+|rarr| ``params.``\ \*\ ``.params.``\ \*            trained parameters for a given iteration and round
+|rarr| ``params.``\ \*\ ``.params``                 final trained parameters for a given iteration
+|rarr| ``params.params``                            best final set of trained parameters
+``segway.bed.gz``                                   segmentation in BED format
+``segway.str``                                      DBN structure of segmentation
+``triangulation/``                                  triangulation files used for DBN interface
+|rarr| ``segway.str.``\ \*\ ``.``\ \*\ ``.trifile`` triangulation file
+``viterbi/``                                        intermediate BED files created during distributed Viterbi decoding,
+                                                    which get merged into ``segway.bed.gz``
+=================================================== =====================================================
 
 Job names
 ---------

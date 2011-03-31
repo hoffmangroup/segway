@@ -7,7 +7,7 @@ task: wraps a GMTK subtask to reduce size of output
 
 __version__ = "$Revision$"
 
-# Copyright 2009 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
 
 from errno import ENOENT
 from os import extsep, fdopen
@@ -111,6 +111,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
         assert region_end == start_pos[-1] - resolution + remainder
     start_pos[-1] = region_end
 
+    # XXX: why is this unused?
     score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels)
