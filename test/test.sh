@@ -14,6 +14,13 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-segway --num-labels=4 train data/GL000145.h3k27k36me3.genomedata traindir
-segway identify data/GL000145.h3k27k36me3.genomedata traindir identifydir
-segway-layer identifydir/segway.bed.gz segway.layered.bed.gz XXXX this should be automated
+segway --num-labels=4 train data/test.genomedata traindir
+segway identify data/test.genomedata traindir identifydir
+
+# diff
+diff --exclude=.svn -r -u data/traindir traindir > traindir.diff
+diff --exclude=.svn -r -u data/identifydir identifydir > identifydir.diff
+
+# XXX: need to exclude differences in UUIDs/dates. one way would be to
+# write a copy of these directories that replaces UUID with <UUID>,
+# etc.

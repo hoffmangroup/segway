@@ -91,6 +91,16 @@ def recolor(mnemonics, labels):
 
     return res
 
+def make_layer_filename(filename):
+    """
+    exported to run.py
+
+    replace .bed from right side with .layered.bed
+    """
+    left, _, right = filename.rpartition(".bed")
+
+    return ".layered.bed".join([left, right])
+
 # XXX: it would be better to not define the coordinates in non-contiguous areas
 def layer(infilename="-", outfilename="-", mnemonic_filename=None,
           trackline_updates={}):

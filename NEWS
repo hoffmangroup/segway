@@ -16,9 +16,11 @@ change as well.
 * segway: change --random-starts to --iterations
 * segway: training now writes important file locations hyperparameters
   into TRAINDIR/train.tab
+* segway: idenfication now automatically runs segway-layer as well
 
 * segway: logs/run.sh is no longer flushed immediately. UUID is available from logs/segway.sh
 * docs changed accordingly
+* docs: add quick start tutorial to top
 
 0.2.7:
 

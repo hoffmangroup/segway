@@ -45,6 +45,7 @@ from tabdelim import DictReader, ListWriter
 from .bed import read_native
 from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
                       RestartableJobDict, Session)
+from .layer import layer, make_layer_filename
 from ._util import (ceildiv, data_filename, data_string,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_ASINH_NORMAL, EXT_FLOAT, EXT_GZ, EXT_INT,
@@ -228,6 +229,7 @@ SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
 BED_FILEBASENAME = extjoin(PKG, EXT_BED, EXT_GZ) # "segway.bed.gz"
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
+TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 
 SUBDIRNAME_ACC = "accumulators"
 SUBDIRNAME_AUX = "auxiliary"
@@ -251,12 +253,12 @@ JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
 
 TRAIN_FIELDNAMES = ["name", "value"]
 
-SAVE_TRAIN_OPTIONS_NAMES = ["input_master_filename", "structure_filename",
-                            "params_filenames", "dont_train_filename",
-                            "seg_table_filename", "distribution",
-                            "len_seg_strength", "segtransition_weight_scale",
-                            "ruler_scale", "resolution", "num_segs",
-                            "num_subsegs"]
+TRAIN_OPTION_TYPES = \
+    dict(input_master_filename=str, structure_filename=str,
+         params_filename=str, dont_train_filename=str, seg_table_filename=str,
+         distribution=str, len_seg_strength=float,
+         segtransition_weight_scale=float, ruler_scale=int, resolution=int,
+         num_segs=int, num_subsegs=int, include_tracknames=[str])
 
 # templates and formats
 RES_STR_TMPL = "segway.str.tmpl"
@@ -894,7 +896,7 @@ class Runner(object):
         self.seg_table_filename = None
 
         self.params_filename = None # actual params filename for this instance
-        self.params_filenames = None # list of possible params filenames
+        self.params_filenames = [] # list of possible params filenames
         self.old_workdirname = None
         self.workdirname = None
         self.log_likelihood_filename = None
@@ -917,6 +919,8 @@ class Runner(object):
         self.supervision_labels = None
 
         self.card_supervision_label = -1
+
+        self.include_tracknames = []
 
         # default is 0
         self.global_mem_usage = LockableDefaultDict(int)
@@ -969,6 +973,15 @@ class Runner(object):
             else:
                 raise ValueError("unrecognized task: %s" % task)
 
+    def set_option(self, name, value, default=None):
+        if value is None:
+            if getattr(self, name) is not None:
+                return
+
+            value = default
+
+        setattr(self, name, value)
+
     @classmethod
     def fromoptions(cls, args, options):
         res = cls()
@@ -984,7 +997,8 @@ class Runner(object):
             res.workdirname = traindirname
             assert len(args) == 3
         else:
-            res.identifydirname = args[3]
+            res.workdirname = args[3]
+            res.load_train_options(traindirname)
 
         res.old_workdirname = options.old_directory
         res.obs_dirname = options.observations
@@ -1018,26 +1032,36 @@ class Runner(object):
         res.keep_going = options.keep_going
         res.max_frames = options.split_sequences
 
-        ## below: will be saved in Runner.save_train_options()
-        res.input_master_filename = options.input_master
-        res.structure_filename = options.structure
-        res.params_filenames = options.trainable_params
-        res.dont_train_filename = options.dont_train
-        res.seg_table_filename = options.seg_table
+        ## below: can be loaded in Runner.save_train_options(), or
+        ## override what is set there
+        # XXX: these defaults should move to __init__
+        res.set_option("input_master_filename", options.input_master)
+        res.set_option("structure_filename", options.structure)
+        res.set_option("dont_train_filename", options.dont_train)
+        res.set_option("seg_table_filename", options.seg_table)
+        res.set_option("distribution", options.distribution,
+                       DISTRIBUTION_DEFAULT)
+        res.set_option("len_seg_strength", options.prior_strength,
+                       PRIOR_STRENGTH)
+        res.set_option("segtransition_weight_scale",
+                       options.segtransition_weight_scale,
+                       SEGTRANSITION_WEIGHT_SCALE)
+        res.set_option("ruler_scale", options.ruler_scale, RULER_SCALE)
+        res.set_option("resolution", options.resolution, RESOLUTION)
+        res.set_option("num_segs", options.num_labels, NUM_SEGS)
+        res.set_option("num_subsegs", options.num_sublabels, NUM_SUBSEGS)
 
-        res.distribution = options.distribution
-        res.len_seg_strength = options.prior_strength
-        res.segtransition_weight_scale = options.segtransition_weight_scale
-        res.ruler_scale = options.ruler_scale
-        res.resolution = options.resolution
+        params_filenames = options.trainable_params
+        if params_filenames:
+            res.params_filenames = params_filenames
 
         include_tracknames = options.track
-        # will mess things up if it's there
-        assert "supervisionLabel" not in include_tracknames
-        res.include_tracknames = include_tracknames
-
-        res.num_segs = options.num_labels
-        res.num_subsegs = options.num_sublabels
+        if include_tracknames:
+            # non-allowed special trackname
+            # XXX: doesn't deal with the case where it is a default
+            # trackname in input file
+            assert "supervisionLabel" not in include_tracknames
+            res.include_tracknames = include_tracknames
 
         return res
 
@@ -1084,7 +1108,7 @@ class Runner(object):
     def load_seg_table(self):
         filename = self.seg_table_filename
 
-        if filename is None:
+        if not filename:
             filename = data_filename("seg_table.tab")
 
         # always the last element of the range
@@ -2470,6 +2494,7 @@ class Runner(object):
 
         if bed_filename is None:
             bed_filename = self.workdirpath / BED_FILEBASENAME
+            self.bed_filename = bed_filename
 
         # values for comparison to combine adjoining segments
         last_line = ""
@@ -2949,17 +2974,43 @@ class Runner(object):
                 self.last_params_filename, self.log_likelihood_filename)
 
     def save_train_options(self):
-        filename = self.make_filename(PREFIX_TRAIN, EXT_TAB)
+        filename = self.make_filename(TRAIN_FILEBASENAME)
 
         with open(filename, "w") as tabfile:
             writer = ListWriter(tabfile)
             writer.writerow(TRAIN_FIELDNAMES)
 
-            for trackname in self.include_tracknames:
-                writer.writerow(["include_tracknames", trackname])
+            for name, typ in TRAIN_OPTION_TYPES.iteritems():
+                value = getattr(self, name)
+                if isinstance(typ, list):
+                    for item in value:
+                        writer.writerow([name, item])
+                else:
+                    writer.writerow([name, value])
 
-            for name in SAVE_TRAIN_OPTIONS_NAMES:
-                writer.writerow([name, getattr(self, name)])
+    def load_train_options(self, traindirname):
+        """
+        load options from training and convert to appropriate type
+        """
+        filename = path(traindirname) / TRAIN_FILEBASENAME
+
+        with open(filename) as tabfile:
+            reader = DictReader(tabfile)
+
+            for row in reader:
+                name = row["name"]
+                value = row["value"]
+
+                typ = TRAIN_OPTION_TYPES[name]
+                if isinstance(typ, list):
+                    assert len(typ) == 1
+                    subtyp = typ[0]
+                    getattr(self, name).append(subtyp(value))
+                else:
+                    setattr(self, name, typ(value))
+
+        if self.params_filename is not None:
+            self.params_filenames = [self.params_filename]
 
     def run_train(self):
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
@@ -3229,6 +3280,8 @@ class Runner(object):
 
         if self.identify:
             self.concatenate_bed()
+            bed_filename = self.bed_filename
+            layer(bed_filename, make_layer_filename(bed_filename))
 
         # XXXopt: parallelize
         if self.posterior:
@@ -3348,8 +3401,7 @@ def parse_options(args):
                          help="filter out genomic coordinates in FILE"
                          " (default none)")
 
-        group.add_option("--resolution", type=int,
-                         default=RESOLUTION, metavar="RES",
+        group.add_option("--resolution", type=int, metavar="RES",
                          help="downsample to every RES bp (default %d)" %
                          RESOLUTION)
 
@@ -3361,8 +3413,7 @@ def parse_options(args):
                                                DIRPATH_WORKDIR_HELP / SUBDIRNAME_PARAMS))
 
         group.add_option("-s", "--structure", metavar="FILE",
-                         help="use or create structure in FILE"
-                         " (default %s)" %
+                         help="use or create structure in FILE (default %s)" %
                          make_default_filename(RES_STR_TMPL))
 
         group.add_option("-p", "--trainable-params", action="append",
@@ -3401,7 +3452,7 @@ def parse_options(args):
 
     with OptionGroup(parser, "Modeling variables") as group:
         group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
-                         metavar="DIST", default=DISTRIBUTION_DEFAULT,
+                         metavar="DIST",
                          help="use DIST distribution"
                          " (default %s)" % DISTRIBUTION_DEFAULT)
 
@@ -3410,31 +3461,27 @@ def parse_options(args):
                          help="run NUM training iterations, randomizing start"
                          " parameters NUM times (default %d)" % ITERATIONS)
 
-        group.add_option("-N", "--num-labels", type=slice,
-                         default=NUM_SEGS, metavar="SLICE",
+        group.add_option("-N", "--num-labels", type=slice, metavar="SLICE",
                          help="make SLICE segment labels"
                          " (default %d)" % NUM_SEGS)
 
-        group.add_option("--num-sublabels", type=int,
-                         default=NUM_SUBSEGS, metavar="NUM",
+        group.add_option("--num-sublabels", type=int, metavar="NUM",
                          help="make NUM segment sublabels"
                          " (default %d)" % NUM_SUBSEGS)
 
-        group.add_option("--ruler-scale", type=int,
-                         default=RULER_SCALE, metavar="SCALE",
+        group.add_option("--ruler-scale", type=int, metavar="SCALE",
                          help="ruler marking every SCALE bp (default %d)" %
                          RULER_SCALE)
 
-        group.add_option("--prior-strength", type=float,
-                         default=PRIOR_STRENGTH, metavar="RATIO",
+        group.add_option("--prior-strength", type=float, metavar="RATIO",
                          help="use RATIO times the number of data counts as"
                          " the number of pseudocounts for the segment length"
-                         " prior (default %d)" % PRIOR_STRENGTH)
+                         " prior (default %f)" % PRIOR_STRENGTH)
 
         group.add_option("--segtransition-weight-scale", type=float,
-                         default=SEGTRANSITION_WEIGHT_SCALE, metavar="SCALE",
+                         metavar="SCALE",
                          help="exponent for segment transition probability "
-                         " (default %d)" % SEGTRANSITION_WEIGHT_SCALE)
+                         " (default %f)" % SEGTRANSITION_WEIGHT_SCALE)
 
     with OptionGroup(parser, "Technical variables") as group:
         group.add_option("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,

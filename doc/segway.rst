@@ -808,7 +808,8 @@ workdir instead.
 |rarr| ``params.``\ \*\ ``.params``                 final trained parameters for a given iteration
 |rarr| ``params.params``                            best final set of trained parameters
 ``segway.bed.gz``                                   segmentation in BED format
-``segway.str``                                      DBN structure of segmentation
+``segway.str``                                      dynamic Bayesian network structure
+``train.tab``                                       important file locations and hyperparameters used in training, to be passed to identify
 ``triangulation/``                                  triangulation files used for DBN interface
 |rarr| ``segway.str.``\ \*\ ``.``\ \*\ ``.trifile`` triangulation file
 ``viterbi/``                                        intermediate BED files created during distributed Viterbi decoding,
