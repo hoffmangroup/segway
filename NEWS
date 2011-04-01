@@ -1,6 +1,24 @@
-0.2.8:
+1.0.0:
 
+For the first official release, I have improved the user interface in
+a number of ways. Segway should be much simpler to run. However, the
+command-line interfaces have changed, so your scripts will have to
+change as well.
 
+* segway: change command-line signature. Usage is now
+  segway train GENOMEDATA TRAINDIR
+  segway identify GENOMEDATA TRAINDIR IDENTIFYDIR
+  segway posterior GENOMEDATA TRAINDIR IDENTIFYDIR
+  segway identify+posterior GENOMEDATA TRAINDIR IDENTIFYDIR
+
+  Accordingly, have removed --no-train, --no-identify, --no-posterior, --directory
+
+* segway: change --random-starts to --iterations
+* segway: training now writes important file locations hyperparameters
+  into TRAINDIR/train.tab
+
+* segway: logs/run.sh is no longer flushed immediately. UUID is available from logs/segway.sh
+* docs changed accordingly
 
 0.2.7:
 

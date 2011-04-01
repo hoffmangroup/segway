@@ -51,7 +51,7 @@ from ._util import (ceildiv, data_filename, data_string,
                     extjoin, GB, get_chrom_coords, get_label_color, gzip_open,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     _make_continuous_cells, make_filelistpath, maybe_gzip_open,
-                    MB, NamedTemporaryDir, OptionBuilder_GMTK, PKG,
+                    MB, OptionBuilder_GMTK, PKG,
                     _save_observations_window, VITERBI_PROG)
 
 # set once per file run
@@ -209,6 +209,7 @@ PREFIX_ACC = "acc"
 PREFIX_CMDLINE_SHORT = "run"
 PREFIX_CMDLINE_LONG = "details"
 PREFIX_CMDLINE_TOP = "segway"
+PREFIX_TRAIN = "train"
 PREFIX_POSTERIOR = "posterior"
 
 PREFIX_VITERBI = "viterbi"
@@ -247,6 +248,15 @@ JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
                       "num_frames", "maxvmem", "cpu", "exit_status"]
 # XXX: should add num_subsegs as well, but it's complicated to pass
 # that data into RestartableJobDict.wait()
+
+TRAIN_FIELDNAMES = ["name", "value"]
+
+SAVE_TRAIN_OPTIONS_NAMES = ["input_master_filename", "structure_filename",
+                            "params_filenames", "dont_train_filename",
+                            "seg_table_filename", "distribution",
+                            "len_seg_strength", "segtransition_weight_scale",
+                            "ruler_scale", "resolution", "num_segs",
+                            "num_subsegs"]
 
 # templates and formats
 RES_STR_TMPL = "segway.str.tmpl"
@@ -851,7 +861,7 @@ class RandomStartThread(Thread):
         self.runner.session = self.session
         self.runner.num_segs = self.num_segs
         self.runner.iteration_index = self.iteration_index
-        self.result = self.runner.run_train_start()
+        self.result = self.runner.run_train_iteration()
 
 def maybe_quote_arg(text):
     return '"%s"' % text.replace('"', r'\"')
@@ -885,7 +895,7 @@ class Runner(object):
 
         self.params_filename = None # actual params filename for this instance
         self.params_filenames = None # list of possible params filenames
-        self.old_dirname = None
+        self.old_workdirname = None
         self.workdirname = None
         self.log_likelihood_filename = None
         self.log_likelihood_log_filename = None
@@ -963,23 +973,25 @@ class Runner(object):
     def fromoptions(cls, args, options):
         res = cls()
 
-        task_str, genomedataname, workdirname = args
+        task_str = args[0]
+        genomedataname = args[1]
+        traindirname = args[2]
 
         res.set_tasks(task_str)
         res.genomedataname = genomedataname
-        res.workdirname = workdirname
 
-        res.old_dirname = options.old_directory
+        if res.train:
+            res.workdirname = traindirname
+            assert len(args) == 3
+        else:
+            res.identifydirname = args[3]
+
+        res.old_workdirname = options.old_directory
         res.obs_dirname = options.observations
         res.bed_filename = options.bed
 
-        res.input_master_filename = options.input_master
-        res.structure_filename = options.structure
-        res.params_filenames = options.trainable_params
-        res.dont_train_filename = options.dont_train
         res.include_coords_filename = options.include_coords
         res.exclude_coords_filename = options.exclude_coords
-        res.seg_table_filename = options.seg_table
 
         res.supervision_filename = options.semisupervised
         if options.semisupervised:
@@ -987,8 +999,33 @@ class Runner(object):
         else:
             res.supervision_type = SUPERVISION_UNSUPERVISED
 
-        res.distribution = options.distribution
         res.iterations = options.iterations
+
+        res.verbosity = options.verbosity
+        # multiple lists to one
+        res.user_native_spec = sum([opt.split(" ")
+                                    for opt in options.cluster_opt], [])
+
+        mem_usage_list = map(float, options.mem_usage.split(","))
+
+        # XXX: should do a ceil first?
+        # use int64 in case run.py is run on a 32-bit machine to control
+        # 64-bit compute nodes
+        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
+
+        res.clobber = options.clobber
+        res.dry_run = options.dry_run
+        res.keep_going = options.keep_going
+        res.max_frames = options.split_sequences
+
+        ## below: will be saved in Runner.save_train_options()
+        res.input_master_filename = options.input_master
+        res.structure_filename = options.structure
+        res.params_filenames = options.trainable_params
+        res.dont_train_filename = options.dont_train
+        res.seg_table_filename = options.seg_table
+
+        res.distribution = options.distribution
         res.len_seg_strength = options.prior_strength
         res.segtransition_weight_scale = options.segtransition_weight_scale
         res.ruler_scale = options.ruler_scale
@@ -999,28 +1036,8 @@ class Runner(object):
         assert "supervisionLabel" not in include_tracknames
         res.include_tracknames = include_tracknames
 
-        res.verbosity = options.verbosity
-        # multiple lists to one
-        res.user_native_spec = sum([opt.split(" ")
-                                    for opt in options.cluster_opt], [])
-
         res.num_segs = options.num_labels
         res.num_subsegs = options.num_sublabels
-
-        mem_usage_list = map(float, options.mem_usage.split(","))
-
-        # XXX: should do a ceil first?
-        # int64 in case you run this on a 32-bit machine to control
-        # 64-bit compute nodes
-        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
-
-        res.clobber = options.clobber
-        res.train = not options.no_train
-        res.identify = not options.no_identify
-        res.posterior = not options.no_posterior
-        res.dry_run = options.dry_run
-        res.keep_going = options.keep_going
-        res.max_frames = options.split_sequences
 
         return res
 
@@ -1170,7 +1187,7 @@ class Runner(object):
         filebasename = extjoin_not_none(*exts)
 
         # add subdirname if it exists
-        return self.dirpath / kwargs.get("subdirname", "") / filebasename
+        return self.workdirpath / kwargs.get("subdirname", "") / filebasename
 
     def set_tracknames(self, chromosome):
         # XXXopt: a lot of stuff here repeated for every chromosome
@@ -1250,6 +1267,10 @@ class Runner(object):
             # set. And this will only happen from the master thread.
             self.last_params_filename = None
 
+    def make_params_filename(self, iteration_index=None):
+        return self.make_filename(PREFIX_PARAMS, iteration_index, EXT_PARAMS,
+                                  subdirname=SUBDIRNAME_PARAMS)
+
     def set_params_filename(self, iteration_index=None, new=False):
         """
         None means the final params file, not for any particular thread
@@ -1278,9 +1299,7 @@ class Runner(object):
         # not set, or the file already exists and we are training
         if (new or not params_filename
             or (self.train and path(params_filename).exists())):
-            params_filename = \
-                self.make_filename(PREFIX_PARAMS, iteration_index, EXT_PARAMS,
-                                   subdirname=SUBDIRNAME_PARAMS)
+            params_filename = self.make_params_filename(iteration_index)
 
         self.params_filename = params_filename
 
@@ -1298,13 +1317,13 @@ class Runner(object):
                                    subdirname=SUBDIRNAME_LOG)
 
     def make_triangulation_dirpath(self):
-        res = self.dirpath / "triangulation"
+        res = self.workdirpath / "triangulation"
         self.make_dir(res)
 
         self.triangulation_dirpath = res
 
     def make_output_dirpath(self, dirname, iteration_index, clobber=None):
-        res = self.dirpath / "output" / dirname / str(iteration_index)
+        res = self.workdirpath / "output" / dirname / str(iteration_index)
         self.make_dir(res, clobber)
 
         return res
@@ -1340,7 +1359,7 @@ class Runner(object):
                 raise
 
     def make_subdir(self, subdirname):
-        self.make_dir(self.dirpath / subdirname)
+        self.make_dir(self.workdirpath / subdirname)
 
     def make_subdirs(self, subdirnames):
         for subdirname in subdirnames:
@@ -1354,7 +1373,7 @@ class Runner(object):
         if obs_dirname:
             obs_dirpath = path(obs_dirname)
         else:
-            obs_dirpath = self.dirpath / SUBDIRNAME_OBS
+            obs_dirpath = self.workdirpath / SUBDIRNAME_OBS
             self.obs_dirname = obs_dirpath
 
         self.obs_dirpath = obs_dirpath
@@ -1400,7 +1419,7 @@ class Runner(object):
         orig_filename = data_filename(resname)
 
         orig_filepath = path(orig_filename)
-        dirpath = self.dirpath / subdirname
+        dirpath = self.workdirpath / subdirname
 
         orig_filepath.copy(dirpath)
         return dirpath / orig_filepath.name
@@ -1427,13 +1446,13 @@ class Runner(object):
                        card_frameIndex=self.max_frames,
                        ruler_scale=ruler_scale_scaled)
 
-        aux_dirpath = self.dirpath / SUBDIRNAME_AUX
+        aux_dirpath = self.workdirpath / SUBDIRNAME_AUX
 
         include_filename, self.gmtk_include_filename_is_new = \
             save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
                           aux_dirpath, self.clobber)
 
-        dirpath_trailing_slash = self.dirpath + "/"
+        dirpath_trailing_slash = self.workdirpath + "/"
         include_filename_relative = \
             include_filename.partition(dirpath_trailing_slash)[2]
         assert include_filename_relative
@@ -2282,11 +2301,9 @@ class Runner(object):
         name_collection_spec = self.make_name_collection_spec()
         card_seg = num_segs
 
-        params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
-
         self.input_master_filename, input_master_filename_is_new = \
             save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
-                          locals(), params_dirpath, self.clobber,
+                          locals(), self.params_dirpath, self.clobber,
                           iteration_index)
 
         # print >>sys.stderr, "input_master_filename = %s; is_new = %s" \
@@ -2316,12 +2333,12 @@ class Runner(object):
 
     def make_viterbi_filenames(self):
         self.viterbi_filenames = \
-            self._make_viterbi_filenames(self.dirpath)
+            self._make_viterbi_filenames(self.workdirpath)
 
-        old_dirpath = self.old_dirpath
-        if old_dirpath:
+        old_workdirpath = self.old_workdirpath
+        if old_workdirpath:
             self.old_viterbi_filenames = \
-                self._make_viterbi_filenames(old_dirpath)
+                self._make_viterbi_filenames(old_workdirpath)
         else:
             self.old_viterbi_filenames = None
 
@@ -2372,6 +2389,8 @@ class Runner(object):
         self.make_subdirs(SUBDIRNAMES_EITHER)
         self.make_obs_dir()
 
+        self.params_dirpath = self.workdirpath / SUBDIRNAME_PARAMS
+        
         self.load_supervision()
 
         # XXX: decrease the amount of time this file is open
@@ -2450,7 +2469,7 @@ class Runner(object):
         bed_filename = self.bed_filename
 
         if bed_filename is None:
-            bed_filename = self.dirpath / BED_FILEBASENAME
+            bed_filename = self.workdirpath / BED_FILEBASENAME
 
         # values for comparison to combine adjoining segments
         last_line = ""
@@ -2554,10 +2573,10 @@ class Runner(object):
     def make_job_name_train(self, iteration_index, round_index, window_index):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, iteration_index,
                                      round_index, window_index,
-                                     self.dirpath.name, UUID)
+                                     self.workdirpath.name, UUID)
 
     def make_job_name_identify(self, prefix, window_index):
-        return "%s%d.%s.%s" % (prefix, window_index, self.dirpath.name,
+        return "%s%d.%s.%s" % (prefix, window_index, self.workdirpath.name,
                                UUID)
 
     def make_gmtk_kwargs(self):
@@ -2885,8 +2904,8 @@ class Runner(object):
             # IC = BIC
             self.calc_info_criterion = self.calc_bayesian_info_criterion
 
-    def run_train_start(self):
-        # make new files if you have more than one random start
+    def run_train_iteration(self):
+        # make new files if you have more than one iteration
         self.set_triangulation_filename()
 
         new = self.make_new_params
@@ -2929,26 +2948,33 @@ class Runner(object):
         return (info_criterion, self.num_segs, self.input_master_filename,
                 self.last_params_filename, self.log_likelihood_filename)
 
+    def save_train_options(self):
+        filename = self.make_filename(PREFIX_TRAIN, EXT_TAB)
+
+        with open(filename, "w") as tabfile:
+            writer = ListWriter(tabfile)
+            writer.writerow(TRAIN_FIELDNAMES)
+
+            for trackname in self.include_tracknames:
+                writer.writerow(["include_tracknames", trackname])
+
+            for name in SAVE_TRAIN_OPTIONS_NAMES:
+                writer.writerow([name, getattr(self, name)])
+
     def run_train(self):
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
-
-        # save the destination file for input_master as we will be
-        # generating new input masters for each start
-        #
-        # len(dst_filenames) == len(TRAIN_ATTRNAMES) == len(return value
-        # of Runner.run_train_start())-1. This is asserted below.
 
         iterations = self.iterations
         assert iterations >= 1
 
-        # XXX: duplicative
-        params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
+        # save the destination file for input_master as we will be
+        # generating new input masters for each start
 
-        # must be before file creation. Otherwise the newness value
-        # will be wrong
+        # must be before file creation. Otherwise
+        # input_master_filename_is_new will be wrong
         input_master_filename, input_master_filename_is_new = \
             make_template_filename(self.input_master_filename,
-                                   RES_INPUT_MASTER_TMPL, params_dirpath,
+                                   RES_INPUT_MASTER_TMPL, self.params_dirpath,
                                    self.clobber)
 
         # should I make new parameters in each thread?
@@ -2966,36 +2992,44 @@ class Runner(object):
                          self.params_filename,
                          self.log_likelihood_filename]
 
+        ## save file locations to tab-delimited file
+        self.save_train_options()
+
+        ## which thread runner should I use?
         num_segs_range = slice2range(self.num_segs)
 
         if len(num_segs_range) > 1 or iterations > 1:
-            thread_runner = self.run_train_multithread
+            run_train_func = self.run_train_multithread
         else:
-            thread_runner = self.run_train_singlethread
+            run_train_func = self.run_train_singlethread
 
-        start_params = thread_runner(num_segs_range)
+        ## this is where the actual training takes place
+        iteration_params = run_train_func(num_segs_range)
 
         if self.make_new_params:
-            self.proc_train_results(start_params, dst_filenames)
+            self.proc_train_results(iteration_params, dst_filenames)
         elif not self.dry_run:
-            # only one random start: always overwrite params.params
-            assert len(start_params) == 1
-            copy2(start_params[0][OFFSET_PARAMS_FILENAME],
-                  self.params_filename)
+            # only one iteration
+            assert len(iteration_params) == 1
+            last_params_filename = iteration_params[0][OFFSET_PARAMS_FILENAME]
+            copy2(last_params_filename, self.params_filename)
+
+            # always overwrite params.params
+            copy2(last_params_filename, self.make_params_filename())
 
     def run_train_singlethread(self, num_segs_range):
         # having a single-threaded version makes debugging much easier
         with Session() as session:
             self.session = session
             self.iteration_index = 0
-            start_params = [self.run_train_start()]
+            iteration_params = [self.run_train_iteration()]
 
         self.session = None
 
-        return start_params
+        return iteration_params
 
     def run_train_multithread(self, num_segs_range):
-        # XXX: Python 2.6 use itertools.product()
+        # XXX: Python 2.6: use itertools.product()
         seg_iteration_indexes = xrange(self.iterations)
         enumerator = enumerate((num_seg, seg_iteration_index)
                                for num_seg in num_segs_range
@@ -3021,7 +3055,7 @@ class Runner(object):
 
                 # list of tuples(log_likelihood, input_master_filename,
                 #                params_filename)
-                start_params = []
+                iteration_params = []
                 for thread in threads:
                     while thread.isAlive():
                         # XXX: KeyboardInterrupts only occur if there is a
@@ -3030,7 +3064,7 @@ class Runner(object):
 
                     # this will get AttributeError if the thread failed and
                     # therefore did not set thread.result
-                    start_params.append(thread.result)
+                    iteration_params.append(thread.result)
             except KeyboardInterrupt:
                 self.interrupt_event.set()
                 for thread in threads:
@@ -3038,14 +3072,14 @@ class Runner(object):
 
                 raise
 
-        return start_params
+        return iteration_params
 
-    def proc_train_results(self, start_params, dst_filenames):
+    def proc_train_results(self, iteration_params, dst_filenames):
         if self.dry_run:
             return
 
         # finds the min by info_criterion (minimize -log_likelihood)
-        min_params = min(start_params)
+        min_params = min(iteration_params)
 
         self.num_segs = min_params[OFFSET_NUM_SEGS]
         self.set_triangulation_filename()
@@ -3200,65 +3234,68 @@ class Runner(object):
         if self.posterior:
             self.posterior2wig()
 
-    def run(self):
-        """
-        main run, after dirname is specified
+    def set_workdirpaths(self):
+        self.workdirpath = path(self.workdirname)
 
-        this is exposed so that it can be overriden in a subclass
-        """
-        # XXXopt: use binary I/O to gmtk rather than ascii for parameters
-
-        self.dirpath = path(self.workdirname)
-
-        old_dirname = self.old_dirname
-        if old_dirname:
-            self.old_dirpath = path(old_dirname)
+        old_workdirname = self.old_workdirname
+        if old_workdirname:
+            self.old_workdirpath = path(old_workdirname)
         else:
-            self.old_dirpath = None
+            # deals with case where it is empty too
+            self.old_workdirpath = None
 
-        self.make_subdir(SUBDIRNAME_LOG)
-        cmdline_short_filename = self.make_filename(PREFIX_CMDLINE_SHORT,
-                                                    EXT_SH,
-                                                    subdirname=SUBDIRNAME_LOG)
-        cmdline_long_filename = self.make_filename(PREFIX_CMDLINE_LONG, EXT_SH,
-                                                    subdirname=SUBDIRNAME_LOG)
-        cmdline_top_filename = self.make_filename(PREFIX_CMDLINE_TOP, EXT_SH,
-                                                  subdirname=SUBDIRNAME_LOG)
-        job_log_filename = self.make_filename(PREFIX_JOB_LOG, EXT_TAB,
-                                                subdirname=SUBDIRNAME_LOG)
+    def make_script_filename(self, prefix):
+        return self.make_filename(prefix, EXT_SH, subdirname=SUBDIRNAME_LOG)
 
-        self.interrupt_event = Event()
-
-        self.save_params()
-
+    def make_run_msg(self):
         now = datetime.now()
         pkg_desc = working_set.find(Requirement.parse(PKG))
         run_msg = "## %s run %s at %s" % (pkg_desc, UUID, now)
+
+        cmdline_top_filename = self.make_script_filename(PREFIX_CMDLINE_TOP)
 
         with open(cmdline_top_filename, "w") as cmdline_top_file:
             print >>cmdline_top_file, run_msg
             print >>cmdline_top_file
             print >>cmdline_top_file, cmdline2text()
 
-        with open(cmdline_short_filename, "w") as cmdline_short_file:
-            # XXX: works around a pyflakes bug for with * as self.*; report
-            self.cmdline_short_file = cmdline_short_file
+        return run_msg
 
-            with open(cmdline_long_filename, "w") as cmdline_long_file:
-                self.cmdline_long_file = cmdline_long_file
+    def run(self):
+        """
+        main run, after dirname is specified
 
-                print >>cmdline_short_file, run_msg
-                print >>cmdline_long_file, run_msg
+        this is exposed so that it can be overriden in a subclass
 
-                # so that we can immediately get the UUID if we want it
-                self.cmdline_short_file.flush()
+        opens log files, saves parameters, and calls main function
+        run_train() or run_identify_posterior()
+        """
+        # XXXopt: use binary I/O to gmtk rather than ascii for parameters
+
+        self.set_workdirpaths()
+        self.interrupt_event = Event()
+
+        ## start log files
+        self.make_subdir(SUBDIRNAME_LOG)
+        run_msg = self.make_run_msg()
+
+        cmdline_short_filename = self.make_script_filename(PREFIX_CMDLINE_SHORT)
+        cmdline_long_filename = self.make_script_filename(PREFIX_CMDLINE_LONG)
+        job_log_filename = self.make_filename(PREFIX_JOB_LOG, EXT_TAB,
+                                              subdirname=SUBDIRNAME_LOG)
+
+        self.save_params()
+
+        with open(cmdline_short_filename, "w") as self.cmdline_short_file:
+            with open(cmdline_long_filename, "w") as self.cmdline_long_file:
+                print >>self.cmdline_short_file, run_msg
+                print >>self.cmdline_long_file, run_msg
 
                 if self.triangulate:
                     self.run_triangulate()
 
-                with open(job_log_filename, "w") as job_log_file:
-                    self.job_log_file = job_log_file
-                    print >>job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
+                with open(job_log_filename, "w") as self.job_log_file:
+                    print >>self.job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
 
                     if self.train:
                         self.run_train()
@@ -3277,15 +3314,15 @@ class Runner(object):
         # XXX: register atexit for cleanup_resources
 
         workdirname = self.workdirname
-        if self.clobber or not path(workdirname).isdir():
-            self.make_dir(workdirname)
+        if not path(workdirname).isdir():
+            self.make_dir(workdirname, self.clobber)
 
         self.run(*args, **kwargs)
 
 def parse_options(args):
     from optplus import OptionParser, OptionGroup
 
-    usage = "%prog [OPTION]... TASK GENOMEDATA WORKDIR"
+    usage = "%prog [OPTION]... TASK GENOMEDATA TRAINDIR [IDENTIFYDIR]"
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
 
@@ -3433,8 +3470,12 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
-    if not len(args) == 2:
-        parser.error("Expected two arguments.")
+    if args[0] == "train":
+        if len(args) != 3:
+            parser.error("Expected 3 arguments for the train task.")
+    else:
+        if len(args) != 4:
+            parser.error("Expected 4 arguments for the identify task.")
 
     return options, args
 

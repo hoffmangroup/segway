@@ -347,12 +347,19 @@ function of both :option:`--segtransition-weight-scale` and
 
 Task selection
 ==============
-By default, Segway performs model generation, training, and
-identification after each other. Usually, usersw will want to perform
-training and identification separately, so that they can train on a
-subset of the genome. To train only, use the :option:`--no-identify`
-option. To perform identification only, use the :option:`--no-train` option.
-The use of :option:`--dry-run` will cause Segway to generate
+
+Segway will perform either (a) model generation and training or (b)
+identification separately, so it is possible to train on a subset of
+the genome and identify on the whole thing. To train, use::
+
+  segway train GENOMEDATA TRAINDIR
+
+To identify, specify the TRAINDIR you used in the first round::
+
+  segway identify GENOMEDATA TRAINDIR IDENTIFYDIR
+
+In both cases, replace GENOMEDATA with the Genomedata archive you're
+using. The use of :option:`--dry-run` will cause Segway to generate
 appropriate model and observation files but not to actually perform
 any inference or queue any jobs. This can be useful when
 troubleshooting a model or task.
@@ -363,7 +370,7 @@ Most users will generate the model at training time, but to specify
 your own model there are the :option:`--structure`\=\ *filename* and
 :option:`--input-master`\=\ *filename* options. You can simultaneously
 run multiple *iterations* of EM training in parallel, specified with the
-:option:`--random-starts`\=\ *iterations* option. Each iteration consists of
+:option:`--iterations`\=\ *iterations* option. Each iteration consists of
 a number of rounds, which are broken down into individual tasks for
 each training region. The results from each region for a particular
 iteration and round are combined in a quick *bundle* task. It results in
@@ -561,10 +568,8 @@ Working files
 -------------
 
 Segway must create a number of working files in order to accomplish
-its tasks. because the tasks may be executed on different machines,
-these files cannot be created on a machine-local temporary space. You
-can specify where the working directory *workdir* is with the
-:option:`--directory`\=\ *workdir* option.
+its tasks, and it does this in the directory specified by the required
+*workdir* argument.
 
 The observation files can be quite large, taking up 8 bytes per track
 per position and cannot be compressed. Since they are needed multiple
@@ -736,14 +741,13 @@ to get more information.
 Names used by Segway
 ====================
 
-Files
------
+Workdir files
+-------------
 
 Segway expects to be able to create many of these files anew. To avoid
-data loss, it will quit if they already exist. For you can use the
-experimental :option:`--clobber` option to allow overwriting of the
-files instead, but it isn't fully tested. It will probably be removed
-in the future.
+data loss, by default, it will quit if they already exist. If you use
+the :option:`--clobber` option, Segway will overwrite the whole
+workdir instead.
 
 .. tabularcolumns:: lp{4.5in}
 
@@ -869,7 +873,7 @@ For example::
 
   GENOMEDATA_DIRNAME = "genomedata"
 
-  run.main(["--no-identify", GENOMEDATA_DIRNAME])
+  run.main(["--random-starts=3", "train", GENOMEDATA_DIRNAME])
 
 All other interfaces (the ones that do not use a ``main()`` function)
 to Segway code are undocumented and should not be used. If you do use

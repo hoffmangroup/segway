@@ -5,9 +5,9 @@
 LONG_DESCRIPTION
 """
 
-__version__ = "0.2.8"
+__version__ = "1.0.0"
 
-# Copyright 2008-2010 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2011 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
