@@ -1,0 +1,2 @@
+jobid	jobname	prog	num_segs	num_frames	maxvmem	cpu	exit_status
+1424744	vit0.identifydir.9d9028be5cac11e0b5e70019b9e1892e	gmtkViterbi	4	184355	542330880.0000	7.0000	0

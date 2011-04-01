@@ -14,5 +14,6 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-segway --num-labels=3 --seg-table=data/seg_table_min_100.tab train data/GL000145.h3k27k36me3.genomedata workdir.train
-segway 
+segway --num-labels=4 train data/GL000145.h3k27k36me3.genomedata traindir
+segway identify data/GL000145.h3k27k36me3.genomedata traindir identifydir
+segway-layer identifydir/segway.bed.gz segway.layered.bed.gz

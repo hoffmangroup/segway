@@ -1,0 +1,13 @@
+name	value
+input_master_filename	traindir/params/input.master
+structure_filename	traindir/segway.str
+params_filename	traindir/params/params.params
+dont_train_filename	traindir/auxiliary/dont_train.list
+seg_table_filename	
+distribution	asinh_norm
+len_seg_strength	0
+segtransition_weight_scale	1.0
+ruler_scale	10
+resolution	1
+num_segs	4
+num_subsegs	1
