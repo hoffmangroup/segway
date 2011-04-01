@@ -16,4 +16,4 @@ fi
 
 segway --num-labels=4 train data/GL000145.h3k27k36me3.genomedata traindir
 segway identify data/GL000145.h3k27k36me3.genomedata traindir identifydir
-segway-layer identifydir/segway.bed.gz segway.layered.bed.gz
+segway-layer identifydir/segway.bed.gz segway.layered.bed.gz XXXX this should be automated
