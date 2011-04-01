@@ -162,7 +162,7 @@ TMP_USAGE_BASE = 10*MB # just a guess
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
 ## defaults
-RANDOM_STARTS = 1
+ITERATIONS = 1
 
 # self->self, self->other
 PROBS_FORCE_TRANSITION = array([0.0, 0.0, 1.0])
@@ -886,8 +886,7 @@ class Runner(object):
         self.params_filename = None # actual params filename for this instance
         self.params_filenames = None # list of possible params filenames
         self.old_dirname = None
-        self.dirname = None
-        self.is_dirname_temp = False
+        self.workdirname = None
         self.log_likelihood_filename = None
         self.log_likelihood_log_filename = None
         self.dont_train_filename = None
@@ -924,7 +923,7 @@ class Runner(object):
         # variables
         self.num_segs = NUM_SEGS
         self.num_subsegs = NUM_SUBSEGS
-        self.random_starts = RANDOM_STARTS
+        self.iterations = ITERATIONS
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
@@ -933,11 +932,11 @@ class Runner(object):
         # flags
         self.clobber = False
         self.triangulate = True
-        self.train = True # EM train # this should become an int for num_starts
-        self.posterior = True
-        self.verbosity = VERBOSITY
-        self.identify = True # viterbi
+        self.train = False # EM train # this should become an int for num_starts
+        self.posterior = False
+        self.identify = False # viterbi
         self.dry_run = False
+        self.verbosity = VERBOSITY
         self.use_dinucleotide = None
 
         # functions
@@ -945,12 +944,31 @@ class Runner(object):
 
         self.__dict__.update(kwargs)
 
+    def set_tasks(self, text):
+        tasks = text.split("+")
+        if "train" in tasks and len(tasks) > 1:
+            raise ValueError("train task must be run separately")
+
+        for task in tasks:
+            if task == "train":
+                self.train = True
+            elif task == "identify":
+                self.identify = True
+            elif task == "posterior":
+                self.posterior = True
+            else:
+                raise ValueError("unrecognized task: %s" % task)
+
     @classmethod
     def fromoptions(cls, args, options):
         res = cls()
 
-        res.genomedata_dirname = args[0]
-        res.dirname = options.directory
+        task_str, genomedataname, workdirname = args
+
+        res.set_tasks(task_str)
+        res.genomedataname = genomedataname
+        res.workdirname = workdirname
+
         res.old_dirname = options.old_directory
         res.obs_dirname = options.observations
         res.bed_filename = options.bed
@@ -970,7 +988,7 @@ class Runner(object):
             res.supervision_type = SUPERVISION_UNSUPERVISED
 
         res.distribution = options.distribution
-        res.random_starts = options.random_starts
+        res.iterations = options.iterations
         res.len_seg_strength = options.prior_strength
         res.segtransition_weight_scale = options.segtransition_weight_scale
         res.ruler_scale = options.ruler_scale
@@ -1381,14 +1399,11 @@ class Runner(object):
     def save_resource(self, resname, subdirname=""):
         orig_filename = data_filename(resname)
 
-        if self.is_dirname_temp:
-            return orig_filename
-        else:
-            orig_filepath = path(orig_filename)
-            dirpath = self.dirpath / subdirname
+        orig_filepath = path(orig_filename)
+        dirpath = self.dirpath / subdirname
 
-            orig_filepath.copy(dirpath)
-            return dirpath / orig_filepath.name
+        orig_filepath.copy(dirpath)
+        return dirpath / orig_filepath.name
 
     def save_include(self):
         num_segs = self.num_segs
@@ -1512,7 +1527,7 @@ class Runner(object):
 
         self.structure_filename, self.structure_filename_is_new = \
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
-                          self.dirname, self.clobber)
+                          self.workdirname, self.clobber)
 
     def save_observations_window(self, float_filename, int_filename, float_data,
                                 seq_data=None, supervision_data=None):
@@ -2360,7 +2375,7 @@ class Runner(object):
         self.load_supervision()
 
         # XXX: decrease the amount of time this file is open
-        with Genome(self.genomedata_dirname) as genome:
+        with Genome(self.genomedataname) as genome:
         # do first, because it sets self.num_tracks and self.tracknames
             self.prep_observations(genome)
 
@@ -2923,8 +2938,8 @@ class Runner(object):
         # len(dst_filenames) == len(TRAIN_ATTRNAMES) == len(return value
         # of Runner.run_train_start())-1. This is asserted below.
 
-        random_starts = self.random_starts
-        assert random_starts >= 1
+        iterations = self.iterations
+        assert iterations >= 1
 
         # XXX: duplicative
         params_dirpath = self.dirpath / SUBDIRNAME_PARAMS
@@ -2937,7 +2952,7 @@ class Runner(object):
                                    self.clobber)
 
         # should I make new parameters in each thread?
-        make_new_params = (self.random_starts > 1
+        make_new_params = (self.iterations > 1
                            or isinstance(self.num_segs, slice))
         self.make_new_params = make_new_params
         if not make_new_params:
@@ -2953,7 +2968,7 @@ class Runner(object):
 
         num_segs_range = slice2range(self.num_segs)
 
-        if len(num_segs_range) > 1 or random_starts > 1:
+        if len(num_segs_range) > 1 or iterations > 1:
             thread_runner = self.run_train_multithread
         else:
             thread_runner = self.run_train_singlethread
@@ -2981,7 +2996,7 @@ class Runner(object):
 
     def run_train_multithread(self, num_segs_range):
         # XXX: Python 2.6 use itertools.product()
-        seg_iteration_indexes = xrange(self.random_starts)
+        seg_iteration_indexes = xrange(self.iterations)
         enumerator = enumerate((num_seg, seg_iteration_index)
                                for num_seg in num_segs_range
                                for seg_iteration_index in seg_iteration_indexes)
@@ -3101,7 +3116,7 @@ class Runner(object):
             prefix_args = [find_executable("segway-task"), "run", "viterbi",
                            output_filename, window_chrom, window_start,
                            window_end, self.resolution, self.num_segs,
-                           self.genomedata_dirname, float_filepath,
+                           self.genomedataname, float_filepath,
                            int_filepath, self.distribution,
                            self.track_indexes_text]
             output_filename = None
@@ -3193,7 +3208,7 @@ class Runner(object):
         """
         # XXXopt: use binary I/O to gmtk rather than ascii for parameters
 
-        self.dirpath = path(self.dirname)
+        self.dirpath = path(self.workdirname)
 
         old_dirname = self.old_dirname
         if old_dirname:
@@ -3261,29 +3276,16 @@ class Runner(object):
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
 
-        dirname = self.dirname
-        if dirname:
-            if self.clobber or not path(dirname).isdir():
-                self.make_dir(dirname)
+        workdirname = self.workdirname
+        if self.clobber or not path(workdirname).isdir():
+            self.make_dir(workdirname)
 
-            self.run(*args, **kwargs)
-        else:
-            try:
-                with NamedTemporaryDir(prefix=TEMPDIR_PREFIX) as tempdir:
-                    self.dirname = tempdir.name
-                    self.is_dirname_temp = True
-                    self.run()
-            finally:
-                # the temporary directory has already been deleted (after
-                # unwinding of the with block), so let's stop referring to
-                # it
-                self.dirname = None
-                self.is_dirname_temp = False
+        self.run(*args, **kwargs)
 
 def parse_options(args):
     from optplus import OptionParser, OptionGroup
 
-    usage = "%prog [OPTION]... GENOMEDATADIR"
+    usage = "%prog [OPTION]... TASK GENOMEDATA WORKDIR"
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
 
@@ -3346,10 +3348,6 @@ def parse_options(args):
                          "FILE (default none)")
 
     with OptionGroup(parser, "Intermediate files") as group:
-        group.add_option("-d", "--directory", metavar="WORKDIR",
-                         help="create all other files in WORKDIR"
-                         " (default temporary)")
-
         group.add_option("-o", "--observations", metavar="DIR",
                           help="use or create observations in DIR"
                          " (default %s)" %
@@ -3370,10 +3368,10 @@ def parse_options(args):
                          help="use DIST distribution"
                          " (default %s)" % DISTRIBUTION_DEFAULT)
 
-        group.add_option("-r", "--random-starts", type=int,
-                         default=RANDOM_STARTS, metavar="NUM",
-                         help="randomize start parameters NUM times;"
-                         " run NUM iterations (default %d)" % RANDOM_STARTS)
+        group.add_option("--iterations", type=int,
+                         default=ITERATIONS, metavar="NUM",
+                         help="run NUM training iterations, randomizing start"
+                         " parameters NUM times (default %d)" % ITERATIONS)
 
         group.add_option("-N", "--num-labels", type=slice,
                          default=NUM_SEGS, metavar="SLICE",
@@ -3426,12 +3424,6 @@ def parse_options(args):
     with OptionGroup(parser, "Flags") as group:
         group.add_option("-c", "--clobber", action="store_true",
                          help="delete any preexisting files")
-        group.add_option("-T", "--no-train", action="store_true",
-                         help="do not train model")
-        group.add_option("-I", "--no-identify", action="store_true",
-                         help="do not identify segments")
-        group.add_option("-P", "--no-posterior", action="store_true",
-                         help="do not identify probability of segments")
         group.add_option("-k", "--keep-going", action="store_true",
                          help="keep going in some iterations even when you have"
                          " errors in another")
@@ -3441,8 +3433,8 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
-    if not len(args) == 1:
-        parser.error("Expected only one argument.")
+    if not len(args) == 2:
+        parser.error("Expected two arguments.")
 
     return options, args
 
