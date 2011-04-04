@@ -52,7 +52,9 @@ Acquiring data
 5. Observation data is stored with the genomedata system.
    <http://noble.gs.washington.edu/proj/genomedata/>. There is a small
    Genomedata archive for testing that comes with Segway, that is used
-   in the below steps.
+   in the below steps. You can get it using::
+
+     wget http://noble.gs.washington.edu/proj/segway/2011/test.genomedata
 
 Running Segway
 --------------
@@ -60,13 +62,13 @@ Running Segway
    data. Here, we specify that we want Segway to discover four unique
    patterns::
 
-     segway --num-labels-4 train test/data/test.genomedata traindir
+     segway --num-labels=4 train test.genomedata traindir
 
 7. Use the ``segway identify`` command to create the segmentation,
    which partitions the genome into regions labeled with one of the
    four discovered patterns::
 
-     segway identify test/data/test.genomedata traindir identifydir
+     segway identify test.genomedata traindir identifydir
 
 Results
 -------

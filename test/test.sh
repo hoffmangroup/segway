@@ -14,7 +14,8 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-segway --num-labels=4 train data/test.genomedata traindir
+segway --num-labels=4 --input-master=data/traindir/params/input.master \
+    train data/test.genomedata traindir
 segway identify data/test.genomedata traindir identifydir
 
 # diff

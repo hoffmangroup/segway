@@ -935,13 +935,16 @@ class Runner(object):
         self.num_free_params = None
 
         # variables
-        self.num_segs = NUM_SEGS
-        self.num_subsegs = NUM_SUBSEGS
+        self.num_segs = None
+        self.num_subsegs = None
         self.iterations = ITERATIONS
-        self.len_seg_strength = PRIOR_STRENGTH
-        self.distribution = DISTRIBUTION_DEFAULT
+        self.len_seg_strength = None
+        self.distribution = None
         self.max_em_iters = MAX_EM_ITERS
         self.max_frames = MAX_FRAMES
+        self.segtransition_weight_scale = None
+        self.ruler_scale = None
+        self.resolution = None
 
         # flags
         self.clobber = False
@@ -975,7 +978,12 @@ class Runner(object):
 
     def set_option(self, name, value, default=None):
         if value is None:
-            if getattr(self, name) is not None:
+            try:
+                value = getattr(self, name)
+            except AttributeError:
+                pass
+
+            if value is not None:
                 return
 
             value = default

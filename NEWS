@@ -1,6 +1,9 @@
 1.0.1:
 
-
+* run: fix various option setup errors
+* setup: add description
+* setup: fix download URL
+* docs: fix quickstart errors
 
 1.0.0:
 
