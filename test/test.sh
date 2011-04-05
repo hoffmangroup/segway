@@ -14,13 +14,18 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-segway --num-labels=4 --input-master=data/traindir/params/input.master \
-    train data/test.genomedata traindir
-segway identify data/test.genomedata traindir identifydir
+TMPDIR="$(mktemp -dp . test.XXXXXX)"
+
+cd "$TMPDIR"
+
+segway --num-labels=4 --input-master=../data/input.master train \
+    ../data/test.genomedata traindir
+segway identify ../data/test.genomedata traindir identifydir
 
 # diff
-diff --exclude=.svn -r -u data/traindir traindir > traindir.diff
-diff --exclude=.svn -r -u data/identifydir identifydir > identifydir.diff
+diff --exclude=.svn -r -u ../data/traindir traindir > traindir.diff || true
+diff --exclude=.svn -r -u ../data/identifydir identifydir > identifydir.diff \
+    || true
 
 # XXX: need to exclude differences in UUIDs/dates. one way would be to
 # write a copy of these directories that replaces UUID with <UUID>,
