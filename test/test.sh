@@ -22,10 +22,5 @@ segway --num-labels=4 --input-master=../data/input.master train ../data/test.gen
 segway identify ../data/test.genomedata traindir identifydir
 
 # diff
-diff --exclude=.svn -r -u ../data/traindir traindir > traindir.diff || true
-diff --exclude=.svn -r -u ../data/identifydir identifydir > identifydir.diff \
-    || true
-
-# XXX: need to exclude differences in UUIDs/dates. one way would be to
-# write a copy of these directories that replaces UUID with <UUID>,
-# etc.
+../compare_directory.py ../data/traindir traindir
+../compare_directory.py ../data/identifydir identifydir
