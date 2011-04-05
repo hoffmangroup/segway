@@ -18,8 +18,7 @@ TMPDIR="$(mktemp -dp . test.XXXXXX)"
 
 cd "$TMPDIR"
 
-segway --num-labels=4 --input-master=../data/input.master train \
-    ../data/test.genomedata traindir
+segway --num-labels=4 --input-master=../data/input.master train ../data/test.genomedata traindir
 segway identify ../data/test.genomedata traindir identifydir
 
 # diff
