@@ -2988,7 +2988,7 @@ class Runner(object):
             writer = ListWriter(tabfile)
             writer.writerow(TRAIN_FIELDNAMES)
 
-            for name, typ in TRAIN_OPTION_TYPES.iteritems():
+            for name, typ in sorted(TRAIN_OPTION_TYPES.iteritems()):
                 value = getattr(self, name)
                 if isinstance(typ, list):
                     for item in value:
