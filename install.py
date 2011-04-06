@@ -18,6 +18,8 @@ GMTK_VERSION = "20091016"
 
 ####################### BEGIN COMMON CODE HEADER #####################
 
+# script produced with: /net/noble/vol2/home/mmh1/arch/Linux/RHEL5/x86_64/bin/make-installer --clobber install.tmpl
+
 import os
 import sys
 
@@ -33,7 +35,7 @@ assert sys.version_info >= (2, 4)
 
 MIN_HDF5_VERSION = "1.8"
 MIN_NUMPY_VERSION = "1.2"
-PYTABLES_VERSION = ">2.0.4,<2.2a0"
+PYTABLES_VERSION = ">2.0.4"
 
 HDF5_URL = "ftp://ftp.hdfgroup.org/HDF5/prev-releases/hdf5-1.8.4-patch1/" \
     "src/hdf5-1.8.4-patch1.tar.gz"
@@ -73,19 +75,17 @@ MIN_DRMAA_VERSION = "0.4a3"
 
 LSF_DRMAA_URL = "http://downloads.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.4/lsf_drmaa-1.0.4.tar.gz"
 
-GMTK_USER = "segway"
 GMTK_VERSION_FILENAME = "gmtk.version"
 GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/" \
     "gmtk-%s.tar.gz" % GMTK_VERSION
 
-SEGWAY_USER = "segway"
 SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
     "segway-%s.tar.gz" % PKG_VERSION
 
-# also has keywords: user, password, OPTFLAGS, ARCH_GCC, SSELEVEL
+# also has keywords: OPTFLAGS, ARCH_GCC, SSELEVEL
 GMTK_INSTALL_SCRIPT = """
 cd $tmpdir
-wget --user=$user --password=$password $url -O $file
+wget $url -O $file
 if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 
@@ -122,7 +122,7 @@ make install
 
 SEGWAY_INSTALL_SCRIPT = """
 cd $tmpdir
-wget --user=$user --password=$password $url -O $file
+wget $url -O $file
 if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 $python setup.py install
@@ -248,6 +248,13 @@ class ShellManager(object):
                                  " to the terminal")
         else:
             prompt = """
+This install script will guide you through installing a number of programs.
+All these programs are installed and configured in such a way that
+administrative privileges are not necessary. It will also try to identify
+existing installations of these programs, but it cannot always find them.
+In such cases, the simplest solution might be to just let this script
+install another version of these programs.
+
 In the course of this installation, a number of environment variables
 must be permanently set so the installed programs will work. Your shell
 was found to be: %s (from the value of $SHELL), so these settings
@@ -266,7 +273,6 @@ be printed to the terminal)?""" % (shell, file)
         self._out = None  # Output file not yet open
         self.file_open = False
 
-
     def write_var(self, variable, value):
         """Write the given variable and value to the shell rc file"""
         if self._out is None:
@@ -283,7 +289,7 @@ be printed to the terminal)?""" % (shell, file)
     def save_var(self, variable, value):
         """Write the given variable and value to the shell rc file"""
         if self.is_var(variable, value):
-            print >>sys.stderr, "\nYour %s is already %s!" % (variable, value)
+            print >>sys.stderr, "\nYour %s is already %s." % (variable, value)
         else:
             self.write_var(variable, value)
             self.set_var(variable, value)
@@ -291,7 +297,7 @@ be printed to the terminal)?""" % (shell, file)
     def save_to_var(self, variable, value):
         """Prepend the value to the variable in the shell rc file"""
         if self.in_var(variable, value):
-            print >>sys.stderr, "\nYour %s already includes %s!" % \
+            print >>sys.stderr, "\nYour %s already includes %s." % \
                 (variable, value)
         else:
             full_value = "%s:$%s" % (value, variable)
@@ -366,8 +372,8 @@ class Environment(object):
 
     def refresh_packages(self):
         """Refresh list of packages/eggs that can be imported"""
-        print >>sys.stderr, "Updating list of packages/eggs in %s" % \
-            self.python_home
+        #print >>sys.stderr, "Updating list of packages/eggs in %s" % \
+        #    self.python_home
         addsitedir(fix_path(self.python_home))
 
     def has_lsf(self):
@@ -460,16 +466,20 @@ class Environment(object):
         """Prompt user whether or not to create a cfg file"""
         cfg_path = fix_path(cfg_file)
         if os.path.isfile(cfg_path):
-            print >>sys.stderr, ("\nFound your %s! (hopefully the configuration"
-                                 " matches)" % cfg_file)
+            query = """
+Distutils configuration file (%s) already exists.
+If it wasn't created by a previous run of this installation
+script, it might cause unexpected problems.
+May I overwrite it?""" % cfg_file
         else:
             query = """
 May I create %s?
 It will be used by distutils to install new Python modules
 into this directory (and subdirectories) automatically.""" % cfg_file
-            permission = prompt_yes_no(query)
-            if permission:
-                self._write_pydistutils_cfg(cfg_path)
+
+        permission = prompt_yes_no(query)
+        if permission:
+            self._write_pydistutils_cfg(cfg_path)
 
     def _write_pydistutils_cfg(self, cfg_path):
         """Write a pydistutils.cfg file based upon homes set up"""
@@ -602,14 +612,18 @@ class Installer(object):
             print >>sys.stderr, "not found."
             return False
         else:
-            print >>sys.stderr, "found."
+            if version is True:
+                print >>sys.stderr, "found."
+            else:
+                print >>sys.stderr, "found version: %s." % version
+
             if version is True or self.min_version is None:
                 # "True" testing necessary to distinguish from tuple or string
                 return True
             elif str2version(self.min_version) > str2version(version):
-                print >>sys.stderr, ("Found version: %s. Version %s or above"
-                                     " required.") % (version,
-                                                      self.min_version)
+                print >>sys.stderr, (" Version %s or above required." %
+                                     self.min_version)
+                return False
             else:
                 return True
 
@@ -637,27 +651,29 @@ class Installer(object):
         else returns False
 
         """
-        permission = self.start_install()
-        if not permission:
-            return False
-
-        if self.check_version():
-            return True
-
-        permission = self.prompt_install()
-        if not permission:
-            return False
-
-        self.announce_install()
-
-        success = True
         try:
+            permission = self.start_install()
+            if not permission:
+                return False
+
+            if self.check_version():
+                return True
+
+            permission = self.prompt_install()
+            if not permission:
+                return False
+
+            self.announce_install()
+
+            success = True
             self.install(*args, **kwargs)
         except Exception, e:
             success = False
             if str(e):  # print any error message
                 print >>sys.stderr, "===== ERROR: %s =====" % e
 
+        # Allow cleanup to crash or call sys.exit
+        print >>sys.stderr, "Cleaning up."
         self.cleanup(success)
 
         return success
@@ -924,7 +940,7 @@ class Hdf5Installer(ScriptInstaller):
             cmd = Popen(["h5repack", "-V"], stdout=PIPE, stderr=PIPE)
             res = cmd.stdout.readlines()[0].strip()
             if "Version" in res:
-                # HDF5 Found!
+                # HDF5 Found
                 return res.split("Version ")[1]
             else:
                 return None
@@ -1004,7 +1020,7 @@ class Tester(object):
             except Exception, e:
                 print >>sys.stderr, "Error: %r" % e
                 print >>sys.stderr, ("There seems to be an error with the"
-                                     " installation of %s!" % self.name)
+                                     " installation of %s." % self.name)
                 raise InstallationError()
 
 class PytablesTester(Tester):
@@ -1028,7 +1044,7 @@ class TestSuite(object):
                     tester.prompt_test()
                 except InstallationError:
                     die("""
-===== Test failed! =====
+===== Test failed =====
 Your installation may be incomplete and might not work.""")
 
             else:
@@ -1212,14 +1228,9 @@ class GmtkInstaller(ScriptInstaller):
         return None
 
     def install(self):
-        query = "\nALERT: GMTK source code is password protected.\
-    \n[Username: %s] Password: " % GMTK_USER
-        password = prompt_user(query)
-
         optflags = self.get_optflags()
         env = {"OPTFLAGS": optflags}
-        self.script_install(dir=self.env.arch_home, safe=True, env=env,
-                            user=GMTK_USER, password=password)
+        self.script_install(dir=self.env.arch_home, safe=True, env=env)
 
     def get_optflags(self):
         if "OPTFLAGS" in os.environ:
@@ -1339,10 +1350,7 @@ class SegwayInstaller(ScriptInstaller, EasyInstaller):
     get_version = EasyInstaller.get_egg_version
 
     def install(self):
-        query = "\nALERT: Segway source code is password protected.\
-\n[Username: %s] Password: " % SEGWAY_USER
-        password = prompt_user(query)
-        self.script_install(user=SEGWAY_USER, password=password)
+        self.script_install()
 
 
 ############################## MAIN #########################

@@ -1,6 +1,8 @@
 1.0.2:
 
-
+* run: train.tab is now sorted for easier test comparison
+* run: eliminate reporting of "info criterion" (which was flaky) in likelihood.tab
+* test: automated testing framework in test/test.sh
 
 1.0.1:
 

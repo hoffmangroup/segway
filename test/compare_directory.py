@@ -71,8 +71,20 @@ def compare_file(template_filename, query_filename):
 
     return bool(match)
 
+class TestCounter(object):
+    def __init__(self):
+        self.num_error = 0
+        self.num_success = 0
+
+    def error(self, msg):
+        self.num_error += 1
+        print >>sys.stderr, " %s" % msg
+
+    def success(self):
+        self.num_success += 1
+
 def compare_directory(template_dirname, query_dirname):
-    res = 0
+    counter = TestCounter()
     query_filenames = dict(get_dir_filenames(query_dirname))
 
     template_filenames = get_dir_filenames(template_dirname)
@@ -82,16 +94,25 @@ def compare_directory(template_dirname, query_dirname):
         for query_filename_relative, query_filename in query_filenames.iteritems():
             if re_template_filename_relative.match(query_filename_relative):
                 del query_filenames[query_filename_relative]
-                if not compare_file(template_filename, query_filename):
-                    print >>sys.stderr, "%s and %s differ" % (template_filename, query_filename)
-                    res = 1
+                if compare_file(template_filename, query_filename):
+                    counter.success()
+                else:
+                    counter.error("%s and %s differ" % (template_filename, query_filename))
 
                 break
         else:
-            print >>sys.stderr, "query directory missing %s" % template_filename
-            return 1
+            counter.error("query directory missing %s" % template_filename)
 
-    return res
+    for query_filename_relative in query_filenames.iterkeys():
+        counter.error("template directory missing %s" % query_filename_relative)
+
+    if counter.num_error == 0:
+        print >>sys.stderr, "PASS: %s and %s: %d files match" % (template_dirname, query_dirname, counter.num_success)
+        return 0
+    else:
+        msg = "FAIL: %s and %s: %d files match; %d files mismatch" % (template_dirname, query_dirname, counter.num_success, counter.num_error)
+        print >>sys.stderr, msg
+        return 1
 
 def parse_options(args):
     from optparse import OptionParser

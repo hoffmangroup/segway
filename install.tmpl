@@ -24,19 +24,17 @@ MIN_DRMAA_VERSION = "0.4a3"
 
 LSF_DRMAA_URL = "http://downloads.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.4/lsf_drmaa-1.0.4.tar.gz"
 
-GMTK_USER = "segway"
 GMTK_VERSION_FILENAME = "gmtk.version"
 GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/" \
     "gmtk-%s.tar.gz" % GMTK_VERSION
 
-SEGWAY_USER = "segway"
 SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
     "segway-%s.tar.gz" % PKG_VERSION
 
-# also has keywords: user, password, OPTFLAGS, ARCH_GCC, SSELEVEL
+# also has keywords: OPTFLAGS, ARCH_GCC, SSELEVEL
 GMTK_INSTALL_SCRIPT = """
 cd $tmpdir
-wget --user=$user --password=$password $url -O $file
+wget $url -O $file
 if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 
@@ -73,7 +71,7 @@ make install
 
 SEGWAY_INSTALL_SCRIPT = """
 cd $tmpdir
-wget --user=$user --password=$password $url -O $file
+wget $url -O $file
 if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 $python setup.py install
@@ -120,14 +118,9 @@ class GmtkInstaller(ScriptInstaller):
         return None
 
     def install(self):
-        query = "\nALERT: GMTK source code is password protected.\
-    \n[Username: %s] Password: " % GMTK_USER
-        password = prompt_user(query)
-
         optflags = self.get_optflags()
         env = {"OPTFLAGS": optflags}
-        self.script_install(dir=self.env.arch_home, safe=True, env=env,
-                            user=GMTK_USER, password=password)
+        self.script_install(dir=self.env.arch_home, safe=True, env=env)
 
     def get_optflags(self):
         if "OPTFLAGS" in os.environ:
@@ -247,10 +240,7 @@ class SegwayInstaller(ScriptInstaller, EasyInstaller):
     get_version = EasyInstaller.get_egg_version
 
     def install(self):
-        query = "\nALERT: Segway source code is password protected.\
-\n[Username: %s] Password: " % SEGWAY_USER
-        password = prompt_user(query)
-        self.script_install(user=SEGWAY_USER, password=password)
+        self.script_install()
 
 
 ############################## MAIN #########################

@@ -18,8 +18,7 @@ from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, repeat
-from math import ceil, floor, frexp, ldexp, log, log10
-from operator import neg
+from math import ceil, floor, frexp, ldexp, log10
 from os import environ, extsep
 import re
 from shutil import copy2
@@ -330,7 +329,7 @@ CARD_SEGTRANSITION = 3
 NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
 
 # training results
-# XXX: this should really be a namedtuple, yuck
+# XXX: Python 2.6: this should really be a namedtuple, yuck
 OFFSET_NUM_SEGS = 1
 OFFSET_FILENAMES = 2 # where the filenames begin in the results
 OFFSET_PARAMS_FILENAME = 3
@@ -1101,13 +1100,10 @@ class Runner(object):
         with open(self.log_likelihood_filename) as infile:
             log_likelihood = float(infile.read().strip())
 
-        info_criterion = self.calc_info_criterion(log_likelihood)
-
         with open(self.log_likelihood_log_filename, "a") as logfile:
-            row = map(str, [log_likelihood, info_criterion])
-            print >>logfile, "\t".join(row)
+            print >>logfile, str(log_likelihood)
 
-        return log_likelihood, info_criterion
+        return log_likelihood
 
     def load_include_exclude_coords(self):
         self.include_coords = load_coords(self.include_coords_filename)
@@ -2667,21 +2663,6 @@ class Runner(object):
         for window_len, window_index in zipper:
             yield window_index, window_len
 
-    def calc_bayesian_info_criterion(self, log_likelihood):
-        """
-        BIC = -2 ln L + k ln n
-        this is a modified BIC = -(2/n) ln L + k ln N
-
-        k: # of free params
-        n: # of bases
-        N: # of sequences
-        """
-        model_penalty = (self.num_free_params * log(self.num_windows))
-        #print >>sys.stderr, "num_free_params = %s; num_bases = %s; model_penalty = %s" \
-        #    % (self.num_free_params, self.num_bases, model_penalty)
-
-        return model_penalty - (2/self.num_bases * log_likelihood)
-
     def log_cmdline(self, cmdline, args=None):
         if args is None:
             args = cmdline
@@ -2929,14 +2910,6 @@ class Runner(object):
 
         self.last_params_filename = curr_params_filename
 
-    def set_calc_info_criterion(self):
-        if self.num_free_params is None:
-            # IC = -L
-            self.calc_info_criterion = neg
-        else:
-            # IC = BIC
-            self.calc_info_criterion = self.calc_bayesian_info_criterion
-
     def run_train_iteration(self):
         # make new files if you have more than one iteration
         self.set_triangulation_filename()
@@ -2954,8 +2927,6 @@ class Runner(object):
         log_likelihood = NINF
         round_index = 0
 
-        self.set_calc_info_criterion()
-
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
                       lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
@@ -2970,7 +2941,7 @@ class Runner(object):
                 return (None, None, None, None)
 
             last_log_likelihood = log_likelihood
-            log_likelihood, info_criterion = self.load_log_likelihood()
+            log_likelihood = self.load_log_likelihood()
 
             # print >>sys.stderr, "log likelihood = %s" % log_likelihood
             # print >>sys.stderr, "info criterion = %s" % info_criterion
@@ -2978,7 +2949,7 @@ class Runner(object):
             round_index += 1
 
         # log_likelihood, num_segs and a list of src_filenames to save
-        return (info_criterion, self.num_segs, self.input_master_filename,
+        return (log_likelihood, self.num_segs, self.input_master_filename,
                 self.last_params_filename, self.log_likelihood_filename)
 
     def save_train_options(self):
@@ -3137,13 +3108,13 @@ class Runner(object):
         if self.dry_run:
             return
 
-        # finds the min by info_criterion (minimize -log_likelihood)
-        min_params = min(iteration_params)
+        # finds the min by info_criterion (maximize log_likelihood)
+        max_params = max(iteration_params)
 
-        self.num_segs = min_params[OFFSET_NUM_SEGS]
+        self.num_segs = max_params[OFFSET_NUM_SEGS]
         self.set_triangulation_filename()
 
-        src_filenames = min_params[OFFSET_FILENAMES:]
+        src_filenames = max_params[OFFSET_FILENAMES:]
 
         if None in src_filenames:
             raise ValueError("all training iterations failed")

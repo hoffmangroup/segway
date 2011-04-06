@@ -134,7 +134,7 @@ Segway accomplishes three major tasks from a single command-line. It--
 .. 4. calculates **posterior** probability for each possible segment
 .. label at each position.
 
-.. todo: : block diagram
+.. todo: block diagram
 
 .. By default, the **generate**, **train**, and **identify** tasks are
    run (for now, **posterior** is as well, but this will change), but it
@@ -740,10 +740,9 @@ exit status is useful for determining whether the job succeeded
 sometimes text, depending on the clustering system used).
 
 The ``likelihood.*.tab`` files each track the progression of
-likelihood during a single iteration of EM training. The file has two
-columns. Each row represents a round of training. The first column is
-the log likelihood, and the second column is a way of calculating the
-Bayesian Information Criterion.
+likelihood during a single iteration of EM training. The file has a
+single column, one for each round of training, which contains the log
+likelihood. Higher values are better.
 
 GMTK reports
 ~~~~~~~~~~~~
@@ -837,8 +836,7 @@ workdir instead.
 |rarr| ``jobs.tab``                                 tab-delimeted sumary of jobs queued,
                                                     including resource informatoin and exit status
 |rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
-|rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of likelihood and a measure of
-                                                    Bayesian information criterion by training
+|rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of likelihood by training
                                                     iteration; can be used to examine  how fast
                                                     training converges
 |rarr| ``run.sh``                                   list of commands run by Segway, not
@@ -984,6 +982,8 @@ Helpful commands
 ================
 Here are some short bash scripts or one-liners that are useful:
 
+.. todo: this should be automated from --old-directory
+
 Generate the command-line arguments necessary to continue Segway from
 an interrupted training run using `$NUM_ITERATIONS` iterations::
 
@@ -1016,22 +1016,24 @@ Rename winning parameters when a training run is cut short::
 
 Make a tarball of parameters and models from various directories::
 
-    (for X in 20091224.stws1 20091224.stws1000; do
-        echo $X/{auxiliary,params/input.master,params/params.params,segway.str,triangulation}
-    done) | xargs tar zcvf 20091224.params.tar.gz
+    (for DIR in traindir1 traindir2; do
+        echo $DIR/{auxiliary,params/input.master,params/params.params,segway.str,triangulation}
+    done) | xargs tar zcvf training.params.tar.gz
 
-Rsync parameters from one host to another::
+Rsync parameters from `$REMOTEDIR` on `$REMOTEHOST` to `$LOCALDIR`::
 
-    rsync -rtvz --exclude output --exclude posterior --exclude viterbi --exclude observations --exclude "*.observations" --exclude accumulators REMOTEHOST:REMOTEDIR LOCALDIR
+    rsync -rtvz --exclude output --exclude posterior --exclude viterbi --exclude observations --exclude "*.observations" --exclude accumulators $REMOTEHOST:$REMOTEDIR $LOCALDIR
 
 Print all last likelihoods::
 
     for X in likelihood.*.tab; do dc -e "8 k $(tail -n 2 $X | cut -f 1 | xargs echo | sed -e 's/-//g') sc sl ll lc - ll / p"; done
 
+.. todo: research BEDTools issue here
+
 Recover as much as possible from an incomplete identification run
 without completing it. Note that this does not combine adjacent lines
-of same segment. BEDTools might have something to do that with. You
-will have to create your own header.txt with appropriate track lines::
+of same segment. BEDTools might be able to do this for you. You will
+have to create your own header.txt with appropriate track lines::
 
     cat header.txt <(find viterbi -type f | sort | xargs cat) | gzip -c > segway.bed.gz
 
