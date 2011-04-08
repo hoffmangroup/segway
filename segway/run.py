@@ -1005,7 +1005,13 @@ class Runner(object):
             assert len(args) == 3
         else:
             res.workdirname = args[3]
-            res.load_train_options(traindirname)
+
+            try:
+                res.load_train_options(traindirname)
+            except IOError, err:
+                # train.tab use is optional
+                if err.errno != ENOENT:
+                    raise
 
         res.old_workdirname = options.old_directory
         res.obs_dirname = options.observations

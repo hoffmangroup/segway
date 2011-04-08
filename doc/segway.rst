@@ -136,13 +136,6 @@ Segway accomplishes three major tasks from a single command-line. It--
 
 .. todo: block diagram
 
-.. By default, the **generate**, **train**, and **identify** tasks are
-   run (for now, **posterior** is as well, but this will change), but it
-   is possible to run each of these steps independently. For example, you
-   may want to specify your own model (including models for tasks quite
-   unlike segmentation), train it on one dataset, and then perform
-   posterior decoding on another dataset, skipping the identify stage.
-
 Technical description
 ---------------------
 More specifically, Segway performs the following steps:

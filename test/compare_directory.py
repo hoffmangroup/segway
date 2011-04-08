@@ -34,7 +34,9 @@ def get_dir_filenames(dirname):
         except ValueError:
             pass
 
-        for filename in filenames:
+        dirnames.sort()
+
+        for filename in sorted(filenames):
             filename_relative = str(relative_dirpath / filename)
             # not really absolute, but more so than relative
             filename_absolute = str(dirbasepath / filename)

@@ -1,16 +1,19 @@
 1.0.3:
 
-
+* segway: train.tab is now optional, so you should be able to run
+  identify on pre-Segway 1.0.0 training directories that don't have
+  it, as long as you specify all the same options as you did before
+* test: filenames are sorted before comparisons
 
 1.0.2:
 
-* run: train.tab is now sorted for easier test comparison
-* run: eliminate reporting of "info criterion" (which was flaky) in likelihood.tab
+* segway: train.tab is now sorted for easier test comparison
+* segway: eliminate reporting of "info criterion" (which was flaky) in likelihood.tab
 * test: automated testing framework in test/test.sh
 
 1.0.1:
 
-* run: fix various option setup errors
+* segway: fix various option setup errors
 * setup: add description
 * setup: fix download URL
 * docs: fix quickstart errors
