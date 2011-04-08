@@ -1,0 +1,28 @@
+Segway has an acceptance testing system that you can use by running
+./test.sh. It will test a full training task and identification on
+test data (data/test.genomedata), using previously generated starting
+parameters (data/input.master). It then compares the test runs
+(test.XXXXXX where XXXXXX represents random alphanumeric characters)
+with previous "golden" runs (data/traindir, data/identifydir).
+
+Segway produces some output that will change depending on the version,
+the date, or randomly (UUIDs are used for each run). These golden runs
+have been changed to be templates with regular expressions (regexes)
+defining inexact matches. The regexes can be in filenames or file
+contents, even if the file is gzipped, and take the form of
+"(%<REGEX>%) where <REGEX> is a Python regular expression (usually
+equivalent to a Perl-compatible regular expression). For example,
+there is a file named
+data/traindir/output/e/0/emt0.0.0.traindir.(%[0-9a-f]{32}%), and the
+regular expression there allows any 32 hexadecimal digits, fitting the
+UUID that is uniquely generated for each Segway run.
+data/traindir/log/jobs.tab starts like this:
+
+jobid	jobname	prog	num_segs	num_frames	maxvmem	cpu	exit_status
+(%[0-9]+%)	emt0.0.0.traindir.(%[0-9a-f]{32}%)	gmtkEMtrainNew	4	184355	(%[0-9]+.[0-9]+%)	(%[0-9]+.[0-9]+%)	0
+
+The parts of the line that can change on each run are substituted with
+an escaped regular expression, and the deterministic parts will match
+exactly only.
+
+A unit test system is planned.
