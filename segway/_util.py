@@ -3,7 +3,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2009 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
 from contextlib import closing
@@ -84,6 +84,9 @@ OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
 
 VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
+
+BED_SCORE = "1000"
+BED_STRAND = "."
 
 def extjoin(*args):
     return extsep.join(args)
