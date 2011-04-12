@@ -17,8 +17,7 @@ from numpy import array, diff, vstack
 from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native
-from .task import BED_SCORE, BED_STRAND
-from ._util import get_label_color, maybe_gzip_open
+from ._util import BED_SCORE, BED_STRAND, get_label_color, maybe_gzip_open
 
 BED_START = "0"
 ACCEPTABLE_STRANDS = set(".+")
