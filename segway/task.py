@@ -16,18 +16,18 @@ import sys
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import array, zeros
+from numpy import array, zeros, empty, where, diff, r_
 from path import path
 
-from ._util import (DTYPE_IDENTIFY, EXT_FLOAT, EXT_INT, EXT_LIST,
-                    find_segment_starts, get_label_color,
+from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
+                    EXT_INT, EXT_LIST, find_segment_starts, get_label_color,
                     _make_continuous_cells, _save_observations_window,
                     VITERBI_PROG)
 
+from run import (POSTERIOR_SCALE_FACTOR, read_posterior, POSTERIOR_PROG)
+
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
-BED_SCORE = "1000"
-BED_STRAND = "."
 
 SCORE_MIN = 100
 SCORE_MAX = 1000
