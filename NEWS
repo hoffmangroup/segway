@@ -3,6 +3,7 @@
 * segway: train.tab is now optional, so you should be able to run
   identify on pre-Segway 1.0.0 training directories that don't have
   it, as long as you specify all the same options as you did before
+* segway-winner: new command to pick winning paramters in interrupted training run
 * test: filenames are sorted before comparisons
 * test/README: added description of test system
 

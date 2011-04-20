@@ -299,7 +299,7 @@ number of segment labels to use in the model (default 2). You can set
 this to a single number or a range with Python slice notation. For
 example, ``--num-labels=5:20:5`` will result in 5, 10, and 15 labels
 being tried. If you specify :option:`--num-starts`\=\ *starts*, then
-there will be *starts* different iterations for each of the *labels*
+there will be *starts* different instances for each of the *labels*
 labels tried.
 
 The question of finding the right number of labels is a difficult one.
@@ -425,14 +425,14 @@ Train task
 Most users will generate the model at training time, but to specify
 your own model there are the :option:`--structure`\=\ *filename* and
 :option:`--input-master`\=\ *filename* options. You can simultaneously
-run multiple *iterations* of EM training in parallel, specified with the
-:option:`--iterations`\=\ *iterations* option. Each iteration consists of
+run multiple *instances* of EM training in parallel, specified with the
+:option:`--instances`\=\ *instances* option. Each instance consists of
 a number of rounds, which are broken down into individual tasks for
 each training region. The results from each region for a particular
-iteration and round are combined in a quick *bundle* task. It results in
+instance and round are combined in a quick *bundle* task. It results in
 the generation of a parameter file like ``params.3.params.18`` where
-``3`` is the iteration index and ``18`` is the round index. Training for
-a particular iteration continues until at least one of these criteria is
+``3`` is the instance index and ``18`` is the round index. Training for
+a particular instance continues until at least one of these criteria is
 met:
 
 * the likelihood from one round is only a small improvement from the
@@ -456,7 +456,7 @@ criteria are met. Training can be a time-consuming process. You may
 wish to train only on a subset of your data, as described in
 :ref:`positions`.
 
-When all iterations are complete, Segway picks the parameter set with the
+When all instances are complete, Segway picks the parameter set with the
 best likelihood and copies it to ``params.params``.
 
 There are two different modes of training available, unsupervised and
@@ -511,14 +511,14 @@ incomplete training run.
 You can recover from a previously completed training run by specifying
 multiple :option:`--input-master` and :option:`--trainable-params`
 files. They will be matched to each other in order. If there are more
-iterations specfiied than master and parameter files, then new ones will
-be generated automatically for the remaining iterations. The final
+instances specified than master and parameter files, then new ones will
+be generated automatically for the remaining instances. The final
 parameters file is generated in *workdir*\ ``/params/params.params``
 The Helpful Commands section of this manual contains some short
 scripts useful for this process
 
 The new training run will start over with round index 0 for all
-iterations, so the usual maximum of 100 rounds will take place after
+instances, so the usual maximum of 100 rounds will take place after
 another 100 rounds rather than from the initial start.
 
 In the future, this will be replaced with :option:`--old-directory`\=\
@@ -733,7 +733,7 @@ exit status is useful for determining whether the job succeeded
 sometimes text, depending on the clustering system used).
 
 The ``likelihood.*.tab`` files each track the progression of
-likelihood during a single iteration of EM training. The file has a
+likelihood during a single instance of EM training. The file has a
 single column, one for each round of training, which contains the log
 likelihood. Higher values are better.
 
@@ -811,7 +811,7 @@ workdir instead.
 =================================================== =====================================================
 ``accumulators/``                                   intermediate files used to pass E-step results to
                                                     the M-step of EM training
-|rarr| ``acc.``\ \*\ ``.bin``                       accumulator for a particular iteration and
+|rarr| ``acc.``\ \*\ ``.bin``                       accumulator for a particular instance and
                                                     region (reused each round)
 ``auxiliary/``                                      miscelaneous model files
 |rarr| ``dont_train.list``                          defines list of hidden random variables
@@ -821,7 +821,7 @@ workdir instead.
 ``likelihood/``                                     GMTK's report of the log likelihood for
                                                     the most recent M-step of EM training
 |rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
-                                                    iteration|rarr| Segway uses this to decide when to
+                                                    instance|rarr| Segway uses this to decide when to
                                                     stop training
 ``log/``                                            diagnostic information
 |rarr| ``details.sh``                               script file that includes the exact
@@ -830,7 +830,7 @@ workdir instead.
                                                     including resource informatoin and exit status
 |rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
 |rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of likelihood by training
-                                                    iteration; can be used to examine  how fast
+                                                    instance; can be used to examine  how fast
                                                     training converges
 |rarr| ``run.sh``                                   list of commands run by Segway, not
                                                     including wrappers
@@ -851,15 +851,15 @@ workdir instead.
                                                     at the command-line
 ``output/``                                         diagnostic output of individual GMTK jobs
 ``output/e/``                                       stderr
-``output/e/0,1,``...                                stderr for a particular training iteration (0, 1,
+``output/e/0,1,``...                                stderr for a particular training instance (0, 1,
                                                     ...)
 ``output/e/identify``                               stderr for identification
 ``output/o/``                                       stdout
-``params/``                                         generated and trained parameters for a given iteration
+``params/``                                         generated and trained parameters for a given instance
 |rarr| ``input.``\ \*\ ``.master``                  generated hyperparameters and starting parameters
 |rarr| ``input.master``                             best set of hyperparameters and starting parameters
-|rarr| ``params.``\ \*\ ``.params.``\ \*            trained parameters for a given iteration and round
-|rarr| ``params.``\ \*\ ``.params``                 final trained parameters for a given iteration
+|rarr| ``params.``\ \*\ ``.params.``\ \*            trained parameters for a given instance and round
+|rarr| ``params.``\ \*\ ``.params``                 final trained parameters for a given instance
 |rarr| ``params.params``                            best final set of trained parameters
 ``segway.bed.gz``                                   segmentation in BED format
 ``segway.str``                                      dynamic Bayesian network structure
@@ -880,7 +880,7 @@ look like this::
   emt0.1.34.traindir.ed03201cea2047399d4cbcc4b62f9827
 
 In this example, ``emt`` means expectation maximization training, the
-``0`` means iteration 0, the ``1`` means round 1, and the ``34`` means
+``0`` means instance 0, the ``1`` means round 1, and the ``34`` means
 window 34. The name of the training directory is ``traindir``, and
 ``ed03201cea2047399d4cbcc4b62f9827`` is a universally unique
 identifier for this particular Segway run. This can be useful if you
@@ -902,7 +902,7 @@ named similarly::
 ..  jt34.identifydir.4f32630d53724f08b34a8fc58793307d
 .. or posterior (``jt``)
 
-Of course, there are no iterations or rounds for the identify task, so
+Of course, there are no instances or rounds for the identify task, so
 only the sequence index is reported.
 
 Tracks
@@ -978,12 +978,12 @@ Here are some short bash scripts or one-liners that are useful:
 .. todo: this should be automated from --old-directory
 
 Generate the command-line arguments necessary to continue Segway from
-an interrupted training run using `$NUM_ITERATIONS` iterations::
+an interrupted training run using `$NUM_INSTANCES` instances::
 
-    NUM_ITERATIONS=<define number of threads here>
+    NUM_INSTANCES=<define number of threads here>
     OLDTRAINDIRNAME=<define old workdir here>
     OLDTRAINSPEC="$(
-        for ((X=0; X < NUM_ITERATIONS; X++)); do
+        for ((X=0; X < NUM_INSTANCES; X++)); do
             OLDPARAMSFILENAMES=$(ls \
                                  $OLDTRAINDIRNAME/params/params.$X.params.*
                                  \
@@ -1002,10 +1002,10 @@ specify all of the previous parameter files as starting values.
 Rename winning parameters when a training run is cut short::
 
      TRAINDIRNAME=<define workdir here>
-     WINNING_ITERATION=$(fgrep "" $TRAINDIRNAME/log/likelihood.*.tab | perl -pe 's#^.*/likelihood.(\d+).tab:#\1\t#' | sort -k 2,2g | tail -n 1 | cut -f 1)
-     cp -v $(ls $TRAINDIRNAME/params/params.${WINNING_ITERATION}.params.* \
+     WINNING_INSTANCE=$(fgrep "" $TRAINDIRNAME/log/likelihood.*.tab | perl -pe 's#^.*/likelihood.(\d+).tab:#\1\t#' | sort -k 2,2g | tail -n 1 | cut -f 1)
+     cp -v $(ls $TRAINDIRNAME/params/params.${WINNING_INSTANCE}.params.* \
          | sort -t . -k 4,4rn | head -n 1) "$TRAINDIRNAME/params/params.params"
-     cp -v "$TRAINDIRNAME/params/input.${WINNING_ITERATION}.master" "$TRAINDIRNAME/params/input.master" 
+     cp -v "$TRAINDIRNAME/params/input.${WINNING_INSTANCE}.master" "$TRAINDIRNAME/params/input.master" 
 
 Make a tarball of parameters and models from various directories::
 

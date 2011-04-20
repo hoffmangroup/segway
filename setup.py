@@ -6,7 +6,7 @@ Segway is a tool for easy pattern discovery and identification in
 functional genomics data.
 """
 
-__version__ = "1.0.3"
+__version__ = "1.1.0"
 
 # Copyright 2008-2011 Michael M. Hoffman <mmh1@washington.edu>
 
@@ -38,6 +38,7 @@ segway = segway.run:main [parallel]
 segway-calc-distance = segway.calc_distance:main
 segway-task = segway.task:main
 segway-layer = segway.layer:main
+segway-winner = segway.winner:main
 
 h5histogram = segway.h5histogram:main
 h5values = segway.h5values:main
