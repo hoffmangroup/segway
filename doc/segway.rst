@@ -153,11 +153,11 @@ More specifically, Segway performs the following steps:
      (``segway.bed.gz``) for use in a genome browser, or by
      Segtools <http://noble.gs.washington.edu/proj/segtools/>, or other tools
 
-..  8. Call GMTK to perform posterior decoding of the observations
-..   using the generated model and discovered parameters
-..  9. Convert the GMTK posterior results into wiggle format
-..     (``posterior.seg*.wig.gz``) for use in a genome browser or
-..     other tools
+  8. Call GMTK to perform posterior decoding of the observations
+     using the generated model and discovered parameters
+  9. Convert the GMTK posterior results into bedGraph format
+     (``posterior.seg*.bedGraph.gz``) for use in a genome browser or
+     other tools
   10. Use a distributed computing system to parallelize all of the
       GMTK tasks listed above, and track and predict their resource
       consumption to maximize efficiency
@@ -168,8 +168,8 @@ More specifically, Segway performs the following steps:
 ..      <http://noble.gs.washington.edu/proj/segtools/> for a more
 ..      comprehensive report and plots on the resulting segmentation.
 
-.. The **identify** and **posterior** tasks can run simultaneously, as
-   they depend only on the results of **train**, and not each other.
+The **identify** and **posterior** tasks can run simultaneously, as
+they depend only on the results of **train**, and not each other.
 
 Data selection
 ==============
@@ -549,7 +549,8 @@ The output is in BED format
 columns for chromosome, start, and end (in zero-based, half-open
 format), and the label. Other columns to the right are used for
 display purposes, such as coloring the browser display, and can be
-safely ignored.
+safely ignored for further processing. We use colors from ColorBrewer
+(http://colorbrewer2.org/).
 
 Recovery
 --------
@@ -557,28 +558,28 @@ The :option:`--old-directory`\=\ *dirname* allows recovery from an
 interrupted identify task. Segway will requeue jobs that never
 completed before, skipping any windows that have already completed.
 
-.. Posterior task
-.. ==============
-.. The **posterior** inference task of Segway estimates for each position
-.. of interest the probability that the model has a particular segment
-.. label given the data. This information is delivered in a series of
-.. numbered wiggle files, one for each segment label. The individual
-.. values will vary from 0 to 100, showing the percentage probability at
-.. each position for the label in that file. In most positions, the value
-.. will be 0 or 100, and substantially reproduce the Viterbi path
-.. determined from the **identify** task.
+Posterior task
+==============
+The **posterior** inference task of Segway estimates for each position
+of interest the probability that the model has a particular segment
+label given the data. This information is delivered in a series of
+numbered wiggle files, one for each segment label. The individual
+values will vary from 0 to 100, showing the percentage probability at
+each position for the label in that file. In most positions, the value
+will be 0 or 100, and substantially reproduce the Viterbi path
+determined from the **identify** task.
 
-.. Posterior results can be useful in determining regions of ambiguous
-.. labeling or in diagnosing new models. The mostly binary nature of the
-.. posterior assignments is a consequence of the design of the default
-.. Segway model, and it is possible to design a model that does not have
-.. this feature. Doing so is left as an exercise to the reader.
+Posterior results can be useful in determining regions of ambiguous
+labeling or in diagnosing new models. The mostly binary nature of the
+posterior assignments is a consequence of the design of the default
+Segway model, and it is possible to design a model that does not have
+this feature. Doing so is left as an exercise to the reader.
 
 .. todo: name the files
 
-.. You may find you need to convert the wiggle files to bigWig format
-.. first to allow small portions to be uploaded to a genome browser
-.. piecewise.
+You may find you need to convert the bedGraph files to bigWig format
+first to allow small portions to be uploaded to a genome browser
+piecewise.
 
 .. todo: same options for specifying model and parameters as identify
 
@@ -747,9 +748,9 @@ likelihood. Higher values are better.
 
 GMTK reports
 ~~~~~~~~~~~~
-The ``jt_info.txt`` file describes how GMTK builds a junction tree. It
-is of interest primarily during GMTK troubleshooting. You are unlikely
-to use it.
+The ``jt_info.txt`` and ``jt_info.posterior.txt`` files describe how
+GMTK builds a junction tree. It is of interest primarily during GMTK
+troubleshooting. You are unlikely to use it.
 
 Task output
 ~~~~~~~~~~~
@@ -829,14 +830,16 @@ workdir instead.
 ``likelihood/``                                     GMTK's report of the log likelihood for
                                                     the most recent M-step of EM training
 |rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
-                                                    instance|rarr| Segway uses this to decide when to
+                                                    instance. Segway uses this to decide when to
                                                     stop training
 ``log/``                                            diagnostic information
 |rarr| ``details.sh``                               script file that includes the exact
                                                     command-lines queued by Segway, with wrapper scripts
-|rarr| ``jobs.tab``                                 tab-delimeted sumary of jobs queued,
+|rarr| ``jobs.tab``                                 tab-delimeted summary of jobs queued,
                                                     including resource informatoin and exit status
 |rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
+|rarr| ``jt_info.posterior.txt``                    log file used by GMTK when creating a junction tree
+                                                    in posterior mode
 |rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of likelihood by training
                                                     instance; can be used to examine  how fast
                                                     training converges
