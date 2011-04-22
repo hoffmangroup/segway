@@ -1,8 +1,8 @@
 Segway has an acceptance testing system that you can use by running
-./test.sh. It will test a full training task and identification on
-test data (data/test.genomedata), using previously generated starting
-parameters (data/input.master). It then compares the test runs
-(test.XXXXXX where XXXXXX represents random alphanumeric characters)
+./test.sh. It will test a full training task, identification and generating 
+posterior probability on test data (data/test.genomedata), using previously
+generated starting parameters (data/input.master). It then compares the test
+ runs (test.XXXXXX where XXXXXX represents random alphanumeric characters)
 with previous "golden" runs (data/traindir, data/identifydir).
 
 Segway produces some output that will change depending on the version,

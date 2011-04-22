@@ -19,7 +19,7 @@ TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
 cd "$TMPDIR"
 
 segway --num-labels=4 --input-master=../data/input.master train ../data/test.genomedata traindir
-segway identify ../data/test.genomedata traindir identifydir
+segway identify+posterior ../data/test.genomedata traindir identifydir
 
 # diff
 ../compare_directory.py ../data/traindir traindir || true # keep going
