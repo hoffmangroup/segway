@@ -130,9 +130,8 @@ Segway accomplishes three major tasks from a single command-line. It--
   2. **trains** parameters of the model starting with the initial
      parameters; and
   3. **identifies** segments in this data with the model.
-
-.. 4. calculates **posterior** probability for each possible segment
-.. label at each position.
+  4. calculates **posterior** probability for each possible segment
+  label at each position.
 
 .. todo: block diagram
 
@@ -545,6 +544,13 @@ supplying the URL to the genome browser rather than uploading the file
 directly. When using the UCSC genome browser, the bigBed utility may
 be helpful in speeding access to parts of a segmentation.
 
+The output is in BED format
+(http://genome.ucsc.edu/FAQ/FAQformat.html#format1), and includes
+columns for chromosome, start, and end (in zero-based, half-open
+format), and the label. Other columns to the right are used for
+display purposes, such as coloring the browser display, and can be
+safely ignored.
+
 Recovery
 --------
 The :option:`--old-directory`\=\ *dirname* allows recovery from an
@@ -582,14 +588,16 @@ Creating layered output
 Segway produces BED Files as output with the segment label in the name
 field. While this is the most sensible way of interchanging the
 segmentation with other programs, it can be difficult to visualize. We
-supply a ``segway-layer`` program that transforms segmentation BED
-files into "layered" BED files with rows for each possible Segment
+supply a :program:`segway-layer` program that transforms segmentation
+BED files into "layered" BED files with rows for each possible Segment
 label and thick boxes at the location of each label. This is what we
 show in the screenshot figure of the Segway article. This is much
 easier to see at low levels of magnification. The layers are also
 labeled, removing the need to distinguish them exclusively by color.
-``segway-layer`` supports the use of standard input and output by
-using ``-`` as a filename, following a common Unix convention.
+:program:`segway-layer` supports the use of standard input and output
+by using ``-`` as a filename, following a common Unix convention.
+Segway automatically runs :program:`segway-layer` at the end of an
+identify task.
 
 The mnemonic files used by Segway and Segtools have a simple format.
 They are tab-delimited files with a header that has the following
@@ -597,15 +605,15 @@ columns: ``old``, ``new``, and ``description``. The ``old`` column
 specifies the original label in the BED file, which is always produced
 as an integer by Segway. The ``new`` column allows the specification
 of a short alphanumeric mnemonic for the label. The ``description``
-column is unused by ``segway-label``, but you can use it to add
-helpful annotations for humans examining the list of  labels,
-or to save label mnemonics you used previously. The row order of the
+column is unused by :program:`segway-layer`, but you can use it to add
+helpful annotations for humans examining the list of labels, or to
+save label mnemonics you used previously. The row order of the
 mnemonic file matters, as the layers will be laid down in a similar
 order. Mnemonics sharing the same alphabetical prefix (for example,
 ``A0`` and ``A1``) or characters before a period (for example, ``0.0``
 and ``0.1``) will be rendered with the same color.
 
-``segtools-gmtk-parameters`` in the Segtools package can automatically
+:program:`segtools-gmtk-parameters` in the Segtools package can automatically
 identify an initial hierarchical labeling of segmentation parameters.
 This can be very useful as a first approximation of assigning meaning
 to segment labels.
@@ -969,7 +977,12 @@ specified and version information when :option:`--version` is specified.
 
 .. include:: _build/cmdline-help/segway.help.txt
 
+Utilities
+---------
+
 .. include:: _build/cmdline-help/segway-layer.help.txt
+
+.. include:: _build/cmdline-help/segway-winner.help.txt
 
 Helpful commands
 ================
@@ -999,13 +1012,9 @@ an interrupted training run using `$NUM_INSTANCES` instances::
 Then you can add `$OLDTRAINSPEC` into your Segway command-line to
 specify all of the previous parameter files as starting values.
 
-Rename winning parameters when a training run is cut short::
-
-     TRAINDIRNAME=<define workdir here>
-     WINNING_INSTANCE=$(fgrep "" $TRAINDIRNAME/log/likelihood.*.tab | perl -pe 's#^.*/likelihood.(\d+).tab:#\1\t#' | sort -k 2,2g | tail -n 1 | cut -f 1)
-     cp -v $(ls $TRAINDIRNAME/params/params.${WINNING_INSTANCE}.params.* \
-         | sort -t . -k 4,4rn | head -n 1) "$TRAINDIRNAME/params/params.params"
-     cp -v "$TRAINDIRNAME/params/input.${WINNING_INSTANCE}.master" "$TRAINDIRNAME/params/input.master" 
+There used to be a recipe here to rename winning parameters when a
+training run is cut short, but this has been replaced by the
+:program:`segway-winner` command.
 
 Make a tarball of parameters and models from various directories::
 

@@ -44,7 +44,7 @@ $(CMDLINEHELPDIR)/%.help.txt:
 	python gethelp.py $* | sed -e 's/ATTR VALUE/<ATTR VALUE>/g' > $@
 
 # XXX: these dependencies could probably be automated
-cmdline-help: $(CMDLINEHELPDIR)/segway.help.txt $(CMDLINEHELPDIR)/segway-layer.help.txt
+cmdline-help: $(CMDLINEHELPDIR)/segway.help.txt $(CMDLINEHELPDIR)/segway-layer.help.txt $(CMDLINEHELPDIR)/segway-winner.help.txt
 
 html: $(PREREQS)
 	$(SPHINXBUILD) -b html $(ALLSPHINXOPTS) $(BUILDDIR)/html

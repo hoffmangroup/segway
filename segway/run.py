@@ -7,11 +7,11 @@ run: main Segway implementation
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2011 Michael M. Hoffman <mmh1@uw.edu>
 
 from cStringIO import StringIO
 from collections import defaultdict
-from contextlib import closing, nested
+from contextlib import closing
 from copy import copy
 from datetime import datetime
 from distutils.spawn import find_executable
@@ -47,12 +47,12 @@ from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
 from .layer import layer, make_layer_filename
 from ._util import (ceildiv, data_filename, data_string,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
-                    DISTRIBUTION_ASINH_NORMAL, EXT_FLOAT, EXT_GZ, EXT_INT,
-                    extjoin, GB, get_chrom_coords, get_label_color, gzip_open,
+                    DISTRIBUTION_ASINH_NORMAL, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS, EXT_TAB,
+                    extjoin, GB, get_chrom_coords, 
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     _make_continuous_cells, make_filelistpath, maybe_gzip_open,
-                    MB, OptionBuilder_GMTK, PKG,
-                    _save_observations_window, VITERBI_PROG)
+                    MB, OptionBuilder_GMTK, PKG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
+                    _save_observations_window, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
@@ -193,13 +193,10 @@ EXT_BIN = "bin"
 EXT_LIKELIHOOD = "ll"
 EXT_LOG = "log"
 EXT_OUT = "out"
-EXT_PARAMS = "params"
 EXT_POSTERIOR = "posterior"
 EXT_SH = "sh"
-EXT_TAB = "tab"
 EXT_TXT = "txt"
 EXT_TRIFILE = "trifile"
-EXT_WIG = "wig"
 
 def make_prefix_fmt(num):
     # make sure there are sufficient leading zeros
@@ -210,12 +207,10 @@ PREFIX_CMDLINE_SHORT = "run"
 PREFIX_CMDLINE_LONG = "details"
 PREFIX_CMDLINE_TOP = "segway"
 PREFIX_TRAIN = "train"
-PREFIX_POSTERIOR = "posterior"
+PREFIX_POSTERIOR = "posterior%s"
 
 PREFIX_VITERBI = "viterbi"
-PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_WINDOW = "window"
-PREFIX_PARAMS = "params"
 PREFIX_JT_INFO = "jt_info"
 PREFIX_JOB_LOG = "jobs"
 
@@ -233,9 +228,7 @@ TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 SUBDIRNAME_ACC = "accumulators"
 SUBDIRNAME_AUX = "auxiliary"
 SUBDIRNAME_LIKELIHOOD = "likelihood"
-SUBDIRNAME_LOG = "log"
 SUBDIRNAME_OBS = "observations"
-SUBDIRNAME_PARAMS = "params"
 SUBDIRNAME_POSTERIOR = "posterior"
 SUBDIRNAME_VITERBI = "viterbi"
 
@@ -295,24 +288,14 @@ NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${subseg}_${track}"
 TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
 
-WIG_ATTRS = dict(autoScale="off")
-WIG_ATTRS_VITERBI = dict(name="%s.%s" % (PKG, UUID),
+BED_ATTRS = dict(autoScale="off")
+BED_ATTRS_VITERBI = dict(name="%s.%s" % (PKG, UUID),
                          visibility="dense",
                          viewLimits="0:1",
                          itemRgb="on",
-                         **WIG_ATTRS)
-WIG_ATTRS_POSTERIOR = dict(type="wiggle_0",
-                           viewLimits="0:100",
-                           visibility="full",
-                           yLineMark="50",
-                           maxHeightPixels="101:101:11",
-                           windowingFunction="mean",
-                           **WIG_ATTRS)
+                         **BED_ATTRS)
 
-WIG_NAME_POSTERIOR = "%s segment %%s" % PKG
-
-WIG_DESC_VITERBI = "%s segmentation of %%s" % PKG
-WIG_DESC_POSTERIOR = "%s posterior decoding segment %%s of %%%%s" % PKG
+BED_DESC_VITERBI = "%s segmentation of %%s" % PKG
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
@@ -401,14 +384,14 @@ def make_fixedstep_header(chrom, start, resolution):
     # now, since we want to switch to bedGraph eventually anyway
     return FIXEDSTEP_HEADER % (chrom, start_1based, resolution, resolution)
 
-def make_wig_attr(key, value):
+def make_bed_attr(key, value):
     if " " in value:
         value = '"%s"' % value
 
     return "%s=%s" % (key, value)
 
-def make_wig_attrs(mapping):
-    res = " ".join(make_wig_attr(key, value)
+def make_bed_attrs(mapping):
+    res = " ".join(make_bed_attr(key, value)
                    for key, value in mapping.iteritems())
 
     return "track %s" % res
@@ -759,29 +742,6 @@ def read_posterior(infile, num_frames, num_labels):
         res[frame_index, label] = prob
 
     return res
-
-def load_posterior_write_wig((chrom, start, end), resolution, num_labels,
-                             infilename, outfiles):
-    header = make_fixedstep_header(chrom, start, resolution)
-    num_frames = ceildiv(end - start, resolution)
-
-    for outfile in outfiles:
-        print >>outfile, header
-
-    with open(infilename) as infile:
-        probs = read_posterior(infile, num_frames, num_labels)
-
-    probs_rounded = empty(probs.shape, int)
-
-    # scale, round, and cast to int
-    (probs * POSTERIOR_SCALE_FACTOR).round(out = probs_rounded)
-
-    # print array columns as text to each outfile
-    for outfile, probs_rounded_label in zip(outfiles, probs_rounded.T):
-
-        # can't use array.tofile() because outfile is a GzipFile
-        for prob in probs_rounded_label:
-            print >>outfile, prob
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -1290,6 +1250,10 @@ class Runner(object):
                 self.make_filename(PREFIX_JT_INFO, EXT_TXT,
                                    subdirname=SUBDIRNAME_LOG)
 
+        self.posterior_jt_info_filename = \
+            self.make_filename(PREFIX_JT_INFO, EXT_TXT,
+                               subdirname=SUBDIRNAME_LOG)
+
     def set_last_params_filename(self, params_filename):
         if params_filename is None:
             self.last_params_filename = None
@@ -1619,7 +1583,7 @@ class Runner(object):
 
     def write_observations(self, float_filelist, int_filelist, float_tabfile):
         # XXX: these expect different filepaths
-        assert not ((self.train or self.posterior) and self.identify)
+        assert not ((self.identify or self.posterior) and self.train)
 
         print_obs_filepaths_custom = partial(self.print_obs_filepaths,
                                              float_filelist, int_filelist,
@@ -1652,7 +1616,7 @@ class Runner(object):
                     if self.identify:
                         assert seq_cells is None and supervision_cells is None
 
-                if not (self.train or self.posterior):
+                if not self.train:
                     # don't actually write data
                     continue
 
@@ -2340,9 +2304,6 @@ class Runner(object):
                           locals(), self.params_dirpath, self.clobber,
                           instance_index)
 
-        # print >>sys.stderr, "input_master_filename = %s; is_new = %s" \
-        #     % (self.input_master_filename, input_master_filename_is_new)
-
         # only use num_free_params if a new input.master was created
         if input_master_filename_is_new:
             # print >>sys.stderr, "num_free_params = %d" % num_free_params
@@ -2476,27 +2437,14 @@ class Runner(object):
 
         setattr(self, name, dst_filename)
 
-    def make_posterior_wig_filename(self, seg):
-        seg_label = ("seg%s" % make_prefix_fmt(self.num_segs)[:-1]) % seg
-
-        return self.make_filename(PREFIX_POSTERIOR, seg_label, EXT_WIG, EXT_GZ)
-
-    def make_wig_desc_attrs(self, mapping, desc_tmpl):
+    def make_bed_desc_attrs(self, mapping, desc_tmpl):
         attrs = mapping.copy()
         attrs["description"] = desc_tmpl % ", ".join(self.tracknames_all)
 
-        return make_wig_attrs(attrs)
+        return make_bed_attrs(attrs)
 
-    def make_wig_header_viterbi(self):
-        return self.make_wig_desc_attrs(WIG_ATTRS_VITERBI, WIG_DESC_VITERBI)
-
-    def make_wig_header_posterior(self, seg_label):
-        attrs = WIG_ATTRS_POSTERIOR.copy()
-        attrs["name"] = WIG_NAME_POSTERIOR % seg_label
-        attrs["color"] = get_label_color(seg_label)
-
-        return self.make_wig_desc_attrs(attrs,
-                                        WIG_DESC_POSTERIOR % seg_label)
+    def make_bed_header_viterbi(self):
+        return self.make_bed_desc_attrs(BED_ATTRS_VITERBI, BED_DESC_VITERBI)
 
     def concatenate_bed(self):
         # the final bed filename, not the individual viterbi_filenames
@@ -2514,7 +2462,7 @@ class Runner(object):
         with maybe_gzip_open(bed_filename, "w") as bed_file:
             # XXX: add in browser track line (see SVN revisions
             # previous to 195)
-            print >>bed_file, self.make_wig_header_viterbi()
+            print >>bed_file, self.make_bed_header_viterbi()
 
             for viterbi_filename in self.viterbi_filenames:
                 with open(viterbi_filename) as viterbi_file:
@@ -2565,29 +2513,6 @@ class Runner(object):
             # write the very last line of all files
             bed_file.write(last_line)
 
-    def posterior2wig(self):
-        infilenames = self.posterior_filenames
-
-        range_num_segs = xrange(self.num_segs)
-        wig_filenames = map(self.make_posterior_wig_filename, range_num_segs)
-
-        zipper = izip(infilenames, self.window_coords)
-
-        wig_files_unentered = [gzip_open(wig_filename, "w")
-                               for wig_filename in wig_filenames]
-
-        with nested(*wig_files_unentered) as wig_files:
-            for seg_index, wig_file in enumerate(wig_files):
-                print >>wig_file, self.make_wig_header_posterior(seg_index)
-
-            for infilename, window_coord in zipper:
-                load_posterior_write_wig(window_coord, self.resolution,
-                                         self.num_segs, infilename, wig_files)
-
-        # delete original input files because they are enormous
-        for infilename in infilenames:
-            path(infilename).remove()
-
     def prog_factory(self, prog):
         """
         allows dry_run
@@ -2602,7 +2527,7 @@ class Runner(object):
                                   EXT_BIN, subdirname=SUBDIRNAME_ACC)
 
     def make_posterior_filename(self, window_index):
-        return self.make_filename(PREFIX_POSTERIOR, window_index, EXT_TXT,
+        return self.make_filename(PREFIX_POSTERIOR, window_index, EXT_BED,
                                   subdirname=SUBDIRNAME_POSTERIOR)
 
     def make_job_name_train(self, instance_index, round_index, window_index):
@@ -2920,7 +2845,7 @@ class Runner(object):
         # make new files if you have more than one instance
         self.set_triangulation_filename()
 
-        new = self.make_new_params
+        new = self.instance_make_new_params
 
         instance_index = self.instance_index
 
@@ -2989,8 +2914,8 @@ class Runner(object):
                 typ = TRAIN_OPTION_TYPES[name]
                 if isinstance(typ, list):
                     assert len(typ) == 1
-                    subtyp = typ[0]
-                    getattr(self, name).append(subtyp(value))
+                    item_typ = typ[0]
+                    getattr(self, name).append(item_typ(value))
                 else:
                     setattr(self, name, typ(value))
 
@@ -3013,16 +2938,18 @@ class Runner(object):
                                    RES_INPUT_MASTER_TMPL, self.params_dirpath,
                                    self.clobber)
 
-        # should I make new parameters in each thread?
-        make_new_params = (self.instances > 1
-                           or isinstance(self.num_segs, slice))
-        self.make_new_params = make_new_params
-        if not make_new_params:
+        # should I make new parameters in each instance?
+        instance_make_new_params = (self.instances > 1
+                                    or isinstance(self.num_segs, slice))
+        self.instance_make_new_params = instance_make_new_params
+        if not instance_make_new_params:
             self.save_input_master()
 
         if not input_master_filename_is_new:
             # do not overwrite existing file
             input_master_filename = None
+
+        self.input_master_filename = input_master_filename
 
         dst_filenames = [input_master_filename,
                          self.params_filename,
@@ -3042,7 +2969,7 @@ class Runner(object):
         ## this is where the actual training takes place
         instance_params = run_train_func(num_segs_range)
 
-        if self.make_new_params:
+        if self.instance_make_new_params:
             self.proc_train_results(instance_params, dst_filenames)
         elif not self.dry_run:
             # only one instance
@@ -3177,21 +3104,22 @@ class Runner(object):
         kwargs = self.get_identify_kwargs(window_index, kwargs)
 
         if prog == VITERBI_PROG:
-            window_coord = self.window_coords[window_index]
-            window_chrom, window_start, window_end = window_coord
-
-            float_filepath, int_filepath = \
-                self.make_obs_filepaths(window_chrom, window_index, temp=True)
-
-            prefix_args = [find_executable("segway-task"), "run", "viterbi",
-                           output_filename, window_chrom, window_start,
-                           window_end, self.resolution, self.num_segs,
-                           self.genomedataname, float_filepath,
-                           int_filepath, self.distribution,
-                           self.track_indexes_text]
-            output_filename = None
+            kind = "viterbi"
         else:
-            prefix_args = []
+            kind = "posterior"
+        window_coord = self.window_coords[window_index]
+        window_chrom, window_start, window_end = window_coord
+
+        float_filepath, int_filepath = \
+            self.make_obs_filepaths(window_chrom, window_index, temp=True)
+
+        prefix_args = [find_executable("segway-task"), "run", kind,
+                       output_filename, window_chrom, window_start,
+                       window_end, self.resolution, self.num_segs,
+                       self.genomedataname, float_filepath,
+                       int_filepath, self.distribution,
+                       self.track_indexes_text]
+        output_filename = None
 
         num_frames = self.window_lens[window_index]
 
@@ -3217,6 +3145,7 @@ class Runner(object):
     def run_identify_posterior(self, clobber=None):
         ## setup files
         if not self.input_master_filename:
+            print >>sys.stderr, "WARNING: input master not specified. Generating."
             self.save_input_master()
 
         self.set_output_dirpaths("identify", clobber)
@@ -3231,6 +3160,7 @@ class Runner(object):
                               pVitValsFile="-")
 
         posterior_kwargs = dict(triFile=self.posterior_triangulation_filename,
+                                jtFile=self.posterior_jt_info_filename,
                                 doDistributeEvidence=True,
                                 **self.get_posterior_clique_print_ranges())
 
@@ -3267,10 +3197,6 @@ class Runner(object):
             self.concatenate_bed()
             bed_filename = self.bed_filename
             layer(bed_filename, make_layer_filename(bed_filename))
-
-        # XXXopt: parallelize
-        if self.posterior:
-            self.posterior2wig()
 
     def set_workdirpaths(self):
         self.workdirpath = path(self.workdirname)

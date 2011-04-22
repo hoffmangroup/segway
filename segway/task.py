@@ -38,6 +38,11 @@ EXT_OPTIONS = {}
 EXT_OPTIONS[EXT_INT] = "-of1"
 EXT_OPTIONS[EXT_FLOAT] = "-of2"
 
+POSTERIOR_BEDGRAPH_HEADER="track type=bedGraph name=posterior.%d \
+        description=\"Segway posterior probability of label %d\" \
+        visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
+        autoScale=off color=200,100,0 altColor=0,100,200"
+
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
 
@@ -111,7 +116,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
         assert region_end == start_pos[-1] - resolution + remainder
     start_pos[-1] = region_end
 
-    # XXX: why is this unused?
+    # XXX: why is score_step never used? should this line be removed?
     score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels)

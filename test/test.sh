@@ -14,7 +14,7 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-TMPDIR="$(mktemp -dp . test.XXXXXX)"
+TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
 
 cd "$TMPDIR"
 

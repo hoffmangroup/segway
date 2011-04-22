@@ -22,7 +22,7 @@ from numpy import (add, append, arcsinh, array, column_stack, diff, empty,
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
 from pkg_resources import resource_filename, resource_string
-from tables import Filters, openFile
+from tables import Filters, NoSuchNodeError, openFile
 
 # XXX: check that these are all in use
 
@@ -43,6 +43,9 @@ EXT_LIST = "list"
 EXT_INT = "int"
 EXT_FLOAT = "float32"
 EXT_GZ = "gz"
+EXT_MASTER = "master"
+EXT_PARAMS = "params"
+EXT_TAB = "tab"
 
 SUFFIX_GZ = extsep + EXT_GZ
 
@@ -53,6 +56,13 @@ DTYPE_SEG_LEN = intc
 DISTRIBUTION_NORM = "norm"
 DISTRIBUTION_GAMMA = "gamma"
 DISTRIBUTION_ASINH_NORMAL = "asinh_norm"
+
+PREFIX_INPUT = "input"
+PREFIX_LIKELIHOOD = "likelihood"
+PREFIX_PARAMS = "params"
+
+SUBDIRNAME_LOG = "log"
+SUBDIRNAME_PARAMS = "params"
 
 # sentinel values
 ISLAND_BASE_NA = 0
