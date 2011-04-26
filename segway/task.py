@@ -142,6 +142,47 @@ def save_bed(outfilename, *args, **kwargs):
     with open(outfilename, "w") as outfile:
         write_bed(outfile, *args, **kwargs)
 
+def read_posterior_save_bed(coord, resolution,  outfilename_tmpl, num_labels,
+                            infile):
+    (chrom, start, end) = coord
+    num_frames = ceildiv(end - start, resolution)
+    probs = read_posterior(infile, num_frames, num_labels)
+    probs_rounded = empty(probs.shape, int)
+
+    outfilenames = []
+    for label_index in xrange(num_labels):
+        outfilenames.append(outfilename_tmpl % label_index)
+
+    # scale, round, and cast to int
+    (probs * POSTERIOR_SCALE_FACTOR).round(out = probs_rounded)
+
+    # print array columns as text to each outfile
+    zipper = zip(outfilenames, probs_rounded.T, xrange(num_labels))
+    for outfilename, probs_rounded_label, label_index in zipper:
+        # run-length encoding on the probs_rounded_label
+
+        outfile = open(outfilename, "w")
+        pos, = where(diff(probs_rounded_label) != 0)
+        pos = r_[start, pos[:]+start+1, end]
+
+        posterior_header = POSTERIOR_BEDGRAPH_HEADER % (label_index,
+                                                        label_index)
+        print >>outfile, posterior_header
+
+        for bed_start, bed_end in zip(pos[:-1], pos[1:]):
+            chrom_start = str(bed_start)
+            chrom_end = str(bed_end)
+            value = str(probs_rounded_label[bed_start-start])
+
+            row = [chrom, chrom_start, chrom_end, value]
+            print >>outfile, "\t".join(row)
+
+def load_posterior_save_bed(coord, resolution, outfilename, num_labels,
+                            infilename):
+    with open(infilename) as infile:
+        read_posterior_save_bed(coord, resolution, outfilename,
+                                int(num_labels), infile)
+
 def parse_viterbi_save_bed(coord, resolution, viterbi_lines, bed_filename, num_labels):
     data = parse_viterbi(viterbi_lines)
 
@@ -171,6 +212,61 @@ def replace_args_filelistname(args, temp_filepaths, ext):
 def print_to_fd(fd, line):
     with fdopen(fd, "w") as outfile:
         print >>outfile, line
+
+def run_posterior_save_bed(coord, resolution, outfilename, num_labels,
+                           genomedata_dirname, float_filename, int_filename,
+                           distribution, track_indexes_text, *args):
+    # XXX: this whole function is duplicative of run_viterbi_save_bed and needs to be reduced
+    # convert from tuple
+    args = list(args)
+
+    # a 2,000,000-frame output file is only 84 MiB so it is okay to
+    # read the whole thing into memory
+    (chrom, start, end) = coord
+    track_indexes = make_track_indexes(track_indexes_text)
+
+    float_filepath = TEMP_DIRPATH / float_filename
+    int_filepath = TEMP_DIRPATH / int_filename
+    temp_filepaths = [float_filepath, int_filepath]
+
+    # XXX: should do something to ensure of1 matches with int, of2 with float
+    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
+    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
+                                                 EXT_FLOAT)
+    with Genome(genomedata_dirname) as genome:
+        supercontigs = genome[chrom].supercontigs[start:end]
+        assert len(supercontigs) == 1
+        supercontig = supercontigs[0]
+
+        continuous_cells = _make_continuous_cells(supercontig, start, end,
+                                                  track_indexes)
+    try:
+        print_to_fd(float_filelistfd, float_filename)
+        print_to_fd(int_filelistfd, int_filename)
+
+        _save_observations_window(float_filename, int_filename,
+                                  continuous_cells, resolution, distribution)
+
+        # XXXopt: does this actually free the memory? or do we need to
+        # use a subprocess to do the loading?
+
+        # remove from memory
+        del continuous_cells
+
+        output = POSTERIOR_PROG.getoutput(*args)
+    finally:
+        for filepath in temp_filepaths:
+            # don't raise a nested exception if the file was never created
+            try:
+                filepath.remove()
+            except OSError, err:
+                if err.errno == ENOENT:
+                    pass
+
+    lines = output.splitlines()
+    return read_posterior_save_bed(coord, resolution,  outfilename,
+                                   int(num_labels), lines)
+
 
 def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
                          genomedata_dirname, float_filename, int_filename,
@@ -230,7 +326,9 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
                                   num_labels)
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
-         ("load", "viterbi"): load_viterbi_save_bed}
+         ("load", "viterbi"): load_viterbi_save_bed,
+         ("run", "posterior"): run_posterior_save_bed,
+         ("load", "posterior"): load_posterior_save_bed}
 
 def task(verb, kind, outfilename, chrom, start, end, resolution, *args):
     start = int(start)

@@ -123,7 +123,7 @@ cluster for more efficient memory use.
 
 The workflow
 ============
-Segway accomplishes three major tasks from a single command-line. It--
+Segway accomplishes four major tasks from a single command-line. It--
 
   1. **generates** an unsupervised segmentation model and initial
      parameters appropriate for this data;
@@ -665,16 +665,16 @@ You will find a full description of all the working files in the
 
 Distributed computing
 ---------------------
-Segway can currently perform training and identification tasks only
-using a cluster controllable with the DRMAA interface. I have
-only tested it against Sun Grid Engine and Platform LSF, but it should
-be possible to work with other DRMAA-compatible distributed computing
-systems, such as PBS Pro, PBS/TORQUE, Condor, or GridWay. If you are
-interested in using one of these systems, please contact Michael so he
-correct all the fine details. A standalone version is planned, but for
-now you must have a clustering system. Try installing the free SGE on
-your workstation if you want to run Segway without a full clustering
-system.
+Segway can currently perform the training, identification, and
+posterior tasks only using a cluster controllable with the DRMAA
+interface. I have only tested it against Sun Grid Engine and Platform
+LSF, but it should be possible to work with other DRMAA-compatible
+distributed computing systems, such as PBS Pro, PBS/TORQUE, Condor, or
+GridWay. If you are interested in using one of these systems, please
+contact Michael so he correct all the fine details. A standalone
+version is planned, but for now you must have a clustering system. Try
+installing the free SGE on your workstation if you want to run Segway
+without a full clustering system.
 
 The :option:`--cluster-opt` option allows the specification of native
 options to your clustering system---those options you might pass
@@ -772,7 +772,7 @@ Performance
 -----------
 Some factors that affect compute time and memory requirements:
 
-* the length of the longest region you are training or identifying on.
+* the length of the longest region you are training or identifying on
 * the number of tracks
 * the number of labels
 
