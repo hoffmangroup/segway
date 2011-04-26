@@ -23,8 +23,8 @@ BASH_CMD = "bash"
 RES_WRAPPER = "segway-wrapper.sh"
 
 MSG_EDGE = """
-Edge of memory usage progression reached without success.
-Check for errors in %s.
+Ran through entire memory usage progression reached without success.
+This is probably not related to memory usage, however. Check for errors in %s.
 See the Troubleshooting section of the Segway documentation."""
 
 class JobError(RuntimeError):

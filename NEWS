@@ -7,6 +7,7 @@
   it, as long as you specify all the same options as you did before
 * segway-winner: new command to pick winning paramters in interrupted training run
 * segway: train.tab now includes input master filename in multi-instance training
+* segway: changed memory progression edge error to be more easily understandable
 * test: filenames are sorted before comparisons
 * test: now includes posterior test
 * test/README: added description of test system

@@ -802,6 +802,16 @@ uses to call GMTK. Try running that to see if it gives you any clues.
 You may want to switch the GMTK option -verbosity 0 to -verbosity 30
 to get more information.
 
+An error like::
+
+  ERROR: discrete observed random variable 'presence_dnase', frame 0, line 23, specifies a feature element 14:14 that is out of discrete range ([23:45] inclusive) of observation matrix
+
+probably indicates that you are incorrectly mixing and matching
+``train.tab`` files and ``segway.str`` files from different training
+runs.
+
+/net/noble/vol2/home/avinash/shortcuts/multipass/segway_src/runs/2011/0413-segway-coordinated-jan2011/k562.coordinated/t20110414/
+
 Names used by Segway
 ====================
 

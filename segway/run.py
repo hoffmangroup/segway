@@ -28,6 +28,7 @@ from tempfile import gettempdir
 from threading import Event, Lock, Thread
 from time import sleep
 from uuid import uuid1
+from warnings import warn
 
 from genomedata import Genome
 from genomedata._util import fill_array
@@ -1251,7 +1252,7 @@ class Runner(object):
                                    subdirname=SUBDIRNAME_LOG)
 
         self.posterior_jt_info_filename = \
-            self.make_filename(PREFIX_JT_INFO, EXT_TXT,
+            self.make_filename(PREFIX_JT_INFO, "posterior", EXT_TXT,
                                subdirname=SUBDIRNAME_LOG)
 
     def set_last_params_filename(self, params_filename):
@@ -2938,6 +2939,8 @@ class Runner(object):
                                    RES_INPUT_MASTER_TMPL, self.params_dirpath,
                                    self.clobber)
 
+        self.input_master_filename = input_master_filename
+
         # should I make new parameters in each instance?
         instance_make_new_params = (self.instances > 1
                                     or isinstance(self.num_segs, slice))
@@ -2945,18 +2948,16 @@ class Runner(object):
         if not instance_make_new_params:
             self.save_input_master()
 
+        ## save file locations to tab-delimited file
+        self.save_train_options()
+
         if not input_master_filename_is_new:
             # do not overwrite existing file
             input_master_filename = None
 
-        self.input_master_filename = input_master_filename
-
         dst_filenames = [input_master_filename,
                          self.params_filename,
                          self.log_likelihood_filename]
-
-        ## save file locations to tab-delimited file
-        self.save_train_options()
 
         ## which thread runner should I use?
         num_segs_range = slice2range(self.num_segs)
@@ -3145,7 +3146,7 @@ class Runner(object):
     def run_identify_posterior(self, clobber=None):
         ## setup files
         if not self.input_master_filename:
-            print >>sys.stderr, "WARNING: input master not specified. Generating."
+            warn("Input master not specified. Generating.")
             self.save_input_master()
 
         self.set_output_dirpaths("identify", clobber)
