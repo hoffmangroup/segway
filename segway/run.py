@@ -335,7 +335,7 @@ INDEX_BED_START = 1
 
 SEGTRANSITION_WEIGHT_SCALE = 1.0
 
-DIRPATH_WORKDIR_HELP = path("WORKDIR")
+DIRPATH_WORK_DIR_HELP = path("WORKDIR")
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
@@ -497,6 +497,7 @@ def is_training_progressing(last_ll, curr_ll,
 def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
 
+# XXX: these next three functions are spaghetti
 def make_default_filename(resource, dirname="WORKDIR", instance_index=None):
     resource_part = resource.rpartition(".tmpl")
     stem = resource_part[0] or resource_part[2]
@@ -518,6 +519,7 @@ def make_template_filename(filename, resource, dirname=None, clobber=False,
             return filename, False
         # else filename is unchanged
     else:
+        # filename is None
         filename = make_default_filename(resource, dirname, instance_index)
 
     return filename, True
@@ -858,9 +860,9 @@ class Runner(object):
         self.params_filename = None # actual params filename for this instance
         self.params_filenames = [] # list of possible params filenames
         self.recover_dirname = None
-        self.workdirname = None
+        self.work_dirname = None
         self.log_likelihood_filename = None
-        self.log_likelihood_log_filename = None
+        self.log_likelihood_tab_filename = None
         self.dont_train_filename = None
 
         self.viterbi_filenames = None
@@ -892,7 +894,6 @@ class Runner(object):
         self.mins = None
         self.maxs = None
         self.tracknames = None
-        self.num_free_params = None
 
         # variables
         self.num_segs = None
@@ -962,10 +963,10 @@ class Runner(object):
         res.genomedataname = genomedataname
 
         if res.train:
-            res.workdirname = traindirname
+            res.work_dirname = traindirname
             assert len(args) == 3
         else:
-            res.workdirname = args[3]
+            res.work_dirname = args[3]
 
             try:
                 res.load_train_options(traindirname)
@@ -1066,7 +1067,7 @@ class Runner(object):
         with open(self.log_likelihood_filename) as infile:
             log_likelihood = float(infile.read().strip())
 
-        with open(self.log_likelihood_log_filename, "a") as logfile:
+        with open(self.log_likelihood_tab_filename, "a") as logfile:
             print >>logfile, str(log_likelihood)
 
         return log_likelihood
@@ -1178,10 +1179,19 @@ class Runner(object):
                                distribution=self.distribution)
 
     def make_filename(self, *exts, **kwargs):
+        """
+        makes a filename by joining together exts
+
+        kwargs:
+        dirname: top level directory (default self.work_dirname)
+        subdirname: next level directory
+        """
         filebasename = extjoin_not_none(*exts)
 
         # add subdirname if it exists
-        return self.workdirpath / kwargs.get("subdirname", "") / filebasename
+        return path(kwargs.get("dirname", self.work_dirname)) \
+            / kwargs.get("subdirname", "") \
+            / filebasename
 
     def set_tracknames(self, chromosome):
         # XXXopt: a lot of stuff here repeated for every chromosome
@@ -1254,29 +1264,22 @@ class Runner(object):
             self.make_filename(PREFIX_JT_INFO, "posterior", EXT_TXT,
                                subdirname=SUBDIRNAME_LOG)
 
-    def set_last_params_filename(self, params_filename):
-        if params_filename is None:
-            self.last_params_filename = None
-        elif path(params_filename).exists():
-            self.last_params_filename = params_filename
-        else:
-            # if it doesn't exist, then it's actually a new filename,
-            # but the only time this will be used is when new is not
-            # set. And this will only happen from the master thread.
-            self.last_params_filename = None
+    def get_last_params_filename(self, params_filename):
+        if params_filename is not None and path(params_filename).exists():
+            return params_filename
 
-    def make_params_filename(self, instance_index=None):
+        # otherwise, None is returned by default. if it doesn't exist,
+        # then it's actually a new filename, but the only time this
+        # will be used is when new is not set. And this will only
+        # happen from the master thread.
+
+    def make_params_filename(self, instance_index, dirname):
         return self.make_filename(PREFIX_PARAMS, instance_index, EXT_PARAMS,
+                                  dirname=dirname,
                                   subdirname=SUBDIRNAME_PARAMS)
 
-    def set_params_filename(self, instance_index=None, new=False):
-        """
-        None means the final params file, not for any particular thread
-        """
-        # if this is not run and params_filename is
-        # unspecified, then it won't be passed to gmtkViterbiNew
-
-        # these are unexpected corner cases for now
+    def get_params_filename(self, instance_index=None, new=False):
+        # this is an unexpected corner case for now
         assert not (instance_index is None and new)
 
         params_filenames = self.params_filenames
@@ -1291,17 +1294,32 @@ class Runner(object):
         else:
             params_filename = None
 
-        self.set_last_params_filename(params_filename)
+        last_params_filename = self.get_last_params_filename(params_filename)
 
         # make new filenames when new is set, or params_filename is
         # not set, or the file already exists and we are training
         if (new or not params_filename
             or (self.train and path(params_filename).exists())):
-            params_filename = self.make_params_filename(instance_index)
+            params_filename = self.make_params_filename(instance_index, self.work_dirname)
 
-        self.params_filename = params_filename
+        return params_filename, last_params_filename
 
-    def set_log_likelihood_filename(self, instance_index=None, new=False):
+    def set_params_filename(self, instance_index=None, new=False):
+        """
+        None means the final params file, not for any particular thread
+        """
+        # if this is not run and params_filename is
+        # unspecified, then it won't be passed to gmtkViterbiNew
+
+        self.params_filename, self.last_params_filename = \
+            self.get_params_filename(instance_index, new)
+
+    def make_log_likelihood_tab_filename(self, instance_index, dirname):
+        return self.make_filename(PREFIX_LIKELIHOOD, instance_index, EXT_TAB,
+                                  dirname=dirname,
+                                  subdirname=SUBDIRNAME_LOG)
+
+    def set_log_likelihood_filenames(self, instance_index=None, new=False):
         if new or not self.log_likelihood_filename:
             log_likelihood_filename = \
                 self.make_filename(PREFIX_LIKELIHOOD, instance_index,
@@ -1310,18 +1328,18 @@ class Runner(object):
 
             self.log_likelihood_filename = log_likelihood_filename
 
-            self.log_likelihood_log_filename = \
-                self.make_filename(PREFIX_LIKELIHOOD, instance_index, EXT_TAB,
-                                   subdirname=SUBDIRNAME_LOG)
+            self.log_likelihood_tab_filename = \
+                self.make_log_likelihood_tab_filename(instance_index,
+                                                      self.work_dirname)
 
     def make_triangulation_dirpath(self):
-        res = self.workdirpath / "triangulation"
+        res = self.work_dirpath / "triangulation"
         self.make_dir(res)
 
         self.triangulation_dirpath = res
 
     def make_output_dirpath(self, dirname, instance_index, clobber=None):
-        res = self.workdirpath / "output" / dirname / str(instance_index)
+        res = self.work_dirpath / "output" / dirname / str(instance_index)
         self.make_dir(res, clobber)
 
         return res
@@ -1357,7 +1375,7 @@ class Runner(object):
                 raise
 
     def make_subdir(self, subdirname):
-        self.make_dir(self.workdirpath / subdirname)
+        self.make_dir(self.work_dirpath / subdirname)
 
     def make_subdirs(self, subdirnames):
         for subdirname in subdirnames:
@@ -1371,7 +1389,7 @@ class Runner(object):
         if obs_dirname:
             obs_dirpath = path(obs_dirname)
         else:
-            obs_dirpath = self.workdirpath / SUBDIRNAME_OBS
+            obs_dirpath = self.work_dirpath / SUBDIRNAME_OBS
             self.obs_dirname = obs_dirpath
 
         self.obs_dirpath = obs_dirpath
@@ -1417,7 +1435,7 @@ class Runner(object):
         orig_filename = data_filename(resname)
 
         orig_filepath = path(orig_filename)
-        dirpath = self.workdirpath / subdirname
+        dirpath = self.work_dirpath / subdirname
 
         orig_filepath.copy(dirpath)
         return dirpath / orig_filepath.name
@@ -1444,13 +1462,13 @@ class Runner(object):
                        card_frameIndex=self.max_frames,
                        ruler_scale=ruler_scale_scaled)
 
-        aux_dirpath = self.workdirpath / SUBDIRNAME_AUX
+        aux_dirpath = self.work_dirpath / SUBDIRNAME_AUX
 
         include_filename, self.gmtk_include_filename_is_new = \
             save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
                           aux_dirpath, self.clobber)
 
-        dirpath_trailing_slash = self.workdirpath + "/"
+        dirpath_trailing_slash = self.work_dirpath + "/"
         include_filename_relative = \
             include_filename.partition(dirpath_trailing_slash)[2]
         assert include_filename_relative
@@ -1544,7 +1562,7 @@ class Runner(object):
 
         self.structure_filename, self.structure_filename_is_new = \
             save_template(self.structure_filename, RES_STR_TMPL, mapping,
-                          self.workdirname, self.clobber)
+                          self.work_dirname, self.clobber)
 
     def save_observations_window(self, float_filename, int_filename, float_data,
                                 seq_data=None, supervision_data=None):
@@ -2304,11 +2322,6 @@ class Runner(object):
                           locals(), self.params_dirpath, self.clobber,
                           instance_index)
 
-        # only use num_free_params if a new input.master was created
-        if input_master_filename_is_new:
-            # print >>sys.stderr, "num_free_params = %d" % num_free_params
-            self.num_free_params = num_free_params
-
     def save_dont_train(self):
         self.dont_train_filename = self.save_resource(RES_DONT_TRAIN,
                                                       SUBDIRNAME_AUX)
@@ -2328,7 +2341,7 @@ class Runner(object):
 
     def make_viterbi_filenames(self):
         self.viterbi_filenames = \
-            self._make_viterbi_filenames(self.workdirpath)
+            self._make_viterbi_filenames(self.work_dirpath)
 
         recover_dirpath = self.recover_dirpath
         if recover_dirpath:
@@ -2342,6 +2355,8 @@ class Runner(object):
         window_range = xrange(self.num_windows)
 
         self.posterior_filenames = map(make_posterior_filename, window_range)
+
+        # XXX: recovery needs to be added here
 
     def load_supervision(self):
         supervision_type = self.supervision_type
@@ -2384,8 +2399,11 @@ class Runner(object):
         self.make_subdirs(SUBDIRNAMES_EITHER)
         self.make_obs_dir()
 
-        self.params_dirpath = self.workdirpath / SUBDIRNAME_PARAMS
-        
+        self.params_dirpath = self.work_dirpath / SUBDIRNAME_PARAMS
+        if self.recover_dirpath:
+            self.recover_params_dirpath = \
+                self.recover_dirpath / SUBDIRNAME_PARAMS
+
         self.load_supervision()
 
         # XXX: decrease the amount of time this file is open
@@ -2419,7 +2437,7 @@ class Runner(object):
                 self.save_output_master()
 
                 # might turn off self.train, if the params already exist
-                self.set_log_likelihood_filename()
+                self.set_log_likelihood_filenames()
 
             self.save_observations()
 
@@ -2451,7 +2469,7 @@ class Runner(object):
         bed_filename = self.bed_filename
 
         if bed_filename is None:
-            bed_filename = self.workdirpath / BED_FILEBASENAME
+            bed_filename = self.work_dirpath / BED_FILEBASENAME
             self.bed_filename = bed_filename
 
         # values for comparison to combine adjoining segments
@@ -2533,10 +2551,10 @@ class Runner(object):
     def make_job_name_train(self, instance_index, round_index, window_index):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, instance_index,
                                      round_index, window_index,
-                                     self.workdirpath.name, UUID)
+                                     self.work_dirpath.name, UUID)
 
     def make_job_name_identify(self, prefix, window_index):
-        return "%s%d.%s.%s" % (prefix, window_index, self.workdirpath.name,
+        return "%s%d.%s.%s" % (prefix, window_index, self.work_dirpath.name,
                                UUID)
 
     def make_gmtk_kwargs(self):
@@ -2842,21 +2860,22 @@ class Runner(object):
         self.last_params_filename = curr_params_filename
 
     def run_train_instance(self):
-        # make new files if you have more than one instance
+        # make new files if there is more than one instance
         self.set_triangulation_filename()
 
         new = self.instance_make_new_params
 
         instance_index = self.instance_index
         self.set_output_dirpaths(instance_index)
+        self.set_log_likelihood_filenames(instance_index, new)
+        self.set_params_filename(instance_index, new)
 
         last_log_likelihood, log_likelihood, round_index = \
             self.recover_train_instance()
 
         if round_index == 0:
+            # if round > 0, this is set by self.recover_train_instance()
             self.save_input_master(instance_index, new)
-            self.set_params_filename(instance_index, new)
-            self.set_log_likelihood_filename(instance_index, new)
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
@@ -3066,6 +3085,18 @@ to find the winning instance anyway.""" % thread.instance_index)
         for name, src_filename, dst_filename in zipper:
             self.copy_results(name, src_filename, dst_filename)
 
+    def recover_filename(self, resource):
+        instance_index = self.instance_index
+        old_filename = make_default_filename(resource,
+                                             self.recover_params_dirpath,
+                                             instance_index)
+
+        new_filename = make_default_filename(resource, self.params_dirpath,
+                                             instance_index)
+
+        path(old_filename).copy2(new_filename)
+        return new_filename
+
     def recover_train_instance(self):
         """
         returns last_log_likelihood, log_likelihood, round_idnex
@@ -3073,19 +3104,45 @@ to find the winning instance anyway.""" % thread.instance_index)
         """
         last_log_likelihood = NINF
         log_likelihood = NINF
-        round_index = 0
-        if XXX:
-            XXX copy input_master
-            
-            XXX copy all params files
-            XXX copy log likelihood filenames
-            
-            last_log_likelihood = XXX
-            log_likelihood = XXX
-            round_index = XXX
-        else:
+        final_round_index = 0
 
-        return last_log_likelihood, log_likelihood, round_index
+        if self.recover_dirpath:
+            instance_index = self.instance_index
+            recover_dirname = self.recover_dirname
+
+            self.input_master_filename = \
+                self.recover_filename(RES_INPUT_MASTER_TMPL)
+
+            recover_log_likelihood_tab_filename = \
+                self.make_log_likelihood_tab_filename(instance_index,
+                                                      recover_dirname)
+
+            with open(recover_log_likelihood_tab_filename) as log_likelihood_tab_file:
+                log_likelihoods = [float(line.rstrip())
+                                   for line in log_likelihood_tab_file.readlines()]
+
+            final_round_index = len(log_likelihoods)
+            if final_round_index > 0:
+                log_likelihood = log_likelihoods[-1]
+            if final_round_index > 1:
+                last_log_likelihood = log_likelihoods[-2]
+
+            path(recover_log_likelihood_tab_filename).copy2(self.log_likelihood_tab_filename)
+
+            old_params_filename = self.make_params_filename(instance_index,
+                                                            recover_dirname)
+            new_params_filename = self.params_filename
+            for round_index in xrange(final_round_index):
+                old_curr_params_filename = extjoin(old_params_filename,
+                                                   round_index)
+                new_curr_params_filename = extjoin(new_params_filename,
+                                                   round_index)
+
+                path(old_curr_params_filename).copy2(new_curr_params_filename)
+
+            self.last_params_filename = new_curr_params_filename
+
+        return last_log_likelihood, log_likelihood, final_round_index
 
     def recover_viterbi_window(self, window_index):
         """
@@ -3231,8 +3288,8 @@ to find the winning instance anyway.""" % thread.instance_index)
             bed_filename = self.bed_filename
             layer(bed_filename, make_layer_filename(bed_filename))
 
-    def set_workdirpaths(self):
-        self.workdirpath = path(self.workdirname)
+    def set_work_dirpaths(self):
+        self.work_dirpath = path(self.work_dirname)
 
         recover_dirname = self.recover_dirname
         if recover_dirname:
@@ -3269,7 +3326,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         """
         # XXXopt: use binary I/O to gmtk rather than ascii for parameters
 
-        self.set_workdirpaths()
+        self.set_work_dirpaths()
         self.interrupt_event = Event()
 
         ## start log files
@@ -3313,9 +3370,9 @@ to find the winning instance anyway.""" % thread.instance_index)
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
 
-        workdirname = self.workdirname
-        if not path(workdirname).isdir():
-            self.make_dir(workdirname, self.clobber)
+        work_dirname = self.work_dirname
+        if not path(work_dirname).isdir():
+            self.make_dir(work_dirname, self.clobber)
 
         self.run(*args, **kwargs)
 
@@ -3357,7 +3414,7 @@ def parse_options(args):
                          help="use or create input master in FILE"
                          " (default %s)" %
                          make_default_filename(RES_INPUT_MASTER_TMPL,
-                                               DIRPATH_WORKDIR_HELP / SUBDIRNAME_PARAMS))
+                                               DIRPATH_WORK_DIR_HELP / SUBDIRNAME_PARAMS))
 
         group.add_option("-s", "--structure", metavar="FILE",
                          help="use or create structure in FILE (default %s)" %
@@ -3372,7 +3429,7 @@ def parse_options(args):
                          help="use FILE as list of parameters not to train"
                          " (default %s)" %
                          make_default_filename(RES_DONT_TRAIN,
-                                               DIRPATH_WORKDIR_HELP / SUBDIRNAME_AUX))
+                                               DIRPATH_WORK_DIR_HELP / SUBDIRNAME_AUX))
 
         group.add_option("--seg-table", metavar="FILE",
                          help="load segment hyperparameters from FILE"
@@ -3386,7 +3443,7 @@ def parse_options(args):
         group.add_option("-o", "--observations", metavar="DIR",
                           help="use or create observations in DIR"
                          " (default %s)" %
-                         (DIRPATH_WORKDIR_HELP / SUBDIRNAME_OBS))
+                         (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
 
         group.add_option("-r", "--recover", metavar="DIR",
                          help="continue from interrupted run in DIR")
