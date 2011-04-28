@@ -8,6 +8,8 @@
 * segway-winner: new command to pick winning paramters in interrupted training run
 * segway: train.tab now includes input master filename in multi-instance training
 * segway: changed memory progression edge error to be more easily understandable
+* segway: when some error kills one training instance, there is now a more detailed error at end
+* segway: remove --keep-going, which hasn't done anything in a few versions
 * test: filenames are sorted before comparisons
 * test: now includes posterior test
 * test/README: added description of test system

@@ -1003,7 +1003,6 @@ class Runner(object):
 
         res.clobber = options.clobber
         res.dry_run = options.dry_run
-        res.keep_going = options.keep_going
         res.max_frames = options.split_sequences
 
         ## below: can be loaded in Runner.save_train_options(), or
@@ -3028,7 +3027,15 @@ class Runner(object):
 
                     # this will get AttributeError if the thread failed and
                     # therefore did not set thread.result
-                    instance_params.append(thread.result)
+                    try:
+                        thread_result = thread.result
+                    except AttributeError:
+                        raise AttributeError("""\
+Training instance %s failed. See previously printed error for reason.
+Final params file will not be written. Rerun the instance or use segway-winner
+to find the winning instance anyway.""" % thread.instance_index)
+                    else:
+                        instance_params.append(thread_result)
             except KeyboardInterrupt:
                 self.interrupt_event.set()
                 for thread in threads:
@@ -3420,15 +3427,14 @@ def parse_options(args):
     with OptionGroup(parser, "Flags") as group:
         group.add_option("-c", "--clobber", action="store_true",
                          help="delete any preexisting files")
-        group.add_option("-k", "--keep-going", action="store_true",
-                         help="keep going in some instances even when you have"
-                         " errors in another")
         group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
                          " executables")
 
     options, args = parser.parse_args(args)
 
+    if len(args) < 3:
+        parser.error("Expected at least 3 arguments.")
     if args[0] == "train":
         if len(args) != 3:
             parser.error("Expected 3 arguments for the train task.")

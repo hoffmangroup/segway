@@ -61,7 +61,7 @@ def get_input_master_filename(dirpath, instance):
 
 def print_and_copy(flag, getter, dirpath, instance, final_basename, copy, clobber):
     if flag:
-        srcpath = get_last_params_filename(dirpath, instance)
+        srcpath = getter(dirpath, instance)
         print srcpath
 
         dstpath = dirpath / final_basename
