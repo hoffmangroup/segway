@@ -807,7 +807,7 @@ class Mixin_Lockable(AddableMixin):
 
 LockableDefaultDict = Mixin_Lockable + defaultdict
 
-class RandomStartThread(Thread):
+class TrainThread(Thread):
     def __init__(self, runner, session, instance_index, num_segs):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
@@ -857,7 +857,7 @@ class Runner(object):
 
         self.params_filename = None # actual params filename for this instance
         self.params_filenames = [] # list of possible params filenames
-        self.old_workdirname = None
+        self.recover_dirname = None
         self.workdirname = None
         self.log_likelihood_filename = None
         self.log_likelihood_log_filename = None
@@ -974,7 +974,7 @@ class Runner(object):
                 if err.errno != ENOENT:
                     raise
 
-        res.old_workdirname = options.old_directory
+        res.recover_dirname = options.recover
         res.obs_dirname = options.observations
         res.bed_filename = options.bed
 
@@ -2330,12 +2330,12 @@ class Runner(object):
         self.viterbi_filenames = \
             self._make_viterbi_filenames(self.workdirpath)
 
-        old_workdirpath = self.old_workdirpath
-        if old_workdirpath:
-            self.old_viterbi_filenames = \
-                self._make_viterbi_filenames(old_workdirpath)
+        recover_dirpath = self.recover_dirpath
+        if recover_dirpath:
+            self.recover_viterbi_filenames = \
+                self._make_viterbi_filenames(recover_dirpath)
         else:
-            self.old_viterbi_filenames = None
+            self.recover_viterbi_filenames = None
 
     def make_posterior_filenames(self):
         make_posterior_filename = self.make_posterior_filename
@@ -2848,15 +2848,15 @@ class Runner(object):
         new = self.instance_make_new_params
 
         instance_index = self.instance_index
-
-        self.save_input_master(instance_index, new)
-        self.set_params_filename(instance_index, new)
-        self.set_log_likelihood_filename(instance_index, new)
         self.set_output_dirpaths(instance_index)
 
-        last_log_likelihood = NINF
-        log_likelihood = NINF
-        round_index = 0
+        last_log_likelihood, log_likelihood, round_index = \
+            self.recover_train_instance()
+
+        if round_index == 0:
+            self.save_input_master(instance_index, new)
+            self.set_params_filename(instance_index, new)
+            self.set_log_likelihood_filename(instance_index, new)
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
@@ -2985,11 +2985,11 @@ class Runner(object):
         with Session() as session:
             self.session = session
             self.instance_index = 0
-            instance_params = [self.run_train_instance()]
+            res = [self.run_train_instance()]
 
         self.session = None
 
-        return instance_params
+        return res
 
     def run_train_multithread(self, num_segs_range):
         # XXX: Python 2.6: use itertools.product()
@@ -3005,8 +3005,8 @@ class Runner(object):
                     # print >>sys.stderr, (
                     #    "instance_index %s, num_seg %s, seg_instance_index %s"
                     #    % (instance_index, num_seg, seg_instance_index))
-                    thread = RandomStartThread(self, session, instance_index,
-                                               num_seg)
+                    thread = TrainThread(self, session, instance_index,
+                                         num_seg)
                     thread.start()
                     threads.append(thread)
 
@@ -3066,14 +3066,39 @@ to find the winning instance anyway.""" % thread.instance_index)
         for name, src_filename, dst_filename in zipper:
             self.copy_results(name, src_filename, dst_filename)
 
-    def is_viterbi_window_complete(self, window_index):
-        old_filenames = self.old_viterbi_filenames
-        if not old_filenames:
+    def recover_train_instance(self):
+        """
+        returns last_log_likelihood, log_likelihood, round_idnex
+        NINF, NINF, 0 if there is no recovery
+        """
+        last_log_likelihood = NINF
+        log_likelihood = NINF
+        round_index = 0
+        if XXX:
+            XXX copy input_master
+            
+            XXX copy all params files
+            XXX copy log likelihood filenames
+            
+            last_log_likelihood = XXX
+            log_likelihood = XXX
+            round_index = XXX
+        else:
+
+        return last_log_likelihood, log_likelihood, round_index
+
+    def recover_viterbi_window(self, window_index):
+        """
+        returns False if no recovery
+                True if recovery
+        """
+        recover_filenames = self.recover_viterbi_filenames
+        if not recover_filenames:
             return False
 
-        old_filename = old_filenames[window_index]
+        recover_filename = recover_filenames[window_index]
         try:
-            with open(old_filename) as oldfile:
+            with open(recover_filename) as oldfile:
                 lines = oldfile.readlines()
         except IOError, err:
             if err.errno == ENOENT:
@@ -3097,7 +3122,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         # copy the old filename to where the job's output would have
         # landed
-        path(old_filename).copy2(self.viterbi_filenames[window_index])
+        path(recover_filename).copy2(self.viterbi_filenames[window_index])
 
         print >>sys.stderr, "window %d already complete" % window_index
 
@@ -3183,7 +3208,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                                 restartable_jobs, window_index)
 
                 if (self.identify
-                    and not self.is_viterbi_window_complete(window_index)):
+                    and not self.recover_viterbi_window(window_index)):
                     queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
                                           VITERBI_PROG, viterbi_kwargs,
                                           viterbi_filenames)
@@ -3209,12 +3234,12 @@ to find the winning instance anyway.""" % thread.instance_index)
     def set_workdirpaths(self):
         self.workdirpath = path(self.workdirname)
 
-        old_workdirname = self.old_workdirname
-        if old_workdirname:
-            self.old_workdirpath = path(old_workdirname)
+        recover_dirname = self.recover_dirname
+        if recover_dirname:
+            self.recover_dirpath = path(recover_dirname)
         else:
             # deals with case where it is empty too
-            self.old_workdirpath = None
+            self.recover_dirpath = None
 
     def make_script_filename(self, prefix):
         return self.make_filename(prefix, EXT_SH, subdirname=SUBDIRNAME_LOG)
@@ -3279,6 +3304,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
                             if not self.posterior_triangulation_filename:
                                 self.save_posterior_triangulation()
+
+                        if self.posterior and self.recover_dirname:
+                            raise NotImplementedError # XXX
 
                         self.run_identify_posterior()
 
@@ -3360,9 +3388,8 @@ def parse_options(args):
                          " (default %s)" %
                          (DIRPATH_WORKDIR_HELP / SUBDIRNAME_OBS))
 
-        group.add_option("--old-directory", metavar="DIR",
-                         help="continue from interrupted run in DIR"
-                         " (for identify only)")
+        group.add_option("-r", "--recover", metavar="DIR",
+                         help="continue from interrupted run in DIR")
 
     with OptionGroup(parser, "Output files") as group:
         group.add_option("-b", "--bed", metavar="FILE",
