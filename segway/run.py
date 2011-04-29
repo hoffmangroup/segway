@@ -49,7 +49,7 @@ from .layer import layer, make_layer_filename
 from ._util import (ceildiv, data_filename, data_string,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_ASINH_NORMAL, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS, EXT_TAB,
-                    extjoin, GB, get_chrom_coords, 
+                    extjoin, GB, get_chrom_coords,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     _make_continuous_cells, make_filelistpath, maybe_gzip_open,
                     MB, OptionBuilder_GMTK, PKG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
@@ -3138,9 +3138,9 @@ to find the winning instance anyway.""" % thread.instance_index)
             new_params_filename = self.params_filename
             for round_index in xrange(final_round_index):
                 old_curr_params_filename = extjoin(old_params_filename,
-                                                   round_index)
+                                                   str(round_index))
                 new_curr_params_filename = extjoin(new_params_filename,
-                                                   round_index)
+                                                   str(round_index))
 
                 path(old_curr_params_filename).copy2(new_curr_params_filename)
 
