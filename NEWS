@@ -17,6 +17,7 @@
 * test: filenames are sorted before comparisons
 * test: now includes posterior test
 * test/README: added description of test system
+* test: training now only goes through two rounds to speed the tests
 
 1.0.2:
 
