@@ -163,7 +163,7 @@ TMP_USAGE_BASE = 10*MB # just a guess
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
 ## defaults
-INSTANCES = 1
+NUM_INSTANCES = 1
 
 # self->self, self->other
 PROBS_FORCE_TRANSITION = array([0.0, 0.0, 1.0])
@@ -898,7 +898,7 @@ class Runner(object):
         # variables
         self.num_segs = None
         self.num_subsegs = None
-        self.instances = INSTANCES
+        self.num_instances = NUM_INSTANCES
         self.len_seg_strength = None
         self.distribution = None
         self.max_em_iters = MAX_EM_ITERS
@@ -988,7 +988,7 @@ class Runner(object):
         else:
             res.supervision_type = SUPERVISION_UNSUPERVISED
 
-        res.instances = options.instances
+        res.num_instances = options.num_instances
 
         res.verbosity = options.verbosity
         # multiple lists to one
@@ -1024,6 +1024,7 @@ class Runner(object):
         res.set_option("resolution", options.resolution, RESOLUTION)
         res.set_option("num_segs", options.num_labels, NUM_SEGS)
         res.set_option("num_subsegs", options.num_sublabels, NUM_SUBSEGS)
+        res.set_option("max_em_iters", options.max_train_rounds, MAX_EM_ITERS)
 
         params_filenames = options.trainable_params
         if params_filenames:
@@ -1273,7 +1274,10 @@ class Runner(object):
         # will be used is when new is not set. And this will only
         # happen from the master thread.
 
-    def make_params_filename(self, instance_index, dirname):
+    def make_params_filename(self, instance_index=None, dirname=None):
+        if dirname is None:
+            dirname = self.work_dirname
+
         return self.make_filename(PREFIX_PARAMS, instance_index, EXT_PARAMS,
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_PARAMS)
@@ -1300,7 +1304,7 @@ class Runner(object):
         # not set, or the file already exists and we are training
         if (new or not params_filename
             or (self.train and path(params_filename).exists())):
-            params_filename = self.make_params_filename(instance_index, self.work_dirname)
+            params_filename = self.make_params_filename(instance_index)
 
         return params_filename, last_params_filename
 
@@ -2944,8 +2948,8 @@ class Runner(object):
     def run_train(self):
         self.train_prog = self.prog_factory(EM_TRAIN_PROG)
 
-        instances = self.instances
-        assert instances >= 1
+        num_instances = self.num_instances
+        assert num_instances >= 1
 
         # save the destination file for input_master as we will be
         # generating new input masters for each start
@@ -2960,7 +2964,7 @@ class Runner(object):
         self.input_master_filename = input_master_filename
 
         # should I make new parameters in each instance?
-        instance_make_new_params = (self.instances > 1
+        instance_make_new_params = (num_instances > 1
                                     or isinstance(self.num_segs, slice))
         self.instance_make_new_params = instance_make_new_params
         if not instance_make_new_params:
@@ -2980,7 +2984,7 @@ class Runner(object):
         ## which thread runner should I use?
         num_segs_range = slice2range(self.num_segs)
 
-        if len(num_segs_range) > 1 or instances > 1:
+        if len(num_segs_range) > 1 or num_instances > 1:
             run_train_func = self.run_train_multithread
         else:
             run_train_func = self.run_train_singlethread
@@ -3012,7 +3016,7 @@ class Runner(object):
 
     def run_train_multithread(self, num_segs_range):
         # XXX: Python 2.6: use itertools.product()
-        seg_instance_indexes = xrange(self.instances)
+        seg_instance_indexes = xrange(self.num_instances)
         enumerator = enumerate((num_seg, seg_instance_index)
                                for num_seg in num_segs_range
                                for seg_instance_index in seg_instance_indexes)
@@ -3460,9 +3464,9 @@ def parse_options(args):
                          " (default %s)" % DISTRIBUTION_DEFAULT)
 
         group.add_option("--num-instances", type=int,
-                         default=INSTANCES, metavar="NUM",
+                         default=NUM_INSTANCES, metavar="NUM",
                          help="run NUM training instances, randomizing start"
-                         " parameters NUM times (default %d)" % INSTANCES)
+                         " parameters NUM times (default %d)" % NUM_INSTANCES)
 
         group.add_option("-N", "--num-labels", type=slice, metavar="SLICE",
                          help="make SLICE segment labels"
@@ -3471,6 +3475,10 @@ def parse_options(args):
         group.add_option("--num-sublabels", type=int, metavar="NUM",
                          help="make NUM segment sublabels"
                          " (default %d)" % NUM_SUBSEGS)
+
+        group.add_option("--max-train-rounds", type=int, metavar="NUM",
+                         help="each training instance runs a maximum of NUM"
+                         " rounds (default %d)" % MAX_EM_ITERS)
 
         group.add_option("--ruler-scale", type=int, metavar="SCALE",
                          help="ruler marking every SCALE bp (default %d)" %
