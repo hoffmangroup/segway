@@ -726,7 +726,7 @@ sometimes text, depending on the clustering system used).
 The ``likelihood.*.tab`` files each track the progression of
 likelihood during a single instance of EM training. The file has a
 single column, one for each round of training, which contains the log
-likelihood. Higher values are better.
+likelihood. More positive values are better.
 
 GMTK reports
 ~~~~~~~~~~~~
