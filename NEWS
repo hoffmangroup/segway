@@ -2,12 +2,10 @@
 
 * segway: now again includes posterior output in bedGraph format
   (thanks to Avinash Sahu)
-* segway: --old-directory renamed to --recover-dir
-
-* segway: --recover-dir now supports identify as well as train. less
+* segway: --old-directory renamed to --recover
+* segway: --recover now supports identify as well as train. less
   clunky and more consistent than the old recipe for training recovery
-  included in the docs
-
+  included in the docs (posterior still not supported)
 * segway: train.tab is now optional, so you should be able to run
   identify on pre-Segway 1.0.0 training directories that don't have
   it, as long as you specify all the same options as you did before

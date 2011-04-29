@@ -3459,7 +3459,7 @@ def parse_options(args):
                          help="use DIST distribution"
                          " (default %s)" % DISTRIBUTION_DEFAULT)
 
-        group.add_option("--instances", type=int,
+        group.add_option("--num-instances", type=int,
                          default=INSTANCES, metavar="NUM",
                          help="run NUM training instances, randomizing start"
                          " parameters NUM times (default %d)" % INSTANCES)

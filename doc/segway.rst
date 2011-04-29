@@ -282,7 +282,7 @@ used.
 You can tell Segway just to generate these files and not to perform
 any inference using the :option:`--dry-run` option.
 
-Using :option:`--num-starts`\=\ *starts* will generate multiple copies of the
+Using :option:`--num-instances`\=\ *starts* will generate multiple copies of the
 ``input.master`` file, named ``input.0.master``, ``input.1.master``,
 and so on, with different randomly picked initial parameters. You may
 substitute your own ``input.master`` files but I recommend starting
@@ -297,7 +297,7 @@ You can use the :option:`--num-labels`\=\ *labels* option to specify the
 number of segment labels to use in the model (default 2). You can set
 this to a single number or a range with Python slice notation. For
 example, ``--num-labels=5:20:5`` will result in 5, 10, and 15 labels
-being tried. If you specify :option:`--num-starts`\=\ *starts*, then
+being tried. If you specify :option:`--num-instances`\=\ *starts*, then
 there will be *starts* different instances for each of the *labels*
 labels tried.
 
