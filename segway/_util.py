@@ -13,6 +13,7 @@ from itertools import repeat
 from os import extsep
 import shutil
 import sys
+import re
 from tempfile import mkdtemp
 
 import colorbrewer
@@ -64,6 +65,8 @@ PREFIX_PARAMS = "params"
 SUBDIRNAME_LOG = "log"
 SUBDIRNAME_PARAMS = "params"
 
+POSTERIOR_SCALE_FACTOR = 100.0
+
 # sentinel values
 ISLAND_BASE_NA = 0
 ISLAND_LST_NA = 0
@@ -94,6 +97,7 @@ OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
 
 VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
+POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 
 BED_SCORE = "1000"
 BED_STRAND = "."
@@ -430,6 +434,41 @@ def _make_continuous_cells(supercontig, start, end, track_indexes):
 
     # extract only the tracks that are used correct for min_col offset
     return rows[..., track_indexes - min_col]
+
+re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
+def parse_posterior(iterable):
+    """
+    a generator.
+    yields tuples (index, label, prob)
+
+    index: (int) frame index
+    label: (int) segment label
+    prob: (float) prob value
+    """
+    # ignores non-matching lines
+    for line in iterable:
+        m_posterior_entry = re_posterior_entry.match(line.rstrip())
+
+        if m_posterior_entry:
+            group = m_posterior_entry.group
+            yield (int(group(2)), int(group(3)), float(group(1)))
+
+def read_posterior(infile, num_frames, num_labels):
+    """
+    returns an array (num_frames, num_labels)
+    """
+    # XXX: should these be single precision?
+    res = zeros((num_frames, num_labels))
+
+    for frame_index, label, prob in parse_posterior(infile):
+        if label >= num_labels:
+            raise ValueError("saw label %s but num_labels is only %s"
+                             % (label, num_labels))
+
+        res[frame_index, label] = prob
+
+    return res
+
 
 def make_filelistpath(dirpath, ext):
     return dirpath / extjoin(ext, EXT_LIST)

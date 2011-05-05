@@ -21,10 +21,9 @@ from path import path
 
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, find_segment_starts, get_label_color,
-                    _make_continuous_cells, _save_observations_window,
-                    VITERBI_PROG)
-
-from run import (POSTERIOR_SCALE_FACTOR, read_posterior, POSTERIOR_PROG)
+                    _make_continuous_cells, POSTERIOR_PROG,
+                    POSTERIOR_SCALE_FACTOR, read_posterior,
+                    _save_observations_window, VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -37,11 +36,6 @@ TEMP_DIRPATH = path(gettempdir())
 EXT_OPTIONS = {}
 EXT_OPTIONS[EXT_INT] = "-of1"
 EXT_OPTIONS[EXT_FLOAT] = "-of2"
-
-POSTERIOR_BEDGRAPH_HEADER="track type=bedGraph name=posterior.%d \
-        description=\"Segway posterior probability of label %d\" \
-        visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
-        autoScale=off color=200,100,0 altColor=0,100,200"
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
@@ -164,10 +158,6 @@ def read_posterior_save_bed(coord, resolution,  outfilename_tmpl, num_labels,
         outfile = open(outfilename, "w")
         pos, = where(diff(probs_rounded_label) != 0)
         pos = r_[start, pos[:]+start+1, end]
-
-        posterior_header = POSTERIOR_BEDGRAPH_HEADER % (label_index,
-                                                        label_index)
-        print >>outfile, posterior_header
 
         for bed_start, bed_end in zip(pos[:-1], pos[1:]):
             chrom_start = str(bed_start)

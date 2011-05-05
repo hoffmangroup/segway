@@ -52,8 +52,10 @@ from ._util import (ceildiv, data_filename, data_string,
                     extjoin, GB, get_chrom_coords,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     _make_continuous_cells, make_filelistpath, maybe_gzip_open,
-                    MB, OptionBuilder_GMTK, PKG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
-                    _save_observations_window, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, VITERBI_PROG)
+                    MB, OptionBuilder_GMTK, PKG, POSTERIOR_PROG,
+                    PREFIX_LIKELIHOOD, PREFIX_PARAMS,
+                    _save_observations_window, SUBDIRNAME_LOG,
+                    SUBDIRNAME_PARAMS, VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
@@ -121,7 +123,6 @@ LEN_SEG_EXPECTED = 100000
 LEN_SUBSEG_EXPECTED = 100
 
 SWAP_ENDIAN = False
-POSTERIOR_SCALE_FACTOR = 100.0
 
 ## option defaults
 VERBOSITY = 0
@@ -182,7 +183,6 @@ ENV_CMD = "/usr/bin/env"
 # XXX: need to differentiate this (prog) from prog.prog == progname throughout
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
-POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
@@ -190,6 +190,7 @@ SPECIAL_TRACKNAMES = ["dinucleotide", "supervisionLabel"]
 
 # extensions and suffixes
 EXT_BED = "bed"
+EXT_BEDGRAPH = "bedGraph"
 EXT_BIN = "bin"
 EXT_LIKELIHOOD = "ll"
 EXT_LOG = "log"
@@ -223,6 +224,7 @@ SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
 BED_FILEBASENAME = extjoin(PKG, EXT_BED, EXT_GZ) # "segway.bed.gz"
+BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ) # "posterior%s.bed.gz"
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 
@@ -306,6 +308,10 @@ COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % PKG
 
 FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%d step=%d span=%d"
+POSTERIOR_BEDGRAPH_HEADER="track type=bedGraph name=posterior.%d \
+        description=\"Segway posterior probability of label %d\" \
+        visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
+        autoScale=off color=200,100,0 altColor=0,100,200"
 
 CARD_SEGTRANSITION = 3
 
@@ -712,40 +718,6 @@ def prob_transition_from_expected_len(length):
     # ("duration modeling")
     return length / (1 + length)
 
-re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
-def parse_posterior(iterable):
-    """
-    a generator.
-    yields tuples (index, label, prob)
-
-    index: (int) frame index
-    label: (int) segment label
-    prob: (float) prob value
-    """
-    # ignores non-matching lines
-    for line in iterable:
-        m_posterior_entry = re_posterior_entry.match(line.rstrip())
-
-        if m_posterior_entry:
-            group = m_posterior_entry.group
-            yield (int(group(2)), int(group(3)), float(group(1)))
-
-def read_posterior(infile, num_frames, num_labels):
-    """
-    returns an array (num_frames, num_labels)
-    """
-    # XXX: should these be single precision?
-    res = zeros((num_frames, num_labels))
-
-    for frame_index, label, prob in parse_posterior(infile):
-        if label >= num_labels:
-            raise ValueError("saw label %s but num_labels is only %s"
-                             % (label, num_labels))
-
-        res[frame_index, label] = prob
-
-    return res
-
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
 
@@ -869,6 +841,7 @@ class Runner(object):
 
         self.obs_dirname = None
         self.bed_filename = None
+        self.bedgraph_filename = None
 
         self.include_coords_filename = None
         self.exclude_coords_filename = None
@@ -978,6 +951,7 @@ class Runner(object):
         res.recover_dirname = options.recover
         res.obs_dirname = options.observations
         res.bed_filename = options.bed
+        #res.bedgraph_filename = options.bedgraph
 
         res.include_coords_filename = options.include_coords
         res.exclude_coords_filename = options.exclude_coords
@@ -2535,6 +2509,77 @@ class Runner(object):
             # write the very last line of all files
             bed_file.write(last_line)
 
+
+    def concatenate_bedgraph(self):
+        # the final bedgraph filename, not the individual posterior_filenames
+        bedgraph_filename = self.bedgraph_filename
+
+        if bedgraph_filename is None:
+            bedgraph_filename = self.work_dirpath / BEDGRAPH_FILEBASENAME
+            self.bedgraph_filename = bedgraph_filename
+
+        # values for comparison to combine adjoining segments
+        last_line = ""
+        last_start = None
+        last_vals = (None, None, None) # (chrom, coord, seg)
+        
+        for num_seg in xrange(self.num_segs):
+            with maybe_gzip_open(bedgraph_filename % num_seg, "w") as bedgraph_file:
+                # XXX: add in browser track line (see SVN revisions
+                # previous to 195)
+                posterior_header = POSTERIOR_BEDGRAPH_HEADER % (num_seg,
+                                                        num_seg)
+                print >>bedgraph_file, posterior_header
+
+                for posterior_filename in self.posterior_filenames:
+                    with open(posterior_filename % num_seg) as posterior_file:
+                        lines = posterior_file.readlines()
+                        first_line = lines[0]
+                        first_row, first_coords = parse_bed4(first_line)
+                        (chrom, start, end, seg) = first_coords
+
+                        # write the last line and the first line, after
+                        # potentially merging
+                        if last_vals == (chrom, start, seg):
+                            first_row[INDEX_BED_START] = last_start
+
+                            # add back trailing newline eliminated by line.split()
+                            merged_line = "\t".join(first_row) + "\n"
+
+                            # if there's just a single line in the BED file
+                            if len(lines) == 1:
+                                last_line = merged_line
+                                last_vals = (chrom, end, seg)
+                                # last_start is already set correctly
+                                # postpone writing until after additional merges
+                                continue
+                            else:
+                                # write the merged line
+                                bedgraph_file.write(merged_line)
+                        else:
+                            if len(lines) == 1:
+                                # write the last line of the last file.
+                                # hold back the first line of this file,
+                                # and treat it as the last line
+                                bedgraph_file.write(last_line)
+                            else:
+                                # write the last line of the last file, first
+                                # line of this file
+                                bedgraph_file.writelines([last_line, first_line])
+
+                        # write the bulk of the lines
+                        bedgraph_file.writelines(lines[1:-1])
+
+                        # set last_line
+                        last_line = lines[-1]
+                        last_row, last_coords = parse_bed4(last_line)
+                        (chrom, start, end, seg) = last_coords
+                        last_vals = (chrom, end, seg)
+                        last_start = start
+
+                # write the very last line of all files
+                bedgraph_file.write(last_line)
+
     def prog_factory(self, prog):
         """
         allows dry_run
@@ -3291,6 +3336,9 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.concatenate_bed()
             bed_filename = self.bed_filename
             layer(bed_filename, make_layer_filename(bed_filename))
+
+        if self.posterior:
+                self.concatenate_bedgraph()
 
     def set_work_dirpaths(self):
         self.work_dirpath = path(self.work_dirname)
