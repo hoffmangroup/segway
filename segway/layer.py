@@ -153,9 +153,9 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
 
     labels_sorted = uniquify(ordering + sorted(colors.iterkeys()))
 
-    # used to only do this sometimes, don't know why:
-    # if len(mnemonics) == len(colors):
-    colors = recolor(mnemonics, labels_sorted)
+    # only do this if you have mnemonics
+    if mnemonics:
+        colors = recolor(mnemonics, labels_sorted)
 
     with maybe_gzip_open(outfilename, "w") as outfile:
         print >>outfile, " ".join(trackline)

@@ -481,7 +481,8 @@ one can enforce that those positions will have label 2. You might do
 this if you had specific reason to believe that these regions were
 enhancers and wanted to find similar patterns in your data tracks.
 Using smaller labels first (such as 0) is probably better. Supervision
-labels are not enforced during the identify task.
+labels are not enforced during the identify task, and therefore cannot
+be specified during identify.
 
 To simulate fully supervised training, simply supply supervision
 labels for the entire training region.

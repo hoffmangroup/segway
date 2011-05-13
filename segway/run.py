@@ -3413,6 +3413,9 @@ to find the winning instance anyway.""" % thread.instance_index)
                         self.run_train()
 
                     if self.identify or self.posterior:
+                        if self.supervision_filename:
+                            raise NotImplementedError # XXX
+
                         if not self.dry_run:
                             # resave now that num_segs is determined
                             self.save_include()

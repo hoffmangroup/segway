@@ -1,6 +1,8 @@
 1.1.1:
 
 * segway: more informative error message when supervision labels overlap each other
+* segway-layer: fix issue #19. Now doesn't override previous colors
+  when mnemonics aren't supplied (thanks to Jay Hesselberth)
 
 1.1.0:
 
