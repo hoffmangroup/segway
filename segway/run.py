@@ -811,6 +811,14 @@ def _log_cmdline(logfile, cmdline):
 def make_weight_scale(scale):
     return "scale %f" % scale
 
+def check_overlapping_supervision_labels(start, end, chrom, coords):
+    for coord_start, coord_end in coords[chrom]:
+        if not (coord_start >= end or coord_end <= start):
+            raise ValueError("supervision label %s(%s, %s) overlaps"
+                             "supervision label %s(%s, %s)" %
+                             (chrom, coord_start, coord_end,
+                              chrom, start, end))
+
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
 class Runner(object):
@@ -2349,15 +2357,13 @@ class Runner(object):
         with open(self.supervision_filename) as supervision_file:
             for datum in read_native(supervision_file):
                 chrom = datum.chrom
-                supervision_coords_chrom = supervision_coords[chrom]
                 start = datum.chromStart
                 end = datum.chromEnd
 
-                for coord_start, coord_end in supervision_coords_chrom:
-                    # disallow overlaps
-                    assert coord_start >= end or coord_end <= start
+                check_overlapping_supervision_labels(start, end, chrom,
+                                                     supervision_coords)
 
-                supervision_coords_chrom.append((start, end))
+                supervision_coords[chrom].append((start, end))
                 supervision_labels[chrom].append(int(datum.name))
 
         max_supervision_label = max(max(labels)

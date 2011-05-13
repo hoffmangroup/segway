@@ -840,7 +840,7 @@ workdir instead.
 |rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
 |rarr| ``jt_info.posterior.txt``                    log file used by GMTK when creating a junction tree
                                                     in posterior mode
-|rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of likelihood by training
+|rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of log likelihood by training
                                                     instance; can be used to examine  how fast
                                                     training converges
 |rarr| ``run.sh``                                   list of commands run by Segway, not

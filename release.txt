@@ -17,10 +17,14 @@ sage
 ./test.sh
 XXX virtualbox
 
-ship XXX
+XXX ship ~/src/sci-util/segway/dist/segway-XXX
 change default version in /net/noble/vol2/home/mmh1/shortcuts/modules/segway/.modulerc
 
-ssh ebi-login
+ebi-login
 python <(wget -O - http://noble.gs.washington.edu/proj/segway/install.py)
+cd ~/src/sci-util/segway
+svn up
+cd test
+./test.sh
 
-send e-mails
+send e-mails with NEWS
