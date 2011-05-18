@@ -2693,6 +2693,8 @@ class Runner(object):
         else:
             args = gmtk_cmdline
 
+        # this doesn't include use of segway-wrapper, which takes the
+        # memory usage as an argument, and may be run multiple times
         self.log_cmdline(gmtk_cmdline, args)
 
         if self.dry_run:

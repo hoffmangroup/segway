@@ -8,6 +8,7 @@ __version__ = "$Revision$"
 # Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
+from tempfile import gettempdir
 
 from optbuild import Mixin_NoConvertUnderscore, OptionBuilder_ShortOptWithSpace
 
@@ -81,7 +82,8 @@ class _JobTemplateFactory(object):
         """
         # ulimit args are in kibibytes
         mem_limit_kb = str(calc_mem_limit(self.mem_limit) // KB)
-        wrapper_cmdline = [BASH_CMD, data_filename(RES_WRAPPER), mem_limit_kb]
+        wrapper_cmdline = [BASH_CMD, data_filename(RES_WRAPPER), mem_limit_kb,
+                           gettempdir()]
 
         return wrapper_cmdline + self.args
 
