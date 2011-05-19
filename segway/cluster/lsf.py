@@ -7,11 +7,12 @@ __version__ = "$Revision$"
 
 from os import environ
 import sys
+from tempfile import gettempdir
 
 from path import path
 
 from .._configparser import OneSectionRawConfigParser
-from .._util import ceildiv
+from .._util import ceildiv, data_filename
 from .common import _JobTemplateFactory, make_native_spec
 
 # use SI (not binary) prefixes. I can't find any documentation for
@@ -38,8 +39,14 @@ UNIT_FOR_LIMITS = LSF_CONF.get("LSF_UNIT_FOR_LIMITS")
 DIVISOR_FOR_LIMITS = SIZE_UNITS[UNIT_FOR_LIMITS]
 
 CORE_FILE_SIZE_LIMIT = 0
+HARD_RESOURCE_MULTIPLIER = 2
 
+# this reduces failures due to systems that are simply borked for
+# arbitrary reasons
 PREEXEC_CMDLINE = "/bin/true"
+
+RES_CLEAN = "segway-clean.sh"
+TEMP_DIRNAME = gettempdir()
 
 class JobTemplateFactory(_JobTemplateFactory):
     # eliminate default overwrite behavior for DRMAA/LSF, go to append
@@ -54,16 +61,29 @@ class JobTemplateFactory(_JobTemplateFactory):
         return ('"select[mem>%s && tmp>%s] rusage[mem=%s, tmp=%s]"'
                 % (mem_usage_mb, tmp_usage_mb, mem_usage_mb, tmp_usage_mb))
 
+    def make_postexec_cmdline(self):
+        assert TEMP_DIRNAME.startswith("/")
+
+        res = [data_filename(RES_CLEAN)]
+        for arg in self.args:
+            if arg.startswith(TEMP_DIRNAME):
+                res.append(arg)
+
+        return " ".join(res)
+
     def make_native_spec(self):
         mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)
 
         # bsub -R: resource requirement
         # bsub -M: per-process memory limit
-        # bsub -v: hard virtual memory limit for all processes
+        # bsub -v: hard virtual memory limit for all processes, cumulatively
         # bsub -C: core file size limit
         res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec,
-                                    v=mem_limit_spec, o=self.output_filename,
-                                    e=self.error_filename, E=PREEXEC_CMDLINE)
+                                    v=mem_limit_spec,
+                                    o=self.output_filename,
+                                    e=self.error_filename,
+                                    E=PREEXEC_CMDLINE,
+                                    Ep=self.make_postexec_cmdline())
 
         # XXX: -C does not work with DRMAA for LSF 1.03
         # wait for upstream fix:

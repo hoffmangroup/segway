@@ -1,17 +1,23 @@
 #!/usr/bin/env bash
 
-# first argument is memory limit in kibibytes
+## memory limit in kibibytes
+MEMLIMIT="$1"
 
-# -c 0: no core dump files
-# -v: virtual memory
-# -m: per process memory limit (no effect on Linux?)
-ulimit -c 0 -v "$1" -m "$1" || exit 201
-
-# the original temporary dir used by the submitting program (usually is /tmp)
+## the original temporary dir used by the submitting program (usually is /tmp)
 SUBMIT_TMPDIR="$2"
 shift 2
 
-export TMPDIR="$(mktemp -dt segway.XXXXXXXXXX)"
+# -c 0: no core dump files
+# -v: virtual memory
+# -m: per process memory limit (no effect on newer Linuxes)
+ulimit -c 0 -v "$MEMLIMIT" -m "$MEMLIMIT" || exit 201
+
+if [ "${LSB_JOBID:-}" ]; then
+    # this way, the post-exec script can delete it easily
+    export TMPDIR="$(mktemp -dt "segway.$LSB_JOBID")"
+else
+    export TMPDIR="$(mktemp -dt segway.XXXXXXXXXX)"
+fi
 
 on_exit ()
 {
@@ -27,4 +33,5 @@ on_exit ()
 
 trap on_exit EXIT
 
+## start a subshell so that going over ulimit only kills the subshell
 "$@"

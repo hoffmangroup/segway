@@ -1,6 +1,6 @@
 1.1.1:
 
-* segway: fix bug where wrapper script sometimes did not delete
+* segway: LSF: fix bug where wrapper script sometimes did not delete
   temporary observation files after a crash
 * segway: more informative error message when supervision labels overlap each other
 * segway-layer: fix issue #19. Now doesn't override previous colors
