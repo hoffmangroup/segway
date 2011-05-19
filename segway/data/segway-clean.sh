@@ -9,7 +9,9 @@ set -o nounset
 set -o pipefail
 set -o errexit
 
-rm -rf -- "$@"
+if [ "$#" -gt 0 ]; then
+    rm -rf -- "$@"
+fi
 
 if [ "${LSB_JOBID:-}" ]; then
     # have to add ".post" so mktemp doesn't complain when it already exists
