@@ -255,12 +255,15 @@ inference process--the windows are treated independently.
 
 Resolution
 ----------
+
 In order to speed up the inference process, you may downsample the
 data to a different resolution using the :option:`--resolution`\=\
 *res* option. This means that Segway will partition the input
 observations into fixed windows of size *res* and perform inference on
 the mean of the observation averaged along the fixed window. This can
-result in a large speedup at the cost of losing the highest possible precision.
+result in a large speedup at the cost of losing the highest possible
+precision. However, if you are considering data that is only generated
+at a low resolution to start with, this can be an appealing option.
 
 You must use the same resolution in both training and identification.
 
@@ -1017,3 +1020,43 @@ have to create your own header.txt with appropriate track lines::
 
     cat header.txt <(find viterbi -type f | sort | xargs cat) | gzip -c > segway.bed.gz
 
+Frequently asked questions
+==========================
+
+How do I make segments longer?
+
+There are several ways to do this.
+
+hard weight constraints
+
+XXX --seg-table
+
+soft weight constraints
+
+--segtransition-weight-scale
+
+downsampling resolution
+
+Glad Segway is working for you. There are a number of parameters you can adjust to fix this. First, since your data is
+only at 50 bp resolution, you might start by using --resolution=50. This will also speed things up considerably.
+
+The --seg-table option will allow you to specify a hard minimum segment length, as described here.
+
+http://noble.gs.washington.edu/proj/segway/doc/1.1.0/segway.html#hard-length-constraints
+
+You can also set a --segtransition-weight-scale option that will increase the strength of the soft length prior for
+longer segments. I might try setting this option to be equal to the number of tracks you are using. Or maybe 10 times
+that amount.
+
+How can I make Segway go faster?
+--------------------------------
+
+resolution
+train on smaller portion of the genome
+split sequences
+
+Training on a subset of the genome is a good idea--at least until this is 
+done successfully. This will speed things up a lot. I'd just pick, say, 1% 
+of the genome to test on. Use the --include-coords option and supply a BED 
+file. Splitting up into smaller subsequences by reducing --split-sequences 
+can also help.

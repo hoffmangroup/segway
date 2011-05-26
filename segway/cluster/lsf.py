@@ -69,7 +69,8 @@ class JobTemplateFactory(_JobTemplateFactory):
             if arg.startswith(TEMP_DIRNAME):
                 res.append(arg)
 
-        return " ".join(res)
+        # returns a quoted string
+        return '"%s"' % " ".join(res)
 
     def make_native_spec(self):
         mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)
