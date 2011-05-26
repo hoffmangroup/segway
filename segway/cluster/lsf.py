@@ -13,7 +13,7 @@ from path import path
 
 from .._configparser import OneSectionRawConfigParser
 from .._util import ceildiv, data_filename
-from .common import _JobTemplateFactory, make_native_spec
+from .common import BASH_CMD, _JobTemplateFactory, make_native_spec
 
 # use SI (not binary) prefixes. I can't find any documentation for
 # this but Tim Cutts seems to assume this is how it works
@@ -64,7 +64,7 @@ class JobTemplateFactory(_JobTemplateFactory):
     def make_postexec_cmdline(self):
         assert TEMP_DIRNAME.startswith("/")
 
-        res = [data_filename(RES_CLEAN)]
+        res = [BASH_CMD, data_filename(RES_CLEAN)]
         for arg in self.args:
             if arg.startswith(TEMP_DIRNAME):
                 res.append(arg)
