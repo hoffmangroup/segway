@@ -782,9 +782,12 @@ Troubleshooting
 
 When Segway reports "end of memory progression reached without
 success", this usually means that dispatched GMTK tasks failed
-repeatedly. Look in the ``output/e`` files to see what the cause of
-the underlying error was. Also ``log/jobs.tab`` lists all the jobs and
-whether they reported an error in the form of nonzero exit status.
+repeatedly. Look in ``log/jobs.tab`` to see all the jobs and whether
+they reported an error in the form of nonzero exit status. The job
+causing your Segway run to fail will probably be near the end of this
+list and have a nonzero exit status in the last column. Look in
+``output/e/``\ *instance*\ ``/``\ *jobname* to find the cause of the
+underlying error.
 
 Are your bundle jobs failing? This might be because an accumulator
 file (written by individual job) is corrupted or truncated. This can

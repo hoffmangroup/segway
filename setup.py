@@ -30,11 +30,9 @@ download_url = "%ssrc/%s-%s.tar.gz" % (url, name, __version__)
 classifiers = ["Natural Language :: English",
                "Programming Language :: Python"]
 
-# XXX: parallel should be an option, after the code is written
-# correctly to fallback when it's not there
 entry_points = """
 [console_scripts]
-segway = segway.run:main [parallel]
+segway = segway.run:main
 segway-calc-distance = segway.calc_distance:main
 segway-task = segway.task:main
 segway-layer = segway.layer:main
@@ -48,15 +46,12 @@ gtf2bed = segway.gtf2bed:main
 
 # XXX: warn: make sure you have LDFLAGS unset if you are building numpy
 
-# need optbuild>0.1.5 for Mixin_UseFullProgPath
+# need optbuild>0.1.11 for OptionBuilder_ShortOptWithEquals
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
 
-install_requires = ["genomedata>0.1.5", "textinput", "optbuild>=0.1.10",
+install_requires = ["genomedata>0.1.5", "textinput", "optbuild>0.1.10",
                     "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
-                    "colorbrewer"]
-
-# XXX: ask if there is a way to specify this at the command-line
-extras_require = dict(parallel=["drmaa>=0.4a3"])
+                    "colorbrewer", "drmaa>=0.4a3"]
 
 if __name__ == "__main__":
     setup(name=name,
@@ -69,7 +64,6 @@ if __name__ == "__main__":
           classifiers=classifiers,
           long_description=long_description,
           install_requires=install_requires,
-          extras_require=extras_require,
           zip_safe=False, # XXX: change back, this is just for better tracebacks
 
           # XXX: this should be based off of __file__ instead

@@ -40,6 +40,7 @@ PKG_DATA = ".".join([PKG, "data"])
 
 FILTERS_GZIP = Filters(complevel=1)
 
+EXT_BED = "bed"
 EXT_LIST = "list"
 EXT_INT = "int"
 EXT_FLOAT = "float32"
@@ -48,7 +49,9 @@ EXT_MASTER = "master"
 EXT_PARAMS = "params"
 EXT_TAB = "tab"
 
+SUFFIX_BED = extsep + EXT_BED
 SUFFIX_GZ = extsep + EXT_GZ
+SUFFIX_TAB = extsep + EXT_TAB
 
 DTYPE_IDENTIFY = intc
 DTYPE_OBS_INT = intc
@@ -162,6 +165,9 @@ def fill_array(scalar, shape, dtype=None, *args, **kwargs):
 def gzip_open(*args, **kwargs):
     return closing(_gzip_open(*args, **kwargs))
 
+def is_gz_filename(filename):
+    return filename.endswith(SUFFIX_GZ)
+
 def maybe_gzip_open(filename, mode="r", *args, **kwargs):
     if filename == "-":
         if mode.startswith("U"):
@@ -176,7 +182,7 @@ def maybe_gzip_open(filename, mode="r", *args, **kwargs):
         else:
             raise ValueError("mode string must begin with one of 'r', 'w', or 'a'")
 
-    if filename.endswith(SUFFIX_GZ):
+    if is_gz_filename(filename):
         return gzip_open(filename, mode, *args, **kwargs)
 
     return open(filename, mode, *args, **kwargs)

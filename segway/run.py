@@ -48,7 +48,7 @@ from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
 from .layer import layer, make_layer_filename
 from ._util import (ceildiv, data_filename, data_string,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
-                    DISTRIBUTION_ASINH_NORMAL, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS, EXT_TAB,
+                    DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS, EXT_TAB,
                     extjoin, GB, get_chrom_coords,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     _make_continuous_cells, make_filelistpath, maybe_gzip_open,
@@ -189,7 +189,6 @@ TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 SPECIAL_TRACKNAMES = ["dinucleotide", "supervisionLabel"]
 
 # extensions and suffixes
-EXT_BED = "bed"
 EXT_BEDGRAPH = "bedGraph"
 EXT_BIN = "bin"
 EXT_LIKELIHOOD = "ll"

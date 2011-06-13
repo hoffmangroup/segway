@@ -12,12 +12,15 @@ __version__ = "$Revision$"
 from collections import defaultdict
 import re
 import sys
+from tempfile import NamedTemporaryFile
 
 from numpy import array, diff, vstack
+from optbuild import OptionBuilder_ShortOptWithEquals
 from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native
-from ._util import BED_SCORE, BED_STRAND, get_label_color, maybe_gzip_open
+from ._util import (BED_SCORE, BED_STRAND, get_label_color,
+                    maybe_gzip_open, PKG, SUFFIX_BED, SUFFIX_TAB)
 
 BED_START = "0"
 ACCEPTABLE_STRANDS = set(".+")
@@ -28,6 +31,8 @@ OFFSET_LABEL = 2
 
 TRACKLINE_DEFAULT = ["track", 'description="segway-layer output"',
                      "visibility=full"]
+
+BEDTOBIGBED_PROG = OptionBuilder_ShortOptWithEquals("bedToBigBed")
 
 class PassThroughDict(dict):
     def __missing__(self, key):
@@ -44,6 +49,48 @@ class IncrementingDefaultDict(defaultdict):
         self.counter += 1
 
         return value
+
+class Tee(object):
+    def __init__(self, *args):
+        self._items = args
+        self._exits = []
+
+    ## code borrowed from Python 2.7 contextlib.nested
+    def __enter__(self):
+        items = self._items
+        new_items = []
+        exits = []
+
+        for item in items:
+            exit = item.__exit__
+            enter = item.__enter__
+            new_items.append(enter())
+            exits.append(exit)
+
+        self._items = new_items
+        self._exits = exits
+
+    def __exit__(self, *exc):
+        while self._exits:
+            exit = self._exits.pop()
+            try:
+                if exit(*exc):
+                    exc = (None, None, None)
+            except:
+                exc = sys.exc_info()
+        if exc != (None, None, None):
+            # Don't rely on sys.exc_info() still containing
+            # the right information. Another exception may
+            # have been raised and caught by an exit method
+            raise exc[0], exc[1], exc[2]
+
+    def write(self, *args, **kwargs):
+        for item in self._items:
+            item.write(*args, **kwargs)
+
+    def flush(self, *args, **kwargs):
+        for item in self._items:
+            item.flush(*args, **kwargs)
 
 def make_comment_ignoring_dictreader(iterable, *args, **kwargs):
     return DictReader((item for item in iterable if not item.startswith("#")),
@@ -100,9 +147,9 @@ def make_layer_filename(filename):
 
     return ".layered.bed".join([left, right])
 
-# XXX: it would be better to not define the coordinates in non-contiguous areas
+# XXX: don't define coordinates in non-contiguous areas
 def layer(infilename="-", outfilename="-", mnemonic_filename=None,
-          trackline_updates={}):
+          trackline_updates={}, bigbed_outfilename=None):
     # dict of lists of tuples of ints
     segments_dict = defaultdict(list)
     colors = {} # overwritten each time
@@ -157,13 +204,26 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
     if mnemonics:
         colors = recolor(mnemonics, labels_sorted)
 
-    with maybe_gzip_open(outfilename, "w") as outfile:
-        print >>outfile, " ".join(trackline)
+    outfile = maybe_gzip_open(outfilename, "w")
+
+    if bigbed_outfilename:
+        temp_file = NamedTemporaryFile(prefix=PKG, suffix=SUFFIX_BED)
+        bigbed_infilename = temp_file.name
+        outfile = Tee(outfile, temp_file)
+
+    ends = {}
+    with outfile:
+        try:
+            final_outfile = outfile._items[0]
+        except AttributeError:
+            pass
+        print >>final_outfile, " ".join(trackline)
 
         for chrom, segments in segments_dict.iteritems():
             segments_array = array(segments)
 
             end = segments_array.max()
+            ends[chrom] = end
 
             for label in labels_sorted:
                 label_key = label_dict[label]
@@ -187,7 +247,8 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
                 block_starts = segments_label_key_augmented[:, 0]
                 block_starts_str = ",".join(map(str, block_starts))
 
-                # just passes through the label itself if there are no mnemonics
+                # this just passes through the label itself if there
+                # are no mnemonics
                 mnemonic = mnemonics[str(label)]
 
                 row = [chrom, BED_START, str(end), mnemonic, BED_SCORE,
@@ -196,12 +257,32 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
 
                 print >>outfile, "\t".join(row)
 
+        if bigbed_outfilename:
+            outfile.flush()
+
+            # XXX: refactor this into a function in _util
+            # XXX: want to make a new wrapper to NamedTemporaryFile
+            # that closes after one level of context, deletes after
+            # the next
+            # with MyNamedTemporaryFile() as temp_file:
+            #     with temp_file
+            #         print >>temp_file, "blah"
+            #     print temp_file.name
+            with NamedTemporaryFile(prefix=PKG, suffix=SUFFIX_TAB) as sizes_file:
+                for chrom, end in ends.iteritems():
+                    print >>sizes_file, "\t".join([chrom, str(end)])
+
+                sizes_file.flush()
+                BEDTOBIGBED_PROG(bigbed_infilename, sizes_file.name, bigbed_outfilename)
+
 def parse_options(args):
     from optplus import OptionParser
 
     usage = "%prog [OPTION]... [INFILE] [OUTFILE]"
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
+    parser.add_option("-b", "--bigBed", metavar="FILE",
+                      help="specify bigBed filename")
     parser.add_option("-m", "--mnemonic-file", metavar="FILE",
                       help="specify tab-delimited file with mnemonic "
                       "replacement identifiers for segment labels")
@@ -221,7 +302,9 @@ def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
     return layer(mnemonic_filename=options.mnemonic_file,
-                 trackline_updates=options.track_line_set, *args)
+                 trackline_updates=options.track_line_set,
+                 bigbed_outfilename=options.bigBed,
+                 *args)
 
 if __name__ == "__main__":
     sys.exit(main())
