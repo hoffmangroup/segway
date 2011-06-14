@@ -1,4 +1,4 @@
-   variable: presence_$track {
+   variable: presence__$track {
      type: discrete observed $presence_index:$presence_index cardinality CARD_PRESENCE;
 
      conditionalparents: CONDITIONALPARENTS_PRESENCE;
@@ -7,7 +7,7 @@
    variable: $track {
      type: continuous observed $track_index:$track_index;
 
-     switchingparents: presence_$track(0) using mapping("map_parent");
+     switchingparents: presence__$track(0) using mapping("map_parent");
 
      conditionalparents: $conditionalparents_spec;
 
