@@ -1,5 +1,10 @@
-1.1.1:
+1.2.0:
 
+* segway: new escaping method from Genomedata tracknames to GMTK
+  tracknames allows any arbitrary Genomedata trackname, but this means
+  that previous files will be incompatible, since "_" is now replaced
+  by "_5f" and "." by "_2e" (formerly both of these were "_", which
+  was ambiguous)
 * segway: LSF: fix bug where wrapper script sometimes did not delete
   temporary observation files after a crash
 * segway: more informative error message when supervision labels overlap each other

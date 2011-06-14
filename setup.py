@@ -6,7 +6,7 @@ Segway is a tool for easy pattern discovery and identification in
 functional genomics data.
 """
 
-__version__ = "1.1.1"
+__version__ = "1.2.0"
 
 # Copyright 2008-2011 Michael M. Hoffman <mmh1@washington.edu>
 

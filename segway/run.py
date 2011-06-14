@@ -22,11 +22,12 @@ from math import ceil, floor, frexp, ldexp, log10
 from os import environ, extsep
 import re
 from shutil import copy2
-from string import Template
+from string import letters, Template
 import sys
 from tempfile import gettempdir
 from threading import Event, Lock, Thread
 from time import sleep
+from urllib import quote
 from uuid import uuid1
 from warnings import warn
 
@@ -48,7 +49,8 @@ from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
 from .layer import layer, make_layer_filename
 from ._util import (ceildiv, data_filename, data_string,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
-                    DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS, EXT_TAB,
+                    DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
+                    EXT_INT, EXT_PARAMS, EXT_TAB,
                     extjoin, GB, get_chrom_coords,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     _make_continuous_cells, make_filelistpath, maybe_gzip_open,
@@ -376,6 +378,23 @@ except ImportError:
                     break
             else:
                 return
+
+def quote_trackname(text):
+    # legal characters are ident in GMTK_FileTokenizer.ll:
+    # {alpha})({alpha}|{dig}|\_|\-)* (alpha is [A-za-z], dig is [0-9])
+    res = text.replace("_", "_5f")
+    res = res.replace(".", "_2e")
+
+    # quote eliminates everything except for _.-, replaces with % escapes
+    res = quote(res)
+    res = res.replace("%", "_")
+
+    # add stub to deal with non-alphabetic first characters
+    if res[0] not in letters:
+        # __ should never appear in strings quoted as before
+        res = "x__" + res
+
+    return res
 
 def make_fixedstep_header(chrom, start, resolution):
     """
@@ -1223,7 +1242,10 @@ class Runner(object):
             tracknames_all = tracknames
 
         # replace illegal characters in tracknames only, not tracknames_all
-        tracknames = [trackname.replace(".", "_") for trackname in tracknames]
+        tracknames = map(quote_trackname, tracknames)
+
+        # can't collapse these
+        assert len(tracknames) == len(frozenset(tracknames))
 
         if self.tracknames is None:
             self.tracknames = tracknames
