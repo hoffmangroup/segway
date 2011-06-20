@@ -216,7 +216,7 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
         try:
             final_outfile = outfile._items[0]
         except AttributeError:
-            pass
+            final_outfile = outfile
         print >>final_outfile, " ".join(trackline)
 
         for chrom, segments in segments_dict.iteritems():
