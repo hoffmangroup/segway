@@ -10,6 +10,7 @@
 * segway: more informative error message when supervision labels overlap each other
 * segway-layer: add --bigBed option, which works if you have
   bedToBigBed in your path
+* segway: add --bigBed option which calls segway-layer --bigBed
 * segway-layer: fix issue #19. Now doesn't override previous colors
   when mnemonics aren't supplied (thanks to Jay Hesselberth)
 * installation: always require drmaa. extras_require wasn't that useful in practice

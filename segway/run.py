@@ -977,6 +977,7 @@ class Runner(object):
         res.recover_dirname = options.recover
         res.obs_dirname = options.observations
         res.bed_filename = options.bed
+        res.bigbed_filename = options.bigBed
         #res.bedgraph_filename = options.bedgraph
 
         res.include_coords_filename = options.include_coords
@@ -3364,7 +3365,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         if self.identify:
             self.concatenate_bed()
             bed_filename = self.bed_filename
-            layer(bed_filename, make_layer_filename(bed_filename))
+            layer(bed_filename, make_layer_filename(bed_filename),
+                  bigbed_outfilename=self.bigbed_filename)
 
         if self.posterior:
                 self.concatenate_bedgraph()
@@ -3534,8 +3536,11 @@ def parse_options(args):
 
     with OptionGroup(parser, "Output files") as group:
         group.add_option("-b", "--bed", metavar="FILE",
-                          help="create identification BED track in FILE"
+                         help="create identification BED track in FILE"
                          " (default WORKDIR/%s)" % BED_FILEBASENAME)
+
+        group.add_option("--bigBed", metavar="FILE",
+                         help="specify layered bigBed filename")
 
     with OptionGroup(parser, "Modeling variables") as group:
         group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
