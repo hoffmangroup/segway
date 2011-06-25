@@ -7,7 +7,7 @@
   variable: dinucleotide {
      type: discrete observed $track_index:$track_index cardinality CARD_DINUCLEOTIDE;
 
-     switchingparents: presence_dinucleotide(0) using mapping("map_parent");
+     switchingparents: presence_dinucleotide(0) using mapping("internal:copyParent");
 
      conditionalparents: nil using DenseCPT("internal:UnityScore")
                          | seg(0) using DenseCPT("seg_dinucleotide");

@@ -58,7 +58,7 @@
 
 #if CARD_SUBSEG <= 1
 #define CONDITIONALPARENTS_OBS seg(0)
-#define MAPPING_OBS mapping("map_parent")
+#define MAPPING_OBS mapping("internal:copyParent")
 #else /* CARD_SUBSEG > 1 */
 #define CONDITIONALPARENTS_OBS seg(0), subseg(0)
 #define MAPPING_OBS mapping("map_seg_subseg_obs")

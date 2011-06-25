@@ -1,3 +1,4 @@
+#if CARD_SUPERVISIONLABEL >= 0
    variable: alwaysTrue {
      type: discrete observed value 1 cardinality CARD_BOOLEAN;
 
@@ -10,3 +11,4 @@
 
      conditionalparents: CONDITIONALPARENTS_NIL_DISCRETE;
    }
+#endif /* CARD_SUPERVISIONLABEL >= 0 */

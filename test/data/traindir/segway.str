@@ -20,7 +20,7 @@ frame: 0 {
    }
 #endif
 
-   variable: presence_h3k27me3 {
+   variable: presence__h3k27me3 {
      type: discrete observed 2:2 cardinality CARD_PRESENCE;
 
      conditionalparents: CONDITIONALPARENTS_PRESENCE;
@@ -29,14 +29,14 @@ frame: 0 {
    variable: h3k27me3 {
      type: continuous observed 0:0;
 
-     switchingparents: presence_h3k27me3(0) using mapping("map_parent");
+     switchingparents: presence__h3k27me3(0) using mapping("map_parent");
 
      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_h3k27me3") MAPPING_OBS;
 
      weight: scale 1.000000;
    }
 
-   variable: presence_h3k36me3 {
+   variable: presence__h3k36me3 {
      type: discrete observed 3:3 cardinality CARD_PRESENCE;
 
      conditionalparents: CONDITIONALPARENTS_PRESENCE;
@@ -45,7 +45,7 @@ frame: 0 {
    variable: h3k36me3 {
      type: continuous observed 1:1;
 
-     switchingparents: presence_h3k36me3(0) using mapping("map_parent");
+     switchingparents: presence__h3k36me3(0) using mapping("map_parent");
 
      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_h3k36me3") MAPPING_OBS;
 
@@ -94,7 +94,7 @@ frame: 1 {
    }
 #endif
 
-   variable: presence_h3k27me3 {
+   variable: presence__h3k27me3 {
      type: discrete observed 2:2 cardinality CARD_PRESENCE;
 
      conditionalparents: CONDITIONALPARENTS_PRESENCE;
@@ -103,14 +103,14 @@ frame: 1 {
    variable: h3k27me3 {
      type: continuous observed 0:0;
 
-     switchingparents: presence_h3k27me3(0) using mapping("map_parent");
+     switchingparents: presence__h3k27me3(0) using mapping("map_parent");
 
      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_h3k27me3") MAPPING_OBS;
 
      weight: scale 1.000000;
    }
 
-   variable: presence_h3k36me3 {
+   variable: presence__h3k36me3 {
      type: discrete observed 3:3 cardinality CARD_PRESENCE;
 
      conditionalparents: CONDITIONALPARENTS_PRESENCE;
@@ -119,7 +119,7 @@ frame: 1 {
    variable: h3k36me3 {
      type: continuous observed 1:1;
 
-     switchingparents: presence_h3k36me3(0) using mapping("map_parent");
+     switchingparents: presence__h3k36me3(0) using mapping("map_parent");
 
      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_h3k36me3") MAPPING_OBS;
 

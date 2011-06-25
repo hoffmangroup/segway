@@ -99,7 +99,7 @@ def compare_directory(template_dirname, query_dirname):
                 if compare_file(template_filename, query_filename):
                     counter.success()
                 else:
-                    counter.error("%s and %s differ" % (template_filename, query_filename))
+                    counter.error("diff %s %s" % (template_filename, query_filename))
 
                 break
         else:

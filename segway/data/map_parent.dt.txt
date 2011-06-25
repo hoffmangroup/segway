@@ -1,3 +1,0 @@
-map_parent
-1              % num parents
-    -1 { p0 }

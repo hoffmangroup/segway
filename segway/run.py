@@ -184,7 +184,7 @@ ENV_CMD = "/usr/bin/env"
 
 # XXX: need to differentiate this (prog) from prog.prog == progname throughout
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
-EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrainNew")
+EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
@@ -2213,7 +2213,6 @@ class Runner(object):
     def make_items_dt(self):
         res = []
 
-        res.append(data_string("map_parent.dt.txt"))
         res.append(data_string("map_frameIndex_ruler.dt.txt"))
         res.append(self.make_map_seg_segCountDown_dt_spec())
         res.append(self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec())
@@ -2636,7 +2635,7 @@ class Runner(object):
 
     def make_gmtk_kwargs(self):
         """
-        universal args to gmtkEMtrainNew, gmtkViterbi, gmtkJT
+        universal args to gmtkEMtrain, gmtkViterbi, gmtkJT
         """
         res = dict(strFile=self.structure_filename,
                    verbosity=self.verbosity,

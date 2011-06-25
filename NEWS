@@ -1,5 +1,7 @@
 1.2.0:
 
+* now requires a new version of GMTK (at least 20110624-368c7a027f88)
+  for increased speed
 * segway: new escaping method from Genomedata tracknames to GMTK
   tracknames allows any arbitrary Genomedata trackname, but this means
   that previous files will be incompatible, since "_" is now replaced
@@ -13,7 +15,8 @@
 * segway: add --bigBed option which calls segway-layer --bigBed
 * segway-layer: fix issue #19. Now doesn't override previous colors
   when mnemonics aren't supplied (thanks to Jay Hesselberth)
-* installation: always require drmaa. extras_require wasn't that useful in practice
+* installation: always require drmaa. setuptools extras_require wasn't that useful in practice
+* test: when files differ, output is in a form that makes it easier to diff
 
 1.1.0:
 

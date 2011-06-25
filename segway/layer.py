@@ -212,7 +212,7 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
         outfile = Tee(outfile, temp_file)
 
     ends = {}
-    with outfile:
+    with outfile as outfile:
         try:
             final_outfile = outfile._items[0]
         except AttributeError:
