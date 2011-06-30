@@ -384,26 +384,27 @@ def _save_observations_window(float_filename, int_filename, float_data,
         if distribution == DISTRIBUTION_ASINH_NORMAL:
             float_data = arcsinh(float_data)
 
-        mask_missing = isnan(float_data)
+        if resolution > 1:
+            # only write this out if we are at a low resolution
+            mask_missing = isnan(float_data)
 
-        # output -> presence_data -> int_blocks
-        # done in two steps so I can specify output type
-        presence_data = empty(mask_missing.shape, DTYPE_OBS_INT)
-        invert(mask_missing, presence_data)
+            # output -> presence_data -> int_blocks
+            # done in two steps so I can specify output type
+            presence_data = empty(mask_missing.shape, DTYPE_OBS_INT)
+            invert(mask_missing, presence_data)
 
-        num_datapoints = downsample_add(presence_data, resolution)
+            num_datapoints = downsample_add(presence_data, resolution)
 
-        int_blocks.append(num_datapoints)
+            int_blocks.append(num_datapoints)
 
-        # so that there is no divide by zero
-        num_datapoints_min_1 = maximum(num_datapoints, 1)
+            # so that there is no divide by zero
+            num_datapoints_min_1 = maximum(num_datapoints, 1)
 
-        # make float
-        float_data[mask_missing] = 0.0
+            # make float
+            float_data = downsample_add(float_data, resolution)
+            float_data /= num_datapoints_min_1
 
-        float_data_downsampled = downsample_add(float_data, resolution)
-        float_data_downsampled /= num_datapoints_min_1
-        float_data_downsampled.tofile(float_filename)
+        float_data.tofile(float_filename)
 
     if seq_data is not None:
         assert resolution == 1 # not implemented yet
@@ -413,8 +414,11 @@ def _save_observations_window(float_filename, int_filename, float_data,
         assert resolution == 1 # not implemented yet
         int_blocks.append(supervision_data)
 
-    # XXXopt: use the correctly sized matrix in the first place
-    int_data = column_stack(int_blocks)
+    if int_blocks:
+        int_data = column_stack(int_blocks)
+    else:
+        int_data = array([], dtype=DTYPE_OBS_INT)
+
     int_data.tofile(int_filename)
 
 # XXX: there is a new genomedata interface that should be able to

@@ -171,9 +171,6 @@ NUM_INSTANCES = 1
 # self->self, self->other
 PROBS_FORCE_TRANSITION = array([0.0, 0.0, 1.0])
 
-# replace NAN with SENTINEL to avoid GMTK warnings
-SENTINEL = float32(9.87654321)
-
 CPP_DIRECTIVE_FMT = "-D%s=%s"
 
 GMTK_INDEX_PLACEHOLDER = "@D"
@@ -1464,7 +1461,6 @@ class Runner(object):
 
         mapping = dict(card_seg=num_segs,
                        card_subseg=self.num_subsegs,
-                       card_presence=resolution+1,
                        card_segCountDown=self.card_seg_countdown,
                        card_supervisionLabel=self.card_supervision_label,
                        card_frameIndex=self.max_frames,
@@ -1497,18 +1493,6 @@ class Runner(object):
             return " | ".join(make_weight_scale(index * multiplier)
                               for index in xrange(resolution + 1))
 
-    def make_conditionalparents_spec(self, track):
-        """
-        this defines the parents of every observation
-        """
-
-        spec = ('CONDITIONALPARENTS_OBS '
-                'using mixture collection("collection_seg_%s") '
-                'MAPPING_OBS' % track)
-
-        return " | ".join(["CONDITIONALPARENTS_NIL_CONTINUOUS"] +
-                          [spec] * self.resolution)
-
     def save_structure(self):
         tracknames = self.tracknames
         num_tracks = self.num_tracks
@@ -1538,18 +1522,15 @@ class Runner(object):
             # weight_scale = 1.0
             # assert weight_scale == 1.0
 
-            conditionalparents_spec = self.make_conditionalparents_spec(track)
             weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
             add_observation(observation_items, "observation.tmpl",
                             track=track, track_index=track_index,
-                            presence_index=num_tracks+track_index,
-                            conditionalparents_spec=conditionalparents_spec,
                             weight_spec=weight_spec)
 
-        next_int_track_index = num_tracks*2
+        next_int_track_index = num_tracks+1
         # XXX: duplicative
         if self.use_dinucleotide:
             add_observation(observation_items, "dinucleotide.tmpl",
@@ -1575,9 +1556,9 @@ class Runner(object):
     def save_observations_window(self, float_filename, int_filename, float_data,
                                 seq_data=None, supervision_data=None):
         return _save_observations_window(float_filename, int_filename,
-                                        float_data, self.resolution,
-                                        self.distribution, seq_data,
-                                        supervision_data)
+                                         float_data, self.resolution,
+                                         self.distribution, seq_data,
+                                         supervision_data)
 
     def subset_metadata_attr(self, genome, name):
         subset_array = getattr(genome, name)[self.track_indexes]
@@ -1813,7 +1794,10 @@ class Runner(object):
         self.used_supercontigs = used_supercontigs
 
     def set_num_tracks(self, num_tracks):
-        num_int_cols = num_tracks
+        if self.resolution > 1:
+            num_int_cols = num_tracks
+        else:
+            num_int_cols = 0
 
         if self.use_dinucleotide:
             num_int_cols += NUM_SEQ_COLS
@@ -2651,19 +2635,19 @@ class Runner(object):
         if HASH_LOAD_FACTOR is not None:
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
 
-        assert self.int_filelistpath
-        if self.int_filelistpath:
-            res.update(of1=self.int_filelistpath,
+        assert self.float_filelistpath # XXX: dinucleotide-only won't work
+        if self.float_filelistpath:
+            res.update(of1=self.float_filelistpath,
                        fmt1="binary",
-                       nf1=0,
-                       ni1=self.num_int_cols,
+                       nf1=self.num_tracks,
+                       ni1=0,
                        iswp1=SWAP_ENDIAN)
 
-        if self.float_filelistpath:
-            res.update(of2=self.float_filelistpath,
+        if self.int_filelistpath:
+            res.update(of2=self.int_filelistpath,
                        fmt2="binary",
-                       nf2=self.num_tracks,
-                       ni2=0,
+                       nf2=0,
+                       ni2=self.num_int_cols,
                        iswp2=SWAP_ENDIAN)
 
         return res

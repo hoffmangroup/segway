@@ -367,6 +367,12 @@ Due to the lack of an epilogue in the model, it is possible to get one
 segment per sequence that actually does not meet. This is expected and
 will be fixed in a future release.
 
+Note that increasing hard minimum or maximum length constraints will
+greatly increase memory use and run time. You can decrease this
+performance penalty by increasing ruler size (which makes the
+precision of the duration model a little coarser), or by using the
+soft length priors below.
+
 Use these segment lengths along with the supervised learning feature
 with caution. If you try to create something impossible with your
 supervision labels, such as defining a 2300-bp region to have label 1,
@@ -402,6 +408,9 @@ comparatively greater or lesser weight to the probability from the
 soft transition model. Therefore the impact of the prior will be a
 function of both :option:`--segtransition-weight-scale` and
 :option:`--prior-strength`.
+
+One may effectively use the hard length constraints and soft length
+priors simultaneously.
 
 Task selection
 ==============
