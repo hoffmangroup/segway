@@ -2626,7 +2626,8 @@ class Runner(object):
                    island=ISLAND,
                    componentCache=COMPONENT_CACHE,
                    deterministicChildrenStore=DETERMINISTIC_CHILDREN_STORE,
-                   jtFile=self.jt_info_filename)
+                   jtFile=self.jt_info_filename,
+                   obsNAN=True)
 
         if ISLAND:
             res["base"] = ISLAND_BASE
@@ -2635,7 +2636,8 @@ class Runner(object):
         if HASH_LOAD_FACTOR is not None:
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
 
-        assert self.float_filelistpath # XXX: dinucleotide-only won't work
+        # XXX: dinucleotide-only won't work, because it has no float data
+        assert self.float_filelistpath and self.num_tracks
         if self.float_filelistpath:
             res.update(of1=self.float_filelistpath,
                        fmt1="binary",
@@ -2643,7 +2645,7 @@ class Runner(object):
                        ni1=0,
                        iswp1=SWAP_ENDIAN)
 
-        if self.int_filelistpath:
+        if self.int_filelistpath and self.num_int_cols:
             res.update(of2=self.int_filelistpath,
                        fmt2="binary",
                        nf2=0,
