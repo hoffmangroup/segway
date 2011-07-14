@@ -270,7 +270,7 @@ COVAR_TMPL_UNTIED = "covar_${seg}_${subseg}_${track} 1 ${rand}"
 GAMMASCALE_TMPL = "gammascale_${seg}_${subseg}_${track} 1 1 ${rand}"
 GAMMASHAPE_TMPL = "gammashape_${seg}_${subseg}_${track} 1 1 ${rand}"
 
-MC_NORM_TMPL = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
+MC_NORM_TMPL = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
     " mc_${distribution}_${seg}_${subseg}_${track}" \
     " mean_${seg}_${subseg}_${track} covar_${track}"
 MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${subseg}_${track}" \
@@ -2529,12 +2529,12 @@ class Runner(object):
             bedgraph_filename = self.work_dirpath / BEDGRAPH_FILEBASENAME
             self.bedgraph_filename = bedgraph_filename
 
-        # values for comparison to combine adjoining segments
-        last_line = ""
-        last_start = None
-        last_vals = (None, None, None) # (chrom, coord, seg)
-        
         for num_seg in xrange(self.num_segs):
+            # values for comparison to combine adjoining segments
+            last_start = None
+            last_line = ""
+            last_vals = (None, None, None) # (chrom, coord, seg)
+
             with maybe_gzip_open(bedgraph_filename % num_seg, "w") as bedgraph_file:
                 # XXX: add in browser track line (see SVN revisions
                 # previous to 195)
