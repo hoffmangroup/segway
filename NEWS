@@ -2,6 +2,9 @@
 
 * now requires a new version of GMTK (at least 20110624-368c7a027f88)
   for increased speed
+* segway: now has experimental Torque support. PBS and PBS Pro will
+  probably work with some changes--please e-mail Michael if you want
+  to help with identifying the necessary changes (thanks to Jay Hesselberth)
 * segway: new escaping method from Genomedata tracknames to GMTK
   tracknames allows any arbitrary Genomedata trackname, but this means
   that previous files will be incompatible, since "_" is now replaced

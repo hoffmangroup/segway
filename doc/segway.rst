@@ -74,7 +74,8 @@ Results
 -------
 
 8. The ``identifydir/segway.bed.gz`` file has each segment as a
-   separate line in the BED file, and can be used for further processing.
+   separate line in the BED file, and can be used for further
+   processing.
 
 9. The ``identifydir/segway.layered.bed.gz`` file is designed for
    easier visualization on a genome browser. It has thick lines where
@@ -131,7 +132,7 @@ Segway accomplishes four major tasks from a single command-line. It--
      parameters; and
   3. **identifies** segments in this data with the model.
   4. calculates **posterior** probability for each possible segment
-  label at each position.
+     label at each position.
 
 .. todo: block diagram
 
@@ -199,7 +200,6 @@ in modeling CpG or G+C bias.
 
 Positions
 ---------
-
 By default, Segway runs analyses on the whole genome. This can be
 incredibly time-consuming, especially for training. In reality,
 training (and even identification) on a smaller proportion of the
@@ -211,11 +211,7 @@ files with regions that should be excluded or included respectively.
 If both are specified, then inclusions are prcoessed first and the
 exclusions are then taken out of the included regions.
 
-.. using warning rather than note because it works with multi-para stuff in LaTeX
-
-.. todo: is this still the case?
-
-.. warning::
+.. note::
 
   BED format uses zero-based half-open coordinates, just like
   Python. This means that the first nucleotide on chromosome 1 is
@@ -239,11 +235,6 @@ picked to include a variety of different gene densities, and a number
 of more limited studies provide data just for these regions. All
 coordinates are in terms of the GRCh37 assembly of the human reference
 genome (also called ``hg19`` by UCSC).
-
-.. todo: convert to hg19
-.. There is a file containing only nine of these regions at
-   <http://noble.gs.washington.edu/proj/segway/data/regions.manual.1.tab>,
-   which covers 0.15% of the human genome, and is useful for training.
 
 
 After reading in data from a Genomedata archive, and selecting a
@@ -314,13 +305,14 @@ a smaller number of labels.
 
 There is an experimental :option:`--num-sublabels`\=\ *sublabels*
 option that enables hierarchical segmentation, where each segment
-label is divided into a number of segment sublabels. This may require
-some manipulation of model parameter files to actually be useful. The
+label is divided into a number of segment sublabels, each one with its
+own Gaussian emission parameters. The
 output segmentation will be defined in terms of individual sublabels,
-where the output label number is equal to the (super) segment label
-times the number of sublabels per label plus the sublabel number.
-
-.. TODO: reword last sentences so they are more clear
+where the output label number |l| is defined in terms of the
+(super) segment label |l_0|, the sublabel |l_1|, and the number of
+sublabels per label |n_1| using the formula |l = l_0 n_1 + l_1|.
+Using this feature effectively may require manipulation of model
+parameters.
 
 Segway allows multiple models of the values of a continuous
 observation tracks using three different probability distributions: a
@@ -329,10 +321,10 @@ on asinh-transformed data (``--distribution=asinh_norm``, the
 default), or a gamma distribution (``--distribution=gamma``). For
 gamma distributions, Segway generates initial parameters by converting
 mean |mu| and variance |sigma|:sup:`2` to shape *k* and scale \theta
-using the equations |mu| = *k*\ |theta| and |sigma|:sup:`2` =
-*k*\ |theta|:sup:`2`. The ideal methodology for setting gamma parameter
-values is less well-understood, and it also requires an unreleased
-version of GMTK. I recommend the use of ``asinh_norm`` in most cases.
+using the equations |mu| = *k*\ |theta| and |sigma|:sup:`2` = *k*\
+|theta|:sup:`2`. The ideal methodology for setting gamma parameter
+values is less well-understood. I recommend the use of ``asinh_norm``
+in most cases.
 
 Segment duration model
 ----------------------
@@ -401,12 +393,13 @@ due to the prior as the number of nucleotides in the training regions.
 
 The :option:`--segtransition-weight-scale`\=\ *scale* option controls
 the strength of the prior in another way. It controls the strength of
-the transition model relative to the data from the observed tracks.
-The default *scale* of 1 gives the soft transition model equal
-strength to a single data track. Using higher or lower values uses
-comparatively greater or lesser weight to the probability from the
-soft transition model. Therefore the impact of the prior will be a
-function of both :option:`--segtransition-weight-scale` and
+the length prior relative to the data from the observed tracks. The
+default *scale* of 1 gives the soft transition model equal strength to
+a single data track. Using higher or lower values gives comparatively
+greater or lesser weight to the probability from the soft length
+prior, essentially allowing the prior to have more votes in
+determining where a segment boundary is. The impact of the prior will
+be a function of both :option:`--segtransition-weight-scale` and
 :option:`--prior-strength`.
 
 One may effectively use the hard length constraints and soft length
@@ -414,7 +407,6 @@ priors simultaneously.
 
 Task selection
 ==============
-
 Segway will perform either (a) model generation and training or (b)
 identification separately, so it is possible to train on a subset of
 the genome and identify on the whole thing. To train, use::
@@ -561,47 +553,23 @@ The :option:`--recover`\=\ *dirname* allows recovery from an
 interrupted identify task. Segway will requeue jobs that never
 completed before, skipping any windows that have already completed.
 
-Posterior task
-==============
-The **posterior** inference task of Segway estimates for each position
-of interest the probability that the model has a particular segment
-label given the data. This information is delivered in a series of
-numbered wiggle files, one for each segment label. The individual
-values will vary from 0 to 100, showing the percentage probability at
-each position for the label in that file. In most positions, the value
-will be 0 or 100, and substantially reproduce the Viterbi path
-determined from the **identify** task.
-
-Posterior results can be useful in determining regions of ambiguous
-labeling or in diagnosing new models. The mostly binary nature of the
-posterior assignments is a consequence of the design of the default
-Segway model, and it is possible to design a model that does not have
-this feature. Doing so is left as an exercise to the reader.
-
-.. todo: name the files
-
-You may find you need to convert the bedGraph files to bigWig format
-first to allow small portions to be uploaded to a genome browser
-piecewise.
-
-.. todo: same options for specifying model and parameters as identify
-
 Creating layered output
-=======================
-
-Segway produces BED Files as output with the segment label in the name
+-----------------------
+Segway produces BED files as output with the segment label in the name
 field. While this is the most sensible way of interchanging the
-segmentation with other programs, it can be difficult to visualize. We
-supply a :program:`segway-layer` program that transforms segmentation
-BED files into "layered" BED files with rows for each possible Segment
-label and thick boxes at the location of each label. This is what we
-show in the screenshot figure of the Segway article. This is much
-easier to see at low levels of magnification. The layers are also
-labeled, removing the need to distinguish them exclusively by color.
+segmentation with other programs, it can be difficult to visualize. To
+solve this problem, Segway will also produce a *layered* BED file with
+rows for each possible Segment label and thick boxes at the location
+of each label. This is what we show in the screenshot figure of the
+Segway article. This is much easier to see at low levels of
+magnification. The layers are also labeled, removing the need to
+distinguish them exclusively by color. While Segway automatically
+creates these files at the end of an identify task, you can also use
+:program:`segway-layer` wit ha standard BED segmentation to repeat the
+layering process, which you may want to do if you want to add mnemonic
+labels instead of the initial integers used as labels.
 :program:`segway-layer` supports the use of standard input and output
 by using ``-`` as a filename, following a common Unix convention.
-Segway automatically runs :program:`segway-layer` at the end of an
-identify task.
 
 The mnemonic files used by Segway and Segtools have a simple format.
 They are tab-delimited files with a header that has the following
@@ -628,6 +596,32 @@ A simple mnemonic file appears below::
   0	TSS	transcription start site
   2	GE	gene end
   1	D	dead zone
+
+Posterior task
+==============
+The **posterior** inference task of Segway estimates for each position
+of interest the probability that the model has a particular segment
+label given the data. This information is delivered in a series of
+numbered wiggle files, one for each segment label. The individual
+values will vary from 0 to 100, showing the percentage probability at
+each position for the label in that file. In most positions, the value
+will be 0 or 100, and substantially reproduce the Viterbi path
+determined from the **identify** task. The **posterior** task uses the
+same options for specifying a model and parameters as **identify**.
+
+Posterior results can be useful in determining regions of ambiguous
+labeling or in diagnosing new models. The mostly binary nature of the
+posterior assignments is a consequence of the design of the default
+Segway model, and it is possible to design a model that does not have
+this feature. Doing so is left as an exercise to the reader.
+
+.. todo: name the files
+
+You may find you need to convert the bedGraph files to bigWig format
+first to allow small portions to be uploaded to a genome browser
+piecewise.
+
+.. todo: same options for specifying model and parameters as identify
 
 Technical matters
 =================
@@ -658,13 +652,8 @@ options (:option:`--track`, :option:`--include-coords`,
 :option:`--exclude-coords`) must be exactly the same when sharing
 observation files. Otherwise you are likely to get unexplained failures.
 
-.. todo: comp add a check in observation directory to make sure tracks and coords are same
-.. todo: comp add a lock file to eliminate race condition.
-
 You will find a full description of all the working files in the
-**Files** section
-
-.. todo: comp above should be a link, not bold
+Files_ section
 
 Distributed computing
 ---------------------
@@ -921,13 +910,11 @@ On LSF, use::
 
   bkill -J "*.ed03201cea2047399d4cbcc4b62f9827"
 
-Jobs created in the identify (``vit``) task are
+Jobs created in the identify (``vit``) or posterior (``jt``) task are
 named similarly::
 
   vit34.identifydir.4f32630d53724f08b34a8fc58793307d
-
-..  jt34.identifydir.4f32630d53724f08b34a8fc58793307d
-.. or posterior (``jt``)
+  jt34.identifydir.4f32630d53724f08b34a8fc58793307d
 
 Of course, there are no instances or rounds for the identify task, so
 only the sequence index is reported.
@@ -1007,6 +994,10 @@ Helpful commands
 ================
 Here are some short bash scripts or one-liners that are useful:
 
+There used to be a recipe here to continue Segway from an interrupted
+training run, but this has been replaced by the
+:option:`--old-directory` option.
+
 Make a tarball of parameters and models from various directories::
 
     (for DIR in traindir1 traindir2; do
@@ -1026,9 +1017,10 @@ Print all last likelihoods::
 .. todo: research BEDTools capability here
 
 Recover as much as possible from an incomplete identification run
-without completing it. Note that this does not combine adjacent lines
-of same segment. BEDTools might be able to do this for you. You will
-have to create your own header.txt with appropriate track lines::
+without completing it (which can be done with
+:option:`--old-directory`. Note that this does not combine adjacent
+lines of same segment. BEDTools might be able to do this for you. You
+will have to create your own header.txt with appropriate track lines::
 
     cat header.txt <(find viterbi -type f | sort | xargs cat) | gzip -c > segway.bed.gz
 

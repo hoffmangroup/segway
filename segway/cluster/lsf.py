@@ -51,6 +51,7 @@ TEMP_DIRNAME = gettempdir()
 class JobTemplateFactory(_JobTemplateFactory):
     # eliminate default overwrite behavior for DRMAA/LSF, go to append
     # which is default for DRMAA/SGE
+    # we use a native spec -o and -e instead of the DRMAA interface
     set_template_output_error = False
 
     def make_res_req(self, mem_usage, tmp_usage):

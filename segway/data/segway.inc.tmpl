@@ -2,8 +2,9 @@
 #define SEG_INC
 
 %% component types
-#define COMPONENT_TYPE_DIAG_GAUSSIAN 0
+%% enumerated in tksrc/GMTK_Component.h:ComponentType
 #define COMPONENT_TYPE_GAMMA 3
+#define COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN 5
 
 %% cardinalities
 
@@ -40,7 +41,9 @@
 #endif
 
 % supervision label
+#ifndef CARD_SUPERVISIONLABEL
 #define CARD_SUPERVISIONLABEL $card_supervisionLabel
+#endif CARD_SUPERVISIONLABEL
 
 % AA .. TT
 #define CARD_DINUCLEOTIDE 16

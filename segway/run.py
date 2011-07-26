@@ -1990,6 +1990,8 @@ class Runner(object):
         return prob_self_self, prob_self_other
 
     def make_dense_cpt_segCountDown_seg_segTransition(self):
+        # first values are the ones where segCountDown = 0 therefore
+        # the transitions to segTransition = 2 occur early on
         card_seg_countdown = self.card_seg_countdown
 
         # by default, when segCountDown is high, never transition

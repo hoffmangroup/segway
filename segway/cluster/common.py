@@ -41,11 +41,17 @@ class _JobTemplateFactory(object):
         self.native_spec = template.nativeSpecification
         self.mem_usage_progression = mem_usage_progression
 
-        # set here so that it can be overridden for LSF
+        # set here so that segway.cluster.lsf can use it
         self.output_filename = output_filename
         self.error_filename = error_filename
 
+        # only do this if the subclass doesn't do it for you
         if self.set_template_output_error:
+            # format:
+            # hostname:filename
+            # no hostname = execution host
+            # XXX: should add drmaa.const.PLACEHOLDER_WD to
+            # beginning of relative paths--those that don't start with "/"
             template.outputPath = ":" + output_filename
             template.errorPath = ":" + error_filename
 

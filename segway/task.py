@@ -27,15 +27,14 @@ from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
-
 SCORE_MIN = 100
 SCORE_MAX = 1000
 
 TEMP_DIRPATH = path(gettempdir())
 
 EXT_OPTIONS = {}
-EXT_OPTIONS[EXT_INT] = "-of1"
-EXT_OPTIONS[EXT_FLOAT] = "-of2"
+EXT_OPTIONS[EXT_FLOAT] = "-of1" # duplicative of run.py
+EXT_OPTIONS[EXT_INT] = "-of2"
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
@@ -188,13 +187,15 @@ def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename
                                   num_labels)
 
 def replace_args_filelistname(args, temp_filepaths, ext):
-    option = EXT_OPTIONS[ext]
-    filelistname_index = args.index(option) + 1
     fd, filelistname = mkstemp(EXT_LIST + extsep, extsep + ext)
     filelistpath = path(filelistname)
 
     # side-effect on args, temp_filepaths
-    args[filelistname_index] = filelistname
+    option = EXT_OPTIONS[ext]
+    try:
+        args[args.index(option) + 1] = filelistname
+    except ValueError:
+        pass # not going to add this filename to the command line
     temp_filepaths.append(filelistpath)
 
     return fd
@@ -220,9 +221,10 @@ def run_posterior_save_bed(coord, resolution, outfilename, num_labels,
     temp_filepaths = [float_filepath, int_filepath]
 
     # XXX: should do something to ensure of1 matches with int, of2 with float
-    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
+    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
+
     with Genome(genomedata_dirname) as genome:
         supercontigs = genome[chrom].supercontigs[start:end]
         assert len(supercontigs) == 1

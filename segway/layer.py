@@ -70,6 +70,8 @@ class Tee(object):
         self._items = new_items
         self._exits = exits
 
+        return self
+
     def __exit__(self, *exc):
         while self._exits:
             exit = self._exits.pop()

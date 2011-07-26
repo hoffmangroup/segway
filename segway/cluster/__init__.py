@@ -59,6 +59,9 @@ def get_driver_name(session):
         return "sge"
     elif drms_info.startswith("Platform LSF"):
         return "lsf"
+    # not sure what PBS and PBS Pro return here.
+    elif drms_info.startswith("Torque"):
+        return "pbs"
     else:
         msg = ("unsupported distributed resource management system: %s"
                % drms_info)
@@ -222,9 +225,10 @@ class RestartableJobDict(dict):
 
                 resource_usage_orig = job_info.resourceUsage
                 resource_usage = defaultdict(NA_FACTORY, resource_usage_orig)
+
                 try: # SGE
                     maxvmem = resource_usage_orig["maxvmem"]
-                except KeyError: # LSF
+                except KeyError: # non-SGE systems
                     maxvmem = resource_usage["vmem"]
 
                 cpu = resource_usage["cpu"]
