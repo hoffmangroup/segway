@@ -1,0 +1,5 @@
+jobid	jobname	prog	num_segs	num_frames	maxvmem	cpu	exit_status
+8195581	emt0.0.0.traindir.7335ae40beef11e0938400237d9dcf3a	gmtkEMtrainNew	4	184355	182272	13	0
+8195903	emt0.0.bundle.traindir.7335ae40beef11e0938400237d9dcf3a	gmtkEMtrainNew	4	0	25600	0	0
+8195972	emt0.1.0.traindir.7335ae40beef11e0938400237d9dcf3a	gmtkEMtrainNew	4	184355	173056	12	0
+8196182	emt0.1.bundle.traindir.7335ae40beef11e0938400237d9dcf3a	gmtkEMtrainNew	4	0	24576	0	0
