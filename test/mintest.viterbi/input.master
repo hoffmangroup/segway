@@ -1,9 +1,5 @@
 #include "segway.inc"
 
-#if CARD_SEG != 4
-#error CARD_SEG must be defined to be 4 for this input master file
-#endif
-
 DT_IN_FILE inline
 5
 
@@ -75,7 +71,7 @@ DPMF_IN_FILE inline
 0 dpmf_always 1 1.0
 
 DETERMINISTIC_CPT_IN_FILE inline
-5
+4
 
 0 seg_segCountDown
 1
@@ -95,11 +91,6 @@ map_segTransition_ruler_seg_segCountDown_segCountDown
 3 seg_seg_copy
 1
 CARD_SEG CARD_SEG
-internal:copyParent
-
-4 subseg_subseg_copy
-1
-CARD_SUBSEG CARD_SUBSEG
 internal:copyParent
 
 REAL_MAT_IN_FILE inline

@@ -18,6 +18,7 @@
 * segway: add --bigBed option which calls segway-layer --bigBed
 * segway-layer: fix issue #19. Now doesn't override previous colors
   when mnemonics aren't supplied (thanks to Jay Hesselberth)
+* segway-winner: fix issue #21. Now works on Python 2.5.1
 * installation: always require drmaa. setuptools extras_require wasn't that useful in practice
 * test: when files differ, output is in a form that makes it easier to diff
 

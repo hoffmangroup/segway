@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import division, with_statement
 
 """winner.py: pick winning paramters when training run is cut short
 """

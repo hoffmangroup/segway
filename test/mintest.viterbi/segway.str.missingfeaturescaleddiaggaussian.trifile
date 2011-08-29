@@ -1,20 +1,24 @@
 % Structure File Identification Information
 0 segCountDown 0 2 D 0 1 1 seg 0 
 1 seg 0 4 D 0 1 0 
-2 h3k27me3 0 4 C 0 1 1 seg 0 
-3 h3k36me3 0 4 C 0 1 1 seg 0 
-4 frameIndex 1 2000000 D 0 1 0 
-5 ruler 1 2 D 0 1 1 frameIndex 0 
-6 segCountDown 1 2 D 0 1 4 segTransition 0 ruler 0 seg 0 segCountDown -1 
-7 segTransition 1 3 D 0 1 2 segCountDown -1 seg -1 
-8 seg 1 4 D 1 segTransition 0 3 1 seg -1 1 seg -1 1 seg -1 
-9 h3k27me3 1 4 C 0 1 1 seg 0 
-10 h3k36me3 1 4 C 0 1 1 seg 0 
+2 presence_h3k27me3 0 2 D 0 1 0 
+3 presence_h3k36me3 0 2 D 0 1 0 
+4 h3k27me3 0 2 C 0 1 1 seg 0 
+5 h3k36me3 0 2 C 0 1 1 seg 0 
+6 frameIndex 1 2000000 D 0 1 0 
+7 ruler 1 2 D 0 1 1 frameIndex 0 
+8 segCountDown 1 2 D 0 1 4 segTransition 0 ruler 0 seg 0 segCountDown -1 
+9 segTransition 1 3 D 0 1 2 segCountDown -1 seg -1 
+10 seg 1 4 D 1 segTransition 0 3 1 seg -1 1 seg -1 1 seg -1 
+11 presence_h3k27me3 1 2 D 0 1 0 
+12 presence_h3k36me3 1 2 D 0 1 0 
+13 h3k27me3 1 2 C 0 1 1 seg 0 
+14 h3k36me3 1 2 C 0 1 1 seg 0 
 1 1 
 @@@!!!TRIFILE_END_OF_ID_STRING!!!@@@ 
 
 % ---
-% GMTK Triangulation File Created: Thursday August 04 2011, 15:53:39 PDT
+% GMTK Triangulation File Created: Friday August 05 2011, 10:54:06 PDT
 % Options-: triangulationHeuristic: completed, jtWeight: T, jtwUB: F, jtwPUI: 0.000000, jtwMC: F, jtwSNSC: 1.000000, jtwDNSC: 1.000000, pfCobWeight: 0.000000, findBestBoundary: T, traverseFraction: 1.000000, noBoundaryMemoize: F, forceLeftRight: , boundaryHeuristic: S, 
 % ---
 
@@ -37,52 +41,58 @@ Left_interface:Run_Bdry_Alg(T),Bnd_Heurs(S),TravFrac(1.000000),Tri_Heur(complete
 
 % ---
 % --- P partition information: variables and their neighbors
-% segCountDown(0) : seg(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% seg(0) : segCountDown(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% h3k27me3(0) : segCountDown(0), seg(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% h3k36me3(0) : segCountDown(0), seg(0), h3k27me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% ruler(1) : segCountDown(0), seg(0), h3k27me3(0), h3k36me3(0), segCountDown(1), segTransition(1), seg(1),
-% segCountDown(1) : segCountDown(0), seg(0), h3k27me3(0), h3k36me3(0), ruler(1), segTransition(1), seg(1),
-% segTransition(1) : segCountDown(0), seg(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), seg(1),
-% seg(1) : segCountDown(0), seg(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1),
+% segCountDown(0) : seg(0), presence_h3k27me3(0), presence_h3k36me3(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
+% seg(0) : segCountDown(0), presence_h3k27me3(0), presence_h3k36me3(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
+% presence_h3k27me3(0) : segCountDown(0), seg(0), presence_h3k36me3(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
+% presence_h3k36me3(0) : segCountDown(0), seg(0), presence_h3k27me3(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
+% h3k27me3(0) : segCountDown(0), seg(0), presence_h3k27me3(0), presence_h3k36me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
+% h3k36me3(0) : segCountDown(0), seg(0), presence_h3k27me3(0), presence_h3k36me3(0), h3k27me3(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
+% ruler(1) : segCountDown(0), seg(0), presence_h3k27me3(0), presence_h3k36me3(0), h3k27me3(0), h3k36me3(0), segCountDown(1), segTransition(1), seg(1),
+% segCountDown(1) : segCountDown(0), seg(0), presence_h3k27me3(0), presence_h3k36me3(0), h3k27me3(0), h3k36me3(0), ruler(1), segTransition(1), seg(1),
+% segTransition(1) : segCountDown(0), seg(0), presence_h3k27me3(0), presence_h3k36me3(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), seg(1),
+% seg(1) : segCountDown(0), seg(0), presence_h3k27me3(0), presence_h3k36me3(0), h3k27me3(0), h3k36me3(0), ruler(1), segCountDown(1), segTransition(1),
 % --- P partition definition
-P_PARTITION 8 segCountDown 0 seg 0 h3k27me3 0 h3k36me3 0 ruler 1 segCountDown 1 segTransition 1 seg 1 
+P_PARTITION 10 segCountDown 0 seg 0 presence_h3k27me3 0 presence_h3k36me3 0 h3k27me3 0 h3k36me3 0 ruler 1 segCountDown 1 segTransition 1 seg 1 
 
 % ---
 % --- C partition information: variables and their neighbors
-% frameIndex(1) : segCountDown(1), seg(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% segCountDown(1) : frameIndex(1), seg(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% seg(1) : frameIndex(1), segCountDown(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% h3k27me3(1) : frameIndex(1), segCountDown(1), seg(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% h3k36me3(1) : frameIndex(1), segCountDown(1), seg(1), h3k27me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% ruler(2) : frameIndex(1), segCountDown(1), seg(1), h3k27me3(1), h3k36me3(1), segCountDown(2), segTransition(2), seg(2),
-% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), h3k27me3(1), h3k36me3(1), ruler(2), segTransition(2), seg(2),
-% segTransition(2) : frameIndex(1), segCountDown(1), seg(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), seg(2),
-% seg(2) : frameIndex(1), segCountDown(1), seg(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2),
+% frameIndex(1) : segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% segCountDown(1) : frameIndex(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% seg(1) : frameIndex(1), segCountDown(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% presence_h3k27me3(1) : frameIndex(1), segCountDown(1), seg(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% presence_h3k36me3(1) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% h3k27me3(1) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% h3k36me3(1) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% ruler(2) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), segCountDown(2), segTransition(2), seg(2),
+% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segTransition(2), seg(2),
+% segTransition(2) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), seg(2),
+% seg(2) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2),
 % --- C partition definition
-C_PARTITION 9 frameIndex 1 segCountDown 1 seg 1 h3k27me3 1 h3k36me3 1 ruler 2 segCountDown 2 segTransition 2 seg 2 
+C_PARTITION 11 frameIndex 1 segCountDown 1 seg 1 presence_h3k27me3 1 presence_h3k36me3 1 h3k27me3 1 h3k36me3 1 ruler 2 segCountDown 2 segTransition 2 seg 2 
 
 % ---
 % --- E partition information: variables and their neighbors
-% frameIndex(2) : segCountDown(2), seg(2), h3k27me3(2), h3k36me3(2),
-% segCountDown(2) : frameIndex(2), seg(2), h3k27me3(2), h3k36me3(2),
-% seg(2) : frameIndex(2), segCountDown(2), h3k27me3(2), h3k36me3(2),
-% h3k27me3(2) : frameIndex(2), segCountDown(2), seg(2), h3k36me3(2),
-% h3k36me3(2) : frameIndex(2), segCountDown(2), seg(2), h3k27me3(2),
+% frameIndex(2) : segCountDown(2), seg(2), presence_h3k27me3(2), presence_h3k36me3(2), h3k27me3(2), h3k36me3(2),
+% segCountDown(2) : frameIndex(2), seg(2), presence_h3k27me3(2), presence_h3k36me3(2), h3k27me3(2), h3k36me3(2),
+% seg(2) : frameIndex(2), segCountDown(2), presence_h3k27me3(2), presence_h3k36me3(2), h3k27me3(2), h3k36me3(2),
+% presence_h3k27me3(2) : frameIndex(2), segCountDown(2), seg(2), presence_h3k36me3(2), h3k27me3(2), h3k36me3(2),
+% presence_h3k36me3(2) : frameIndex(2), segCountDown(2), seg(2), presence_h3k27me3(2), h3k27me3(2), h3k36me3(2),
+% h3k27me3(2) : frameIndex(2), segCountDown(2), seg(2), presence_h3k27me3(2), presence_h3k36me3(2), h3k36me3(2),
+% h3k36me3(2) : frameIndex(2), segCountDown(2), seg(2), presence_h3k27me3(2), presence_h3k36me3(2), h3k27me3(2),
 % --- E partition definition
-E_PARTITION 5 frameIndex 2 segCountDown 2 seg 2 h3k27me3 2 h3k36me3 2 
+E_PARTITION 7 frameIndex 2 segCountDown 2 seg 2 presence_h3k27me3 2 presence_h3k36me3 2 h3k27me3 2 h3k36me3 2 
 
 % ---
 % --- PC information : variables and their neighbors
-% segCountDown(1) : frameIndex(1), seg(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% seg(1) : frameIndex(1), segCountDown(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% segCountDown(1) : frameIndex(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% seg(1) : frameIndex(1), segCountDown(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
 % --- PC interface definition
 PC_PARTITION 2 segCountDown 1 seg 1 
 
 % ---
 % --- CE information : variables and their neighbors
-% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), h3k27me3(1), h3k36me3(1), ruler(2), segTransition(2), seg(2),
-% seg(2) : frameIndex(1), segCountDown(1), seg(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2),
+% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segTransition(2), seg(2),
+% seg(2) : frameIndex(1), segCountDown(1), seg(1), presence_h3k27me3(1), presence_h3k36me3(1), h3k27me3(1), h3k36me3(1), ruler(2), segCountDown(2), segTransition(2),
 % --- CE interface definition
 CE_PARTITION 2 segCountDown 2 seg 2 
 
@@ -90,9 +100,11 @@ CE_PARTITION 2 segCountDown 2 seg 2
 % ---- P Partitions Cliques and their weights
 % ---- 1 total max-cliques 
 % ---- Triangulation came from method: 1-completed
-% 0 : 8  1.982271
+% 0 : 10  1.982271
 %    segCountDown(0)
 %    seg(0)
+%    presence_h3k27me3(0)
+%    presence_h3k36me3(0)
 %    h3k27me3(0)
 %    h3k36me3(0)
 %    ruler(1)
@@ -102,16 +114,18 @@ CE_PARTITION 2 segCountDown 2 seg 2
 % Maximum clique state space = 1e1.982271, total state space = 1e1.982271
 1-completed 
 1 
-0 8 segCountDown 0 seg 0 h3k27me3 0 h3k36me3 0 ruler 1 segCountDown 1 segTransition 1 seg 1 
+0 10 segCountDown 0 seg 0 presence_h3k27me3 0 presence_h3k36me3 0 h3k27me3 0 h3k36me3 0 ruler 1 segCountDown 1 segTransition 1 seg 1 
 
 % ---
 % ---- C Partitions Cliques and their weights
 % ---- 1 total max-cliques 
 % ---- Triangulation came from method: 1-completed
-% 0 : 9  2.283301
+% 0 : 11  2.283301
 %    frameIndex(1)
 %    segCountDown(1)
 %    seg(1)
+%    presence_h3k27me3(1)
+%    presence_h3k36me3(1)
 %    h3k27me3(1)
 %    h3k36me3(1)
 %    ruler(2)
@@ -121,22 +135,24 @@ CE_PARTITION 2 segCountDown 2 seg 2
 % Maximum clique state space = 1e2.283301, total state space = 1e2.283301
 1-completed 
 1 
-0 9 frameIndex 1 segCountDown 1 seg 1 h3k27me3 1 h3k36me3 1 ruler 2 segCountDown 2 segTransition 2 seg 2 
+0 11 frameIndex 1 segCountDown 1 seg 1 presence_h3k27me3 1 presence_h3k36me3 1 h3k27me3 1 h3k36me3 1 ruler 2 segCountDown 2 segTransition 2 seg 2 
 
 % ---
 % ---- E Partitions Cliques and their weights
 % ---- 1 total max-cliques 
 % ---- Triangulation came from method: 1-completed
-% 0 : 5  0.903090
+% 0 : 7  0.903090
 %    frameIndex(2)
 %    segCountDown(2)
 %    seg(2)
+%    presence_h3k27me3(2)
+%    presence_h3k36me3(2)
 %    h3k27me3(2)
 %    h3k36me3(2)
 % Maximum clique state space = 1e0.903090, total state space = 1e0.903090
 1-completed 
 1 
-0 5 frameIndex 2 segCountDown 2 seg 2 h3k27me3 2 h3k36me3 2 
+0 7 frameIndex 2 segCountDown 2 seg 2 presence_h3k27me3 2 presence_h3k36me3 2 h3k27me3 2 h3k36me3 2 
 
 
 % ----

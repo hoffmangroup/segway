@@ -13,7 +13,6 @@ frame: 0 {
      conditionalparents: nil using DenseCPT("start_seg");
    }
 
-#ifndef MISSING_FEATURE_SCALED_DIAG_GAUSSIAN
    variable: presence_h3k27me3 {
      type: discrete observed 2:2 cardinality CARD_PRESENCE;
 
@@ -25,7 +24,6 @@ frame: 0 {
 
      conditionalparents: CONDITIONALPARENTS_PRESENCE;
    }
-#endif
 
    variable: h3k27me3 {
      type: continuous observed 0:0;
@@ -95,7 +93,6 @@ frame: 1 {
      switchingparents: segTransition(0) using mapping("internal:copyParent");
    }
 
-#ifndef MISSING_FEATURE_SCALED_DIAG_GAUSSIAN
    variable: presence_h3k27me3 {
      type: discrete observed 2:2 cardinality CARD_PRESENCE;
 
@@ -107,7 +104,6 @@ frame: 1 {
 
      conditionalparents: CONDITIONALPARENTS_PRESENCE;
    }
-#endif
 
    variable: h3k27me3 {
      type: continuous observed 0:0;
