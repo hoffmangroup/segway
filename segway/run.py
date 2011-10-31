@@ -94,7 +94,7 @@ NUM_SUBSEGS = 1
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
-COVAR_TIED = True # would need to expand to MC, MX to change
+COVAR_TIED = False
 MAX_WINDOWS = 1000
 
 ISLAND = True
@@ -263,16 +263,23 @@ RES_SEG_TABLE = "seg_table.tab"
 
 MEAN_TMPL = "mean_${seg}_${subseg}_${track} 1 ${rand}"
 
-COVAR_TMPL_TIED = "covar_${track} 1 ${rand}"
-# XXX: unused
-COVAR_TMPL_UNTIED = "covar_${seg}_${subseg}_${track} 1 ${rand}"
+COVAR_NAME_TMPL_TIED = "covar_${track}"
+COVAR_NAME_TMPL_UNTIED = "covar_${seg}_${subseg}_${track}"
+if COVAR_TIED:
+    COVAR_NAME_TMPL = COVAR_NAME_TMPL_TIED
+else:
+    COVAR_NAME_TMPL = COVAR_NAME_TMPL_UNTIED
+
+COVAR_TMPL_TIED = "%s 1 ${rand}" % COVAR_NAME_TMPL_TIED
+COVAR_TMPL_UNTIED = "%s 1 ${rand}" % COVAR_NAME_TMPL_UNTIED
 
 GAMMASCALE_TMPL = "gammascale_${seg}_${subseg}_${track} 1 1 ${rand}"
 GAMMASHAPE_TMPL = "gammashape_${seg}_${subseg}_${track} 1 1 ${rand}"
 
 MC_NORM_TMPL = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
     " mc_${distribution}_${seg}_${subseg}_${track}" \
-    " mean_${seg}_${subseg}_${track} covar_${track}"
+    " mean_${seg}_${subseg}_${track} %s" \
+    " matrix_weightscale_1x1" % COVAR_NAME_TMPL
 MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${subseg}_${track}" \
     " ${min_track} gammascale_${seg}_${subseg}_${track}" \
     " gammashape_${seg}_${subseg}_${track}"
@@ -674,6 +681,10 @@ def find_overlaps(start, end, include_coords, exclude_coords):
         return find_overlaps_exclude(res, exclude_coords)
 
 def make_spec(name, items):
+    """
+    name: str, name of GMTK object type
+    items: list of strs
+    """
     header_lines = ["%s_IN_FILE inline" % name, str(len(items)), ""]
 
     indexed_items = ["%d %s" % indexed_item
@@ -815,6 +826,27 @@ class TrainThread(Thread):
         self.result = self.runner.run_train_instance()
 
 def maybe_quote_arg(text):
+    """
+    return quoted argument, adding backslash quotes
+
+    XXX: would be nice if this were smarter about what needs to be
+    quoted, only doing this when special characters or whitespace are
+    within the arg
+
+    XXX: Enclosing characters in double quotes (`"') preserves the literal value
+of all characters within the quotes, with the exception of `$', ``',
+`\', and, when history expansion is enabled, `!'.  The characters `$'
+and ``' retain their special meaning within double quotes (*note Shell
+Expansions::).  The backslash retains its special meaning only when
+followed by one of the following characters: `$', ``', `"', `\', or
+`newline'.  Within double quotes, backslashes that are followed by one
+of these characters are removed.  Backslashes preceding characters
+without a special meaning are left unmodified.  A double quote may be
+quoted within double quotes by preceding it with a backslash.  If
+enabled, history expansion will be performed unless an `!' appearing in
+double quotes is escaped using a backslash.  The backslash preceding
+the `!' is not removed.
+    """
     return '"%s"' % text.replace('"', r'\"')
 
 def cmdline2text(cmdline=sys.argv):
@@ -2118,9 +2150,11 @@ class Runner(object):
 
     def make_covar_spec(self, tied):
         if tied:
+            # see Runner.generate_tmpl_mappings() for meaning of segnames
             segnames = ["any"]
             tmpl = COVAR_TMPL_TIED
         else:
+            # None: automatically generate segnames
             segnames = None
             tmpl = COVAR_TMPL_UNTIED
 
@@ -2166,6 +2200,9 @@ class Runner(object):
 
     def make_gamma_spec(self):
         return make_spec("REAL_MAT", self.make_items_gamma())
+
+    def make_real_mat_spec(self):
+        return make_spec("REAL_MAT", ["matrix_weightscale_1x1 1 1 1.0"])
 
     def make_mc_spec(self):
         return self.make_spec_multiseg("MC", MC_TMPLS[self.distribution])
@@ -2286,7 +2323,7 @@ class Runner(object):
         if distribution in DISTRIBUTIONS_LIKE_NORM:
             mean_spec = self.make_mean_spec()
             covar_spec = self.make_covar_spec(COVAR_TIED)
-            gamma_spec = ""
+            real_mat_spec = self.make_real_mat_spec()
 
             if COVAR_TIED:
                 num_free_params += (fullnum_subsegs + 1) * num_tracks
@@ -2299,7 +2336,7 @@ class Runner(object):
             # XXX: another option is to calculate an ML estimate for
             # the gamma distribution rather than the ML estimate for the
             # mean and converting
-            gamma_spec = self.make_gamma_spec()
+            real_mat_spec = self.make_gamma_spec()
 
             num_free_params += (fullnum_subsegs * 2) * num_tracks
         else:
@@ -3381,6 +3418,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         with open(cmdline_top_filename, "w") as cmdline_top_file:
             print >>cmdline_top_file, run_msg
             print >>cmdline_top_file
+            print >>cmdline_top_file, "cd %s" % maybe_quote_arg(path.getcwd())
             print >>cmdline_top_file, cmdline2text()
 
         return run_msg

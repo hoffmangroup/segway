@@ -1,1 +1,4 @@
-fix docs (latexpdf missing, no man target)
+* fix docs (latexpdf missing, no man target)
+* check that recovery files are there (when -r specified) before
+  spinning off threads
+
