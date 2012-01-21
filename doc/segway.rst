@@ -6,7 +6,7 @@
 :Organization: University of Washington
 :Address: Department of Genome Sciences, PO Box 355065
           Seattle, WA 98195-5065, United States of America
-:Copyright: 2009-2011 Michael M. Hoffman
+:Copyright: 2009-2012 Michael M. Hoffman
 :Last updated: |today|
 
 .. currentmodule:: segway
@@ -622,6 +622,10 @@ first to allow small portions to be uploaded to a genome browser
 piecewise.
 
 .. todo: same options for specifying model and parameters as identify
+
+Recovery
+--------
+Recovery is not yet supported for the posterior task.
 
 Technical matters
 =================
