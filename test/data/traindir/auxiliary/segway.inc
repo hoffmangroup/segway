@@ -3,6 +3,7 @@
 
 %% component types
 %% enumerated in tksrc/GMTK_Component.h:ComponentType
+#define COMPONENT_TYPE_DIAG_GAUSSIAN 0
 #define COMPONENT_TYPE_GAMMA 3
 #define COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN 5
 

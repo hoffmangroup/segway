@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
-## test.sh: test segway
+## testnew.sh: test segway without using existing input master
+## used to generate new input masters
 
 ## $Revision$
 ## Copyright 2011 Michael M. Hoffman <mmh1@uw.edu>

@@ -3,11 +3,9 @@
 ## test.sh: test segway
 
 ## $Revision$
-## Copyright 2011 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2011-2012 Michael M. Hoffman <mmh1@uw.edu>
 
-set -o nounset
-set -o pipefail
-set -o errexit
+set -o nounset -o pipefail -o errexit
 
 if [ $# != 0 ]; then
     echo usage: "$0"
@@ -16,10 +14,18 @@ fi
 
 TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
 
+echo >&2 "entering directory $TMPDIR"
 cd "$TMPDIR"
 
+# generate a new input master
+if [ "${NEW:-}" ]; then
+    input_master_arg="--input-master=../data/input.master"
+else
+    input_master_arg=""
+fi
+
 segway --num-labels=4 --max-train-rounds=2 \
-    --input-master=../data/input.master train ../data/test.genomedata traindir
+    $input_master_arg train ../data/test.genomedata traindir
 segway identify+posterior ../data/test.genomedata traindir identifydir
 
 # diff
