@@ -7,7 +7,7 @@ run: main Segway implementation
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2011 Michael M. Hoffman <mmh1@uw.edu>
+# Copyright 2008-2012 Michael M. Hoffman <mmh1@uw.edu>
 
 from cStringIO import StringIO
 from collections import defaultdict
@@ -57,7 +57,7 @@ from ._util import (ceildiv, data_filename, data_string,
                     MB, OptionBuilder_GMTK, PKG, POSTERIOR_PROG,
                     PREFIX_LIKELIHOOD, PREFIX_PARAMS,
                     _save_observations_window, SUBDIRNAME_LOG,
-                    SUBDIRNAME_PARAMS, VITERBI_PROG)
+                    SUBDIRNAME_PARAMS, USE_MFSDG, VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
@@ -94,7 +94,13 @@ NUM_SUBSEGS = 1
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
-COVAR_TIED = False
+
+if USE_MFSDG:
+    # because tying not implemented yet
+    COVAR_TIED = False
+else:
+    COVAR_TIED = True
+
 MAX_WINDOWS = 1000
 
 ISLAND = True
@@ -265,21 +271,27 @@ MEAN_TMPL = "mean_${seg}_${subseg}_${track} 1 ${rand}"
 
 COVAR_NAME_TMPL_TIED = "covar_${track}"
 COVAR_NAME_TMPL_UNTIED = "covar_${seg}_${subseg}_${track}"
+COVAR_TMPL_TIED = "%s 1 ${rand}" % COVAR_NAME_TMPL_TIED
+COVAR_TMPL_UNTIED = "%s 1 ${rand}" % COVAR_NAME_TMPL_UNTIED
+
 if COVAR_TIED:
     COVAR_NAME_TMPL = COVAR_NAME_TMPL_TIED
 else:
     COVAR_NAME_TMPL = COVAR_NAME_TMPL_UNTIED
 
-COVAR_TMPL_TIED = "%s 1 ${rand}" % COVAR_NAME_TMPL_TIED
-COVAR_TMPL_UNTIED = "%s 1 ${rand}" % COVAR_NAME_TMPL_UNTIED
-
 GAMMASCALE_TMPL = "gammascale_${seg}_${subseg}_${track} 1 1 ${rand}"
 GAMMASHAPE_TMPL = "gammashape_${seg}_${subseg}_${track} 1 1 ${rand}"
 
-MC_NORM_TMPL = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
-    " mc_${distribution}_${seg}_${subseg}_${track}" \
-    " mean_${seg}_${subseg}_${track} %s" \
-    " matrix_weightscale_1x1" % COVAR_NAME_TMPL
+if USE_MFSDG:
+    MC_NORM_TMPL = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
+        " mc_${distribution}_${seg}_${subseg}_${track}" \
+        " mean_${seg}_${subseg}_${track} %s" \
+        " matrix_weightscale_1x1" % COVAR_NAME_TMPL
+else:
+    MC_NORM_TMPL = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
+        " mc_${distribution}_${seg}_${subseg}_${track}" \
+        " mean_${seg}_${subseg}_${track} covar_${track}"
+
 MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${subseg}_${track}" \
     " ${min_track} gammascale_${seg}_${subseg}_${track}" \
     " gammashape_${seg}_${subseg}_${track}"
@@ -1493,6 +1505,7 @@ class Runner(object):
 
         mapping = dict(card_seg=num_segs,
                        card_subseg=self.num_subsegs,
+                       card_presence=resolution+1,
                        card_segCountDown=self.card_seg_countdown,
                        card_supervisionLabel=self.card_supervision_label,
                        card_frameIndex=self.max_frames,
@@ -1525,6 +1538,18 @@ class Runner(object):
             return " | ".join(make_weight_scale(index * multiplier)
                               for index in xrange(resolution + 1))
 
+    def make_conditionalparents_spec(self, track):
+        """
+        this defines the parents of every observation
+        """
+
+        spec = ('CONDITIONALPARENTS_OBS '
+                'using mixture collection("collection_seg_%s") '
+                'MAPPING_OBS' % track)
+
+        return " | ".join(["CONDITIONALPARENTS_NIL_CONTINUOUS"] +
+                          [spec] * self.resolution)
+
     def save_structure(self):
         tracknames = self.tracknames
         num_tracks = self.num_tracks
@@ -1554,15 +1579,21 @@ class Runner(object):
             # weight_scale = 1.0
             # assert weight_scale == 1.0
 
+            conditionalparents_spec = self.make_conditionalparents_spec(track)
             weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
             add_observation(observation_items, "observation.tmpl",
                             track=track, track_index=track_index,
+                            presence_index=num_tracks+track_index,
+                            conditionalparents_spec=conditionalparents_spec,
                             weight_spec=weight_spec)
 
-        next_int_track_index = num_tracks+1
+        if USE_MFSDG:
+            next_int_track_index = num_tracks+1
+        else:
+            next_int_track_index = num_tracks*2
         # XXX: duplicative
         if self.use_dinucleotide:
             add_observation(observation_items, "dinucleotide.tmpl",
@@ -1826,7 +1857,7 @@ class Runner(object):
         self.used_supercontigs = used_supercontigs
 
     def set_num_tracks(self, num_tracks):
-        if self.resolution > 1:
+        if not USE_MFSDG or self.resolution > 1:
             num_int_cols = num_tracks
         else:
             num_int_cols = 0

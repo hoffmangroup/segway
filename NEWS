@@ -1,7 +1,6 @@
 1.2.0:
 
 * now requires a new version of GMTK (at least 0.1 f6e7c01e2b27 (ticket161)) for increased speed
-* segway: covariances have TEMPORARILY been untied until they are supported again in the new GMTK
 * segway: now has experimental Torque support. PBS and PBS Pro will
   probably work with some changes--please e-mail Michael if you want
   to help with identifying the necessary changes (thanks to Jay Hesselberth)

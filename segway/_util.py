@@ -3,7 +3,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
 from contextlib import closing
@@ -104,6 +104,9 @@ POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 
 BED_SCORE = "1000"
 BED_STRAND = "."
+
+# use the GMTK MissingFeatureScaledDiagGaussian feature?
+USE_MFSDG = False
 
 def extjoin(*args):
     return extsep.join(args)
@@ -384,8 +387,7 @@ def _save_observations_window(float_filename, int_filename, float_data,
         if distribution == DISTRIBUTION_ASINH_NORMAL:
             float_data = arcsinh(float_data)
 
-        if resolution > 1:
-            # only write this out if we are at a low resolution
+        if (not USE_MFSDG) or resolution > 1:
             mask_missing = isnan(float_data)
 
             # output -> presence_data -> int_blocks
@@ -395,12 +397,16 @@ def _save_observations_window(float_filename, int_filename, float_data,
 
             num_datapoints = downsample_add(presence_data, resolution)
 
+            # this is the presence observation
             int_blocks.append(num_datapoints)
 
             # so that there is no divide by zero
             num_datapoints_min_1 = maximum(num_datapoints, 1)
 
             # make float
+            if not USE_MFSDG:
+                float_data[mask_missing] = 0.0
+
             float_data = downsample_add(float_data, resolution)
             float_data /= num_datapoints_min_1
 

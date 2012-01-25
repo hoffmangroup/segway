@@ -7,7 +7,7 @@ task: wraps a GMTK subtask to reduce size of output
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009-2012 Michael M. Hoffman <mmh1@washington.edu>
 
 from errno import ENOENT
 from os import extsep, fdopen
@@ -23,7 +23,7 @@ from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, find_segment_starts, get_label_color,
                     _make_continuous_cells, POSTERIOR_PROG,
                     POSTERIOR_SCALE_FACTOR, read_posterior,
-                    _save_observations_window, VITERBI_PROG)
+                    _save_observations_window, USE_MFSDG, VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -187,6 +187,9 @@ def load_viterbi_save_bed(coord, resolution, outfilename, num_labels, infilename
                                   num_labels)
 
 def replace_args_filelistname(args, temp_filepaths, ext):
+    """
+    replace the filelistnames in arguments with temporary filenames
+    """
     fd, filelistname = mkstemp(EXT_LIST + extsep, extsep + ext)
     filelistpath = path(filelistname)
 
