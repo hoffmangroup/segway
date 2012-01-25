@@ -3,7 +3,9 @@ Segway has an acceptance testing system that you can use by running
 posterior probability on test data (data/test.genomedata), using previously
 generated starting parameters (data/input.master). It then compares the test
  runs (test.XXXXXX where XXXXXX represents random alphanumeric characters)
-with previous "golden" runs (data/traindir, data/identifydir).
+with previous "golden" runs (data/traindir, data/identifydir). To
+generate a new input.master run `new=1 ./test.sh`, but keep in mind
+that the results will not be the same.
 
 Segway produces some output that will change depending on the version,
 the date, or randomly (UUIDs are used for each run). These golden runs
