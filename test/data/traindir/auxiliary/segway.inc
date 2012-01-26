@@ -1,6 +1,9 @@
 #ifndef SEG_INC
 #define SEG_INC
 
+% not used yet:
+% #define USE_MFSDG
+
 %% component types
 %% enumerated in tksrc/GMTK_Component.h:ComponentType
 #define COMPONENT_TYPE_DIAG_GAUSSIAN 0
@@ -13,8 +16,13 @@
 #define CARD_BOOLEAN 2
 
 % data exists or is missing?
+
+#ifdef USE_MFSDG
 % only continues to exist for dinucleotide
 #define CARD_PRESENCE CARD_BOOLEAN
+#else /* USE_MFSDG */
+#define CARD_PRESENCE 2
+#endif /* USE_MFSDG */
 
 % transition or not?
 #define CARD_SEGTRANSITION 3

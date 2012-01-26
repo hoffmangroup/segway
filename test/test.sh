@@ -19,9 +19,9 @@ cd "$TMPDIR"
 
 # generate a new input master
 if [ "${NEW:-}" ]; then
-    input_master_arg="--input-master=../data/input.master"
-else
     input_master_arg=""
+else
+    input_master_arg="--input-master=../data/input.master"
 fi
 
 segway --num-labels=4 --max-train-rounds=2 \

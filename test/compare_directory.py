@@ -8,7 +8,7 @@ XXX: want to keep track of all files in new directory
 
 __version__ = "$Revision$"
 
-## Copyright 2011 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2011, 2012 Michael M. Hoffman <mmh1@uw.edu>
 
 import filecmp
 from os import walk
@@ -99,7 +99,7 @@ def compare_directory(template_dirname, query_dirname):
                 if compare_file(template_filename, query_filename):
                     counter.success()
                 else:
-                    counter.error("diff %s %s" % (template_filename, query_filename))
+                    counter.error("diff '%s' '%s'" % (template_filename, query_filename))
 
                 break
         else:

@@ -5,18 +5,14 @@
 #endif
 
 DT_IN_FILE inline
-5
+4
 
-0 map_parent
-1              % num parents
-    -1 { p0 }
-
-1 map_frameIndex_ruler
+0 map_frameIndex_ruler
 1
 % is the frameIndex divisible by RULER_SCALE
     -1 { mod(p0, RULER_SCALE) == 0 }
 
-2 map_seg_segCountDown
+1 map_seg_segCountDown
 1
 % this is only used at the beginning of an observation track
 0 4 0 1 2 default
@@ -25,7 +21,7 @@ DT_IN_FILE inline
     -1 1
     -1 1
 
-3 map_segTransition_ruler_seg_segCountDown_segCountDown
+2 map_segTransition_ruler_seg_segCountDown_segCountDown
 4
     0 2 2 default
       % segTransition(0) == 2 (seg transition):
@@ -46,7 +42,9 @@ DT_IN_FILE inline
             -1 { max(p3-1, 0) } % subtract 1 from previous value, or 0
 
 
-4 map_seg_subseg_obs
+3 % XXXopt: good candidate for a linear combination C deterministic mapper
+
+map_seg_subseg_obs
 2       % num parents
         -1 { p0*CARD_SUBSEG + p1 } 
 
@@ -97,12 +95,12 @@ map_segTransition_ruler_seg_segCountDown_segCountDown
 3 seg_seg_copy
 1
 CARD_SEG CARD_SEG
-map_parent
+internal:copyParent
 
 4 subseg_subseg_copy
 1
 CARD_SUBSEG CARD_SUBSEG
-map_parent
+internal:copyParent
 
 #if CARD_SUPERVISIONLABEL != -1
 5 supervisionLabel_seg_alwaysTrue
@@ -171,6 +169,19 @@ COVAR_IN_FILE inline
 1 covar_h3k36me3 1 0.437841748302
 
 
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+
+#endif
+
+REAL_MAT_IN_FILE inline
+1
+
+0 matrix_weightscale_1x1 1 1 1.0
+
 MC_IN_FILE inline
 8
 
@@ -195,14 +206,3 @@ MX_IN_FILE inline
 6 1 mx_seg3_subseg0_h3k27me3 1 dpmf_always mc_asinh_norm_seg3_subseg0_h3k27me3
 7 1 mx_seg3_subseg0_h3k36me3 1 dpmf_always mc_asinh_norm_seg3_subseg0_h3k36me3
 
-
-#else
-
-DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
-REAL_MAT_IN_FILE INPUT_PARAMS_FILENAME ascii
-MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
-COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
-MC_IN_FILE INPUT_PARAMS_FILENAME ascii
-MX_IN_FILE INPUT_PARAMS_FILENAME ascii
-
-#endif
