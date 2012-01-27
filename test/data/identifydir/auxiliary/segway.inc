@@ -1,9 +1,14 @@
 #ifndef SEG_INC
 #define SEG_INC
 
+% not used yet:
+% #define USE_MFSDG
+
 %% component types
+%% enumerated in tksrc/GMTK_Component.h:ComponentType
 #define COMPONENT_TYPE_DIAG_GAUSSIAN 0
 #define COMPONENT_TYPE_GAMMA 3
+#define COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN 5
 
 %% cardinalities
 
@@ -11,7 +16,13 @@
 #define CARD_BOOLEAN 2
 
 % data exists or is missing?
+
+#ifdef USE_MFSDG
+% only continues to exist for dinucleotide
+#define CARD_PRESENCE CARD_BOOLEAN
+#else /* USE_MFSDG */
 #define CARD_PRESENCE 2
+#endif /* USE_MFSDG */
 
 % transition or not?
 #define CARD_SEGTRANSITION 3
@@ -39,7 +50,9 @@
 #endif
 
 % supervision label
+#ifndef CARD_SUPERVISIONLABEL
 #define CARD_SUPERVISIONLABEL -1
+#endif
 
 % AA .. TT
 #define CARD_DINUCLEOTIDE 16
@@ -58,7 +71,7 @@
 
 #if CARD_SUBSEG <= 1
 #define CONDITIONALPARENTS_OBS seg(0)
-#define MAPPING_OBS mapping("map_parent")
+#define MAPPING_OBS mapping("internal:copyParent")
 #else /* CARD_SUBSEG > 1 */
 #define CONDITIONALPARENTS_OBS seg(0), subseg(0)
 #define MAPPING_OBS mapping("map_seg_subseg_obs")

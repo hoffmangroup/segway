@@ -14,7 +14,7 @@
                          using mixture collection("collection_seg_$track")
                          MAPPING_OBS;
 #else
-     switchingparents: presence__$track(0) using mapping("map_parent");
+     switchingparents: presence__$track(0) using mapping("internal:copyParent");
 
      conditionalparents: $conditionalparents_spec;
 #endif
