@@ -242,7 +242,6 @@ SUBDIRNAME_VITERBI = "viterbi"
 SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
                      SUBDIRNAME_PARAMS]
-SUBDIRNAMES_IDENTIFY = [SUBDIRNAME_POSTERIOR, SUBDIRNAME_VITERBI]
 
 FLOAT_TAB_FIELDNAMES = ["filename", "window_index", "chrom", "start", "end"]
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
@@ -812,6 +811,36 @@ def format_indexed_strs(fmt, num):
     full_fmt = fmt + "%d"
     return [full_fmt % index for index in xrange(num)]
 
+def make_zero_diagonal_table(length):
+    if length == 1:
+        return array([1.0]) # always return to self
+
+    prob_self_self = 0.0
+    prob_self_other = (1.0 - prob_self_self) / (length - 1)
+
+    # set everywhere (diagonal to be rewritten)
+    res = fill_array(prob_self_other, (length, length))
+
+    # set diagonal
+    range_cpt = xrange(length)
+    res[range_cpt, range_cpt] = prob_self_self
+
+    return res
+
+class memoized_property(object):
+    def __init__(self, fget):
+        self.fget = fget
+        self.__doc__ = fget.__doc__
+        self.__name__ = fget.__name__
+        self.__module__ = fget.__module__
+
+    def __get__(self, instance, owner):
+        res = self.fget(instance or owner)
+
+        # replace this descriptor with the actual value
+        setattr(instance, self.__name__, res)
+        return res
+
 class Mixin_Lockable(AddableMixin):
     def __init__(self, *args, **kwargs):
         self.lock = Lock()
@@ -883,16 +912,11 @@ re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
 class Runner(object):
     def __init__(self, **kwargs):
         # filenames
-        self.float_filelistpath = None
-        self.int_filelistpath = None
-
+        self.bigbed_filename = None
         self.gmtk_include_filename = None
-        self.gmtk_include_filename_relative = None
         self.input_master_filename = None
         self.structure_filename = None
         self.triangulation_filename = None
-        self.posterior_triangulation_filename = None
-        self.jt_info_filename = None
         self.job_log_filename = None
         self.seg_table_filename = None
 
@@ -902,13 +926,8 @@ class Runner(object):
         self.work_dirname = None
         self.log_likelihood_filename = None
         self.log_likelihood_tab_filename = None
-        self.dont_train_filename = None
-
-        self.viterbi_filenames = None
 
         self.obs_dirname = None
-        self.bed_filename = None
-        self.bedgraph_filename = None
 
         self.include_coords_filename = None
         self.exclude_coords_filename = None
@@ -923,6 +942,7 @@ class Runner(object):
         self.card_supervision_label = -1
 
         self.include_tracknames = []
+        self.tied_tracknames = {} # dict of trackname -> head trackname
 
         # default is 0
         self.global_mem_usage = LockableDefaultDict(int)
@@ -936,29 +956,25 @@ class Runner(object):
         self.tracknames = None
 
         # variables
-        self.num_segs = None
-        self.num_subsegs = None
+        self.num_segs = NUM_SEGS
+        self.num_subsegs = NUM_SUBSEGS
         self.num_instances = NUM_INSTANCES
-        self.len_seg_strength = None
-        self.distribution = None
+        self.len_seg_strength = PRIOR_STRENGTH
+        self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
         self.max_frames = MAX_FRAMES
-        self.segtransition_weight_scale = None
-        self.ruler_scale = None
-        self.resolution = None
+        self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
+        self.ruler_scale = RULER_SCALE
+        self.resolution = RESOLUTION
 
         # flags
         self.clobber = False
-        self.triangulate = True
         self.train = False # EM train # this should become an int for num_starts
         self.posterior = False
         self.identify = False # viterbi
         self.dry_run = False
         self.verbosity = VERBOSITY
         self.use_dinucleotide = None
-
-        # functions
-        self.train_prog = None
 
         self.__dict__.update(kwargs)
 
@@ -977,19 +993,9 @@ class Runner(object):
             else:
                 raise ValueError("unrecognized task: %s" % task)
 
-    def set_option(self, name, value, default=None):
-        if value is None:
-            try:
-                value = getattr(self, name)
-            except AttributeError:
-                pass
-
-            if value is not None:
-                return
-
-            value = default
-
-        setattr(self, name, value)
+    def set_option(self, name, value):
+        if value is not None:
+            setattr(self, name, value)
 
     @classmethod
     def fromoptions(cls, args, options):
@@ -1017,8 +1023,9 @@ class Runner(object):
 
         res.recover_dirname = options.recover
         res.obs_dirname = options.observations
-        res.bed_filename = options.bed
-        res.bigbed_filename = options.bigBed
+
+        res.set_option("bed_filename", options.bed)
+        res.set_option("bigbed_filename", options.bigBed)
         #res.bedgraph_filename = options.bedgraph
 
         res.include_coords_filename = options.include_coords
@@ -1050,29 +1057,37 @@ class Runner(object):
 
         ## below: can be loaded in Runner.save_train_options(), or
         ## override what is set there
-        # XXX: these defaults should move to __init__
         res.set_option("input_master_filename", options.input_master)
         res.set_option("structure_filename", options.structure)
         res.set_option("dont_train_filename", options.dont_train)
         res.set_option("seg_table_filename", options.seg_table)
-        res.set_option("distribution", options.distribution,
-                       DISTRIBUTION_DEFAULT)
-        res.set_option("len_seg_strength", options.prior_strength,
-                       PRIOR_STRENGTH)
+        res.set_option("distribution", options.distribution)
+        res.set_option("len_seg_strength", options.prior_strength)
         res.set_option("segtransition_weight_scale",
-                       options.segtransition_weight_scale,
-                       SEGTRANSITION_WEIGHT_SCALE)
-        res.set_option("ruler_scale", options.ruler_scale, RULER_SCALE)
-        res.set_option("resolution", options.resolution, RESOLUTION)
-        res.set_option("num_segs", options.num_labels, NUM_SEGS)
-        res.set_option("num_subsegs", options.num_sublabels, NUM_SUBSEGS)
-        res.set_option("max_em_iters", options.max_train_rounds, MAX_EM_ITERS)
+                       options.segtransition_weight_scale)
+        res.set_option("ruler_scale", options.ruler_scale)
+        res.set_option("resolution", options.resolution)
+        res.set_option("num_segs", options.num_labels)
+        res.set_option("num_subsegs", options.num_sublabels)
+        res.set_option("max_em_iters", options.max_train_rounds)
 
         params_filenames = options.trainable_params
         if params_filenames:
             res.params_filenames = params_filenames
 
-        include_tracknames = options.track
+        include_tracknames = []
+        tied_tracknames = {}
+        for track_spec in options.track:
+            track_spec_names = track_spec.split(",")
+            include_tracknames.extend(track_spec_names)
+
+            for track_spec_name in track_spec_names:
+                if track_spec_name in tied_tracknames:
+                    raise ValueError("can't tie one track in multiple groups")
+
+                # link trackname to the head of the group
+                tied_tracknames[track_spec_name] = track_spec_names[0]
+
         if include_tracknames:
             # non-allowed special trackname
             # XXX: doesn't deal with the case where it is a default
@@ -1080,7 +1095,309 @@ class Runner(object):
             assert "supervisionLabel" not in include_tracknames
             res.include_tracknames = include_tracknames
 
+        res.tied_tracknames = tied_tracknames
+
         return res
+
+    @memoized_property
+    def triangulation_dirpath(self):
+        res = self.work_dirpath / "triangulation"
+        self.make_dir(res)
+
+        return res
+
+    @memoized_property
+    def jt_info_filename(self):
+        return self.make_filename(PREFIX_JT_INFO, EXT_TXT,
+                                  subdirname=SUBDIRNAME_LOG)
+
+    @memoized_property
+    def posterior_jt_info_filename(self):
+        return self.make_filename(PREFIX_JT_INFO, "posterior", EXT_TXT,
+                                  subdirname=SUBDIRNAME_LOG)
+
+    @memoized_property
+    def work_dirpath(self):
+        return path(self.work_dirname)
+
+    @memoized_property
+    def recover_dirpath(self):
+        recover_dirname = self.recover_dirname
+        if recover_dirname:
+            return path(recover_dirname)
+
+        # recover_dirname is None or ""
+        return None
+
+    @memoized_property
+    def include_coords(self):
+        return load_coords(self.include_coords_filename)
+
+    @memoized_property
+    def exclude_coords(self):
+        return load_coords(self.exclude_coords_filename)
+
+    @memoized_property
+    def seg_table(self):
+        filename = self.seg_table_filename
+
+        if not filename:
+            filename = data_filename("seg_table.tab")
+
+        # always the last element of the range
+        num_segs = slice2range(self.num_segs)[-1]
+
+        res = zeros((num_segs, SEG_TABLE_WIDTH), dtype=int)
+        ruler_scale = self.ruler_scale
+        res[:, OFFSET_STEP] = ruler_scale
+
+        with open(filename) as infile:
+            reader = DictReader(infile)
+
+            # overwriting is allowed
+            for row in reader:
+                # XXX: factor out
+                # get row_indexes
+                label = row["label"]
+                label_slice = str2slice_or_int(label)
+
+                if isinstance(label_slice, slice) and label_slice.stop is None:
+                    label_slice = slice(label_slice.start, num_segs,
+                                        label_slice.step)
+
+                row_indexes = slice2range(label_slice)
+
+                # get slice
+                len_slice = str2slice_or_int(row["len"])
+
+                # XXX: eventually, should read ruler scale from file
+                # instead of using as a command-line option
+                assert len_slice.step == ruler_scale
+
+                len_tuple = (len_slice.start, len_slice.stop, len_slice.step)
+                len_row = zeros((SEG_TABLE_WIDTH))
+
+                for item_index, item in enumerate(len_tuple):
+                    if item is not None:
+                        len_row[item_index] = item
+
+                res[row_indexes] = len_row
+
+        return res
+
+    @memoized_property
+    def seg_countdowns_initial(self):
+        table = self.seg_table
+
+        starts = table[:, OFFSET_START]
+        ends = table[:, OFFSET_END]
+        steps = table[:, OFFSET_STEP]
+
+        # XXX: need to assert that ends are either 0 or are always
+        # greater than starts
+
+        # starts and ends must all be divisible by steps
+        assert not (starts % steps).any()
+        assert not (ends % steps).any()
+
+        # // = floor division
+        seg_countdowns_start = starts // steps
+
+        # need minus one to guarantee maximum
+        seg_countdowns_end = (ends // steps) - 1
+
+        seg_countdowns_both = vstack([seg_countdowns_start,
+                                      seg_countdowns_end])
+
+        return seg_countdowns_both.max(axis=0)
+
+    @memoized_property
+    def card_seg_countdown(self):
+        return self.seg_countdowns_initial.max() + 1
+
+    @memoized_property
+    def obs_dirpath(self):
+        obs_dirname = self.obs_dirname
+
+        if obs_dirname:
+            res = path(obs_dirname)
+        else:
+            res = self.work_dirpath / SUBDIRNAME_OBS
+            self.obs_dirname = res
+
+        try:
+            self.make_dir(res)
+        except OSError, err:
+            if not (err.errno == EEXIST and res.isdir()):
+                raise
+
+        return res
+
+    @memoized_property
+    def float_filelistpath(self):
+        return self.make_obs_filelistpath(EXT_FLOAT)
+
+    @memoized_property
+    def int_filelistpath(self):
+        return self.make_obs_filelistpath(EXT_INT)
+
+    @memoized_property
+    def float_tabfilepath(self):
+        return self.obs_dirpath / FLOAT_TABFILEBASENAME
+
+    @memoized_property
+    def gmtk_include_filename_relative(self):
+        return self.gmtk_include_filename
+
+        # XXX: disable until you figure out a good way of dealing with
+        # includes from params/input.master as well
+
+        # dirpath_trailing_slash = self.work_dirpath + "/"
+        # include_filename_relative = \
+        #     include_filename.partition(dirpath_trailing_slash)[2]
+        # assert include_filename_relative
+
+        #self.gmtk_include_filename_relative = include_filename_relative
+
+    @memoized_property
+    def _means_untransformed(self):
+        return self.sums / self.num_datapoints
+
+    @memoized_property
+    def means(self):
+        return self.transform(self._means_untransformed)
+
+    @memoized_property
+    def vars(self):
+        # this is an unstable way of calculating the variance,
+        # but it should be good enough
+        # Numerical Recipes in C, Eqn 14.1.7
+        # XXX: best would be to switch to the pairwise parallel method
+        # (see Wikipedia)
+
+        sums_squares_normalized = self.sums_squares / self.num_datapoints
+        return self.transform(sums_squares_normalized - square(self._means_untransformed))
+
+    @memoized_property
+    def dont_train_filename(self):
+        return self.save_resource(RES_DONT_TRAIN, SUBDIRNAME_AUX)
+
+    @memoized_property
+    def output_master_filename(self):
+        return self.save_resource(RES_OUTPUT_MASTER, SUBDIRNAME_PARAMS)
+
+    @memoized_property
+    def viterbi_filenames(self):
+        self.make_subdir(SUBDIRNAME_VITERBI)
+        return self._make_viterbi_filenames(self.work_dirpath)
+
+    @memoized_property
+    def posterior_filenames(self):
+        self.make_subdir(SUBDIRNAME_POSTERIOR)
+        return map(self.make_posterior_filename, xrange(self.num_windows))
+
+    @memoized_property
+    def recover_viterbi_filenames(self):
+        recover_dirpath = self.recover_dirpath
+        if recover_dirpath:
+            return self._make_viterbi_filenames(recover_dirpath)
+        else:
+            return None
+
+    @memoized_property
+    def recover_posterior_filenames(self):
+        raise NotImplementedError # XXX
+
+    @memoized_property
+    def params_dirpath(self):
+        return self.work_dirpath / SUBDIRNAME_PARAMS
+
+    @memoized_property
+    def recover_params_dirpath(self):
+        recover_dirpath = self.recover_dirpath
+        if recover_dirpath:
+            return recover_dirpath / SUBDIRNAME_PARAMS
+
+    @memoized_property
+    def window_lens(self):
+        return [end - start for chr, start, end in self.window_coords]
+
+    @memoized_property
+    def posterior_triangulation_filename(self):
+        infilename = self.triangulation_filename
+
+        # either strip ".trifile" off end, or just use the whole filename
+        infilename_stem = (infilename.rpartition(SUFFIX_TRIFILE)[0]
+                           or infilename)
+
+        res = extjoin(infilename_stem, EXT_POSTERIOR, EXT_TRIFILE)
+
+        clique_indices = self.posterior_clique_indices
+
+        # XXX: this is a fairly hacky way of doing it and will not
+        # work if the triangulation file changes from what GMTK
+        # generates. probably need to key on tokens rather than lines
+        with open(infilename) as infile:
+            with open(res, "w") as outfile:
+                print >>outfile, COMMENT_POSTERIOR_TRIANGULATION
+                rewriter = rewrite_strip_comments(infile, outfile)
+
+                consume_until(rewriter, "@@@!!!TRIFILE_END_OF_ID_STRING!!!@@@")
+                consume_until(rewriter, "CE_PARTITION")
+
+                components_indexed = enumerate(POSTERIOR_CLIQUE_INDICES)
+                for component_index, component in components_indexed:
+                    clique_index = rewrite_cliques(rewriter, component_index)
+                    clique_indices[component] = clique_index
+
+                for line in rewriter:
+                    pass
+
+        return res
+
+    @memoized_property
+    def output_dirpath(self):
+        return self.make_output_dirpath("o", self.instance_index)
+
+    @memoized_property
+    def error_dirpath(self):
+        return self.make_output_dirpath("e", self.instance_index)
+
+    @memoized_property
+    def use_dinucleotide(self):
+        return "dinucleotide" in self.include_tracknames
+
+    @memoized_property
+    def num_int_cols(self):
+        if not USE_MFSDG or self.resolution > 1:
+            res = self.num_tracks
+        else:
+            res = 0
+
+        if self.use_dinucleotide:
+            res += NUM_SEQ_COLS
+        if self.supervision_type != SUPERVISION_UNSUPERVISED:
+            res += 1
+
+        return res
+
+    @memoized_property
+    def bed_filename(self):
+        return self.work_dirpath / BED_FILEBASENAME
+
+    @memoized_property
+    def bedgraph_filename(self):
+        return self.work_dirpath / BEDGRAPH_FILEBASENAME
+
+    @memoized_property
+    def train_prog(self):
+        return self.prog_factory(EM_TRAIN_PROG)
+
+    def transform(self, num):
+        if self.distribution == DISTRIBUTION_ASINH_NORMAL:
+            return arcsinh(num)
+        else:
+            return num
 
     def make_cpp_options(self, input_params_filename=None,
                          output_params_filename=None):
@@ -1114,82 +1431,6 @@ class Runner(object):
             print >>logfile, str(log_likelihood)
 
         return log_likelihood
-
-    def load_include_exclude_coords(self):
-        self.include_coords = load_coords(self.include_coords_filename)
-        self.exclude_coords = load_coords(self.exclude_coords_filename)
-
-    def load_seg_table(self):
-        filename = self.seg_table_filename
-
-        if not filename:
-            filename = data_filename("seg_table.tab")
-
-        # always the last element of the range
-        num_segs = slice2range(self.num_segs)[-1]
-
-        table = zeros((num_segs, SEG_TABLE_WIDTH), dtype=int)
-        ruler_scale = self.ruler_scale
-        table[:, OFFSET_STEP] = ruler_scale
-
-        with open(filename) as infile:
-            reader = DictReader(infile)
-
-            # overwriting is allowed
-            for row in reader:
-                # XXX: factor out
-                # get table_row_indexes
-                label = row["label"]
-                label_slice = str2slice_or_int(label)
-
-                if isinstance(label_slice, slice) and label_slice.stop is None:
-                    label_slice = slice(label_slice.start, num_segs,
-                                        label_slice.step)
-
-                table_row_indexes = slice2range(label_slice)
-
-                # get slice
-                len_slice = str2slice_or_int(row["len"])
-
-                # XXX: eventually, should read ruler scale from file
-                # instead of using as a command-line option
-                assert len_slice.step == self.ruler_scale
-
-                len_tuple = (len_slice.start, len_slice.stop, len_slice.step)
-                len_row = zeros((SEG_TABLE_WIDTH))
-
-                for item_index, item in enumerate(len_tuple):
-                    if item is not None:
-                        len_row[item_index] = item
-
-                table[table_row_indexes] = len_row
-
-        self.seg_table = table
-
-        starts = table[:, OFFSET_START]
-        ends = table[:, OFFSET_END]
-        steps = table[:, OFFSET_STEP]
-
-        # XXX: need to assert that ends are either 0 or are always
-        # greater than starts
-
-        # starts and ends must all be divisible by steps
-        assert not (starts % steps).any()
-        assert not (ends % steps).any()
-
-        # // = floor division
-        seg_countdowns_start = starts // steps
-
-        # need minus one to guarantee maximum
-        seg_countdowns_end = (ends // steps) - 1
-
-        seg_countdowns_both = vstack([seg_countdowns_start,
-                                      seg_countdowns_end])
-
-        seg_countdowns_initial = seg_countdowns_both.max(axis=0)
-
-        self.seg_countdowns_initial = seg_countdowns_initial
-        self.card_seg_countdown = seg_countdowns_initial.max() + 1
 
     def generate_tmpl_mappings(self, segnames=None):
         # need segnames because in the tied covariance case, the
@@ -1300,16 +1541,6 @@ class Runner(object):
 
         return track_indexes
 
-    def set_jt_info_filename(self):
-        if not self.jt_info_filename:
-            self.jt_info_filename = \
-                self.make_filename(PREFIX_JT_INFO, EXT_TXT,
-                                   subdirname=SUBDIRNAME_LOG)
-
-        self.posterior_jt_info_filename = \
-            self.make_filename(PREFIX_JT_INFO, "posterior", EXT_TXT,
-                               subdirname=SUBDIRNAME_LOG)
-
     def get_last_params_filename(self, params_filename):
         if params_filename is not None and path(params_filename).exists():
             return params_filename
@@ -1381,25 +1612,11 @@ class Runner(object):
                 self.make_log_likelihood_tab_filename(instance_index,
                                                       self.work_dirname)
 
-    def make_triangulation_dirpath(self):
-        res = self.work_dirpath / "triangulation"
+    def make_output_dirpath(self, dirname, instance_index):
+        res = self.work_dirpath / "output" / dirname / str(instance_index)
         self.make_dir(res)
 
-        self.triangulation_dirpath = res
-
-    def make_output_dirpath(self, dirname, instance_index, clobber=None):
-        res = self.work_dirpath / "output" / dirname / str(instance_index)
-        self.make_dir(res, clobber)
-
         return res
-
-    def set_output_dirpaths(self, instance_index, clobber=None):
-        make_output_dirpath_custom = partial(self.make_output_dirpath,
-                                             instance_index=instance_index,
-                                             clobber=clobber)
-
-        self.output_dirpath = make_output_dirpath_custom("o")
-        self.error_dirpath = make_output_dirpath_custom("e")
 
     def make_dir(self, dirname, clobber=None):
         if clobber is None:
@@ -1432,26 +1649,6 @@ class Runner(object):
 
     def make_obs_filelistpath(self, ext):
         return make_filelistpath(self.obs_dirpath, ext)
-
-    def make_obs_dir(self):
-        obs_dirname = self.obs_dirname
-        if obs_dirname:
-            obs_dirpath = path(obs_dirname)
-        else:
-            obs_dirpath = self.work_dirpath / SUBDIRNAME_OBS
-            self.obs_dirname = obs_dirpath
-
-        self.obs_dirpath = obs_dirpath
-
-        try:
-            self.make_dir(obs_dirpath)
-        except OSError, err:
-            if not (err.errno == EEXIST and obs_dirpath.isdir()):
-                raise
-
-        self.float_filelistpath = self.make_obs_filelistpath(EXT_FLOAT)
-        self.int_filelistpath = self.make_obs_filelistpath(EXT_INT)
-        self.float_tabfilepath = obs_dirpath / FLOAT_TABFILEBASENAME
 
     def make_obs_filepath(self, dirpath, prefix, suffix):
         return dirpath / (prefix + suffix)
@@ -1513,22 +1710,9 @@ class Runner(object):
 
         aux_dirpath = self.work_dirpath / SUBDIRNAME_AUX
 
-        include_filename, self.gmtk_include_filename_is_new = \
+        self.gmtk_include_filename, self.gmtk_include_filename_is_new = \
             save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
                           aux_dirpath, self.clobber)
-
-        dirpath_trailing_slash = self.work_dirpath + "/"
-        include_filename_relative = \
-            include_filename.partition(dirpath_trailing_slash)[2]
-        assert include_filename_relative
-
-        self.gmtk_include_filename = include_filename
-        self.gmtk_include_filename_relative = include_filename
-
-        # XXX: disable until you figure out a good way of dealing with
-        # includes from params/input.master as well
-
-        #self.gmtk_include_filename_relative = include_filename_relative
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -1639,18 +1823,6 @@ class Runner(object):
         subset_metadata_attr(genome, "sums_squares")
         subset_metadata_attr(genome, "num_datapoints")
 
-    def get_progs_used(self):
-        res = []
-
-        if self.train:
-            res.append(EM_TRAIN_PROG)
-        if self.identify:
-            res.append(VITERBI_PROG)
-        if self.posterior:
-            res.append(POSTERIOR_PROG)
-
-        return res
-
     def write_observations(self, float_filelist, int_filelist, float_tabfile):
         # XXX: these expect different filepaths
         assert not ((self.identify or self.posterior) and self.train)
@@ -1759,9 +1931,6 @@ class Runner(object):
         used_supercontigs = [] # continuous objects
         max_frames = self.max_frames
 
-        use_dinucleotide = "dinucleotide" in self.include_tracknames
-        self.use_dinucleotide = use_dinucleotide
-
         # XXX: use groupby(include_coords) and then access chromosomes
         # randomly rather than iterating through them all
         for chromosome in genome:
@@ -1775,9 +1944,7 @@ class Runner(object):
                 continue
 
             track_indexes = self.set_tracknames(chromosome)
-            num_tracks = len(track_indexes)
-
-            self.set_num_tracks(num_tracks)
+            self.num_tracks = num_tracks = len(track_indexes)
 
             if num_tracks:
                 supercontigs = chromosome.itercontinuous()
@@ -1856,56 +2023,20 @@ class Runner(object):
 
         self.used_supercontigs = used_supercontigs
 
-    def set_num_tracks(self, num_tracks):
-        if not USE_MFSDG or self.resolution > 1:
-            num_int_cols = num_tracks
-        else:
-            num_int_cols = 0
-
-        if self.use_dinucleotide:
-            num_int_cols += NUM_SEQ_COLS
-        if self.supervision_type != SUPERVISION_UNSUPERVISED:
-            num_int_cols += 1
-
-        self.num_tracks = num_tracks
-        self.num_int_cols = num_int_cols
-
-    def open_writable_or_dummy(self, filepath, clobber=None):
-        if clobber is None:
-            clobber = self.clobber
-
-        if not filepath or (not clobber and filepath.exists()):
+    def open_writable_or_dummy(self, filepath):
+        if not filepath or (not self.clobber and filepath.exists()):
             return closing(StringIO()) # dummy output
         else:
             return open(filepath, "w")
 
-    def save_observations(self, clobber=None):
-        open_writable = partial(self.open_writable_or_dummy, clobber=clobber)
+    def save_observations(self):
+        open_writable = partial(self.open_writable_or_dummy)
 
         with open_writable(self.float_filelistpath) as float_filelist:
             with open_writable(self.int_filelistpath) as int_filelist:
                 with open_writable(self.float_tabfilepath) as float_tabfile:
                     self.write_observations(float_filelist, int_filelist,
                                             float_tabfile)
-
-    def calc_means_vars(self):
-        num_datapoints = self.num_datapoints
-        means = self.sums / num_datapoints
-
-        # this is an unstable way of calculating the variance,
-        # but it should be good enough
-        # Numerical Recipes in C, Eqn 14.1.7
-        # XXX: best would be to switch to the pairwise parallel method
-        # (see Wikipedia)
-        sums_squares_normalized = self.sums_squares / num_datapoints
-        variances = sums_squares_normalized - square(means)
-
-        if self.distribution == DISTRIBUTION_ASINH_NORMAL:
-            self.means = arcsinh(means)
-            self.vars = arcsinh(variances)
-        else:
-            self.means = means
-            self.vars = variances
 
     def get_track_lt_min(self, track_index):
         """
@@ -1960,23 +2091,6 @@ class Runner(object):
 
         return zeros((num_segs, num_segs))
 
-    # XXX: can be factored out of Runner
-    def make_zero_diagonal_table(self, length):
-        if length == 1:
-            return array([1.0]) # always return to self
-
-        prob_self_self = 0.0
-        prob_self_other = (1.0 - prob_self_self) / (length - 1)
-
-        # set everywhere (diagonal to be rewritten)
-        res = fill_array(prob_self_other, (length, length))
-
-        # set diagonal
-        range_cpt = xrange(length)
-        res[range_cpt, range_cpt] = prob_self_self
-
-        return res
-
     def make_dirichlet_table(self):
         probs = self.make_dense_cpt_segCountDown_seg_segTransition()
 
@@ -2013,12 +2127,12 @@ class Runner(object):
         return make_table_spec("seg_subseg", cpt)
 
     def make_dense_cpt_seg_seg_spec(self):
-        cpt = self.make_zero_diagonal_table(self.num_segs)
+        cpt = make_zero_diagonal_table(self.num_segs)
 
         return make_table_spec("seg_seg", cpt)
 
     def make_dense_cpt_seg_subseg_subseg_spec(self):
-        cpt_seg = self.make_zero_diagonal_table(self.num_subsegs)
+        cpt_seg = make_zero_diagonal_table(self.num_subsegs)
         cpt = vstack_tile(cpt_seg, self.num_segs, 1)
 
         return make_table_spec("seg_subseg_subseg", cpt)
@@ -2348,8 +2462,6 @@ class Runner(object):
         # segCountDown_seg_segTransition
         num_free_params += fullnum_subsegs
 
-        self.calc_means_vars()
-
         distribution = self.distribution
         if distribution in DISTRIBUTIONS_LIKE_NORM:
             mean_spec = self.make_mean_spec()
@@ -2383,14 +2495,6 @@ class Runner(object):
                           locals(), self.params_dirpath, self.clobber,
                           instance_index)
 
-    def save_dont_train(self):
-        self.dont_train_filename = self.save_resource(RES_DONT_TRAIN,
-                                                      SUBDIRNAME_AUX)
-
-    def save_output_master(self):
-        self.output_master_filename = self.save_resource(RES_OUTPUT_MASTER,
-                                                         SUBDIRNAME_PARAMS)
-
     def _make_viterbi_filenames(self, dirpath):
         viterbi_dirpath = dirpath / SUBDIRNAME_VITERBI
         num_windows = self.num_windows
@@ -2399,25 +2503,6 @@ class Runner(object):
                                 + EXT_BED)
         return [viterbi_dirpath / viterbi_filename_fmt % index
                 for index in xrange(num_windows)]
-
-    def make_viterbi_filenames(self):
-        self.viterbi_filenames = \
-            self._make_viterbi_filenames(self.work_dirpath)
-
-        recover_dirpath = self.recover_dirpath
-        if recover_dirpath:
-            self.recover_viterbi_filenames = \
-                self._make_viterbi_filenames(recover_dirpath)
-        else:
-            self.recover_viterbi_filenames = None
-
-    def make_posterior_filenames(self):
-        make_posterior_filename = self.make_posterior_filename
-        window_range = xrange(self.num_windows)
-
-        self.posterior_filenames = map(make_posterior_filename, window_range)
-
-        # XXX: recovery needs to be added here
 
     def load_supervision(self):
         supervision_type = self.supervision_type
@@ -2453,16 +2538,6 @@ class Runner(object):
                                        SUPERVISION_LABEL_OFFSET)
 
     def save_params(self):
-        self.load_include_exclude_coords()
-
-        self.make_subdirs(SUBDIRNAMES_EITHER)
-        self.make_obs_dir()
-
-        self.params_dirpath = self.work_dirpath / SUBDIRNAME_PARAMS
-        if self.recover_dirpath:
-            self.recover_params_dirpath = \
-                self.recover_dirpath / SUBDIRNAME_PARAMS
-
         self.load_supervision()
 
         # XXX: decrease the amount of time this file is open
@@ -2470,41 +2545,14 @@ class Runner(object):
         # do first, because it sets self.num_tracks and self.tracknames
             self.prep_observations(genome)
 
-            # sets self.window_lens, needed for save_structure() to do
-            # Dirichlet stuff (but rewriting structure is unnecessary)
-            self.make_window_lens()
-
-            self.load_seg_table()
-
             self.save_include()
             self.save_structure()
             self.set_params_filename()
 
-            train = self.train
-            identify = self.identify
-            posterior = self.posterior
-
-            if train or identify or posterior:
-                self.set_jt_info_filename()
-
-            if train:
-                self.make_subdirs(SUBDIRNAMES_TRAIN)
-
-                if not self.dont_train_filename:
-                    self.save_dont_train()
-
-                self.save_output_master()
-
-                # might turn off self.train, if the params already exist
+            if self.train:
                 self.set_log_likelihood_filenames()
 
             self.save_observations()
-
-        if identify or posterior:
-            self.make_subdirs(SUBDIRNAMES_IDENTIFY)
-
-            # this requires the number of observations
-            self.make_viterbi_filenames()
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -2526,10 +2574,6 @@ class Runner(object):
     def concatenate_bed(self):
         # the final bed filename, not the individual viterbi_filenames
         bed_filename = self.bed_filename
-
-        if bed_filename is None:
-            bed_filename = self.work_dirpath / BED_FILEBASENAME
-            self.bed_filename = bed_filename
 
         # values for comparison to combine adjoining segments
         last_line = ""
@@ -2594,10 +2638,6 @@ class Runner(object):
     def concatenate_bedgraph(self):
         # the final bedgraph filename, not the individual posterior_filenames
         bedgraph_filename = self.bedgraph_filename
-
-        if bedgraph_filename is None:
-            bedgraph_filename = self.work_dirpath / BEDGRAPH_FILEBASENAME
-            self.bedgraph_filename = bedgraph_filename
 
         for num_seg in xrange(self.num_segs):
             # values for comparison to combine adjoining segments
@@ -2724,10 +2764,6 @@ class Runner(object):
 
         return res
 
-    def make_window_lens(self):
-        self.window_lens = [end - start
-                           for chr, start, end in self.window_coords]
-
     def window_lens_sorted(self, reverse=True):
         """
         yields (window_index, window_mem_usage)
@@ -2826,10 +2862,9 @@ class Runner(object):
         """
         kwargs["inputMasterFile"] = self.input_master_filename
 
-        prog = self.train_prog
         name = self.make_job_name_train(instance_index, round_index, window_index)
 
-        return self.queue_gmtk(prog, kwargs, name, num_frames)
+        return self.queue_gmtk(self.train_prog, kwargs, name, num_frames)
 
     def queue_train_parallel(self, input_params_filename, instance_index,
                              round_index, **kwargs):
@@ -2864,7 +2899,7 @@ class Runner(object):
                                               GMTK_INDEX_PLACEHOLDER)
 
         cpp_options = self.make_cpp_options(input_params_filename,
-                                       output_params_filename)
+                                            output_params_filename)
 
         last_window = self.num_windows - 1
 
@@ -2882,38 +2917,6 @@ class Runner(object):
         res.queue(restartable_job)
 
         return res
-
-    def save_posterior_triangulation(self):
-        infilename = self.triangulation_filename
-
-        # either strip ".trifile" off end, or just use the whole filename
-        infilename_stem = (infilename.rpartition(SUFFIX_TRIFILE)[0]
-                           or infilename)
-
-        outfilename = extjoin(infilename_stem, EXT_POSTERIOR, EXT_TRIFILE)
-
-        clique_indices = self.posterior_clique_indices
-
-        # XXX: this is a fairly hacky way of doing it and will not
-        # work if the triangulation file changes from what GMTK
-        # generates. probably need to key on tokens rather than lines
-        with open(infilename) as infile:
-            with open(outfilename, "w") as outfile:
-                print >>outfile, COMMENT_POSTERIOR_TRIANGULATION
-                rewriter = rewrite_strip_comments(infile, outfile)
-
-                consume_until(rewriter, "@@@!!!TRIFILE_END_OF_ID_STRING!!!@@@")
-                consume_until(rewriter, "CE_PARTITION")
-
-                components_indexed = enumerate(POSTERIOR_CLIQUE_INDICES)
-                for component_index, component in components_indexed:
-                    clique_index = rewrite_cliques(rewriter, component_index)
-                    clique_indices[component] = clique_index
-
-                for line in rewriter:
-                    pass
-
-        self.posterior_triangulation_filename = outfilename
 
     def get_posterior_clique_print_ranges(self):
         res = {}
@@ -2965,8 +2968,6 @@ class Runner(object):
         prog(**kwargs)
 
     def run_triangulate(self):
-        self.make_triangulation_dirpath()
-
         num_segs_range = slice2range(self.num_segs)
         for num_segs in num_segs_range:
             self.run_triangulate_single(num_segs)
@@ -3000,7 +3001,6 @@ class Runner(object):
         new = self.instance_make_new_params
 
         instance_index = self.instance_index
-        self.set_output_dirpaths(instance_index)
         self.set_log_likelihood_filenames(instance_index, new)
         self.set_params_filename(instance_index, new)
 
@@ -3076,8 +3076,6 @@ class Runner(object):
             self.params_filenames = [self.params_filename]
 
     def run_train(self):
-        self.train_prog = self.prog_factory(EM_TRAIN_PROG)
-
         num_instances = self.num_instances
         assert num_instances >= 1
 
@@ -3150,6 +3148,27 @@ class Runner(object):
         enumerator = enumerate((num_seg, seg_instance_index)
                                for num_seg in num_segs_range
                                for seg_instance_index in seg_instance_indexes)
+
+        # ensure memoization before threading
+        self.triangulation_dirpath
+        self.jt_info_filename
+        self.include_cords
+        self.exclude_coords
+        self.card_seg_countdown
+        self.obs_dirpath
+        self.float_filelistpath
+        self.int_filelistpath
+        self.float_tabfilepath
+        self.gmtk_include_filename_relative
+        self.means
+        self.vars
+        self.dont_train_filename
+        self.output_master_filename
+        self.params_dirpath
+        self.window_lens
+        self.use_dinucleotide
+        self.num_int_cols
+        self.train_prog
 
         threads = []
         with Session() as session:
@@ -3366,14 +3385,13 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         return res
 
-    def run_identify_posterior(self, clobber=None):
+    def run_identify_posterior(self):
+        self.instance_index = "identify"
+
         ## setup files
         if not self.input_master_filename:
             warn("Input master not specified. Generating.")
             self.save_input_master()
-
-        self.set_output_dirpaths("identify", clobber)
-        self.make_posterior_filenames()
 
         viterbi_filenames = self.viterbi_filenames
         posterior_filenames = self.posterior_filenames
@@ -3424,17 +3442,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                   bigbed_outfilename=self.bigbed_filename)
 
         if self.posterior:
-                self.concatenate_bedgraph()
-
-    def set_work_dirpaths(self):
-        self.work_dirpath = path(self.work_dirname)
-
-        recover_dirname = self.recover_dirname
-        if recover_dirname:
-            self.recover_dirpath = path(recover_dirname)
-        else:
-            # deals with case where it is empty too
-            self.recover_dirpath = None
+            self.concatenate_bedgraph()
 
     def make_script_filename(self, prefix):
         return self.make_filename(prefix, EXT_SH, subdirname=SUBDIRNAME_LOG)
@@ -3465,7 +3473,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         """
         # XXXopt: use binary I/O to gmtk rather than ascii for parameters
 
-        self.set_work_dirpaths()
         self.interrupt_event = Event()
 
         ## start log files
@@ -3477,6 +3484,11 @@ to find the winning instance anyway.""" % thread.instance_index)
         job_log_filename = self.make_filename(PREFIX_JOB_LOG, EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
+        self.make_subdirs(SUBDIRNAMES_EITHER)
+
+        if self.train:
+            self.make_subdirs(SUBDIRNAMES_TRAIN)
+
         self.save_params()
 
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
@@ -3484,8 +3496,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                 print >>self.cmdline_short_file, run_msg
                 print >>self.cmdline_long_file, run_msg
 
-                if self.triangulate:
-                    self.run_triangulate()
+                self.run_triangulate()
 
                 with open(job_log_filename, "w") as self.job_log_file:
                     print >>self.job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
@@ -3498,11 +3509,9 @@ to find the winning instance anyway.""" % thread.instance_index)
                             raise NotImplementedError # XXX
 
                         if not self.dry_run:
-                            # resave now that num_segs is determined
+                            # resave now that num_segs is determined,
+                            # in case you tested multiple num_segs
                             self.save_include()
-
-                            if not self.posterior_triangulation_filename:
-                                self.save_posterior_triangulation()
 
                         if self.posterior and self.recover_dirname:
                             raise NotImplementedError # XXX
@@ -3528,8 +3537,8 @@ def parse_options(args):
     with OptionGroup(parser, "Data selection") as group:
         group.add_option("-t", "--track", action="append", default=[],
                          metavar="TRACK",
-                         help="append TRACK to list of tracks to use"
-                         " (default all)")
+                         help="append TRACK to list of tracks to use, using "
+                         " commas to separate tied tracks (default all)")
 
         group.add_option("--tracks-from", action="load", metavar="FILE",
                          dest="track",
