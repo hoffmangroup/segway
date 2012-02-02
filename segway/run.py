@@ -18,11 +18,11 @@ from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, repeat
-from math import ceil, floor, frexp, ldexp, log10
+from math import ceil, floor, ldexp, log10
 from os import environ, extsep
 import re
 from shutil import copy2
-from string import letters, Template
+from string import letters
 import sys
 from tempfile import gettempdir
 from threading import Event, Lock, Thread
@@ -32,11 +32,9 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from genomedata._util import fill_array
-from numpy import (append, arange, arcsinh, array, empty, finfo, float32, intc,
-                   int64, NINF, outer, sqrt, square, tile, vectorize, vstack,
-                   where, zeros)
-from numpy.random import uniform
+from numpy import (append, arange, arcsinh, array, finfo, float32, intc,
+                   int64, NINF, square, vstack, zeros)
+
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -46,18 +44,23 @@ from tabdelim import DictReader, ListWriter
 from .bed import read_native
 from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
                       RestartableJobDict, Session)
+from .input_master import InputMasterSaver, RES_INPUT_MASTER_TMPL
 from .layer import layer, make_layer_filename
-from ._util import (ceildiv, data_filename, data_string,
+from ._util import (ceildiv, data_filename,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
                     EXT_INT, EXT_PARAMS, EXT_TAB,
-                    extjoin, GB, get_chrom_coords,
+                    extjoin, extjoin_not_none, GB, get_chrom_coords,
                     is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
-                    _make_continuous_cells, make_filelistpath, maybe_gzip_open,
-                    MB, OptionBuilder_GMTK, PKG, POSTERIOR_PROG,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS,
-                    _save_observations_window, SUBDIRNAME_LOG,
-                    SUBDIRNAME_PARAMS, USE_MFSDG, VITERBI_PROG)
+                    _make_continuous_cells, make_default_filename,
+                    make_filelistpath, maybe_gzip_open,
+                    MB, memoized_property, OFFSET_START, OFFSET_END,
+                    OFFSET_STEP, OptionBuilder_GMTK, PKG, POSTERIOR_PROG,
+                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, resource_substitute,
+                    _save_observations_window, save_template,
+                    SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
+                    SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
+                    USE_MFSDG, VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
@@ -67,25 +70,6 @@ UUID = uuid1().hex
 DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
-DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
-                                     DISTRIBUTION_ASINH_NORMAL])
-
-## XXX: should be options
-MEAN_METHOD_UNIFORM = "uniform" # randomly pick from the range
-MEAN_METHOD_ML_JITTER = "ml_jitter" # maximum likelihood, then jitter
-
-# maximum likelihood, adjusted by no more than 0.2*sd
-MEAN_METHOD_ML_JITTER_STD = "ml_jitter_std"
-MEAN_METHODS = [MEAN_METHOD_UNIFORM, MEAN_METHOD_ML_JITTER,
-                MEAN_METHOD_ML_JITTER_STD]
-MEAN_METHOD = MEAN_METHOD_ML_JITTER_STD
-
-COVAR_METHOD_MAX_RANGE = "max_range" # maximum range
-COVAR_METHOD_ML_JITTER = "ml_jitter" # maximum likelihood, then jitter
-COVAR_METHOD_ML = "ml" # maximum likelihood
-COVAR_METHODS = [COVAR_METHOD_MAX_RANGE, COVAR_METHOD_ML_JITTER,
-                 COVAR_METHOD_ML]
-COVAR_METHOD = COVAR_METHOD_ML
 
 MAX_WEIGHT_SCALE = 25
 MIN_NUM_SEGS = 2
@@ -94,12 +78,6 @@ NUM_SUBSEGS = 1
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
-
-if USE_MFSDG:
-    # because tying not implemented yet
-    COVAR_TIED = False
-else:
-    COVAR_TIED = True
 
 MAX_WINDOWS = 1000
 
@@ -126,10 +104,6 @@ MEM_USAGE_MULTIPLIER = 2
 
 JOIN_TIMEOUT = finfo(float).max
 
-# XXX: should be options
-LEN_SEG_EXPECTED = 100000
-LEN_SUBSEG_EXPECTED = 100
-
 SWAP_ENDIAN = False
 
 ## option defaults
@@ -146,15 +120,10 @@ SIZEOF_DTYPE_OBS_INT = DTYPE_OBS_INT().nbytes
 # sizeof tmp space used per frame
 SIZEOF_FRAME_TMP = (SIZEOF_FLOAT32 + SIZEOF_DTYPE_OBS_INT)
 
-JITTER_STD_BOUND = 0.2
 FUDGE_EP = -17 # ldexp(1, -17) = ~1e-6
 assert FUDGE_EP > MACHEP_FLOAT32
 
-# binary
-JITTER_ORDERS_MAGNITUDE = 5 # log10(2**5) = 1.5 decimal orders of magnitude
-
 FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
-ABSOLUTE_FUDGE = 0.001
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
@@ -173,9 +142,6 @@ POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
 ## defaults
 NUM_INSTANCES = 1
-
-# self->self, self->other
-PROBS_FORCE_TRANSITION = array([0.0, 0.0, 1.0])
 
 CPP_DIRECTIVE_FMT = "-D%s=%s"
 
@@ -260,49 +226,10 @@ TRAIN_OPTION_TYPES = \
 
 # templates and formats
 RES_STR_TMPL = "segway.str.tmpl"
-RES_INPUT_MASTER_TMPL = "input.master.tmpl"
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
 RES_SEG_TABLE = "seg_table.tab"
-
-MEAN_TMPL = "mean_${seg}_${subseg}_${track} 1 ${rand}"
-
-COVAR_NAME_TMPL_TIED = "covar_${track}"
-COVAR_NAME_TMPL_UNTIED = "covar_${seg}_${subseg}_${track}"
-COVAR_TMPL_TIED = "%s 1 ${rand}" % COVAR_NAME_TMPL_TIED
-COVAR_TMPL_UNTIED = "%s 1 ${rand}" % COVAR_NAME_TMPL_UNTIED
-
-if COVAR_TIED:
-    COVAR_NAME_TMPL = COVAR_NAME_TMPL_TIED
-else:
-    COVAR_NAME_TMPL = COVAR_NAME_TMPL_UNTIED
-
-GAMMASCALE_TMPL = "gammascale_${seg}_${subseg}_${track} 1 1 ${rand}"
-GAMMASHAPE_TMPL = "gammashape_${seg}_${subseg}_${track} 1 1 ${rand}"
-
-if USE_MFSDG:
-    MC_NORM_TMPL = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
-        " mc_${distribution}_${seg}_${subseg}_${track}" \
-        " mean_${seg}_${subseg}_${track} %s" \
-        " matrix_weightscale_1x1" % COVAR_NAME_TMPL
-else:
-    MC_NORM_TMPL = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-        " mc_${distribution}_${seg}_${subseg}_${track}" \
-        " mean_${seg}_${subseg}_${track} covar_${track}"
-
-MC_GAMMA_TMPL = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${subseg}_${track}" \
-    " ${min_track} gammascale_${seg}_${subseg}_${track}" \
-    " gammashape_${seg}_${subseg}_${track}"
-MC_TMPLS = {"norm": MC_NORM_TMPL,
-            "gamma": MC_GAMMA_TMPL,
-            "asinh_norm": MC_NORM_TMPL}
-
-MX_TMPL = "1 mx_${seg}_${subseg}_${track} 1 dpmf_always" \
-    " mc_${distribution}_${seg}_${subseg}_${track}"
-
-NAME_COLLECTION_TMPL = "collection_seg_${track} ${fullnum_subsegs}"
-NAME_COLLECTION_CONTENTS_TMPL = "mx_${seg}_${subseg}_${track}"
 
 TRACK_FMT = "browser position %s:%s-%s"
 FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
@@ -329,25 +256,11 @@ POSTERIOR_BEDGRAPH_HEADER="track type=bedGraph name=posterior.%d \
         visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
         autoScale=off color=200,100,0 altColor=0,100,200"
 
-CARD_SEGTRANSITION = 3
-
-# here to avoid duplication
-NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
-
 # training results
 # XXX: Python 2.6: this should really be a namedtuple, yuck
 OFFSET_NUM_SEGS = 1
 OFFSET_FILENAMES = 2 # where the filenames begin in the results
 OFFSET_PARAMS_FILENAME = 3
-
-SEG_TABLE_WIDTH = 3
-OFFSET_START = 0
-OFFSET_END = 1
-OFFSET_STEP = 2
-
-SUPERVISION_UNSUPERVISED = 0
-SUPERVISION_SEMISUPERVISED = 1
-SUPERVISION_SUPERVISED = 2
 
 SUPERVISION_LABEL_OFFSET = 1
 
@@ -436,15 +349,6 @@ def make_bed_attrs(mapping):
 
     return "track %s" % res
 
-def vstack_tile(array_like, *reps):
-    reps = list(reps) + [1]
-
-    return tile(array_like, reps)
-
-def extjoin_not_none(*args):
-    return extjoin(*[str(arg) for arg in args
-                     if arg is not None])
-
 def quote_spaced_str(item):
     """
     add quotes around text if it has spaces in it
@@ -532,53 +436,6 @@ def is_training_progressing(last_ll, curr_ll,
     # using x !< y instead of x >= y to give the right default answer
     # in the case of NaNs
     return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
-
-def resource_substitute(resourcename):
-    return Template(data_string(resourcename)).substitute
-
-# XXX: these next three functions are spaghetti
-def make_default_filename(resource, dirname="WORKDIR", instance_index=None):
-    resource_part = resource.rpartition(".tmpl")
-    stem = resource_part[0] or resource_part[2]
-    stem_part = stem.rpartition(extsep)
-    prefix = stem_part[0]
-    ext = stem_part[2]
-
-    filebasename = extjoin_not_none(prefix, instance_index, ext)
-
-    return path(dirname) / filebasename
-
-def make_template_filename(filename, resource, dirname=None, clobber=False,
-                           instance_index=None):
-    """
-    returns (filename, is_new)
-    """
-    if filename:
-        if not clobber and path(filename).exists():
-            return filename, False
-        # else filename is unchanged
-    else:
-        # filename is None
-        filename = make_default_filename(resource, dirname, instance_index)
-
-    return filename, True
-
-def save_template(filename, resource, mapping, dirname=None,
-                  clobber=False, instance_index=None):
-    """
-    creates a temporary file if filename is None or empty
-    """
-    filename, is_new = make_template_filename(filename, resource, dirname,
-                                              clobber, instance_index)
-
-    if is_new:
-        with open(filename, "w+") as outfile:
-            tmpl = Template(data_string(resource))
-            text = tmpl.substitute(mapping)
-
-            outfile.write(text)
-
-    return filename, is_new
 
 class NoData(object):
     """
@@ -691,84 +548,8 @@ def find_overlaps(start, end, include_coords, exclude_coords):
     else:
         return find_overlaps_exclude(res, exclude_coords)
 
-def make_spec(name, items):
-    """
-    name: str, name of GMTK object type
-    items: list of strs
-    """
-    header_lines = ["%s_IN_FILE inline" % name, str(len(items)), ""]
-
-    indexed_items = ["%d %s" % indexed_item
-                     for indexed_item in enumerate(items)]
-
-    all_lines = header_lines + indexed_items
-
-    return "\n".join(all_lines) + "\n"
-
-def array2text(a):
-    ndim = a.ndim
-    if ndim == 1:
-        return " ".join(map(str, a))
-    else:
-        delimiter = "\n" * (ndim-1)
-        return delimiter.join(array2text(row) for row in a)
-
-def make_dirichlet_name(name):
-    return "dirichlet_%s" % name
-
-def _make_table_spec(name, table, ndim, extra_rows=[]):
-    header_rows = [name, ndim]
-    header_rows.extend(table.shape)
-
-    rows = [" ".join(map(str, header_rows))]
-    rows.extend(extra_rows)
-    rows.extend([array2text(table), ""])
-
-    return "\n".join(rows)
-
-def make_table_spec(name, table, dirichlet=False):
-    """
-    if dirichlet is True, this table has a corresponding DirichletTable
-    automatically generated name
-    """
-    ndim = table.ndim - 1 # don't include output dim
-
-    if dirichlet:
-        extra_rows = ["DirichletTable %s" % make_dirichlet_name(name)]
-    else:
-        extra_rows = []
-
-    return _make_table_spec(name, table, ndim, extra_rows)
-
-def make_dirichlet_table_spec(name, table):
-    dirichlet_name = make_dirichlet_name(name)
-
-    return _make_table_spec(dirichlet_name, table, table.ndim)
-
-# def make_dt_spec(num_tracks):
-#     return make_spec("DT", ["%d seg_obs%d BINARY_DT" % (index, index)
-#                             for index in xrange(num_tracks)])
-
-def prob_transition_from_expected_len(length):
-    # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
-    # see also Reynolds SM et al. PLoS Comput Biol 4:e1000213
-    # ("duration modeling")
-    return length / (1 + length)
-
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
-
-def jitter_cell(cell):
-    """
-    adds some random noise
-    """
-    # get the binary exponent and subtract JITTER_ORDERS_MAGNITUDE
-    # e.g. 3 * 2**10 --> 1 * 2**5
-    max_noise = ldexp(1, frexp(cell)[1] - JITTER_ORDERS_MAGNITUDE)
-
-    return cell + uniform(-max_noise, max_noise)
-
-jitter = vectorize(jitter_cell)
 
 def rewrite_cliques(rewriter, frame):
     """
@@ -806,40 +587,6 @@ def update_starts(starts, ends, new_starts, new_ends, instance_index):
 
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
-
-def format_indexed_strs(fmt, num):
-    full_fmt = fmt + "%d"
-    return [full_fmt % index for index in xrange(num)]
-
-def make_zero_diagonal_table(length):
-    if length == 1:
-        return array([1.0]) # always return to self
-
-    prob_self_self = 0.0
-    prob_self_other = (1.0 - prob_self_self) / (length - 1)
-
-    # set everywhere (diagonal to be rewritten)
-    res = fill_array(prob_self_other, (length, length))
-
-    # set diagonal
-    range_cpt = xrange(length)
-    res[range_cpt, range_cpt] = prob_self_self
-
-    return res
-
-class memoized_property(object):
-    def __init__(self, fget):
-        self.fget = fget
-        self.__doc__ = fget.__doc__
-        self.__name__ = fget.__name__
-        self.__module__ = fget.__module__
-
-    def __get__(self, instance, owner):
-        res = self.fget(instance or owner)
-
-        # replace this descriptor with the actual value
-        setattr(instance, self.__name__, res)
-        return res
 
 class Mixin_Lockable(AddableMixin):
     def __init__(self, *args, **kwargs):
@@ -1186,36 +933,6 @@ class Runner(object):
         return res
 
     @memoized_property
-    def seg_countdowns_initial(self):
-        table = self.seg_table
-
-        starts = table[:, OFFSET_START]
-        ends = table[:, OFFSET_END]
-        steps = table[:, OFFSET_STEP]
-
-        # XXX: need to assert that ends are either 0 or are always
-        # greater than starts
-
-        # starts and ends must all be divisible by steps
-        assert not (starts % steps).any()
-        assert not (ends % steps).any()
-
-        # // = floor division
-        seg_countdowns_start = starts // steps
-
-        # need minus one to guarantee maximum
-        seg_countdowns_end = (ends // steps) - 1
-
-        seg_countdowns_both = vstack([seg_countdowns_start,
-                                      seg_countdowns_end])
-
-        return seg_countdowns_both.max(axis=0)
-
-    @memoized_property
-    def card_seg_countdown(self):
-        return self.seg_countdowns_initial.max() + 1
-
-    @memoized_property
     def obs_dirpath(self):
         obs_dirname = self.obs_dirname
 
@@ -1393,6 +1110,36 @@ class Runner(object):
     def train_prog(self):
         return self.prog_factory(EM_TRAIN_PROG)
 
+    @memoized_property
+    def seg_countdowns_initial(self):
+        table = self.seg_table
+
+        starts = table[:, OFFSET_START]
+        ends = table[:, OFFSET_END]
+        steps = table[:, OFFSET_STEP]
+
+        # XXX: need to assert that ends are either 0 or are always
+        # greater than starts
+
+        # starts and ends must all be divisible by steps
+        assert not (starts % steps).any()
+        assert not (ends % steps).any()
+
+        # // = floor division
+        seg_countdowns_start = starts // steps
+
+        # need minus one to guarantee maximum
+        seg_countdowns_end = (ends // steps) - 1
+
+        seg_countdowns_both = vstack([seg_countdowns_start,
+                                      seg_countdowns_end])
+
+        return seg_countdowns_both.max(axis=0)
+
+    @memoized_property
+    def card_seg_countdown(self):
+        return self.seg_countdowns_initial.max() + 1
+
     def transform(self, num):
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
             return arcsinh(num)
@@ -1431,36 +1178,6 @@ class Runner(object):
             print >>logfile, str(log_likelihood)
 
         return log_likelihood
-
-    def generate_tmpl_mappings(self, segnames=None):
-        # need segnames because in the tied covariance case, the
-        # segnames are replaced by "any" (see Runner.make_covar_spec()),
-        # and only one mapping is produced
-        if segnames is None:
-            segnames = format_indexed_strs("seg", self.num_segs)
-            subsegnames = format_indexed_strs("subseg", self.num_subsegs)
-        elif segnames == ["any"]:
-            subsegnames = ["any"]
-
-        tracknames = self.tracknames
-
-        num_subsegs = self.num_subsegs
-        num_tracks = len(tracknames)
-
-        for seg_index, segname in enumerate(segnames):
-            seg_offset = num_tracks * num_subsegs * seg_index
-
-            for subseg_index, subsegname in enumerate(subsegnames):
-                subseg_offset = seg_offset + num_tracks * subseg_index
-
-                for track_index, trackname in enumerate(tracknames):
-                    track_offset = subseg_offset + track_index
-
-                    # XXX: change name of index to track_offset in templates
-                    yield dict(seg=segname, subseg=subsegname, track=trackname,
-                               seg_index=seg_index, subseg_index=subseg_index,
-                               track_index=track_index, index=track_offset,
-                               distribution=self.distribution)
 
     def make_filename(self, *exts, **kwargs):
         """
@@ -2038,462 +1755,15 @@ class Runner(object):
                     self.write_observations(float_filelist, int_filelist,
                                             float_tabfile)
 
-    def get_track_lt_min(self, track_index):
-        """
-        returns a value less than a minimum in a track
-        """
-        # XXX: refactor into a new function
-        min_track = self.mins[track_index]
-
-        # fudge the minimum by a very small amount. this is not
-        # continuous, but hopefully we won't get values where it
-        # matters
-        # XXX: restore this after GMTK issues fixed
-        # if min_track == 0.0:
-        #     min_track_fudged = FUDGE_TINY
-        # else:
-        #     min_track_fudged = min_track - ldexp(abs(min_track), FUDGE_EP)
-
-        # this happens for really big numbers or really small
-        # numbers; you only have 7 orders of magnitude to play
-        # with on a float32
-        min_track_f32 = float32(min_track)
-
-        assert min_track_f32 - float32(ABSOLUTE_FUDGE) != min_track_f32
-        return min_track - ABSOLUTE_FUDGE
-
-    def make_items_multiseg(self, tmpl, data=None, segnames=None):
-        substitute = Template(tmpl).substitute
-
-        res = []
-        for mapping in self.generate_tmpl_mappings(segnames):
-            track_index = mapping["track_index"]
-
-            if self.distribution == DISTRIBUTION_GAMMA:
-                mapping["min_track"] = self.get_track_lt_min(track_index)
-
-            if data is not None:
-                seg_index = mapping["seg_index"]
-                subseg_index = mapping["subseg_index"]
-                mapping["rand"] = data[seg_index, subseg_index, track_index]
-
-            res.append(substitute(mapping))
-
-        return res
-
-    def make_spec_multiseg(self, name, *args, **kwargs):
-        items = self.make_items_multiseg(*args, **kwargs)
-
-        return make_spec(name, items)
-
-    def make_empty_cpt(self):
-        num_segs = self.num_segs
-
-        return zeros((num_segs, num_segs))
-
-    def make_dirichlet_table(self):
-        probs = self.make_dense_cpt_segCountDown_seg_segTransition()
-
-        # XXX: the ratio is not exact as num_bases is not the same as
-        # the number of base-base transitions. It is surely close
-        # enough, though
-        total_pseudocounts = self.len_seg_strength * self.num_bases
-        divisor = self.card_seg_countdown * self.num_segs
-        pseudocounts_per_row = total_pseudocounts / divisor
-
-        # astype(int) means flooring the floats
-        pseudocounts = (probs * pseudocounts_per_row).astype(int)
-
-        return pseudocounts
-
-    def make_dirichlet_spec(self):
-        dirichlet_table = self.make_dirichlet_table()
-        # XXX: duplicative name
-        items = [make_dirichlet_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
-                                           dirichlet_table)]
-
-        return make_spec("DIRICHLET_TAB", items)
-
-    def make_dense_cpt_start_seg_spec(self):
-        num_segs = self.num_segs
-        cpt = fill_array(1.0 / num_segs, num_segs)
-
-        return make_table_spec("start_seg", cpt)
-
-    def make_dense_cpt_seg_subseg_spec(self):
-        num_subsegs = self.num_subsegs
-        cpt = fill_array(1.0 / num_subsegs, (self.num_segs, num_subsegs))
-
-        return make_table_spec("seg_subseg", cpt)
-
-    def make_dense_cpt_seg_seg_spec(self):
-        cpt = make_zero_diagonal_table(self.num_segs)
-
-        return make_table_spec("seg_seg", cpt)
-
-    def make_dense_cpt_seg_subseg_subseg_spec(self):
-        cpt_seg = make_zero_diagonal_table(self.num_subsegs)
-        cpt = vstack_tile(cpt_seg, self.num_segs, 1)
-
-        return make_table_spec("seg_subseg_subseg", cpt)
-
-    def make_dinucleotide_table_row(self):
-        # simple one-parameter model
-        gc = uniform()
-        at = 1 - gc
-
-        a = at / 2
-        c = gc / 2
-        g = gc - c
-        t = 1 - a - c - g
-
-        acgt = array([a, c, g, t])
-
-        # shape: (16,)
-        return outer(acgt, acgt).ravel()
-
-    def make_dense_cpt_seg_dinucleotide_spec(self):
-        table = [self.make_dinucleotide_table_row()
-                 for seg_index in xrange(self.num_segs)]
-
-        return make_table_spec("seg_dinucleotide", table)
-
-    def calc_prob_transition_from_scaled_expected_len(self, length):
-        length_scaled = length // self.resolution
-
-        prob_self_self = prob_transition_from_expected_len(length_scaled)
-        prob_self_other = 1.0 - prob_self_self
-
-        return prob_self_self, prob_self_other
-
-    def make_dense_cpt_segCountDown_seg_segTransition(self):
-        # first values are the ones where segCountDown = 0 therefore
-        # the transitions to segTransition = 2 occur early on
-        card_seg_countdown = self.card_seg_countdown
-
-        # by default, when segCountDown is high, never transition
-        res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
-
-        prob_seg_self_self, prob_seg_self_other = \
-            self.calc_prob_transition_from_scaled_expected_len(LEN_SEG_EXPECTED)
-
-        prob_subseg_self_self, prob_subseg_self_other = \
-            self.calc_prob_transition_from_scaled_expected_len(LEN_SUBSEG_EXPECTED)
-
-        # 0: no transition
-        # 1: subseg transition
-        # 2: seg transition
-        probs_allow_transition = \
-            array([prob_seg_self_self * prob_subseg_self_self,
-                   prob_seg_self_self * prob_subseg_self_other,
-                   prob_seg_self_other])
-
-        probs_prevent_transition = array([prob_subseg_self_self,
-                                          prob_subseg_self_other,
-                                          0.0])
-
-        # find the labels with maximum segment lengths and those without
-        table = self.seg_table
-        ends = table[:, OFFSET_END]
-        bitmap_without_maximum = ends == 0
-
-        # where() returns a tuple; this unpacks it
-        labels_with_maximum, = where(~bitmap_without_maximum)
-        labels_without_maximum, = where(bitmap_without_maximum)
-
-        # labels without a maximum
-        res[0, labels_without_maximum] = probs_allow_transition
-        res[1:, labels_without_maximum] = probs_prevent_transition
-
-        # labels with a maximum
-        seg_countdowns_initial = self.seg_countdowns_initial
-
-        res[0, labels_with_maximum] = PROBS_FORCE_TRANSITION
-        for label in labels_with_maximum:
-            seg_countdown_initial = seg_countdowns_initial[label]
-            minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
-
-            seg_countdown_allow = seg_countdown_initial - minimum + 1
-
-            res[1:seg_countdown_allow, label] = probs_allow_transition
-            res[seg_countdown_allow:, label] = probs_prevent_transition
-
-        return res
-
-    def make_dense_cpt_segCountDown_seg_segTransition_spec(self):
-        cpt = self.make_dense_cpt_segCountDown_seg_segTransition()
-
-        return make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION, cpt,
-                               dirichlet=self.len_seg_strength > 0)
-
-    def make_dense_cpt_spec(self):
-        items = [self.make_dense_cpt_start_seg_spec(),
-                 self.make_dense_cpt_seg_subseg_spec(),
-                 self.make_dense_cpt_seg_seg_spec(),
-                 self.make_dense_cpt_seg_subseg_subseg_spec(),
-                 self.make_dense_cpt_segCountDown_seg_segTransition_spec()]
-
-        if self.use_dinucleotide:
-            items.append(self.make_dense_cpt_seg_dinucleotide_spec())
-
-        return make_spec("DENSE_CPT", items)
-
-    def rand_means(self):
-        low = self.mins
-        high = self.maxs
-        num_segs = self.num_segs
-
-        assert len(low) == len(high)
-
-        # size parameter is so that we always get an array, even if it
-        # has shape = (1,)
-
-        # iterator so that we regenerate uniform for every seg
-        return array([uniform(low, high, len(low))
-                      for seg_index in xrange(num_segs)])
-
-    def make_means(self):
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
-        means = self.means
-
-        if MEAN_METHOD == MEAN_METHOD_UNIFORM:
-            raise NotImplementedError # XXX: need subseg dimenstion
-            return self.rand_means()
-        elif MEAN_METHOD == MEAN_METHOD_ML_JITTER:
-            return jitter(vstack_tile(means, num_segs, num_subsegs))
-        elif MEAN_METHOD == MEAN_METHOD_ML_JITTER_STD:
-            stds = sqrt(self.vars)
-
-            # tile the means of each track (num_segs, num_subsegs times)
-            means_tiled = vstack_tile(means, num_segs, num_subsegs)
-            stds_tiled = vstack_tile(stds, num_segs, num_subsegs)
-
-            noise = uniform(-JITTER_STD_BOUND, JITTER_STD_BOUND,
-                             stds_tiled.shape)
-
-            return means_tiled + (stds_tiled * noise)
-
-        raise ValueError("unsupported MEAN_METHOD")
-
-    def make_mean_spec(self):
-        return self.make_spec_multiseg("MEAN", MEAN_TMPL, self.make_means())
-
-    def make_covars(self):
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
-
-        if COVAR_METHOD == COVAR_METHOD_MAX_RANGE:
-            ranges = self.maxs - self.mins
-            return vstack_tile(ranges, num_segs, num_subsegs)
-        elif COVAR_METHOD == COVAR_METHOD_ML_JITTER:
-            return jitter(vstack_tile(self.vars, num_segs, num_subsegs))
-        elif COVAR_METHOD == COVAR_METHOD_ML:
-            return vstack_tile(self.vars, num_segs, num_subsegs)
-
-        raise ValueError("unsupported COVAR_METHOD")
-
-    def make_covar_spec(self, tied):
-        if tied:
-            # see Runner.generate_tmpl_mappings() for meaning of segnames
-            segnames = ["any"]
-            tmpl = COVAR_TMPL_TIED
-        else:
-            # None: automatically generate segnames
-            segnames = None
-            tmpl = COVAR_TMPL_UNTIED
-
-        vars = self.make_covars()
-
-        return self.make_spec_multiseg("COVAR", tmpl, vars, segnames)
-
-    def make_items_gamma(self):
-        means = self.means
-        vars = self.vars
-
-        substitute_scale = Template(GAMMASCALE_TMPL).substitute
-        substitute_shape = Template(GAMMASHAPE_TMPL).substitute
-
-        # random start values are equivalent to the random start
-        # values of a Gaussian:
-        #
-        # means = scales * shapes
-        # vars = shapes * scales**2
-        #
-        # therefore:
-        scales = vars / means
-        shapes = means**2 / vars
-
-        res = []
-        for mapping in self.generate_tmpl_mappings():
-            track_index = mapping["track_index"]
-            index = mapping["index"] * 2
-
-            # factory for new dictionaries that start with mapping
-            mapping_plus = partial(dict, **mapping)
-
-            scale = jitter(scales[track_index])
-            shape = jitter(shapes[track_index])
-
-            mapping_scale = mapping_plus(rand=scale, index=index)
-            res.append(substitute_scale(mapping_scale))
-
-            mapping_shape = mapping_plus(rand=shape, index=index+1)
-            res.append(substitute_shape(mapping_shape))
-
-        return res
-
-    def make_gamma_spec(self):
-        return make_spec("REAL_MAT", self.make_items_gamma())
-
-    def make_real_mat_spec(self):
-        return make_spec("REAL_MAT", ["matrix_weightscale_1x1 1 1 1.0"])
-
-    def make_mc_spec(self):
-        return self.make_spec_multiseg("MC", MC_TMPLS[self.distribution])
-
-    def make_mx_spec(self):
-        return self.make_spec_multiseg("MX", MX_TMPL)
-
-    def make_segCountDown_tree_spec(self, resourcename):
-        num_segs = self.num_segs
-        seg_countdowns_initial = self.seg_countdowns_initial
-
-        header = ([str(num_segs)] +
-                  [str(num_seg) for num_seg in xrange(num_segs-1)] +
-                  ["default"])
-
-        lines = [" ".join(header)]
-
-        for seg, seg_countdown_initial in enumerate(seg_countdowns_initial):
-            lines.append("    -1 %d" % seg_countdown_initial)
-
-        tree = "\n".join(lines)
-
-        return resource_substitute(resourcename)(tree=tree)
-
-    def make_map_seg_segCountDown_dt_spec(self):
-        return self.make_segCountDown_tree_spec("map_seg_segCountDown.dt.tmpl")
-
-    def make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec(self):
-        return self.make_segCountDown_tree_spec("map_segTransition_ruler_seg_segCountDown_segCountDown.dt.tmpl")
-
-    def make_items_dt(self):
-        res = []
-
-        res.append(data_string("map_frameIndex_ruler.dt.txt"))
-        res.append(self.make_map_seg_segCountDown_dt_spec())
-        res.append(self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec())
-        res.append(data_string("map_seg_subseg_obs.dt.txt"))
-
-        supervision_type = self.supervision_type
-        if supervision_type == SUPERVISION_SEMISUPERVISED:
-            res.append(data_string("map_supervisionLabel_seg_alwaysTrue_semisupervised.dt.txt"))
-        elif supervision_type == SUPERVISION_SUPERVISED:
-             # XXX: does not exist yet
-            res.append(data_string("map_supervisionLabel_seg_alwaysTrue_supervised.dt.txt"))
-        else:
-            assert supervision_type == SUPERVISION_UNSUPERVISED
-
-        return res
-
-    def make_dt_spec(self):
-        return make_spec("DT", self.make_items_dt())
-
-    def make_name_collection_spec(self):
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
-        tracknames = self.tracknames
-
-        substitute = Template(NAME_COLLECTION_TMPL).substitute
-        substitute_contents = Template(NAME_COLLECTION_CONTENTS_TMPL).substitute
-
-        items = []
-
-        fullnum_subsegs = num_segs * num_subsegs
-
-        for track_index, track in enumerate(tracknames):
-            mapping = dict(track=track, fullnum_subsegs=fullnum_subsegs)
-
-            contents = [substitute(mapping)]
-            for seg_index in xrange(num_segs):
-                seg = "seg%d" % seg_index
-
-                for subseg_index in xrange(num_subsegs):
-                    subseg = "subseg%d" % subseg_index
-                    mapping = dict(seg=seg, subseg=subseg, track=track)
-
-                    contents.append(substitute_contents(mapping))
-
-            items.append("\n".join(contents))
-
-        return make_spec("NAME_COLLECTION", items)
-
     def save_input_master(self, instance_index=None, new=False):
-        # the locals of this function are used as the template mapping
-        # use caution before deleting or renaming any variables
-        # check that they are not used in the input.master template
-        num_free_params = 0
-
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
-        num_tracks = self.num_tracks
-        fullnum_subsegs = num_segs * num_subsegs
-
-        include_filename = self.gmtk_include_filename_relative
-
         if new:
             input_master_filename = None
         else:
             input_master_filename = self.input_master_filename
 
-        dt_spec = self.make_dt_spec()
-
-        if self.len_seg_strength > 0:
-            dirichlet_spec = self.make_dirichlet_spec()
-        else:
-            dirichlet_spec = ""
-
-        dense_cpt_spec = self.make_dense_cpt_spec()
-
-        # seg_seg
-        num_free_params += fullnum_subsegs * (fullnum_subsegs - 1)
-
-        # segCountDown_seg_segTransition
-        num_free_params += fullnum_subsegs
-
-        distribution = self.distribution
-        if distribution in DISTRIBUTIONS_LIKE_NORM:
-            mean_spec = self.make_mean_spec()
-            covar_spec = self.make_covar_spec(COVAR_TIED)
-            real_mat_spec = self.make_real_mat_spec()
-
-            if COVAR_TIED:
-                num_free_params += (fullnum_subsegs + 1) * num_tracks
-            else:
-                num_free_params += (fullnum_subsegs * 2) * num_tracks
-        elif distribution == DISTRIBUTION_GAMMA:
-            mean_spec = ""
-            covar_spec = ""
-
-            # XXX: another option is to calculate an ML estimate for
-            # the gamma distribution rather than the ML estimate for the
-            # mean and converting
-            real_mat_spec = self.make_gamma_spec()
-
-            num_free_params += (fullnum_subsegs * 2) * num_tracks
-        else:
-            raise ValueError("distribution %s not supported" % distribution)
-
-        mc_spec = self.make_mc_spec()
-        mx_spec = self.make_mx_spec()
-        name_collection_spec = self.make_name_collection_spec()
-        card_seg = num_segs
-
         self.input_master_filename, input_master_filename_is_new = \
-            save_template(input_master_filename, RES_INPUT_MASTER_TMPL,
-                          locals(), self.params_dirpath, self.clobber,
-                          instance_index)
+            InputMasterSaver(self)(input_master_filename, self.params_dirpath,
+                                   self.clobber, instance_index)
 
     def _make_viterbi_filenames(self, dirpath):
         viterbi_dirpath = dirpath / SUBDIRNAME_VITERBI
@@ -3085,9 +2355,8 @@ class Runner(object):
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
         input_master_filename, input_master_filename_is_new = \
-            make_template_filename(self.input_master_filename,
-                                   RES_INPUT_MASTER_TMPL, self.params_dirpath,
-                                   self.clobber)
+            InputMasterSaver(self)(self.input_master_filename,
+                                   self.params_dirpath, self.clobber)
 
         self.input_master_filename = input_master_filename
 

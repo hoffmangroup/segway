@@ -12,6 +12,7 @@ from gzip import open as _gzip_open
 from itertools import repeat
 from os import extsep
 import shutil
+from string import Template
 import sys
 import re
 from tempfile import mkdtemp
@@ -83,6 +84,11 @@ ORD_c = ord("c")
 ORD_g = ord("g")
 ORD_t = ord("t")
 
+SEG_TABLE_WIDTH = 3
+OFFSET_START = 0
+OFFSET_END = 1
+OFFSET_STEP = 2
+
 data_filename = partial(resource_filename, PKG_DATA)
 data_string = partial(resource_string, PKG_DATA)
 
@@ -108,8 +114,16 @@ BED_STRAND = "."
 # use the GMTK MissingFeatureScaledDiagGaussian feature?
 USE_MFSDG = False
 
+SUPERVISION_UNSUPERVISED = 0
+SUPERVISION_SEMISUPERVISED = 1
+SUPERVISION_SUPERVISED = 2
+
 def extjoin(*args):
     return extsep.join(args)
+
+def extjoin_not_none(*args):
+    return extjoin(*[str(arg) for arg in args
+                     if arg is not None])
 
 # NamedTemporaryDir is based somewhat on Python 2.5.2
 # tempfile._TemporaryFileWrapper
@@ -485,9 +499,69 @@ def read_posterior(infile, num_frames, num_labels):
 
     return res
 
-
 def make_filelistpath(dirpath, ext):
     return dirpath / extjoin(ext, EXT_LIST)
+
+# XXX: these next three functions are spaghetti
+def make_default_filename(resource, dirname="WORKDIR", instance_index=None):
+    resource_part = resource.rpartition(".tmpl")
+    stem = resource_part[0] or resource_part[2]
+    stem_part = stem.rpartition(extsep)
+    prefix = stem_part[0]
+    ext = stem_part[2]
+
+    filebasename = extjoin_not_none(prefix, instance_index, ext)
+
+    return path(dirname) / filebasename
+
+def make_template_filename(filename, resource, dirname=None, clobber=False,
+                           instance_index=None):
+    """
+    returns (filename, is_new)
+    """
+    if filename:
+        if not clobber and path(filename).exists():
+            return filename, False
+        # else filename is unchanged
+    else:
+        # filename is None
+        filename = make_default_filename(resource, dirname, instance_index)
+
+    return filename, True
+
+def save_template(filename, resource, mapping, dirname=None,
+                  clobber=False, instance_index=None):
+    """
+    creates a temporary file if filename is None or empty
+    """
+    filename, is_new = make_template_filename(filename, resource, dirname,
+                                              clobber, instance_index)
+
+    if is_new:
+        with open(filename, "w+") as outfile:
+            tmpl = Template(data_string(resource))
+            text = tmpl.substitute(mapping)
+
+            outfile.write(text)
+
+    return filename, is_new
+
+class memoized_property(object):
+    def __init__(self, fget):
+        self.fget = fget
+        self.__doc__ = fget.__doc__
+        self.__name__ = fget.__name__
+        self.__module__ = fget.__module__
+
+    def __get__(self, instance, owner):
+        res = self.fget(instance or owner)
+
+        # replace this descriptor with the actual value
+        setattr(instance, self.__name__, res)
+        return res
+
+def resource_substitute(resourcename):
+    return Template(data_string(resourcename)).substitute
 
 def main(args=sys.argv[1:]):
     pass
