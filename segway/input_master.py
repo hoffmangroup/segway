@@ -213,12 +213,14 @@ class InputMasterSaver(object):
                    "seg_countdowns_initial", "seg_table", "distribution",
                    "len_seg_strength", "resolution", "supervision_type",
                    "use_dinucleotide", "mins", "maxs", "means", "vars",
-                   "gmtk_include_filename_relative"]
+                   "gmtk_include_filename_relative", "tied_tracknames"]
 
     def __init__(self, runner):
+        # copy _copy_attrs from runner to InputMasterSaver instance
         for attr in self._copy_attrs:
             setattr(self, attr, getattr(runner, attr))
 
+    ### general functions
     def generate_tmpl_mappings(self, segnames=None):
         # need segnames because in the tied covariance case, the
         # segnames are replaced by "any" (see .make_covar_spec()),
@@ -250,8 +252,24 @@ class InputMasterSaver(object):
                                track_index=track_index, index=track_offset,
                                distribution=self.distribution)
 
-    def make_mean_spec(self):
-        return self.make_spec_multiseg("MEAN", MEAN_TMPL, self.make_means())
+    def make_items_multiseg(self, tmpl, data=None, segnames=None):
+        substitute = Template(tmpl).substitute
+
+        res = []
+        for mapping in self.generate_tmpl_mappings(segnames):
+            track_index = mapping["track_index"]
+
+            if self.distribution == DISTRIBUTION_GAMMA:
+                mapping["min_track"] = self.get_track_lt_min(track_index)
+
+            if data is not None:
+                seg_index = mapping["seg_index"]
+                subseg_index = mapping["subseg_index"]
+                mapping["rand"] = data[seg_index, subseg_index, track_index]
+
+            res.append(substitute(mapping))
+
+        return res
 
     def get_track_lt_min(self, track_index):
         """
@@ -277,57 +295,16 @@ class InputMasterSaver(object):
         assert min_track_f32 - float32(ABSOLUTE_FUDGE) != min_track_f32
         return min_track - ABSOLUTE_FUDGE
 
-    def make_items_multiseg(self, tmpl, data=None, segnames=None):
-        substitute = Template(tmpl).substitute
-
-        res = []
-        for mapping in self.generate_tmpl_mappings(segnames):
-            track_index = mapping["track_index"]
-
-            if self.distribution == DISTRIBUTION_GAMMA:
-                mapping["min_track"] = self.get_track_lt_min(track_index)
-
-            if data is not None:
-                seg_index = mapping["seg_index"]
-                subseg_index = mapping["subseg_index"]
-                mapping["rand"] = data[seg_index, subseg_index, track_index]
-
-            res.append(substitute(mapping))
-
-        return res
-
     def make_spec_multiseg(self, name, *args, **kwargs):
         items = self.make_items_multiseg(*args, **kwargs)
 
         return make_spec(name, items)
 
-    def make_empty_cpt(self):
+    ### DENSE_CPT
+        def make_empty_cpt(self):
         num_segs = self.num_segs
 
         return zeros((num_segs, num_segs))
-
-    def make_dirichlet_table(self):
-        probs = self.make_dense_cpt_segCountDown_seg_segTransition()
-
-        # XXX: the ratio is not exact as num_bases is not the same as
-        # the number of base-base transitions. It is surely close
-        # enough, though
-        total_pseudocounts = self.len_seg_strength * self.num_bases
-        divisor = self.card_seg_countdown * self.num_segs
-        pseudocounts_per_row = total_pseudocounts / divisor
-
-        # astype(int) means flooring the floats
-        pseudocounts = (probs * pseudocounts_per_row).astype(int)
-
-        return pseudocounts
-
-    def make_dirichlet_spec(self):
-        dirichlet_table = self.make_dirichlet_table()
-        # XXX: duplicative name
-        items = [make_dirichlet_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
-                                           dirichlet_table)]
-
-        return make_spec("DIRICHLET_TAB", items)
 
     def make_dense_cpt_start_seg_spec(self):
         num_segs = self.num_segs
@@ -453,6 +430,34 @@ class InputMasterSaver(object):
 
         return make_spec("DENSE_CPT", items)
 
+    ### DIRICHLET_TAB
+    def make_dirichlet_table(self):
+        probs = self.make_dense_cpt_segCountDown_seg_segTransition()
+
+        # XXX: the ratio is not exact as num_bases is not the same as
+        # the number of base-base transitions. It is surely close
+        # enough, though
+        total_pseudocounts = self.len_seg_strength * self.num_bases
+        divisor = self.card_seg_countdown * self.num_segs
+        pseudocounts_per_row = total_pseudocounts / divisor
+
+        # astype(int) means flooring the floats
+        pseudocounts = (probs * pseudocounts_per_row).astype(int)
+
+        return pseudocounts
+
+    def make_dirichlet_spec(self):
+        dirichlet_table = self.make_dirichlet_table()
+        # XXX: duplicative name
+        items = [make_dirichlet_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
+                                           dirichlet_table)]
+
+        return make_spec("DIRICHLET_TAB", items)
+
+    ### MEAN
+    def make_mean_spec(self):
+        return self.make_spec_multiseg("MEAN", MEAN_TMPL, self.make_means())
+
     def rand_means(self):
         low = self.mins
         high = self.maxs
@@ -491,6 +496,7 @@ class InputMasterSaver(object):
 
         raise ValueError("unsupported MEAN_METHOD")
 
+    ### COVAR
     def make_covars(self):
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs
@@ -519,6 +525,7 @@ class InputMasterSaver(object):
 
         return self.make_spec_multiseg("COVAR", tmpl, vars, segnames)
 
+    ### REAL_MAT
     def make_items_gamma(self):
         means = self.means
         vars = self.vars
@@ -559,15 +566,21 @@ class InputMasterSaver(object):
         return make_spec("REAL_MAT", self.make_items_gamma())
 
     def make_real_mat_spec(self):
+        """
+        used for MissingFeatureScaledDiagGaussians
+        """
         return make_spec("REAL_MAT", ["matrix_weightscale_1x1 1 1 1.0"])
 
+    ### MC
     def make_mc_spec(self):
         return self.make_spec_multiseg("MC",
                                        MC_TMPLS[self.distribution])
 
+    ### MX
     def make_mx_spec(self):
         return self.make_spec_multiseg("MX", MX_TMPL)
 
+    ### DT
     def make_segCountDown_tree_spec(self, resourcename):
         num_segs = self.num_segs
         seg_countdowns_initial = self.seg_countdowns_initial
@@ -613,6 +626,7 @@ class InputMasterSaver(object):
     def make_dt_spec(self):
         return make_spec("DT", self.make_items_dt())
 
+    ### NAME_COLLECTION
     def make_name_collection_spec(self):
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs

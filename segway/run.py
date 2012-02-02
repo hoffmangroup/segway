@@ -657,7 +657,22 @@ def check_overlapping_supervision_labels(start, end, chrom, coords):
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
 class Runner(object):
+    """
+    Purpose:
+
+    1. hold configuration--interface between UI and other code
+    2. create necessary files (through Saver objects)
+       TODO: move all saving to Saver objects
+    3. execute GMTK
+    4. monitor GMTK output
+    5. convert output to bioinformatics formats
+       TODO: move this to some other kind of object
+    """
     def __init__(self, **kwargs):
+        """
+        usually not called directly, instead Runner.fromoptions() is called
+        (which calls Runner.__init__())
+        """
         # filenames
         self.bigbed_filename = None
         self.gmtk_include_filename = None
@@ -746,6 +761,9 @@ class Runner(object):
 
     @classmethod
     def fromoptions(cls, args, options):
+        """
+        the usual way a Runner is created
+        """
         res = cls()
 
         task_str = args[0]
