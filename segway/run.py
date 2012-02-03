@@ -44,8 +44,9 @@ from tabdelim import DictReader, ListWriter
 from .bed import read_native
 from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
                       RestartableJobDict, Session)
-from .input_master import InputMasterSaver, RES_INPUT_MASTER_TMPL
+from .input_master import InputMasterSaver
 from .layer import layer, make_layer_filename
+from .structure import StructureSaver
 from ._util import (ceildiv, data_filename,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
@@ -56,7 +57,7 @@ from ._util import (ceildiv, data_filename,
                     make_filelistpath, maybe_gzip_open,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
                     OFFSET_STEP, OptionBuilder_GMTK, PKG, POSTERIOR_PROG,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, resource_substitute,
+                    PREFIX_LIKELIHOOD, PREFIX_PARAMS,
                     _save_observations_window, save_template,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
@@ -71,7 +72,6 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
-MAX_WEIGHT_SCALE = 25
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -157,7 +157,7 @@ EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
-SPECIAL_TRACKNAMES = ["dinucleotide", "supervisionLabel"]
+SPECIAL_TRACKNAMES = frozenset(["dinucleotide", "supervisionLabel"])
 
 # extensions and suffixes
 EXT_BEDGRAPH = "bedGraph"
@@ -225,7 +225,6 @@ TRAIN_OPTION_TYPES = \
          num_segs=int, num_subsegs=int, include_tracknames=[str])
 
 # templates and formats
-RES_STR_TMPL = "segway.str.tmpl"
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_INC_TMPL = "segway.inc.tmpl"
@@ -585,9 +584,6 @@ def update_starts(starts, ends, new_starts, new_ends, instance_index):
     starts[next_index:next_index] = new_starts
     ends[next_index:next_index] = new_ends
 
-def add_observation(observations, resourcename, **kwargs):
-    observations.append(resource_substitute(resourcename)(**kwargs))
-
 class Mixin_Lockable(AddableMixin):
     def __init__(self, *args, **kwargs):
         self.lock = Lock()
@@ -642,9 +638,6 @@ def cmdline2text(cmdline=sys.argv):
 
 def _log_cmdline(logfile, cmdline):
     print >>logfile, " ".join(map(quote_spaced_str, cmdline))
-
-def make_weight_scale(scale):
-    return "scale %f" % scale
 
 def check_overlapping_supervision_labels(start, end, chrom, coords):
     for coord_start, coord_end in coords[chrom]:
@@ -715,7 +708,7 @@ class Runner(object):
         self.window_coords = None
         self.mins = None
         self.maxs = None
-        self.tracknames = None
+        self.tracknames = None # encoded/quoted version
 
         # variables
         self.num_segs = NUM_SEGS
@@ -1158,6 +1151,14 @@ class Runner(object):
     def card_seg_countdown(self):
         return self.seg_countdowns_initial.max() + 1
 
+    @memoized_property
+    def num_tracks(self):
+        return len(self.track_indexes)
+
+    @memoized_property
+    def track_indexes_text(self):
+        return ",".join(map(str, self.track_indexes))
+    
     def transform(self, num):
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
             return arcsinh(num)
@@ -1212,69 +1213,53 @@ class Runner(object):
             / kwargs.get("subdirname", "") \
             / filebasename
 
-    def set_tracknames(self, chromosome):
-        # XXXopt: a lot of stuff here repeated for every chromosome
-        # unnecessarily
-        tracknames = chromosome.tracknames_continuous
+    def set_tracknames(self, genome):
+        tracknames = genome.tracknames_continuous
 
-        # includes special tracks (like dinucleotide)
-        include_tracknames_all = self.include_tracknames
+        # supplied by user: includes special tracks (like dinucleotide)
+        include_tracknames = self.include_tracknames
+        unquoted_tracknames = include_tracknames
+        ordinary_tracknames = frozenset(trackname
+                                        for trackname in include_tracknames
+                                        if trackname not in SPECIAL_TRACKNAMES)
 
-        # XXX: some repetition in next two assignments
-        tracknames_all = [trackname
-                          for trackname in tracknames + SPECIAL_TRACKNAMES
-                          if trackname in include_tracknames_all]
-
-        include_tracknames = frozenset(trackname
-                                       for trackname in include_tracknames_all
-                                       if trackname not in SPECIAL_TRACKNAMES)
-
-        if include_tracknames:
+        if ordinary_tracknames:
             indexed_tracknames = ((index, trackname)
                                   for index, trackname in enumerate(tracknames)
-                                  if trackname in include_tracknames)
+                                  if trackname in ordinary_tracknames)
 
             # redefine tracknames:
             track_indexes, tracknames = zip(*indexed_tracknames)
-            track_indexes = array(track_indexes)
 
             # check that there aren't any missing tracks
-            # XXX: a more informative error message would be better
-            # here, telling us the missing tracks
-            if len(tracknames) != len(include_tracknames):
-                missing_tracknames = include_tracknames.difference(tracknames)
+            if len(tracknames) != len(ordinary_tracknames):
+                missing_tracknames = ordinary_tracknames.difference(tracknames)
                 missing_tracknames_text = ", ".join(missing_tracknames)
                 msg = "could not find tracknames: %s" % missing_tracknames_text
                 raise ValueError(msg)
 
-        elif include_tracknames_all:
-            # there are special tracknames only
+            track_indexes = array(track_indexes)
+
+        elif include_tracknames:
+            ## no ordinary_tracknames => there are special tracknames only
             tracknames = []
             track_indexes = array([], intc)
-            # XXX: this is too late to keep the file from being opened
-            # all this junk should be refactored earlier, it doesn't
-            # need to run every contig
-            self.float_filelistpath = None
-        else:
-            track_indexes = arange(len(tracknames))
-            tracknames_all = tracknames
+            self.float_filelistpath = None # no float data
 
-        # replace illegal characters in tracknames only, not tracknames_all
+        else:
+            # default: use all tracks in archive
+            track_indexes = arange(len(tracknames))
+            unquoted_tracknames = tracknames
+
+        # replace illegal characters in tracknames only, not unquoted_tracknames
         tracknames = map(quote_trackname, tracknames)
 
-        # can't collapse these
+        # assert: none of the quoted tracknames are the same
         assert len(tracknames) == len(frozenset(tracknames))
 
-        if self.tracknames is None:
-            self.tracknames = tracknames
-            self.tracknames_all = tracknames_all
-            self.track_indexes = track_indexes
-            self.track_indexes_text = ",".join(map(str, track_indexes))
-        elif (self.tracknames != tracknames
-              or (self.track_indexes != track_indexes).any()):
-            raise ValueError("all tracknames attributes must be identical")
-
-        return track_indexes
+        self.tracknames = tracknames
+        self.unquoted_tracknames = unquoted_tracknames
+        self.track_indexes = track_indexes
 
     def get_last_params_filename(self, params_filename):
         if params_filename is not None and path(params_filename).exists():
@@ -1449,92 +1434,6 @@ class Runner(object):
             save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
                           aux_dirpath, self.clobber)
 
-    def make_weight_spec(self, multiplier):
-        resolution = self.resolution
-        if resolution == 1:
-            return make_weight_scale(multiplier)
-        else:
-            return " | ".join(make_weight_scale(index * multiplier)
-                              for index in xrange(resolution + 1))
-
-    def make_conditionalparents_spec(self, track):
-        """
-        this defines the parents of every observation
-        """
-
-        spec = ('CONDITIONALPARENTS_OBS '
-                'using mixture collection("collection_seg_%s") '
-                'MAPPING_OBS' % track)
-
-        return " | ".join(["CONDITIONALPARENTS_NIL_CONTINUOUS"] +
-                          [spec] * self.resolution)
-
-    def save_structure(self):
-        tracknames = self.tracknames
-        num_tracks = self.num_tracks
-        num_datapoints = self.num_datapoints
-
-        if self.use_dinucleotide:
-            max_num_datapoints_track = sum(self.window_lens)
-        else:
-            max_num_datapoints_track = num_datapoints.max()
-
-        observation_items = []
-        zipper = izip(count(), tracknames, num_datapoints)
-        for track_index, track, num_datapoints_track in zipper:
-            # relates current num_datapoints to total number of
-            # possible positions. This is better than making the
-            # highest num_datapoints equivalent to 1, because it
-            # becomes easier to mix and match different tracks without
-            # changing the weights of any of them
-
-            # XXX: this should be done based on the minimum seg len in
-            # the seg table instead
-            # weight scale cannot be more than MAX_WEIGHT_SCALE to avoid
-            # artifactual problems
-
-            weight_multiplier = min(max_num_datapoints_track
-                                    / num_datapoints_track, MAX_WEIGHT_SCALE)
-            # weight_scale = 1.0
-            # assert weight_scale == 1.0
-
-            conditionalparents_spec = self.make_conditionalparents_spec(track)
-            weight_spec = self.make_weight_spec(weight_multiplier)
-
-            # XXX: should avoid a weight line at all when weight_scale == 1.0
-            # might avoid some extra multiplication in GMTK
-            add_observation(observation_items, "observation.tmpl",
-                            track=track, track_index=track_index,
-                            presence_index=num_tracks+track_index,
-                            conditionalparents_spec=conditionalparents_spec,
-                            weight_spec=weight_spec)
-
-        if USE_MFSDG:
-            next_int_track_index = num_tracks+1
-        else:
-            next_int_track_index = num_tracks*2
-        # XXX: duplicative
-        if self.use_dinucleotide:
-            add_observation(observation_items, "dinucleotide.tmpl",
-                            track_index=next_int_track_index,
-                            presence_index=next_int_track_index+1)
-            next_int_track_index += 2
-
-        if self.supervision_type != SUPERVISION_UNSUPERVISED:
-            add_observation(observation_items, "supervision.tmpl",
-                            track_index=next_int_track_index)
-            next_int_track_index += 1
-
-        assert observation_items # must be at least one track
-        observations = "\n".join(observation_items)
-
-        mapping = dict(include_filename=self.gmtk_include_filename_relative,
-                       observations=observations)
-
-        self.structure_filename, self.structure_filename_is_new = \
-            save_template(self.structure_filename, RES_STR_TMPL, mapping,
-                          self.work_dirname, self.clobber)
-
     def save_observations_window(self, float_filename, int_filename, float_data,
                                 seq_data=None, supervision_data=None):
         return _save_observations_window(float_filename, int_filename,
@@ -1542,7 +1441,7 @@ class Runner(object):
                                          self.distribution, seq_data,
                                          supervision_data)
 
-    def subset_metadata_attr(self, genome, name):
+    def subset_metadata_attr(self, genome, name, reducer=sum):
         subset_array = getattr(genome, name)[self.track_indexes]
 
         setattr(self, name, subset_array)
@@ -1552,8 +1451,8 @@ class Runner(object):
         limits all the metadata attributes to only tracks that are used
         """
         subset_metadata_attr = self.subset_metadata_attr
-        subset_metadata_attr(genome, "mins")
-        subset_metadata_attr(genome, "maxs")
+        subset_metadata_attr(genome, "mins", min)
+        subset_metadata_attr(genome, "maxs", max)
         subset_metadata_attr(genome, "sums")
         subset_metadata_attr(genome, "sums_squares")
         subset_metadata_attr(genome, "num_datapoints")
@@ -1654,17 +1553,15 @@ class Runner(object):
     def prep_observations(self, genome):
         # XXX: this function is way too long, try to get it to fit
         # inside a screen on your enormous monitor
-
-        # this function is repeatable after max_mem_usage is discovered
         include_coords = self.include_coords
         exclude_coords = self.exclude_coords
 
-        num_tracks = None # this is before any subsetting
         window_index = 0
         window_coords = []
         num_bases = 0
         used_supercontigs = [] # continuous objects
         max_frames = self.max_frames
+        num_tracks = self.num_tracks
 
         # XXX: use groupby(include_coords) and then access chromosomes
         # randomly rather than iterating through them all
@@ -1678,15 +1575,7 @@ class Runner(object):
                 and is_empty_array(chr_include_coords)):
                 continue
 
-            track_indexes = self.set_tracknames(chromosome)
-            self.num_tracks = num_tracks = len(track_indexes)
-
-            if num_tracks:
-                supercontigs = chromosome.itercontinuous()
-            else:
-                supercontigs = izip(chromosome, repeat(None))
-
-            for supercontig, continuous in supercontigs:
+            for supercontig, continuous in chromosome.itercontinuous():
                 assert continuous is None or continuous.shape[1] >= num_tracks
 
                 if continuous is None:
@@ -1825,22 +1714,27 @@ class Runner(object):
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
 
-    def save_params(self):
+    def save_structure(self):
+        self.structure_filename, _ = \
+            StructureSaver(self)(self.work_dirname, self.clobber)
+
+    def save_observations_params(self):
         self.load_supervision()
 
-        # XXX: decrease the amount of time this file is open
+        # need to open Genomedata archive first in order to determine
+        # self.tracknames and self.num_tracks
         with Genome(self.genomedataname) as genome:
-        # do first, because it sets self.num_tracks and self.tracknames
+            self.set_tracknames(genome)
             self.prep_observations(genome)
-
-            self.save_include()
-            self.save_structure()
-            self.set_params_filename()
-
-            if self.train:
-                self.set_log_likelihood_filenames()
-
             self.save_observations()
+            self.used_supercontigs = None
+
+        if self.train:
+            self.set_log_likelihood_filenames()
+
+        self.save_include()
+        self.set_params_filename()
+        self.save_structure()
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -1852,7 +1746,7 @@ class Runner(object):
 
     def make_bed_desc_attrs(self, mapping, desc_tmpl):
         attrs = mapping.copy()
-        attrs["description"] = desc_tmpl % ", ".join(self.tracknames_all)
+        attrs["description"] = desc_tmpl % ", ".join(self.unquoted_tracknames)
 
         return make_bed_attrs(attrs)
 
@@ -2551,7 +2445,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             recover_dirname = self.recover_dirname
 
             self.input_master_filename = \
-                self.recover_filename(RES_INPUT_MASTER_TMPL)
+                self.recover_filename(InputMasterSaver.resource_name)
 
             recover_log_likelihood_tab_filename = \
                 self.make_log_likelihood_tab_filename(instance_index,
@@ -2776,7 +2670,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         if self.train:
             self.make_subdirs(SUBDIRNAMES_TRAIN)
 
-        self.save_params()
+        self.save_observations_params()
 
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:
@@ -2851,12 +2745,12 @@ def parse_options(args):
         group.add_option("-i", "--input-master", metavar="FILE",
                          help="use or create input master in FILE"
                          " (default %s)" %
-                         make_default_filename(RES_INPUT_MASTER_TMPL,
+                         make_default_filename(InputMasterSaver.resource_name,
                                                DIRPATH_WORK_DIR_HELP / SUBDIRNAME_PARAMS))
 
         group.add_option("-s", "--structure", metavar="FILE",
                          help="use or create structure in FILE (default %s)" %
-                         make_default_filename(RES_STR_TMPL))
+                         make_default_filename(StructureSaver.resource_name))
 
         group.add_option("-p", "--trainable-params", action="append",
                          default=[], metavar="FILE",

@@ -155,6 +155,28 @@ class NamedTemporaryDir(object):
     def __exit__(self, exc, value, tb):
         self.close()
 
+def copy_attrs(src, dst, attrs):
+    for attr in attrs:
+        setattr(dst, attr, getattr(src, attr))
+
+class Saver(object):
+    copy_attrs = []
+    resource_name = None
+
+    def __init__(self, runner):
+        # copy copy_attrs from runner to InputMasterSaver instance
+        copy_attrs(runner, self, self.copy_attrs)
+
+    def make_values(self):
+        """
+        override in subclasses
+        """
+        pass
+
+    def __call__(self, filename, *args, **kwargs):
+        return save_template(filename, self.resource_name, self.make_values(),
+                             *args, **kwargs)
+
 def die(msg=""):
     if msg:
         print >>sys.stderr, msg

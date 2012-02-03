@@ -16,10 +16,10 @@ from numpy import (array, empty, float32, outer, sqrt, tile, vectorize, where,
                    zeros)
 from numpy.random import uniform
 
-from ._util import (data_string, DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
+from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
                     DISTRIBUTION_ASINH_NORMAL,
                     OFFSET_END, OFFSET_START, OFFSET_STEP,
-                    resource_substitute, save_template, SUPERVISION_UNSUPERVISED,
+                    resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED, USE_MFSDG)
 
 # XXX: move relevant constants to within classes
@@ -34,8 +34,6 @@ else:
 
 ABSOLUTE_FUDGE = 0.001
 
-RES_INPUT_MASTER_TMPL = "input.master.tmpl"
-
 # here to avoid duplication
 NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
 
@@ -46,10 +44,6 @@ LEN_SEG_EXPECTED = 100000
 LEN_SUBSEG_EXPECTED = 100
 
 JITTER_ORDERS_MAGNITUDE = 5 # log10(2**5) = 1.5 decimal orders of magnitude
-
-def copy_attrs(src, dst, attrs):
-    for attr in attrs:
-        setattr(dst, attr, getattr(src, attr))
 
 def vstack_tile(array_like, *reps):
     reps = list(reps) + [1]
@@ -128,7 +122,7 @@ class ParamSpec(object):
     def __init__(self, saver):
         # copy all variables from saver that it copied from Runner
         # XXX: override in subclasses to only copy subset
-        copy_attrs(saver, self, saver._copy_attrs)
+        copy_attrs(saver, self, saver.copy_attrs)
 
     def get_track_lt_min(self, track_index):
         """
@@ -215,7 +209,7 @@ class ParamSpec(object):
 
             yield substitute(mapping)
 
-    def __call__(self):
+    def __str__(self):
         return make_spec(self.type_name, self.generate_objects())
 
 class DTParamSpec(ParamSpec):
@@ -582,19 +576,16 @@ class MXParamSpec(ParamSpec):
     object_tmpl = "1 mx_${seg}_${subseg}_${track} 1 dpmf_always" \
         " mc_${distribution}_${seg}_${subseg}_${track}"
 
-class InputMasterSaver(object):
-    _copy_attrs = ["tracknames", "num_bases", "num_segs", "num_subsegs",
+class InputMasterSaver(Saver):
+    resource_name = "input.master.tmpl"
+    copy_attrs = ["tracknames", "num_bases", "num_segs", "num_subsegs",
                    "num_tracks", "card_seg_countdown",
                    "seg_countdowns_initial", "seg_table", "distribution",
                    "len_seg_strength", "resolution", "supervision_type",
-                   "use_dinucleotide", "mins", "maxs", "means", "vars",
+                   "use_dinucleotide", "mins", "means", "vars",
                    "gmtk_include_filename_relative", "tied_tracknames"]
 
-    def __init__(self, runner):
-        # copy _copy_attrs from runner to InputMasterSaver instance
-        copy_attrs(runner, self, self._copy_attrs)
-
-    def __call__(self, filename, *args, **kwargs):
+    def make_mapping(self):
         # the locals of this function are used as the template mapping
         # use caution before deleting or renaming any variables
         # check that they are not used in the input.master template
@@ -607,14 +598,14 @@ class InputMasterSaver(object):
 
         include_filename = self.gmtk_include_filename_relative
 
-        dt_spec = DTParamSpec(self)()
+        dt_spec = DTParamSpec(self)
 
         if self.len_seg_strength > 0:
-            dirichlet_spec = DirichletTabParamSpec(self)()
+            dirichlet_spec = DirichletTabParamSpec(self)
         else:
             dirichlet_spec = ""
 
-        dense_cpt_spec = DenseCPTParamSpec(self)()
+        dense_cpt_spec = DenseCPTParamSpec(self)
 
         # seg_seg
         num_free_params += fullnum_subsegs * (fullnum_subsegs - 1)
@@ -624,18 +615,18 @@ class InputMasterSaver(object):
 
         distribution = self.distribution
         if distribution in DISTRIBUTIONS_LIKE_NORM:
-            mean_spec = MeanParamSpec(self)()
+            mean_spec = MeanParamSpec(self)
             if COVAR_TIED:
-                covar_spec = TiedCovarParamSpec(self)()
+                covar_spec = TiedCovarParamSpec(self)
             else:
-                covar_spec = CovarParamSpec(self)()
+                covar_spec = CovarParamSpec(self)
 
             if USE_MFSDG:
-                real_mat_spec = RealMatParamSpec(self)()
+                real_mat_spec = RealMatParamSpec(self)
             else:
                 real_mat_spec = ""
 
-            mc_spec = NormMCParamSpec(self)()
+            mc_spec = NormMCParamSpec(self)
 
             if COVAR_TIED:
                 num_free_params += (fullnum_subsegs + 1) * num_tracks
@@ -648,17 +639,16 @@ class InputMasterSaver(object):
             # XXX: another option is to calculate an ML estimate for
             # the gamma distribution rather than the ML estimate for the
             # mean and converting
-            real_mat_spec = GammaRealMatParamSpec(self)()
-            mc_spec = GammaMCParamSpec(self)()
+            real_mat_spec = GammaRealMatParamSpec(self)
+            mc_spec = GammaMCParamSpec(self)
 
 
             num_free_params += (fullnum_subsegs * 2) * num_tracks
         else:
             raise ValueError("distribution %s not supported" % distribution)
 
-        mx_spec = MXParamSpec(self)()
-        name_collection_spec = NameCollectionParamSpec(self)()
+        mx_spec = MXParamSpec(self)
+        name_collection_spec = NameCollectionParamSpec(self)
         card_seg = num_segs
 
-        return save_template(filename, RES_INPUT_MASTER_TMPL, locals(),
-                             *args, **kwargs)
+        return locals() # dict of vars set in this function
