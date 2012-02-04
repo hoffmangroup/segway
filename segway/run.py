@@ -1715,8 +1715,10 @@ class Runner(object):
                                        SUPERVISION_LABEL_OFFSET)
 
     def save_structure(self):
+        import pdb; pdb.set_trace()
         self.structure_filename, _ = \
-            StructureSaver(self)(self.work_dirname, self.clobber)
+            StructureSaver(self)(self.structure_filename, self.work_dirname,
+                                 self.clobber)
 
     def save_observations_params(self):
         self.load_supervision()
@@ -1727,7 +1729,7 @@ class Runner(object):
             self.set_tracknames(genome)
             self.prep_observations(genome)
             self.save_observations()
-            self.used_supercontigs = None
+            self.used_supercontigs = None # no longer necessary
 
         if self.train:
             self.set_log_likelihood_filenames()
