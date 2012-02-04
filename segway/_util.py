@@ -167,14 +167,14 @@ class Saver(object):
         # copy copy_attrs from runner to InputMasterSaver instance
         copy_attrs(runner, self, self.copy_attrs)
 
-    def make_values(self):
+    def make_mapping(self):
         """
         override in subclasses
         """
         pass
 
     def __call__(self, filename, *args, **kwargs):
-        return save_template(filename, self.resource_name, self.make_values(),
+        return save_template(filename, self.resource_name, self.make_mapping(),
                              *args, **kwargs)
 
 def die(msg=""):
