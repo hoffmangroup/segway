@@ -1565,6 +1565,10 @@ class Runner(object):
 
         # XXX: use groupby(include_coords) and then access chromosomes
         # randomly rather than iterating through them all
+
+        # XXX: hopefully this will fix a bug where end of one = start
+        # of next results in a MemoryError crash (email from ML to
+        # MMH, 2012/1/24)
         for chromosome in genome:
             chrom = chromosome.name
 
