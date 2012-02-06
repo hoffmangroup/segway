@@ -697,7 +697,7 @@ class Runner(object):
         self.card_supervision_label = -1
 
         self.include_tracknames = []
-        self.tied_tracknames = {} # dict of trackname -> head trackname
+        self.tied_tracknames = {} # dict of head trackname -> tied tracknames
 
         # default is 0
         self.global_mem_usage = LockableDefaultDict(int)
@@ -815,6 +815,7 @@ class Runner(object):
 
         ## below: can be loaded in Runner.save_train_options(), or
         ## override what is set there
+        # XXX: this should be an iteration over a list of tuples
         res.set_option("input_master_filename", options.input_master)
         res.set_option("structure_filename", options.structure)
         res.set_option("dont_train_filename", options.dont_train)
@@ -834,17 +835,23 @@ class Runner(object):
             res.params_filenames = params_filenames
 
         include_tracknames = []
-        tied_tracknames = {}
+        tied_tracknames = defaultdict(list)
+        head_tracknames = {}
+        used_tracknames = set()
+
         for track_spec in options.track:
-            track_spec_names = track_spec.split(",")
-            include_tracknames.extend(track_spec_names)
+            current_tracknames = track_spec.split(",")
 
-            for track_spec_name in track_spec_names:
-                if track_spec_name in tied_tracknames:
-                    raise ValueError("can't tie one track in multiple groups")
+            if not used_tracknames.isdisjoint(current_tracknames):
+                raise ValueError("can't tie one track in multiple groups")
 
-                # link trackname to the head of the group
-                tied_tracknames[track_spec_name] = track_spec_names[0]
+            include_tracknames.extend(current_tracknames)
+            used_tracknames |= current_tracknames
+
+            head_trackname = current_tracknames[0]
+            for trackname in current_tracknames:
+                tied_tracknames[head_trackname].append(trackname)
+                head_tracknames[trackname] = head_trackname
 
         if include_tracknames:
             # non-allowed special trackname
@@ -854,6 +861,7 @@ class Runner(object):
             res.include_tracknames = include_tracknames
 
         res.tied_tracknames = tied_tracknames
+        res.head_tracknames = head_tracknames
 
         return res
 
@@ -1224,12 +1232,12 @@ class Runner(object):
                                         if trackname not in SPECIAL_TRACKNAMES)
 
         if ordinary_tracknames:
-            indexed_tracknames = ((index, trackname)
+            indexed_tracknames = ((trackname, index)
                                   for index, trackname in enumerate(tracknames)
                                   if trackname in ordinary_tracknames)
 
             # redefine tracknames:
-            track_indexes, tracknames = zip(*indexed_tracknames)
+            tracknames, track_indexes = zip(*indexed_tracknames)
 
             # check that there aren't any missing tracks
             if len(tracknames) != len(ordinary_tracknames):
@@ -1239,16 +1247,30 @@ class Runner(object):
                 raise ValueError(msg)
 
             track_indexes = array(track_indexes)
+            tied_tracknames = self.tied_tracknames
+            tied_track_indexes = [[] for _ in xrange(len(tied_tracknames))]
+            tied_track_index_map = dict(izip(tied_tracknames.keys(), count()))
+            head_tracknames = self.head_tracknames
+
+            for trackname, index in indexed_tracknames:
+                head_trackname = head_tracknames[trackname]
+                tied_track_indexes_index = tied_track_index_map[head_trackname]
+                tied_track_indexes[tied_track_indexes_index].append(index)
 
         elif include_tracknames:
             ## no ordinary_tracknames => there are special tracknames only
             tracknames = []
             track_indexes = array([], intc)
+            tied_track_indexes = []
             self.float_filelistpath = None # no float data
 
         else:
             # default: use all tracks in archive
             track_indexes = arange(len(tracknames))
+
+            assert not self.tied_tracknames
+            tied_track_indexes = [[track_index]
+                                  for track_index in track_indexes]
             unquoted_tracknames = tracknames
 
         # replace illegal characters in tracknames only, not unquoted_tracknames
@@ -1260,6 +1282,7 @@ class Runner(object):
         self.tracknames = tracknames
         self.unquoted_tracknames = unquoted_tracknames
         self.track_indexes = track_indexes
+        self.tied_track_indexes = tied_track_indexes
 
     def get_last_params_filename(self, params_filename):
         if params_filename is not None and path(params_filename).exists():
@@ -1719,7 +1742,6 @@ class Runner(object):
                                        SUPERVISION_LABEL_OFFSET)
 
     def save_structure(self):
-        import pdb; pdb.set_trace()
         self.structure_filename, _ = \
             StructureSaver(self)(self.structure_filename, self.work_dirname,
                                  self.clobber)
