@@ -32,9 +32,8 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (append, arange, arcsinh, array, finfo, float32, intc,
+from numpy import (append, arange, arcsinh, array, empty, finfo, float32, intc,
                    int64, NINF, square, vstack, zeros)
-
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -1248,20 +1247,20 @@ class Runner(object):
 
             track_indexes = array(track_indexes)
             tied_tracknames = self.tied_tracknames
-            tied_track_indexes = [[] for _ in xrange(len(tied_tracknames))]
+            tied_track_indexes_list = [[] for _ in xrange(len(tied_tracknames))]
             tied_track_index_map = dict(izip(tied_tracknames.keys(), count()))
             head_tracknames = self.head_tracknames
 
             for trackname, index in indexed_tracknames:
                 head_trackname = head_tracknames[trackname]
-                tied_track_indexes_index = tied_track_index_map[head_trackname]
-                tied_track_indexes[tied_track_indexes_index].append(index)
+                tied_track_indexes_list_index = tied_track_index_map[head_trackname]
+                tied_track_indexes_list[tied_track_indexes_list_index].append(index)
 
         elif include_tracknames:
             ## no ordinary_tracknames => there are special tracknames only
             tracknames = []
             track_indexes = array([], intc)
-            tied_track_indexes = []
+            tied_track_indexes_list = []
             self.float_filelistpath = None # no float data
 
         else:
@@ -1269,7 +1268,7 @@ class Runner(object):
             track_indexes = arange(len(tracknames))
 
             assert not self.tied_tracknames
-            tied_track_indexes = [[track_index]
+            tied_track_indexes_list = [[track_index]
                                   for track_index in track_indexes]
             unquoted_tracknames = tracknames
 
@@ -1282,7 +1281,7 @@ class Runner(object):
         self.tracknames = tracknames
         self.unquoted_tracknames = unquoted_tracknames
         self.track_indexes = track_indexes
-        self.tied_track_indexes = tied_track_indexes
+        self.tied_track_indexes_list = tied_track_indexes_list
 
     def get_last_params_filename(self, params_filename):
         if params_filename is not None and path(params_filename).exists():
@@ -1465,7 +1464,19 @@ class Runner(object):
                                          supervision_data)
 
     def subset_metadata_attr(self, genome, name, reducer=sum):
-        subset_array = getattr(genome, name)[self.track_indexes]
+        attr = getattr(genome, name)
+
+        tied_track_indexes_list = self.tied_track_indexes_list
+        shape = len(tied_track_indexes_list)
+        subset_array = empty(shape, attr.dtype)
+        for index, tied_track_indexes in enumerate(tied_track_indexes_list):
+            subset_array[index] = reducer(attr[tied_track_indexes])
+
+        if __debug__:
+            track_indexes = self.track_indexes
+            if len(self.head_tracknames) == len(track_indexes):
+                # ensure that the results are the same as the old method
+                assert subset_array == attr[track_indexes]
 
         setattr(self, name, subset_array)
 
