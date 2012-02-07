@@ -160,7 +160,7 @@ class ParamSpec(object):
         # and only one mapping is produced
         num_subsegs = self.num_subsegs
 
-        tracknames = self.tracknames
+        tracknames = self.head_trackname_list
 
         num_tracks = len(tracknames)
 
@@ -557,11 +557,13 @@ class MCParamSpec(ParamSpec):
 
 class NormMCParamSpec(MCParamSpec):
     if USE_MFSDG:
+        # dimensionality component_type name mean covar weights
         object_tmpl = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
         " mc_${distribution}_${seg}_${subseg}_${track}" \
         " mean_${seg}_${subseg}_${track} covar_${seg}_${subseg}_${track}" \
         " matrix_weightscale_1x1"
     else:
+        # dimensionality component_type name mean covar
         object_tmpl = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
         " mc_${distribution}_${seg}_${subseg}_${track}" \
         " mean_${seg}_${subseg}_${track} covar_${track}"
@@ -579,11 +581,12 @@ class MXParamSpec(ParamSpec):
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
     copy_attrs = ["tracknames", "num_bases", "num_segs", "num_subsegs",
-                   "num_tracks", "card_seg_countdown",
-                   "seg_countdowns_initial", "seg_table", "distribution",
-                   "len_seg_strength", "resolution", "supervision_type",
-                   "use_dinucleotide", "mins", "means", "vars",
-                   "gmtk_include_filename_relative", "tied_tracknames"]
+                  "num_tracks", "card_seg_countdown",
+                  "seg_countdowns_initial", "seg_table", "distribution",
+                  "len_seg_strength", "resolution", "supervision_type",
+                  "use_dinucleotide", "mins", "means", "vars",
+                  "gmtk_include_filename_relative", "tied_tracknames",
+                  "head_trackname_list"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping

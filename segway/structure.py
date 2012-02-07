@@ -10,8 +10,8 @@ __version__ = "$Revision$"
 
 from itertools import count, izip
 
-from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
-                    USE_MFSDG)
+from ._util import (PassThroughDict, resource_substitute, Saver,
+                    SUPERVISION_UNSUPERVISED, USE_MFSDG)
 
 MAX_WEIGHT_SCALE = 25
 
@@ -25,7 +25,7 @@ class StructureSaver(Saver):
     resource_name = "segway.str.tmpl"
     copy_attrs = ["num_tracks", "num_datapoints", "use_dinucleotide",
                   "window_lens", "resolution", "tracknames", "supervision_type",
-                  "gmtk_include_filename_relative"]
+                  "gmtk_include_filename_relative", "head_tracknames"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -35,14 +35,14 @@ class StructureSaver(Saver):
             return " | ".join(make_weight_scale(index * multiplier)
                               for index in xrange(resolution + 1))
 
-    def make_conditionalparents_spec(self, track):
+    def make_conditionalparents_spec(self, trackname):
         """
         this defines the parents of every observation
         """
 
         spec = 'CONDITIONALPARENTS_OBS ' \
             'using mixture collection("collection_seg_%s") ' \
-            'MAPPING_OBS' % track
+            'MAPPING_OBS' % trackname
 
         return " | ".join(["CONDITIONALPARENTS_NIL_CONTINUOUS"] +
                           [spec] * self.resolution)
@@ -57,8 +57,11 @@ class StructureSaver(Saver):
             max_num_datapoints_track = num_datapoints.max()
 
         observation_items = []
+
+        head_tracknames = self.head_tracknames
+
         zipper = izip(count(), self.tracknames, num_datapoints)
-        for track_index, track, num_datapoints_track in zipper:
+        for track_index, trackname, num_datapoints_track in zipper:
             # relates current num_datapoints to total number of
             # possible positions. This is better than making the
             # highest num_datapoints equivalent to 1, because it
@@ -75,13 +78,15 @@ class StructureSaver(Saver):
             # weight_scale = 1.0
             # assert weight_scale == 1.0
 
-            conditionalparents_spec = self.make_conditionalparents_spec(track)
+            head_trackname = head_tracknames[trackname]
+            conditionalparents_spec = \
+                self.make_conditionalparents_spec(head_trackname)
             weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
             add_observation(observation_items, "observation.tmpl",
-                            track=track, track_index=track_index,
+                            track=trackname, track_index=track_index,
                             presence_index=num_tracks+track_index,
                             conditionalparents_spec=conditionalparents_spec,
                             weight_spec=weight_spec)

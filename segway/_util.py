@@ -177,6 +177,10 @@ class Saver(object):
         return save_template(filename, self.resource_name, self.make_mapping(),
                              *args, **kwargs)
 
+class PassThroughDict(dict):
+    def __missing__(self, key):
+        return key
+
 def die(msg=""):
     if msg:
         print >>sys.stderr, msg

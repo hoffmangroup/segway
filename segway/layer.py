@@ -7,7 +7,7 @@ layer: convert flattened Viterbi BED files to a layered thick/thin bed file
 
 __version__ = "$Revision$"
 
-# Copyright 2009-2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009-2012 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
 import re
@@ -20,7 +20,8 @@ from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native
 from ._util import (BED_SCORE, BED_STRAND, get_label_color,
-                    maybe_gzip_open, PKG, SUFFIX_BED, SUFFIX_TAB)
+                    maybe_gzip_open, PassThroughDict, PKG, SUFFIX_BED,
+                    SUFFIX_TAB)
 
 BED_START = "0"
 ACCEPTABLE_STRANDS = set(".+")
@@ -33,10 +34,6 @@ TRACKLINE_DEFAULT = ["track", 'description="segway-layer output"',
                      "visibility=full"]
 
 BEDTOBIGBED_PROG = OptionBuilder_ShortOptWithEquals("bedToBigBed")
-
-class PassThroughDict(dict):
-    def __missing__(self, key):
-        return key
 
 # XXX: don't need counter, can use length
 class IncrementingDefaultDict(defaultdict):

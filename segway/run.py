@@ -55,8 +55,8 @@ from ._util import (ceildiv, data_filename,
                     _make_continuous_cells, make_default_filename,
                     make_filelistpath, maybe_gzip_open,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
-                    OFFSET_STEP, OptionBuilder_GMTK, PKG, POSTERIOR_PROG,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS,
+                    OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict, PKG,
+                    POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
                     _save_observations_window, save_template,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
@@ -836,6 +836,7 @@ class Runner(object):
         include_tracknames = []
         tied_tracknames = defaultdict(list)
         head_tracknames = {}
+        head_trackname_list = []
         used_tracknames = set()
 
         for track_spec in options.track:
@@ -848,6 +849,7 @@ class Runner(object):
             used_tracknames |= current_tracknames
 
             head_trackname = current_tracknames[0]
+            head_trackname_list.append(head_trackname)
             for trackname in current_tracknames:
                 tied_tracknames[head_trackname].append(trackname)
                 head_tracknames[trackname] = head_trackname
@@ -860,7 +862,10 @@ class Runner(object):
             res.include_tracknames = include_tracknames
 
         res.tied_tracknames = tied_tracknames
-        res.head_tracknames = head_tracknames
+
+        if head_tracknames:
+            res.head_tracknames = head_tracknames
+            res.head_trackname_list = head_trackname_list
 
         return res
 
@@ -1165,7 +1170,15 @@ class Runner(object):
     @memoized_property
     def track_indexes_text(self):
         return ",".join(map(str, self.track_indexes))
-    
+
+    @memoized_property
+    def head_tracknames(self):
+        return PassThroughDict()
+
+    @memoized_property
+    def head_trackname_list(self):
+        return self.tracknames
+
     def transform(self, num):
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
             return arcsinh(num)
