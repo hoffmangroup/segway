@@ -153,14 +153,14 @@ DENSE_CPT_IN_FILE inline
 MEAN_IN_FILE inline
 8
 
-0 mean_seg0_subseg0_h3k27me3 1 0.363553175994
-1 mean_seg0_subseg0_h3k36me3 1 0.485988789018
-2 mean_seg1_subseg0_h3k27me3 1 0.419566565554
-3 mean_seg1_subseg0_h3k36me3 1 0.559510743134
-4 mean_seg2_subseg0_h3k27me3 1 0.392383743844
-5 mean_seg2_subseg0_h3k36me3 1 0.672464225003
-6 mean_seg3_subseg0_h3k27me3 1 0.454931211341
-7 mean_seg3_subseg0_h3k36me3 1 0.547029100155
+0 mean_seg0_subseg0_h3k27me3 1 0.446591351929
+1 mean_seg0_subseg0_h3k36me3 1 0.614836736569
+2 mean_seg1_subseg0_h3k27me3 1 0.459066861175
+3 mean_seg1_subseg0_h3k36me3 1 0.588981643538
+4 mean_seg2_subseg0_h3k27me3 1 0.478233980475
+5 mean_seg2_subseg0_h3k36me3 1 0.556547491752
+6 mean_seg3_subseg0_h3k27me3 1 0.357493747623
+7 mean_seg3_subseg0_h3k36me3 1 0.677516916081
 
 COVAR_IN_FILE inline
 2
@@ -177,10 +177,6 @@ COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
 
 #endif
 
-REAL_MAT_IN_FILE inline
-1
-
-0 matrix_weightscale_1x1 1 1 1.0
 
 MC_IN_FILE inline
 8

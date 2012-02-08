@@ -1,7 +1,7 @@
 name	value
 distribution	asinh_norm
 dont_train_filename	traindir/auxiliary/dont_train.list
-input_master_filename	../data/input.master
+input_master_filename	traindir/params/input.master
 len_seg_strength	0
 num_segs	4
 num_subsegs	1

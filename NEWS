@@ -9,6 +9,8 @@
   that previous files will be incompatible, since "_" is now replaced
   by "_5f" and "." by "_2e" (formerly both of these were "_", which
   was ambiguous)
+* segway: allow tying of tracks with --trackname track1,track2, which
+  gives you only one set of parameters
 * segway: LSF: fix bug where wrapper script sometimes did not delete
   temporary observation files after a crash
 * segway: more informative error message when supervision labels overlap each other
@@ -21,6 +23,7 @@
   when mnemonics aren't supplied (thanks to Jay Hesselberth)
 * segway-winner: fix issue #21. Now works on Python 2.5.1
 * installation: always require drmaa. setuptools extras_require wasn't that useful in practice
+* test: use fixed random seed to generate input.master every time
 * test: when files differ, output is in a form that makes it easier to diff
 * test: update for new GMTK
 
