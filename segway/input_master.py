@@ -14,7 +14,8 @@ from string import Template
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, sqrt, tile, vectorize, where,
                    zeros)
-from numpy.random import uniform
+from numpy.random import seed, uniform
+from os import environ
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
                     DISTRIBUTION_ASINH_NORMAL,
@@ -22,9 +23,12 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA, DISTRIBUTION_NO
                     resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED, USE_MFSDG)
 
-# XXX: move relevant constants to within classes
-DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
-                                     DISTRIBUTION_ASINH_NORMAL])
+try:
+    seed_text = environ["SEGWAY_RAND_SEED"]
+except KeyError:
+    pass
+else:
+    seed(int(seed_text)) # for testing purposes
 
 if USE_MFSDG:
     # because tying not implemented yet
@@ -44,6 +48,9 @@ LEN_SEG_EXPECTED = 100000
 LEN_SUBSEG_EXPECTED = 100
 
 JITTER_ORDERS_MAGNITUDE = 5 # log10(2**5) = 1.5 decimal orders of magnitude
+
+DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
+                                     DISTRIBUTION_ASINH_NORMAL])
 
 def vstack_tile(array_like, *reps):
     reps = list(reps) + [1]
@@ -118,11 +125,13 @@ class ParamSpec(object):
     """
     type_name = None
     object_tmpl = None
+    copy_attrs = ["distribution", "head_trackname_list", "mins", "num_segs",
+                  "num_subsegs"]
 
     def __init__(self, saver):
         # copy all variables from saver that it copied from Runner
         # XXX: override in subclasses to only copy subset
-        copy_attrs(saver, self, saver.copy_attrs)
+        copy_attrs(saver, self, self.copy_attrs)
 
     def get_track_lt_min(self, track_index):
         """
@@ -214,6 +223,8 @@ class ParamSpec(object):
 
 class DTParamSpec(ParamSpec):
     type_name = "DT"
+    copy_attrs = ParamSpec.copy_attrs + ["seg_countdowns_initial",
+                                         "supervision_type"]
 
     def make_segCountDown_tree_spec(self, resourcename):
         num_segs = self.num_segs
@@ -270,8 +281,11 @@ class TableParamSpec(ParamSpec):
 
 class DenseCPTParamSpec(TableParamSpec):
     type_name = "DENSE_CPT"
+    copy_attrs = TableParamSpec.copy_attrs \
+        + ["resolution", "card_seg_countdown", "seg_table",
+           "seg_countdowns_initial", "len_seg_strength", "use_dinucleotide"]
 
-    # see Segway manuscript
+    # see Segway paper
     probs_force_transition = array([0.0, 0.0, 1.0])
 
     def make_table_spec(self, name, table, dirichlet=False):
@@ -418,6 +432,8 @@ class DenseCPTParamSpec(TableParamSpec):
 
 class DirichletTabParamSpec(TableParamSpec):
     type_name = "DIRICHLET_TAB"
+    copy_attrs = TableParamSpec.copy_attrs \
+        + ["len_seg_strength", "num_bases", "card_seg_countdown"]
 
     def make_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
@@ -455,7 +471,7 @@ class NameCollectionParamSpec(ParamSpec):
     def generate_objects(self):
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs
-        tracknames = self.tracknames
+        tracknames = self.head_trackname_list
 
         substitute_header = Template(self.header_tmpl).substitute
         substitute_row = Template(self.row_tmpl).substitute
@@ -482,6 +498,8 @@ class MeanParamSpec(ParamSpec):
     object_tmpl = "mean_${seg}_${subseg}_${track} 1 ${datum}"
     jitter_std_bound = 0.2
 
+    copy_attrs = ParamSpec.copy_attrs + ["means", "vars"]
+
     def make_data(self):
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs
@@ -504,6 +522,8 @@ class CovarParamSpec(ParamSpec):
     type_name = "COVAR"
     object_tmpl = "covar_${seg}_${subseg}_${track} 1 ${datum}"
 
+    copy_attrs = ParamSpec.copy_attrs + ["vars"]
+
     def make_data(self):
         return vstack_tile(self.vars, self.num_segs, self.num_subsegs)
 
@@ -525,6 +545,8 @@ class RealMatParamSpec(ParamSpec):
 class GammaRealMatParamSpec(RealMatParamSpec):
     scale_tmpl = "gammascale_${seg}_${subseg}_${track} 1 1 ${datum}"
     shape_tmpl = "gammashape_${seg}_${subseg}_${track} 1 1 ${datum}"
+
+    copy_attrs = ParamSpec.copy_attrs + ["means", "vars"]
 
     def generate_objects(self):
         means = self.means
