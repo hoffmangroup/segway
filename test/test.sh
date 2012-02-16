@@ -23,12 +23,20 @@ else
     cluster_arg="--cluster-opt="
 fi
 
-# seed from random.randrange(2**32)
+set -x
+
+# seed from python -c "import random; print random.randrange(2**32)"
 SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=2 \
     "$cluster_arg" \
     train ../data/test.genomedata traindir
 segway "$cluster_arg" \
     identify+posterior ../data/test.genomedata traindir identifydir
+
+SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=2 \
+    --track=h3k27me3,h3k36me3 "$cluster_arg" \
+    train ../data/test.genomedata traindir.tie
+segway --num-labels=4 --max-train-rounds=2 "$cluster_arg" \
+    identify+posterior ../data/test.genomedata traindir.tie identifydir.tie
 
 # diff
 ../compare_directory.py ../data/traindir traindir || true # keep going

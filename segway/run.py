@@ -221,7 +221,7 @@ TRAIN_OPTION_TYPES = \
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
          distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
-         num_segs=int, num_subsegs=int, include_tracknames=[str])
+         num_segs=int, num_subsegs=int, track_specs=[str])
 
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
@@ -673,6 +673,7 @@ class Runner(object):
         self.triangulation_filename = None
         self.job_log_filename = None
         self.seg_table_filename = None
+        self.supervision_filename = None
 
         self.params_filename = None # actual params filename for this instance
         self.params_filenames = [] # list of possible params filenames
@@ -751,11 +752,34 @@ class Runner(object):
         if value is not None:
             setattr(self, name, value)
 
+    options_to_attrs = [("recover", "recover_dirname"),
+                        ("observations", "obs_dirname"),
+                        ("bed", "bed_filename"),
+                        ("semisupervised", "supervision_filename"),
+                        ("bigBed", "bigbed_filename"),
+                        ("include_coords", "include_coords_filename"),
+                        ("exclude_coords", "exclude_coords_filename"),
+                        ("num_instances",),
+                        ("verbosity",),
+                        ("split_sequences", "max_frames"),
+                        ("clobber",),
+                        ("dry_run",),
+                        ("input_master", "input_master_filename"),
+                        ("structure", "structure_filename"),
+                        ("dont_train", "dont_train_filename"),
+                        ("seg_table", "seg_table_filename"),
+                        ("distribution",),
+                        ("prior_strength", "len_seg_strength"),
+                        ("segtransition_weight_scale",),
+                        ("ruler_scale",),
+                        ("resolution",),
+                        ("num_labels", "num_segs"),
+                        ("num_sublabels", "num_subsegs"),
+                        ("max_train_rounds", "max_em_iters"),
+                        ("track", "track_specs")]
+
     @classmethod
-    def fromoptions(cls, args, options):
-        """
-        the usual way a Runner is created
-        """
+    def fromargs(cls, args):
         res = cls()
 
         task_str = args[0]
@@ -768,35 +792,37 @@ class Runner(object):
         if res.train:
             res.work_dirname = traindirname
             assert len(args) == 3
-        else:
-            res.work_dirname = args[3]
+            return res
 
+        # identify or posterior
+        res.work_dirname = args[3]
+
+        try:
+            res.load_train_options(traindirname)
+        except IOError, err:
+            # train.tab use is optional
+            if err.errno != ENOENT:
+                raise
+
+        return res
+
+    @classmethod
+    def fromoptions(cls, args, options):
+        """
+        the usual way a Runner is created
+        """
+        res = cls.fromargs(args)
+
+        # bulk copy options that need no further processing
+        for option_to_attr in cls.options_to_attrs:
             try:
-                res.load_train_options(traindirname)
-            except IOError, err:
-                # train.tab use is optional
-                if err.errno != ENOENT:
-                    raise
+                src, dst = option_to_attr
+            except ValueError:
+                src, = option_to_attr
+                dst = src
 
-        res.recover_dirname = options.recover
-        res.obs_dirname = options.observations
+            res.set_option(dst, getattr(options, src))
 
-        res.set_option("bed_filename", options.bed)
-        res.set_option("bigbed_filename", options.bigBed)
-        #res.bedgraph_filename = options.bedgraph
-
-        res.include_coords_filename = options.include_coords
-        res.exclude_coords_filename = options.exclude_coords
-
-        res.supervision_filename = options.semisupervised
-        if options.semisupervised:
-            res.supervision_type = SUPERVISION_SEMISUPERVISED
-        else:
-            res.supervision_type = SUPERVISION_UNSUPERVISED
-
-        res.num_instances = options.num_instances
-
-        res.verbosity = options.verbosity
         # multiple lists to one
         res.user_native_spec = sum([opt.split(" ")
                                     for opt in options.cluster_opt], [])
@@ -808,27 +834,7 @@ class Runner(object):
         # 64-bit compute nodes
         res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
 
-        res.clobber = options.clobber
-        res.dry_run = options.dry_run
-        res.max_frames = options.split_sequences
-
-        ## below: can be loaded in Runner.save_train_options(), or
-        ## override what is set there
-        # XXX: this should be an iteration over a list of tuples
-        res.set_option("input_master_filename", options.input_master)
-        res.set_option("structure_filename", options.structure)
-        res.set_option("dont_train_filename", options.dont_train)
-        res.set_option("seg_table_filename", options.seg_table)
-        res.set_option("distribution", options.distribution)
-        res.set_option("len_seg_strength", options.prior_strength)
-        res.set_option("segtransition_weight_scale",
-                       options.segtransition_weight_scale)
-        res.set_option("ruler_scale", options.ruler_scale)
-        res.set_option("resolution", options.resolution)
-        res.set_option("num_segs", options.num_labels)
-        res.set_option("num_subsegs", options.num_sublabels)
-        res.set_option("max_em_iters", options.max_train_rounds)
-
+        # don't change from None if this is false
         params_filenames = options.trainable_params
         if params_filenames:
             res.params_filenames = params_filenames
@@ -839,14 +845,14 @@ class Runner(object):
         head_trackname_list = []
         used_tracknames = set()
 
-        for track_spec in options.track:
+        for track_spec in res.track_specs:
             current_tracknames = track_spec.split(",")
 
             if not used_tracknames.isdisjoint(current_tracknames):
                 raise ValueError("can't tie one track in multiple groups")
 
             include_tracknames.extend(current_tracknames)
-            used_tracknames |= current_tracknames
+            used_tracknames |= frozenset(current_tracknames)
 
             head_trackname = current_tracknames[0]
             head_trackname_list.append(head_trackname)
@@ -1179,6 +1185,13 @@ class Runner(object):
     def head_trackname_list(self):
         return self.tracknames
 
+    @memoized_property
+    def supervision_type(self):
+        if self.supervision_filename:
+            return SUPERVISION_SEMISUPERVISED
+        else:
+            return SUPERVISION_UNSUPERVISED
+
     def transform(self, num):
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
             return arcsinh(num)
@@ -1244,9 +1257,9 @@ class Runner(object):
                                         if trackname not in SPECIAL_TRACKNAMES)
 
         if ordinary_tracknames:
-            indexed_tracknames = ((trackname, index)
+            indexed_tracknames = [(trackname, index)
                                   for index, trackname in enumerate(tracknames)
-                                  if trackname in ordinary_tracknames)
+                                  if trackname in ordinary_tracknames]
 
             # redefine tracknames:
             tracknames, track_indexes = zip(*indexed_tracknames)
@@ -1282,7 +1295,7 @@ class Runner(object):
 
             assert not self.tied_tracknames
             tied_track_indexes_list = [[track_index]
-                                  for track_index in track_indexes]
+                                       for track_index in track_indexes]
             unquoted_tracknames = tracknames
 
         # replace illegal characters in tracknames only, not unquoted_tracknames
@@ -1487,9 +1500,10 @@ class Runner(object):
 
         if __debug__:
             track_indexes = self.track_indexes
-            if len(self.head_tracknames) == len(track_indexes):
+            if len(self.head_trackname_list) == len(track_indexes):
                 # ensure that the results are the same as the old method
-                assert subset_array == attr[track_indexes]
+                assert len(subset_array) == len(track_indexes)
+                assert (subset_array == attr[track_indexes]).all()
 
         setattr(self, name, subset_array)
 

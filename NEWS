@@ -10,7 +10,9 @@
   by "_5f" and "." by "_2e" (formerly both of these were "_", which
   was ambiguous)
 * segway: allow tying of tracks with --trackname track1,track2, which
-  gives you only one set of parameters
+  gives you only one set of parameters. you may need to adjust
+  existing train.tab files to use track_specs instead of
+  include_tracknames because of other necessary changes
 * segway: LSF: fix bug where wrapper script sometimes did not delete
   temporary observation files after a crash
 * segway: more informative error message when supervision labels overlap each other
