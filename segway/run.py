@@ -1262,7 +1262,9 @@ class Runner(object):
                                   if trackname in ordinary_tracknames]
 
             # redefine tracknames:
-            tracknames, track_indexes = zip(*indexed_tracknames)
+            # tracknames, track_indexes = zip(*indexed_tracknames)
+            tracknames = [indexed_trackname[0] for indexed_trackname in indexed_tracknames]
+            track_indexes = [indexed_trackname[1] for indexed_trackname in indexed_tracknames]
 
             # check that there aren't any missing tracks
             if len(tracknames) != len(ordinary_tracknames):
