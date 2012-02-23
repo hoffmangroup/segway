@@ -1262,7 +1262,8 @@ class Runner(object):
                                   if trackname in ordinary_tracknames]
 
             # redefine tracknames:
-            # tracknames, track_indexes = zip(*indexed_tracknames)
+            # tracknames, track_indexes = zip(*indexed_tracknames) won't return
+            # ([], []) like we want
             tracknames = [indexed_trackname[0] for indexed_trackname in indexed_tracknames]
             track_indexes = [indexed_trackname[1] for indexed_trackname in indexed_tracknames]
 
@@ -1275,9 +1276,11 @@ class Runner(object):
 
             track_indexes = array(track_indexes)
             tied_tracknames = self.tied_tracknames
-            tied_track_indexes_list = [[] for _ in xrange(len(tied_tracknames))]
-            tied_track_index_map = dict(izip(tied_tracknames.keys(), count()))
             head_tracknames = self.head_tracknames
+
+            # a dict whose values are initialized in order of access
+            tied_track_index_map = defaultdict(count().next)
+            tied_track_indexes_list = [[] for _ in xrange(len(tied_tracknames))]
 
             for trackname, index in indexed_tracknames:
                 head_trackname = head_tracknames[trackname]
