@@ -1303,13 +1303,17 @@ class Runner(object):
                                        for track_index in track_indexes]
             unquoted_tracknames = tracknames
 
-        # replace illegal characters in tracknames only, not unquoted_tracknames
+        # replace illegal characters in tracknames and head_tracknames only,
+        # not unquoted_tracknames
         tracknames = map(quote_trackname, tracknames)
+        head_tracknames = dict((quote_trackname(key), quote_trackname(value))
+                               for key, value in head_tracknames.iteritems())
 
         # assert: none of the quoted tracknames are the same
         assert len(tracknames) == len(frozenset(tracknames))
 
         self.tracknames = tracknames
+        self.head_tracknames = head_tracknames
         self.unquoted_tracknames = unquoted_tracknames
         self.track_indexes = track_indexes
         self.tied_track_indexes_list = tied_track_indexes_list
