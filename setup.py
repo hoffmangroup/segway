@@ -8,12 +8,12 @@ functional genomics data.
 
 __version__ = "1.2.0"
 
-# Copyright 2008-2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2012 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
 # required for from __future__ import division, with_statement
-assert sys.version_info >= (2, 5, 1)
+assert (2, 5, 1) <= sys.version_info <= (3, 0)
 
 from ez_setup import use_setuptools
 use_setuptools()
@@ -33,15 +33,9 @@ classifiers = ["Natural Language :: English",
 entry_points = """
 [console_scripts]
 segway = segway.run:main
-segway-calc-distance = segway.calc_distance:main
 segway-task = segway.task:main
 segway-layer = segway.layer:main
 segway-winner = segway.winner:main
-
-h5histogram = segway.h5histogram:main
-h5values = segway.h5values:main
-
-gtf2bed = segway.gtf2bed:main
 """
 
 # XXX: warn: make sure you have LDFLAGS unset if you are building numpy
