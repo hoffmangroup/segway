@@ -607,8 +607,7 @@ class InputMasterSaver(Saver):
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
-                  "gmtk_include_filename_relative", "tied_tracknames",
-                  "head_trackname_list"]
+                  "gmtk_include_filename_relative", "head_trackname_list"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping

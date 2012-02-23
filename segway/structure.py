@@ -10,8 +10,8 @@ __version__ = "$Revision$"
 
 from itertools import count, izip
 
-from ._util import (PassThroughDict, resource_substitute, Saver,
-                    SUPERVISION_UNSUPERVISED, USE_MFSDG)
+from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
+                    USE_MFSDG)
 
 MAX_WEIGHT_SCALE = 25
 
