@@ -709,6 +709,7 @@ class Runner(object):
         self.mins = None
         self.maxs = None
         self.tracknames = None # encoded/quoted version
+        self.track_specs = []
 
         # variables
         self.num_segs = NUM_SEGS
