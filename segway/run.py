@@ -1307,7 +1307,7 @@ class Runner(object):
         # not unquoted_tracknames
         tracknames = map(quote_trackname, tracknames)
         head_tracknames = dict((quote_trackname(key), quote_trackname(value))
-                               for key, value in head_tracknames.iteritems())
+                               for key, value in self.head_tracknames.iteritems())
         head_trackname_list = map(quote_trackname, self.head_trackname_list)
 
         # assert: none of the quoted tracknames are the same
