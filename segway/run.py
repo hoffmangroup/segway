@@ -698,6 +698,7 @@ class Runner(object):
 
         self.include_tracknames = []
         self.tied_tracknames = {} # dict of head trackname -> tied tracknames
+        self.head_trackname_list = [] # ordered list of tied_trackname.keys()
 
         # default is 0
         self.global_mem_usage = LockableDefaultDict(int)
@@ -1256,6 +1257,7 @@ class Runner(object):
         ordinary_tracknames = frozenset(trackname
                                         for trackname in include_tracknames
                                         if trackname not in SPECIAL_TRACKNAMES)
+        head_tracknames = self.head_tracknames
 
         if ordinary_tracknames:
             indexed_tracknames = [(trackname, index)
@@ -1277,7 +1279,6 @@ class Runner(object):
 
             track_indexes = array(track_indexes)
             tied_tracknames = self.tied_tracknames
-            head_tracknames = self.head_tracknames
 
             # a dict whose values are initialized in order of access
             tied_track_index_map = defaultdict(count().next)
@@ -1308,7 +1309,7 @@ class Runner(object):
         # not unquoted_tracknames
         tracknames = map(quote_trackname, tracknames)
         head_tracknames = dict((quote_trackname(key), quote_trackname(value))
-                               for key, value in self.head_tracknames.iteritems())
+                               for key, value in head_tracknames.iteritems())
         head_trackname_list = map(quote_trackname, self.head_trackname_list)
 
         # assert: none of the quoted tracknames are the same
