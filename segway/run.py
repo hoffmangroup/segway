@@ -1257,8 +1257,6 @@ class Runner(object):
         ordinary_tracknames = frozenset(trackname
                                         for trackname in include_tracknames
                                         if trackname not in SPECIAL_TRACKNAMES)
-        head_tracknames = self.head_tracknames
-
         if ordinary_tracknames:
             indexed_tracknames = [(trackname, index)
                                   for index, trackname in enumerate(tracknames)
@@ -1279,6 +1277,8 @@ class Runner(object):
 
             track_indexes = array(track_indexes)
             tied_tracknames = self.tied_tracknames
+            head_tracknames = self.head_tracknames
+            head_tracknames_list = self.head_tracknames_list
 
             # a dict whose values are initialized in order of access
             tied_track_index_map = defaultdict(count().next)
@@ -1292,6 +1292,8 @@ class Runner(object):
         elif include_tracknames:
             ## no ordinary_tracknames => there are special tracknames only
             tracknames = []
+            head_tracknames = {}
+            head_trackname_list = []
             track_indexes = array([], intc)
             tied_track_indexes_list = []
             self.float_filelistpath = None # no float data
@@ -1299,6 +1301,8 @@ class Runner(object):
         else:
             # default: use all tracks in archive
             track_indexes = arange(len(tracknames))
+            head_tracknames = dict(zip(tracknames, tracknames))
+            head_trackname_list = tracknames
 
             assert not self.tied_tracknames
             tied_track_indexes_list = [[track_index]
@@ -1310,7 +1314,7 @@ class Runner(object):
         tracknames = map(quote_trackname, tracknames)
         head_tracknames = dict((quote_trackname(key), quote_trackname(value))
                                for key, value in head_tracknames.iteritems())
-        head_trackname_list = map(quote_trackname, self.head_trackname_list)
+        head_trackname_list = map(quote_trackname, head_trackname_list)
 
         # assert: none of the quoted tracknames are the same
         assert len(tracknames) == len(frozenset(tracknames))
