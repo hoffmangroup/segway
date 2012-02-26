@@ -1278,7 +1278,7 @@ class Runner(object):
             track_indexes = array(track_indexes)
             tied_tracknames = self.tied_tracknames
             head_tracknames = self.head_tracknames
-            head_trackname_list = self.head_tracknames_list
+            head_trackname_list = self.head_trackname_list
 
             # a dict whose values are initialized in order of access
             tied_track_index_map = defaultdict(count().next)
