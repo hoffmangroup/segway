@@ -23,7 +23,7 @@ from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, find_segment_starts, get_label_color,
                     _make_continuous_cells, POSTERIOR_PROG,
                     POSTERIOR_SCALE_FACTOR, read_posterior,
-                    _save_observations_window, USE_MFSDG, VITERBI_PROG)
+                    _save_observations_window, VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -109,8 +109,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
         assert region_end == start_pos[-1] - resolution + remainder
     start_pos[-1] = region_end
 
-    # XXX: why is score_step never used? should this line be removed?
-    score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
+    # score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels)
 
