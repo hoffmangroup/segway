@@ -43,6 +43,7 @@ from tabdelim import DictReader, ListWriter
 from .bed import read_native
 from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
                       RestartableJobDict, Session)
+from .include import IncludeSaver
 from .input_master import InputMasterSaver
 from .layer import layer, make_layer_filename
 from .structure import StructureSaver
@@ -57,7 +58,7 @@ from ._util import (ceildiv, data_filename,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
                     OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict, PKG,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
-                    _save_observations_window, save_template,
+                    _save_observations_window,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
                     USE_MFSDG, VITERBI_PROG)
@@ -226,7 +227,6 @@ TRAIN_OPTION_TYPES = \
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
-RES_INC_TMPL = "segway.inc.tmpl"
 RES_SEG_TABLE = "seg_table.tab"
 
 TRACK_FMT = "browser position %s:%s-%s"
@@ -1472,32 +1472,13 @@ class Runner(object):
         return dirpath / orig_filepath.name
 
     def save_include(self):
-        num_segs = self.num_segs
-
-        if isinstance(num_segs, slice):
-            num_segs = "undefined\n#error must define CARD_SEG"
-
-        resolution = self.resolution
-        ruler_scale = self.ruler_scale
-        if ruler_scale % resolution != 0:
-            msg = ("resolution %d is not a divisor of ruler scale %d"
-                   % (resolution, ruler_scale))
-            raise ValueError(msg)
-        ruler_scale_scaled = ruler_scale // resolution
-
-        mapping = dict(card_seg=num_segs,
-                       card_subseg=self.num_subsegs,
-                       card_presence=resolution+1,
-                       card_segCountDown=self.card_seg_countdown,
-                       card_supervisionLabel=self.card_supervision_label,
-                       card_frameIndex=self.max_frames,
-                       ruler_scale=ruler_scale_scaled)
-
+        # XXX: can this become a memoized property?
+        # We may need to write the file even if it is specified
         aux_dirpath = self.work_dirpath / SUBDIRNAME_AUX
 
         self.gmtk_include_filename, self.gmtk_include_filename_is_new = \
-            save_template(self.gmtk_include_filename, RES_INC_TMPL, mapping,
-                          aux_dirpath, self.clobber)
+            IncludeSaver(self)(self.gmtk_include_filename, aux_dirpath,
+                               self.clobber)
 
     def save_observations_window(self, float_filename, int_filename, float_data,
                                 seq_data=None, supervision_data=None):
