@@ -10,6 +10,7 @@ from contextlib import closing
 from functools import partial
 from gzip import open as _gzip_open
 from itertools import repeat
+from math import floor, log10
 from os import extsep
 import shutil
 from string import Template
@@ -18,8 +19,7 @@ import re
 from tempfile import mkdtemp
 
 import colorbrewer
-from numpy import (add, append, arcsinh, array, column_stack, diff, empty,
-                   insert, intc, invert, isnan, maximum, zeros)
+from numpy import (append, array, diff, empty, insert, intc, zeros)
 
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
@@ -75,15 +75,6 @@ POSTERIOR_SCALE_FACTOR = 100.0
 ISLAND_BASE_NA = 0
 ISLAND_LST_NA = 0
 
-ORD_A = ord("A")
-ORD_C = ord("C")
-ORD_G = ord("G")
-ORD_T = ord("T")
-ORD_a = ord("a")
-ORD_c = ord("c")
-ORD_g = ord("g")
-ORD_t = ord("t")
-
 SEG_TABLE_WIDTH = 3
 OFFSET_START = 0
 OFFSET_END = 1
@@ -117,6 +108,8 @@ USE_MFSDG = False
 SUPERVISION_UNSUPERVISED = 0
 SUPERVISION_SEMISUPERVISED = 1
 SUPERVISION_SUPERVISED = 2
+
+SUPERVISION_LABEL_OFFSET = 1
 
 def extjoin(*args):
     return extsep.join(args)
@@ -164,7 +157,7 @@ class Saver(object):
     resource_name = None
 
     def __init__(self, runner):
-        # copy copy_attrs from runner to InputMasterSaver instance
+        # copy copy_attrs from runner to Saver instance
         copy_attrs(runner, self, self.copy_attrs)
 
     def make_mapping(self):
@@ -273,6 +266,12 @@ def walk_continuous_supercontigs(h5file):
 
 # XXX: duplicates bed.py?
 def load_coords(filename):
+    """
+    returns: defaultdict
+      keys: chrom
+      values: array with one dimension 2 and the other number of coords
+      default: array([])
+    """
     if not filename:
         return
 
@@ -349,147 +348,6 @@ def ceildiv(dividend, divisor):
 
     # int(bool) means 0 -> 0, 1+ -> 1
     return (dividend // divisor) + int(bool(dividend % divisor))
-
-def downsample_add(inarray, resolution):
-    # downsample presence data into num_datapoints
-    full_num_rows = inarray.shape[0]
-
-    downsampled_num_rows = ceildiv(full_num_rows, resolution)
-    remainder = full_num_rows % resolution
-    downsampled_shape = [downsampled_num_rows] + list(inarray.shape[1:])
-
-    res = zeros(downsampled_shape, inarray.dtype)
-
-    # if there's no remainder, then only use loop 0
-    if remainder == 0:
-        remainder = resolution
-
-    # loop 0: every bit
-    for index in xrange(remainder):
-        res += inarray[index::resolution]
-
-    # loop 1: remainder
-    for index in xrange(remainder, resolution):
-        res[:-1] += inarray[index::resolution]
-
-    return res
-
-def make_dinucleotide_int_data(seq):
-    """
-    makes an array with two columns, one with 0..15=AA..TT and the other
-    as a presence variable. Set column one to 0 when not present
-    """
-    nucleotide_int_data = (((seq == ORD_A) + (seq == ORD_a))
-                           + ((seq == ORD_C) + (seq == ORD_c)) * 2
-                           + ((seq == ORD_G) + (seq == ORD_g)) * 3
-                           + ((seq == ORD_T) + (seq == ORD_t)) * 4) - 1
-    nucleotide_missing = nucleotide_int_data == -1
-
-    # rewrite all Ns as A now that you have the missingness mask
-    nucleotide_int_data[nucleotide_int_data == -1] = 0
-    col_shape = (len(nucleotide_int_data)-1,)
-
-    # first column: dinucleotide: AA..TT=0..15
-    # combine, and add extra AA stub at end, which will be set missing
-    # 0 AA AC AG AT
-    # 4 CA CC CG CT
-    # 8 GA GC GG GT
-    # 12 TA TC TG TT
-    dinucleotide_int_data = empty(col_shape, DTYPE_OBS_INT)
-    add(nucleotide_int_data[:-1] * 4, nucleotide_int_data[1:],
-        dinucleotide_int_data)
-
-    # second column: presence_dinucleotide: some missing=0; all present = 1
-    # there are so few N boundaries that it is okay to
-    # disregard the whole dinucleotide when half is N
-    dinucleotide_missing = (nucleotide_missing[:-1] + nucleotide_missing[1:])
-
-    dinucleotide_presence = empty(dinucleotide_missing.shape, DTYPE_OBS_INT)
-    invert(dinucleotide_missing, dinucleotide_presence)
-
-    # XXXopt: set these up properly in the first place instead of
-    # column_stacking at the end
-    return column_stack([dinucleotide_int_data, dinucleotide_presence])
-
-def _save_observations_window(float_filename, int_filename, float_data,
-                             resolution, distribution, seq_data=None,
-                             supervision_data=None):
-    # this is now a naked function so that it can be called by task.py
-
-    # input function in GMTK_ObservationMatrix.cc:
-    # ObservationMatrix::readBinSentence
-
-    # input per frame is a series of float32s, followed by a series of
-    # int32s it is better to optimize both sides here by sticking all
-    # the floats in one file, and the ints in another one
-    int_blocks = []
-    if float_data is not None:
-        if distribution == DISTRIBUTION_ASINH_NORMAL:
-            float_data = arcsinh(float_data)
-
-        if (not USE_MFSDG) or resolution > 1:
-            mask_missing = isnan(float_data)
-
-            # output -> presence_data -> int_blocks
-            # done in two steps so I can specify output type
-            presence_data = empty(mask_missing.shape, DTYPE_OBS_INT)
-            invert(mask_missing, presence_data)
-
-            num_datapoints = downsample_add(presence_data, resolution)
-
-            # this is the presence observation
-            int_blocks.append(num_datapoints)
-
-            # so that there is no divide by zero
-            num_datapoints_min_1 = maximum(num_datapoints, 1)
-
-            # make float
-            if not USE_MFSDG:
-                float_data[mask_missing] = 0.0
-
-            float_data = downsample_add(float_data, resolution)
-            float_data /= num_datapoints_min_1
-
-        float_data.tofile(float_filename)
-
-    if seq_data is not None:
-        assert resolution == 1 # not implemented yet
-        int_blocks.append(make_dinucleotide_int_data(seq_data))
-
-    if supervision_data is not None:
-        assert resolution == 1 # not implemented yet
-        int_blocks.append(supervision_data)
-
-    if int_blocks:
-        int_data = column_stack(int_blocks)
-    else:
-        int_data = array([], dtype=DTYPE_OBS_INT)
-
-    int_data.tofile(int_filename)
-
-# XXX: there is a new genomedata interface that should be able to
-# replace the callers to this
-def _make_continuous_cells(supercontig, start, end, track_indexes):
-    continuous = supercontig.continuous
-    if continuous is None:
-        return
-
-    # window_start: relative to the beginning of the supercontig
-    window_start = start - supercontig.start
-    window_end = end - supercontig.start
-
-    # XXXopt: reading all the extra tracks is probably quite wasteful
-    # given the genomedata striping pattern; it is probably better to
-    # read one at a time and stick into an array
-    min_col = track_indexes.min()
-    max_col = track_indexes.max() + 1
-
-    # first, extract a contiguous subset of the tracks in the dataset,
-    # which is a superset of the tracks that are used
-    rows = continuous[window_start:window_end, min_col:max_col]
-
-    # extract only the tracks that are used correct for min_col offset
-    return rows[..., track_indexes - min_col]
 
 re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
 def parse_posterior(iterable):
@@ -588,6 +446,10 @@ class memoized_property(object):
 
 def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
+
+def make_prefix_fmt(num):
+    # make sure there are sufficient leading zeros
+    return "%%0%dd." % (int(floor(log10(num))) + 1)
 
 def main(args=sys.argv[1:]):
     pass

@@ -9,22 +9,19 @@ __version__ = "$Revision$"
 
 # Copyright 2008-2012 Michael M. Hoffman <mmh1@uw.edu>
 
-from cStringIO import StringIO
 from collections import defaultdict
-from contextlib import closing
 from copy import copy
 from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
-from itertools import count, izip, repeat
-from math import ceil, floor, ldexp, log10
+from itertools import count, izip
+from math import ceil, ldexp
 from os import environ, extsep
 import re
 from shutil import copy2
 from string import letters
 import sys
-from tempfile import gettempdir
 from threading import Event, Lock, Thread
 from time import sleep
 from urllib import quote
@@ -32,7 +29,7 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (append, arange, arcsinh, array, empty, finfo, float32, intc,
+from numpy import (arange, arcsinh, array, empty, finfo, float32, intc,
                    int64, NINF, square, vstack, zeros)
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
@@ -46,20 +43,21 @@ from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
 from .include import IncludeSaver
 from .input_master import InputMasterSaver
 from .layer import layer, make_layer_filename
+from .observations import Observations
 from .structure import StructureSaver
-from ._util import (ceildiv, data_filename,
+from ._util import (data_filename,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
                     EXT_INT, EXT_PARAMS, EXT_TAB,
-                    extjoin, extjoin_not_none, GB, get_chrom_coords,
-                    is_empty_array, ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
-                    _make_continuous_cells, make_default_filename,
-                    make_filelistpath, maybe_gzip_open,
+                    extjoin, extjoin_not_none, GB,
+                    ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
+                    make_default_filename,
+                    make_filelistpath, make_prefix_fmt, maybe_gzip_open,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
                     OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict, PKG,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
-                    _save_observations_window,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
+                    SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
                     USE_MFSDG, VITERBI_PROG)
 
@@ -78,8 +76,6 @@ NUM_SUBSEGS = 1
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 TEMPDIR_PREFIX = PKG + "-"
-
-MAX_WINDOWS = 1000
 
 ISLAND = True
 
@@ -129,9 +125,6 @@ LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
 NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 
-# number of frames in a segment must be at least number of frames in model
-MIN_FRAMES = 2
-
 MAX_FRAMES = 2000000 # 2 million
 MEM_USAGE_BUNDLE = 100*MB # XXX: should start using this again
 MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
@@ -170,10 +163,6 @@ EXT_SH = "sh"
 EXT_TXT = "txt"
 EXT_TRIFILE = "trifile"
 
-def make_prefix_fmt(num):
-    # make sure there are sufficient leading zeros
-    return "%%0%dd." % (int(floor(log10(num))) + 1)
-
 PREFIX_ACC = "acc"
 PREFIX_CMDLINE_SHORT = "run"
 PREFIX_CMDLINE_LONG = "details"
@@ -209,7 +198,6 @@ SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
                      SUBDIRNAME_PARAMS]
 
-FLOAT_TAB_FIELDNAMES = ["filename", "window_index", "chrom", "start", "end"]
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
                       "num_frames", "maxvmem", "cpu", "exit_status"]
 # XXX: should add num_subsegs as well, but it's complicated to pass
@@ -259,8 +247,6 @@ POSTERIOR_BEDGRAPH_HEADER="track type=bedGraph name=posterior.%d \
 OFFSET_NUM_SEGS = 1
 OFFSET_FILENAMES = 2 # where the filenames begin in the results
 OFFSET_PARAMS_FILENAME = 3
-
-SUPERVISION_LABEL_OFFSET = 1
 
 RESOLUTION = 1
 
@@ -423,128 +409,11 @@ def slice2range(s):
 
     return xrange(start, stop, step)
 
-def convert_windows(attrs, name):
-    supercontig_start = attrs.start
-    edges_array = getattr(attrs, name) + supercontig_start
-
-    return edges_array.tolist()
-
 def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
     # using x !< y instead of x >= y to give the right default answer
     # in the case of NaNs
     return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
-
-class NoData(object):
-    """
-    sentinel for not adding an extra field to coords, so that one can
-    still use None
-    """
-
-def find_overlaps_include(start, end, coords, data=repeat(NoData)):
-    """
-    find items in coords that overlap (start, end)
-
-    NOTE: multiple overlapping regions in coords will result in data
-    being considered more than once
-    """
-    # diagram of how this works:
-    #        --------------------- (include)
-    #
-    # various (start, end) cases:
-    # A   --
-    # B                              --
-    # C   --------------------------
-    # D   ------
-    # E                       -------------
-    # F             ---------
-    res = []
-
-    for (include_start, include_end), datum in izip(coords, data):
-        if start > include_end or end <= include_start:
-            # cases A, B
-            continue
-        elif start <= include_start:
-            if end < include_end:
-                # case D
-                include_end = end
-
-            # case C otherwise
-        elif start > include_start:
-            include_start = start
-
-            if end < include_end:
-                # case F
-                include_end = end
-
-            # case E otherwise
-        else:
-            assert False # can't happen
-
-        item = [include_start, include_end]
-
-        if datum is not NoData:
-            item.append(datum)
-
-        res.append(item)
-
-    return res
-
-def find_overlaps_exclude(include_coords, exclude_coords):
-    # diagram of how this works:
-    #        --------------------- (include)
-    #
-    # various exclude cases:
-    # A   --
-    # B                              --
-    # C   --------------------------
-    # D   ------
-    # E                       -------------
-    # F             ---------
-
-    # does nothing if exclude_coords is empty
-    for exclude_start, exclude_end in exclude_coords:
-        new_include_coords = []
-
-        for include_index, include_coord in enumerate(include_coords):
-            include_start, include_end = include_coord
-
-            if exclude_start > include_end or exclude_end <= include_start:
-                # cases A, B
-                new_include_coords.append([include_start, include_end])
-            elif exclude_start <= include_start:
-                if exclude_end >= include_end:
-                    # case C
-                    pass
-                else:
-                    # case D
-                    new_include_coords.append([exclude_end, include_end])
-            elif exclude_start > include_start:
-                if exclude_end >= include_end:
-                    # case E
-                    new_include_coords.append([include_start, exclude_start])
-                else:
-                    # case F
-                    new_include_coords.append([include_start, exclude_start])
-                    new_include_coords.append([exclude_end, include_end])
-
-            else:
-                assert False # can't happen
-
-        include_coords = new_include_coords
-
-    return include_coords
-
-def find_overlaps(start, end, include_coords, exclude_coords):
-    if include_coords is None or is_empty_array(include_coords):
-        res = [[start, end]]
-    else:
-        res = find_overlaps_include(start, end, include_coords)
-
-    if exclude_coords is None or is_empty_array(exclude_coords):
-        return res
-    else:
-        return find_overlaps_exclude(res, exclude_coords)
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -576,12 +445,6 @@ def make_mem_req(mem_usage):
     mem_usage_gibibytes = ceil(mem_usage / GB)
 
     return "%dG" % mem_usage_gibibytes
-
-def update_starts(starts, ends, new_starts, new_ends, instance_index):
-    next_index = instance_index + 1
-
-    starts[next_index:next_index] = new_starts
-    ends[next_index:next_index] = new_ends
 
 class Mixin_Lockable(AddableMixin):
     def __init__(self, *args, **kwargs):
@@ -665,6 +528,8 @@ class Runner(object):
         usually not called directly, instead Runner.fromoptions() is called
         (which calls Runner.__init__())
         """
+        self.uuid = UUID
+
         # filenames
         self.bigbed_filename = None
         self.gmtk_include_filename = None
@@ -705,7 +570,6 @@ class Runner(object):
 
         # data
         # a "window" is what GMTK calls a segment
-        self.num_windows = None
         self.window_coords = None
         self.mins = None
         self.maxs = None
@@ -1068,7 +932,7 @@ class Runner(object):
 
     @memoized_property
     def window_lens(self):
-        return [end - start for chr, start, end in self.window_coords]
+        return [end - start for world, chr, start, end in self.window_coords]
 
     @memoized_property
     def posterior_triangulation_filename(self):
@@ -1176,6 +1040,14 @@ class Runner(object):
         return len(self.track_indexes)
 
     @memoized_property
+    def num_windows(self):
+        return len(self.window_coords)
+
+    @memoized_property
+    def num_bases(self):
+        return sum(coord[3] - coord[2] for coord in self.window_coords)
+
+    @memoized_property
     def track_indexes_text(self):
         return ",".join(map(str, self.track_indexes))
 
@@ -1193,6 +1065,14 @@ class Runner(object):
             return SUPERVISION_SEMISUPERVISED
         else:
             return SUPERVISION_UNSUPERVISED
+
+    @memoized_property
+    def num_worlds(self):
+        if self.tied_tracknames:
+            return max(len(tracknames)
+                       for tracknames in self.tied_tracknames.itervalues())
+        else:
+            return 1
 
     def transform(self, num):
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
@@ -1435,33 +1315,6 @@ class Runner(object):
     def make_obs_filelistpath(self, ext):
         return make_filelistpath(self.obs_dirpath, ext)
 
-    def make_obs_filepath(self, dirpath, prefix, suffix):
-        return dirpath / (prefix + suffix)
-
-    def make_obs_filepaths(self, chrom, window_index, temp=False):
-        prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_WINDOWS))
-        prefix = prefix_feature_tmpl % window_index
-
-        if temp:
-            prefix = "".join([prefix, UUID, extsep])
-            dirpath = path(gettempdir())
-        else:
-            dirpath = self.obs_dirpath
-
-        make_obs_filepath_custom = partial(self.make_obs_filepath, dirpath,
-                                           prefix)
-
-        return (make_obs_filepath_custom(EXT_FLOAT),
-                make_obs_filepath_custom(EXT_INT))
-
-    def print_obs_filepaths(self, float_filelist, int_filelist,
-                            *args, **kwargs):
-        float_filepath, int_filepath = self.make_obs_filepaths(*args, **kwargs)
-        print >>float_filelist, float_filepath
-        print >>int_filelist, int_filepath
-
-        return float_filepath, int_filepath
-
     def save_resource(self, resname, subdirname=""):
         orig_filename = data_filename(resname)
 
@@ -1479,13 +1332,6 @@ class Runner(object):
         self.gmtk_include_filename, self.gmtk_include_filename_is_new = \
             IncludeSaver(self)(self.gmtk_include_filename, aux_dirpath,
                                self.clobber)
-
-    def save_observations_window(self, float_filename, int_filename, float_data,
-                                seq_data=None, supervision_data=None):
-        return _save_observations_window(float_filename, int_filename,
-                                         float_data, self.resolution,
-                                         self.distribution, seq_data,
-                                         supervision_data)
 
     def subset_metadata_attr(self, genome, name, reducer=sum):
         attr = getattr(genome, name)
@@ -1515,215 +1361,6 @@ class Runner(object):
         subset_metadata_attr(genome, "sums")
         subset_metadata_attr(genome, "sums_squares")
         subset_metadata_attr(genome, "num_datapoints")
-
-    def write_observations(self, float_filelist, int_filelist, float_tabfile):
-        # XXX: these expect different filepaths
-        assert not ((self.identify or self.posterior) and self.train)
-
-        print_obs_filepaths_custom = partial(self.print_obs_filepaths,
-                                             float_filelist, int_filelist,
-                                             temp=self.identify)
-        save_observations_window = self.save_observations_window
-
-        float_tabwriter = ListWriter(float_tabfile)
-        float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
-
-        zipper = izip(count(), self.used_supercontigs, self.window_coords)
-
-        for window_index, supercontig, (chrom, start, end) in zipper:
-            float_filepath, int_filepath = \
-                print_obs_filepaths_custom(chrom, window_index)
-
-            row = [float_filepath, str(window_index), chrom, str(start),
-                   str(end)]
-            float_tabwriter.writerow(row)
-            print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
-
-            # if they don't both exist
-            if not (float_filepath.exists() and int_filepath.exists()):
-                # XXX: next several lines are duplicative
-                seq_cells = self.make_seq_cells(supercontig, start, end)
-
-                supervision_cells = \
-                    self.make_supervision_cells(chrom, start, end)
-
-                if __debug__:
-                    if self.identify:
-                        assert seq_cells is None and supervision_cells is None
-
-                if not self.train:
-                    # don't actually write data
-                    continue
-
-                continuous_cells = \
-                    self.make_continuous_cells(supercontig, start, end)
-
-                save_observations_window(float_filepath, int_filepath,
-                                        continuous_cells, seq_cells,
-                                        supervision_cells)
-
-    def make_continuous_cells(self, supercontig, start, end):
-        return _make_continuous_cells(supercontig, start, end,
-                                      self.track_indexes)
-
-    def make_supervision_cells(self, chrom, start, end):
-        supervision_type = self.supervision_type
-        if supervision_type == SUPERVISION_UNSUPERVISED:
-            return
-
-        assert supervision_type == SUPERVISION_SEMISUPERVISED
-
-        coords_chrom = self.supervision_coords[chrom]
-        labels_chrom = self.supervision_labels[chrom]
-
-        res = zeros(end - start, dtype=DTYPE_OBS_INT)
-
-        supercontig_coords_labels = find_overlaps_include(start, end,
-                                                          coords_chrom,
-                                                          labels_chrom)
-
-        for label_start, label_end, label_index in supercontig_coords_labels:
-            # adjust so that zero means no label
-            label_adjusted = label_index + SUPERVISION_LABEL_OFFSET
-            res[label_start-start:label_end-start] = label_adjusted
-
-        return res
-
-    def make_seq_cells(self, supercontig, start, end):
-        if not self.use_dinucleotide:
-            return
-
-        seq = supercontig.seq
-        len_seq = len(seq)
-
-        # window_start: relative to the beginning of the
-        # supercontig
-        window_start = start - supercontig.start
-        window_end = end - supercontig.start
-
-        if window_end < len_seq:
-            return seq[window_start:window_end+1]
-        elif window_end == len(seq):
-            seq_window = seq[window_start:window_end]
-            return append(seq_window, ord("N"))
-        else:
-            raise ValueError("sequence too short for supercontig")
-
-    def prep_observations(self, genome):
-        # XXX: this function is way too long, try to get it to fit
-        # inside a screen on your enormous monitor
-        include_coords = self.include_coords
-        exclude_coords = self.exclude_coords
-
-        window_index = 0
-        window_coords = []
-        num_bases = 0
-        used_supercontigs = [] # continuous objects
-        max_frames = self.max_frames
-        num_tracks = self.num_tracks
-
-        # XXX: use groupby(include_coords) and then access chromosomes
-        # randomly rather than iterating through them all
-
-        # XXX: hopefully this will fix a bug where end of one = start
-        # of next results in a MemoryError crash (email from ML to
-        # MMH, 2012/1/24)
-        for chromosome in genome:
-            chrom = chromosome.name
-
-            chr_include_coords = get_chrom_coords(include_coords, chrom)
-            chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
-
-            if (chr_include_coords is not None
-                and is_empty_array(chr_include_coords)):
-                continue
-
-            for supercontig, continuous in chromosome.itercontinuous():
-                assert continuous is None or continuous.shape[1] >= num_tracks
-
-                if continuous is None:
-                    starts = [supercontig.start]
-                    ends = [supercontig.end]
-                else:
-                    attrs = supercontig.attrs
-                    starts = convert_windows(attrs, "chunk_starts")
-                    ends = convert_windows(attrs, "chunk_ends")
-
-                ## iterate through windows and write
-                ## izip so it can be modified in place
-                for instance_index, start, end in izip(count(), starts, ends):
-                    if include_coords or exclude_coords:
-                        overlaps = find_overlaps(start, end,
-                                                 chr_include_coords,
-                                                 chr_exclude_coords)
-                        len_overlaps = len(overlaps)
-
-                        if len_overlaps == 0:
-                            continue
-                        elif len_overlaps == 1:
-                            start, end = overlaps[0]
-                        else:
-                            new_starts, new_ends = zip(*overlaps)
-                            update_starts(starts, ends, new_starts, new_ends,
-                                          instance_index)
-                            continue # consider the newly split sequences next
-
-                    num_bases_window = end - start
-                    num_frames = ceildiv(num_bases_window, self.resolution)
-                    if not MIN_FRAMES <= num_frames:
-                        text = " skipping short sequence of length %d" % num_frames
-                        print >>sys.stderr, text
-                        continue
-
-                    if num_frames > max_frames:
-                        # XXX: I really ought to check that this is
-                        # going to always work even for corner cases,
-                        # but if it doesn't I am saved by another
-                        # split later on
-
-                        # split_sequences was True, so split them
-                        num_new_starts = ceildiv(num_frames, max_frames)
-
-                        # // means floor division
-                        offset = (num_frames // num_new_starts)
-                        new_offsets = arange(num_new_starts) * offset
-                        new_starts = start + new_offsets
-                        new_ends = append(new_starts[1:], end)
-
-                        update_starts(starts, ends, new_starts, new_ends,
-                                      instance_index)
-                        continue
-
-                    # start: relative to beginning of chromosome
-                    window_coords.append((chrom, start, end))
-                    used_supercontigs.append(supercontig)
-
-                    num_bases += num_bases_window
-
-                    window_index += 1
-
-        self.subset_metadata(genome)
-
-        self.num_windows = window_index # already has +1 added to it
-        self.num_bases = num_bases
-        self.window_coords = window_coords
-
-        self.used_supercontigs = used_supercontigs
-
-    def open_writable_or_dummy(self, filepath):
-        if not filepath or (not self.clobber and filepath.exists()):
-            return closing(StringIO()) # dummy output
-        else:
-            return open(filepath, "w")
-
-    def save_observations(self):
-        open_writable = partial(self.open_writable_or_dummy)
-
-        with open_writable(self.float_filelistpath) as float_filelist:
-            with open_writable(self.int_filelistpath) as int_filelist:
-                with open_writable(self.float_tabfilepath) as float_tabfile:
-                    self.write_observations(float_filelist, int_filelist,
-                                            float_tabfile)
 
     def save_input_master(self, instance_index=None, new=False):
         if new:
@@ -1783,15 +1420,26 @@ class Runner(object):
                                  self.clobber)
 
     def save_observations_params(self):
+        # XXX: these expect different filepaths
+        assert not ((self.identify or self.posterior) and self.train)
+
         self.load_supervision()
 
         # need to open Genomedata archive first in order to determine
         # self.tracknames and self.num_tracks
         with Genome(self.genomedataname) as genome:
             self.set_tracknames(genome)
-            self.prep_observations(genome)
-            self.save_observations()
-            self.used_supercontigs = None # no longer necessary
+
+            observations = Observations(self)
+            observations.locate_windows(genome)
+
+            self.window_coords = observations.window_coords
+            self.subset_metadata(genome) # XXX: does this need to be done before save()?
+
+            observations.save(genome)
+
+        self.float_filepaths = observations.float_filepaths
+        self.int_filepaths = observations.int_filepaths
 
         if self.train:
             self.set_log_likelihood_filenames()
@@ -1967,11 +1615,11 @@ class Runner(object):
     def make_job_name_train(self, instance_index, round_index, window_index):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, instance_index,
                                      round_index, window_index,
-                                     self.work_dirpath.name, UUID)
+                                     self.work_dirpath.name, self.uuid)
 
     def make_job_name_identify(self, prefix, window_index):
         return "%s%d.%s.%s" % (prefix, window_index, self.work_dirpath.name,
-                               UUID)
+                               self.uuid)
 
     def make_gmtk_kwargs(self):
         """
@@ -2562,7 +2210,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                 raise
 
         window_coords = self.window_coords[window_index]
-        (window_chrom, window_start, window_end) = window_coords
+        (window_world, window_chrom, window_start, window_end) = window_coords
 
         # XXX: duplicative
         row, line_coords = parse_bed4(lines[0])
@@ -2596,10 +2244,10 @@ to find the winning instance anyway.""" % thread.instance_index)
         else:
             kind = "posterior"
         window_coord = self.window_coords[window_index]
-        window_chrom, window_start, window_end = window_coord
+        window_world, window_chrom, window_start, window_end = window_coord
 
-        float_filepath, int_filepath = \
-            self.make_obs_filepaths(window_chrom, window_index, temp=True)
+        float_filepath = self.float_filepaths[window_index]
+        int_filepath = self.int_filepaths[window_index]
 
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window_chrom, window_start,
@@ -2695,7 +2343,7 @@ to find the winning instance anyway.""" % thread.instance_index)
     def make_run_msg(self):
         now = datetime.now()
         pkg_desc = working_set.find(Requirement.parse(PKG))
-        run_msg = "## %s run %s at %s" % (pkg_desc, UUID, now)
+        run_msg = "## %s run %s at %s" % (pkg_desc, self.uuid, now)
 
         cmdline_top_filename = self.make_script_filename(PREFIX_CMDLINE_TOP)
 

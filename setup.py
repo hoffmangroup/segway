@@ -42,8 +42,9 @@ segway-winner = segway.winner:main
 
 # need optbuild>0.1.11 for OptionBuilder_ShortOptWithEquals
 # need tables>2.04 (>=r3761) because there is a CArray fill bug until then
+# genomedata>1.3.1 for Chromosome.__getitem__[..., array] support
 
-install_requires = ["genomedata>0.1.5", "textinput", "optbuild>0.1.10",
+install_requires = ["genomedata>1.3.1", "textinput", "optbuild>0.1.10",
                     "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
                     "colorbrewer", "drmaa>=0.4a3"]
 

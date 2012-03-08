@@ -29,15 +29,10 @@ set -x
 SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=2 \
     "$cluster_arg" \
     train ../data/test.genomedata traindir
+
+../compare_directory.py ../data/traindir traindir || true # keep going
+
 segway "$cluster_arg" \
     identify+posterior ../data/test.genomedata traindir identifydir
 
-SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=2 \
-    --track=h3k27me3,h3k36me3 "$cluster_arg" \
-    train ../data/test.genomedata traindir.tie
-segway --num-labels=4 --max-train-rounds=2 "$cluster_arg" \
-    identify+posterior ../data/test.genomedata traindir.tie identifydir.tie
-
-# diff
-../compare_directory.py ../data/traindir traindir || true # keep going
 ../compare_directory.py ../data/identifydir identifydir || true

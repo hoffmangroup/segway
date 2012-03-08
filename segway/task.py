@@ -19,11 +19,11 @@ from genomedata import Genome
 from numpy import array, zeros, empty, where, diff, r_
 from path import path
 
+from .observations import _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, find_segment_starts, get_label_color,
-                    _make_continuous_cells, POSTERIOR_PROG,
-                    POSTERIOR_SCALE_FACTOR, read_posterior,
-                    _save_observations_window, VITERBI_PROG)
+                    POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
+                    VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -228,18 +228,14 @@ def run_posterior_save_bed(coord, resolution, outfilename, num_labels,
     int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
 
     with Genome(genomedata_dirname) as genome:
-        supercontigs = genome[chrom].supercontigs[start:end]
-        assert len(supercontigs) == 1
-        supercontig = supercontigs[0]
+        continuous_cells = genome[chrom][start:end, track_indexes]
 
-        continuous_cells = _make_continuous_cells(supercontig, start, end,
-                                                  track_indexes)
     try:
         print_to_fd(float_filelistfd, float_filename)
         print_to_fd(int_filelistfd, int_filename)
 
-        _save_observations_window(float_filename, int_filename,
-                                  continuous_cells, resolution, distribution)
+        _save_window(float_filename, int_filename, continuous_cells,
+                     resolution, distribution)
 
         # XXXopt: does this actually free the memory? or do we need to
         # use a subprocess to do the loading?
@@ -285,19 +281,14 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
                                                    EXT_FLOAT)
 
     with Genome(genomedata_dirname) as genome:
-        supercontigs = genome[chrom].supercontigs[start:end]
-        assert len(supercontigs) == 1
-        supercontig = supercontigs[0]
-
-        continuous_cells = _make_continuous_cells(supercontig, start, end,
-                                                  track_indexes)
+        continuous_cells = genome[chrom][start:end, track_indexes]
 
     try:
         print_to_fd(float_filelistfd, float_filename)
         print_to_fd(int_filelistfd, int_filename)
 
-        _save_observations_window(float_filename, int_filename,
-                                  continuous_cells, resolution, distribution)
+        _save_window(float_filename, int_filename, continuous_cells,
+                     resolution, distribution)
 
         # XXXopt: does this work? or do we need to use a subprocess to
         # do the loading?
