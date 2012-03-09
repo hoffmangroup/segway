@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 
 ## test.sh: test segway
+## run this from the parent
 
-## $Revision$
-## Copyright 2011-2012 Michael M. Hoffman <mmh1@uw.edu>
+## $Revision: -1 $
 
 set -o nounset -o pipefail -o errexit
 
@@ -26,13 +26,9 @@ fi
 set -x
 
 # seed from python -c "import random; print random.randrange(2**32)"
-SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=2 \
-    "$cluster_arg" \
-    train ../data/test.genomedata traindir
+SEGWAY_RAND_SEED=1498730685 segway \
+    --include-coords=../simpleseg/include-coords.bed \
+    --tracks-from=../simpleseg/tracks.txt --num-labels=4 \
+    train ../simpleseg/simpleseg.genomedata traindir
 
-../compare_directory.py ../data/traindir traindir || true # keep going
-
-segway "$cluster_arg" \
-    identify+posterior ../data/test.genomedata traindir identifydir
-
-../compare_directory.py ../data/identifydir identifydir || true
+segway identify simpleseg.genomedata traindir identifydir
