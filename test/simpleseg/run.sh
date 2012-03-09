@@ -26,9 +26,10 @@ fi
 set -x
 
 # seed from python -c "import random; print random.randrange(2**32)"
-SEGWAY_RAND_SEED=1498730685 segway \
+SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --include-coords=../simpleseg/include-coords.bed \
     --tracks-from=../simpleseg/tracks.txt --num-labels=4 \
     train ../simpleseg/simpleseg.genomedata traindir
 
-segway identify simpleseg.genomedata traindir identifydir
+segway "$cluster_arg" identify ../simpleseg/simpleseg.genomedata traindir \
+    identifydir
