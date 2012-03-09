@@ -10,7 +10,7 @@
   that previous files will be incompatible, since "_" is now replaced
   by "_5f" and "." by "_2e" (formerly both of these were "_", which
   was ambiguous)
-* segway: allow tying of tracks with --trackname track1,track2, which
+* segway: allow concatenated segmentation of tracks with --trackname track1,track2, which
   gives you only one set of parameters. you may need to adjust
   existing train.tab files to use track_specs instead of
   include_tracknames because of other necessary changes
@@ -22,6 +22,8 @@
 * segway-layer: add --bigBed option, which works if you have
   bedToBigBed in your path
 * segway: add --bigBed option which calls segway-layer --bigBed
+* segway: removes PYTHONINSPECT from environment for sub-tasks, which
+  caused identify mode failures before
 * segway-layer: fix issue #19. Now doesn't override previous colors
   when mnemonics aren't supplied (thanks to Jay Hesselberth)
 * segway-winner: fix issue #21. Now works on Python 2.5.1

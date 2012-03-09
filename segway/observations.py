@@ -277,7 +277,8 @@ class Observations(object):
                   "float_tabfilepath", "obs_dirpath", "uuid", "resolution",
                   "distribution", "train", "identify", "supervision_type",
                   "supervision_coords", "supervision_labels",
-                  "use_dinucleotide", "track_indexes", "clobber", "num_worlds"]
+                  "use_dinucleotide", "world_track_indexes", "clobber",
+                  "num_worlds"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)
@@ -436,8 +437,8 @@ class Observations(object):
             return chromosome.seq[start:end]
 
     def make_continuous_cells(self, world, chromosome, start, end):
-        assert world == 0
-        return chromosome[start:end, self.track_indexes]
+        track_indexes = self.world_track_indexes[world]
+        return chromosome[start:end, track_indexes]
 
     def make_supervision_cells(self, chrom, start, end):
         supervision_type = self.supervision_type

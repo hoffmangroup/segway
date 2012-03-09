@@ -706,12 +706,22 @@ class Runner(object):
             res.params_filenames = params_filenames
 
         include_tracknames = []
+
+        # dict. key: str: head trackname; value: list(str: tracknames)
         tied_tracknames = defaultdict(list)
+
+        # dict. key: str: trackname; value: head trackname
+        # inverse of tied_tracknames
         head_tracknames = {}
+
+        # ordered list of the head tracknames
         head_trackname_list = []
+
+        # temporary list to avoid duplicates
         used_tracknames = set()
 
         for track_spec in res.track_specs:
+            # local to each value of track_spec
             current_tracknames = track_spec.split(",")
 
             if not used_tracknames.isdisjoint(current_tracknames):
@@ -1066,13 +1076,38 @@ class Runner(object):
         else:
             return SUPERVISION_UNSUPERVISED
 
-    @memoized_property
-    def num_worlds(self):
         if self.tied_tracknames:
             return max(len(tracknames)
                        for tracknames in self.tied_tracknames.itervalues())
         else:
             return 1
+
+    @memoized_property
+    def world_tracknames(self):
+        # XXX: add support for some heads having only one trackname
+        # that is repeated
+
+        return list(zip(*self.tied_tracknames.values()))
+
+    @memoized_property
+    def world_track_indexes(self):
+        """
+        all track indexes, not just the heads
+        """
+        assert (not self.tied_tracknames
+                or len(self.tied_tracknames) == len(self.tied_track_indexes_list))
+
+        res = array(zip(*self.tied_track_indexes_list))
+
+        if __debug__:
+            if self.num_worlds == 1:
+                assert (res == self.track_indexes).all()
+
+        return res
+
+    @memoized_property
+    def num_worlds(self):
+        return len(self.world_tracknames)
 
     def transform(self, num):
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
@@ -1129,6 +1164,9 @@ class Runner(object):
             / filebasename
 
     def set_tracknames(self, genome):
+        # XXX: this function could use a refactor
+        # there is a lot of stuff here that might not be used anywhere
+        # and variable names are confusing
         tracknames = genome.tracknames_continuous
 
         # supplied by user: includes special tracks (like dinucleotide)
@@ -1185,6 +1223,9 @@ class Runner(object):
             head_trackname_list = tracknames
 
             assert not self.tied_tracknames
+            self.tied_tracknames = dict((trackname, [trackname])
+                                        for trackname in tracknames)
+
             tied_track_indexes_list = [[track_index]
                                        for track_index in track_indexes]
             unquoted_tracknames = tracknames
@@ -1715,6 +1756,12 @@ class Runner(object):
         job_tmpl.args = map(str, args)
 
         # this is going to cause problems on heterogeneous systems
+        environment = environ.copy()
+        try:
+            # this causes errors
+            del environment["PYTHONINSPECT"]
+        except KeyError:
+            pass
         job_tmpl.jobEnvironment = environ
 
         if output_filename is None:
