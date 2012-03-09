@@ -196,6 +196,12 @@ There is also a special track name, ``dinucleotide``. When you specify
 the dinucleotide that starts at a particular position. This can help
 in modeling CpG or G+C bias.
 
+You can run a concatenated segmentation by separating tracks with a
+comma. For example::
+
+    segway --track dnasei.liver,dnasei.blood --track h3k36me3.liver,h3k36me3.blood
+
+
 .. _positions:
 
 Positions
