@@ -12,6 +12,6 @@ if [[ $# != 0 || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     exit 2
 fi
 
-for dir in data simpleseg; do
+for dir in data simpleseg simpleconcat; do
     "$dir/run.sh"
 done
