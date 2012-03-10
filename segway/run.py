@@ -37,13 +37,13 @@ from path import path
 from pkg_resources import Requirement, working_set
 from tabdelim import DictReader, ListWriter
 
-from .bed import read_native
+from .bed import parse_bed4, read_native
 from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
                       RestartableJobDict, Session)
 from .include import IncludeSaver
 from .input_master import InputMasterSaver
-from .layer import layer, make_layer_filename
 from .observations import Observations
+from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
 from ._util import (data_filename,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
@@ -52,7 +52,7 @@ from ._util import (data_filename,
                     extjoin, extjoin_not_none, GB,
                     ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     make_default_filename,
-                    make_filelistpath, make_prefix_fmt, maybe_gzip_open,
+                    make_filelistpath, make_prefix_fmt,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
                     OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict, PKG,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
@@ -217,30 +217,12 @@ RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_SEG_TABLE = "seg_table.tab"
 
-TRACK_FMT = "browser position %s:%s-%s"
-FIXEDSTEP_FMT = "fixedStep chrom=%s start=%s step=1 span=1"
-
-BED_ATTRS = dict(autoScale="off")
-BED_ATTRS_VITERBI = dict(name="%s.%s" % (PKG, UUID),
-                         visibility="dense",
-                         viewLimits="0:1",
-                         itemRgb="on",
-                         **BED_ATTRS)
-
-BED_DESC_VITERBI = "%s segmentation of %%s" % PKG
-
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename"]
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % PKG
-
-FIXEDSTEP_HEADER = "fixedStep chrom=%s start=%d step=%d span=%d"
-POSTERIOR_BEDGRAPH_HEADER="track type=bedGraph name=posterior.%d \
-        description=\"Segway posterior probability of label %d\" \
-        visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
-        autoScale=off color=200,100,0 altColor=0,100,200"
 
 # training results
 # XXX: Python 2.6: this should really be a namedtuple, yuck
@@ -249,8 +231,6 @@ OFFSET_FILENAMES = 2 # where the filenames begin in the results
 OFFSET_PARAMS_FILENAME = 3
 
 RESOLUTION = 1
-
-INDEX_BED_START = 1
 
 SEGTRANSITION_WEIGHT_SCALE = 1.0
 
@@ -308,31 +288,6 @@ def quote_trackname(text):
 
     return res
 
-def make_fixedstep_header(chrom, start, resolution):
-    """
-    this function expects 0-based coordinates
-    it does the conversion to 1-based coordinates for you
-    """
-    start_1based = start+1
-
-    # XXX: if there is an overhang of less than resolution, then
-    # having step/span = resolution means the last datum in a window
-    # will actually extend too far. There's no point in fixing this
-    # now, since we want to switch to bedGraph eventually anyway
-    return FIXEDSTEP_HEADER % (chrom, start_1based, resolution, resolution)
-
-def make_bed_attr(key, value):
-    if " " in value:
-        value = '"%s"' % value
-
-    return "%s=%s" % (key, value)
-
-def make_bed_attrs(mapping):
-    res = " ".join(make_bed_attr(key, value)
-                   for key, value in mapping.iteritems())
-
-    return "track %s" % res
-
 def quote_spaced_str(item):
     """
     add quotes around text if it has spaces in it
@@ -384,11 +339,6 @@ def consume_until(iterable, text):
     for line in iterable:
         if line.startswith(text):
             break
-
-def parse_bed4(line):
-    row = line.split()
-    chrom, start, end, seg = row[:4]
-    return row, (chrom, start, end, seg)
 
 def slice2range(s):
     if isinstance(s, int):
@@ -1058,10 +1008,6 @@ class Runner(object):
         return sum(coord[3] - coord[2] for coord in self.window_coords)
 
     @memoized_property
-    def track_indexes_text(self):
-        return ",".join(map(str, self.track_indexes))
-
-    @memoized_property
     def head_tracknames(self):
         return PassThroughDict()
 
@@ -1496,145 +1442,6 @@ class Runner(object):
             dst_filename = src_filename
 
         setattr(self, name, dst_filename)
-
-    def make_bed_desc_attrs(self, mapping, desc_tmpl):
-        attrs = mapping.copy()
-        attrs["description"] = desc_tmpl % ", ".join(self.unquoted_tracknames)
-
-        return make_bed_attrs(attrs)
-
-    def make_bed_header_viterbi(self):
-        return self.make_bed_desc_attrs(BED_ATTRS_VITERBI, BED_DESC_VITERBI)
-
-    def concatenate_bed(self):
-        # the final bed filename, not the individual viterbi_filenames
-        bed_filename = self.bed_filename
-
-        # values for comparison to combine adjoining segments
-        last_line = ""
-        last_start = None
-        last_vals = (None, None, None) # (chrom, coord, seg)
-
-        with maybe_gzip_open(bed_filename, "w") as bed_file:
-            # XXX: add in browser track line (see SVN revisions
-            # previous to 195)
-            print >>bed_file, self.make_bed_header_viterbi()
-
-            for viterbi_filename in self.viterbi_filenames:
-                with open(viterbi_filename) as viterbi_file:
-                    lines = viterbi_file.readlines()
-                    first_line = lines[0]
-                    first_row, first_coords = parse_bed4(first_line)
-                    (chrom, start, end, seg) = first_coords
-
-                    # write the last line and the first line, after
-                    # potentially merging
-                    if last_vals == (chrom, start, seg):
-                        first_row[INDEX_BED_START] = last_start
-
-                        # add back trailing newline eliminated by line.split()
-                        merged_line = "\t".join(first_row) + "\n"
-
-                        # if there's just a single line in the BED file
-                        if len(lines) == 1:
-                            last_line = merged_line
-                            last_vals = (chrom, end, seg)
-                            # last_start is already set correctly
-                            # postpone writing until after additional merges
-                            continue
-                        else:
-                            # write the merged line
-                            bed_file.write(merged_line)
-                    else:
-                        if len(lines) == 1:
-                            # write the last line of the last file.
-                            # hold back the first line of this file,
-                            # and treat it as the last line
-                            bed_file.write(last_line)
-                        else:
-                            # write the last line of the last file, first
-                            # line of this file
-                            bed_file.writelines([last_line, first_line])
-
-                    # write the bulk of the lines
-                    bed_file.writelines(lines[1:-1])
-
-                    # set last_line
-                    last_line = lines[-1]
-                    last_row, last_coords = parse_bed4(last_line)
-                    (chrom, start, end, seg) = last_coords
-                    last_vals = (chrom, end, seg)
-                    last_start = start
-
-            # write the very last line of all files
-            bed_file.write(last_line)
-
-
-    def concatenate_bedgraph(self):
-        # the final bedgraph filename, not the individual posterior_filenames
-        bedgraph_filename = self.bedgraph_filename
-
-        for num_seg in xrange(self.num_segs):
-            # values for comparison to combine adjoining segments
-            last_start = None
-            last_line = ""
-            last_vals = (None, None, None) # (chrom, coord, seg)
-
-            with maybe_gzip_open(bedgraph_filename % num_seg, "w") as bedgraph_file:
-                # XXX: add in browser track line (see SVN revisions
-                # previous to 195)
-                posterior_header = POSTERIOR_BEDGRAPH_HEADER % (num_seg,
-                                                        num_seg)
-                print >>bedgraph_file, posterior_header
-
-                for posterior_filename in self.posterior_filenames:
-                    with open(posterior_filename % num_seg) as posterior_file:
-                        lines = posterior_file.readlines()
-                        first_line = lines[0]
-                        first_row, first_coords = parse_bed4(first_line)
-                        (chrom, start, end, seg) = first_coords
-
-                        # write the last line and the first line, after
-                        # potentially merging
-                        if last_vals == (chrom, start, seg):
-                            first_row[INDEX_BED_START] = last_start
-
-                            # add back trailing newline eliminated by line.split()
-                            merged_line = "\t".join(first_row) + "\n"
-
-                            # if there's just a single line in the BED file
-                            if len(lines) == 1:
-                                last_line = merged_line
-                                last_vals = (chrom, end, seg)
-                                # last_start is already set correctly
-                                # postpone writing until after additional merges
-                                continue
-                            else:
-                                # write the merged line
-                                bedgraph_file.write(merged_line)
-                        else:
-                            if len(lines) == 1:
-                                # write the last line of the last file.
-                                # hold back the first line of this file,
-                                # and treat it as the last line
-                                bedgraph_file.write(last_line)
-                            else:
-                                # write the last line of the last file, first
-                                # line of this file
-                                bedgraph_file.writelines([last_line, first_line])
-
-                        # write the bulk of the lines
-                        bedgraph_file.writelines(lines[1:-1])
-
-                        # set last_line
-                        last_line = lines[-1]
-                        last_row, last_coords = parse_bed4(last_line)
-                        (chrom, start, end, seg) = last_coords
-                        last_vals = (chrom, end, seg)
-                        last_start = start
-
-                # write the very last line of all files
-                bedgraph_file.write(last_line)
 
     def prog_factory(self, prog):
         """
@@ -2296,12 +2103,15 @@ to find the winning instance anyway.""" % thread.instance_index)
         float_filepath = self.float_filepaths[window_index]
         int_filepath = self.int_filepaths[window_index]
 
+        track_indexes = self.world_track_indexes[window_world]
+        track_indexes_text = ",".join(map(str, track_indexes))
+
         prefix_args = [find_executable("segway-task"), "run", kind,
-                       output_filename, window_chrom, window_start,
-                       window_end, self.resolution, self.num_segs,
-                       self.genomedataname, float_filepath,
+                       output_filename, window_chrom,
+                       window_start, window_end, self.resolution,
+                       self.num_segs, self.genomedataname, float_filepath,
                        int_filepath, self.distribution,
-                       self.track_indexes_text]
+                       track_indexes_text]
         output_filename = None
 
         num_frames = self.window_lens[window_index]
@@ -2376,13 +2186,10 @@ to find the winning instance anyway.""" % thread.instance_index)
             restartable_jobs.wait()
 
         if self.identify:
-            self.concatenate_bed()
-            bed_filename = self.bed_filename
-            layer(bed_filename, make_layer_filename(bed_filename),
-                  bigbed_outfilename=self.bigbed_filename)
+            IdentifySaver(self)()
 
         if self.posterior:
-            self.concatenate_bedgraph()
+            PosteriorSaver(self)()
 
     def make_script_filename(self, prefix):
         return self.make_filename(prefix, EXT_SH, subdirname=SUBDIRNAME_LOG)

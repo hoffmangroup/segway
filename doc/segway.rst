@@ -201,7 +201,6 @@ comma. For example::
 
     segway --track dnasei.liver,dnasei.blood --track h3k36me3.liver,h3k36me3.blood
 
-
 .. _positions:
 
 Positions

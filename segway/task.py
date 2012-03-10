@@ -134,7 +134,7 @@ def save_bed(outfilename, *args, **kwargs):
     with open(outfilename, "w") as outfile:
         write_bed(outfile, *args, **kwargs)
 
-def read_posterior_save_bed(coord, resolution,  outfilename_tmpl, num_labels,
+def read_posterior_save_bed(coord, resolution, outfilename_tmpl, num_labels,
                             infile):
     (chrom, start, end) = coord
     num_frames = ceildiv(end - start, resolution)

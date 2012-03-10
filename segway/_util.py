@@ -152,13 +152,15 @@ def copy_attrs(src, dst, attrs):
     for attr in attrs:
         setattr(dst, attr, getattr(src, attr))
 
-class Saver(object):
+class Copier(object):
     copy_attrs = []
-    resource_name = None
 
     def __init__(self, runner):
-        # copy copy_attrs from runner to Saver instance
+        # copy copy_attrs from runner to Copier instance
         copy_attrs(runner, self, self.copy_attrs)
+
+class Saver(Copier):
+    resource_name = None
 
     def make_mapping(self):
         """

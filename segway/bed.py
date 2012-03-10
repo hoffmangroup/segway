@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2012 Michael M. Hoffman <mmh1@washington.edu>
 
 from itertools import chain
 import re
@@ -50,6 +50,14 @@ def read(iterator, datum_cls=Datum):
 
 def read_native(*args, **kwargs):
     return read(datum_cls=NativeDatum, *args, **kwargs)
+
+def parse_bed4(line):
+    """
+    alternate fast path
+    """
+    row = line.split()
+    chrom, start, end, seg = row[:4]
+    return row, (chrom, start, end, seg)
 
 re_trackline_split = re.compile(r"(?:[^ =]+=([\"'])[^\1]+?\1(?= |$)|[^ ]+)")
 def get_trackline_and_reader(iterator, datum_cls=Datum):
