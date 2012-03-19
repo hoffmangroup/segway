@@ -1,9 +1,0 @@
-jobid	jobname	prog	num_segs	num_frames	maxvmem	cpu	exit_status
-1626398	emt0.0.0.traindir.deaaad2a60ba11e1bba90019b9e18917	gmtkEMtrain	4	8000	0.0000	0.6479	0
-1626399	emt0.0.bundle.traindir.deaaad2a60ba11e1bba90019b9e18917	gmtkEMtrain	4	0	0.0000	0.1360	0
-1626400	emt0.1.0.traindir.deaaad2a60ba11e1bba90019b9e18917	gmtkEMtrain	4	8000	0.0000	0.3689	0
-1626401	emt0.1.bundle.traindir.deaaad2a60ba11e1bba90019b9e18917	gmtkEMtrain	4	0	0.0000	0.1590	0
-1626446	emt0.2.0.traindir.deaaad2a60ba11e1bba90019b9e18917	gmtkEMtrain	4	8000	0.0000	0.3579	0
-1626491	emt0.2.bundle.traindir.deaaad2a60ba11e1bba90019b9e18917	gmtkEMtrain	4	0	0.0000	0.1610	0
-1626492	emt0.3.0.traindir.deaaad2a60ba11e1bba90019b9e18917	gmtkEMtrain	4	8000	0.0000	0.3220	0
-1626567	emt0.3.bundle.traindir.deaaad2a60ba11e1bba90019b9e18917	gmtkEMtrain	4	0	0.0000	0.1610	0
