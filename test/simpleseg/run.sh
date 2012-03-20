@@ -27,11 +27,11 @@ set -x
 
 # seed from python -c "import random; print random.randrange(2**32)"
 SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
-    --include-coords=../simpleseg/include-coords.bed \
-    --tracks-from=../simpleseg/tracks.txt --num-labels=4 \
-    train ../simpleseg/simpleseg.genomedata traindir
+    --include-coords=../include-coords.bed \
+    --tracks-from=../tracks.txt --num-labels=4 \
+    train ../simpleseg.genomedata traindir
 
-segway "$cluster_arg" --include-coords=../simpleseg/include-coords.bed \
-    identify ../simpleseg/simpleseg.genomedata traindir identifydir
+segway "$cluster_arg" --include-coords=../include-coords.bed \
+    identify ../simpleseg.genomedata traindir identifydir
 
 ../../compare_directory.py ../touchstone .
