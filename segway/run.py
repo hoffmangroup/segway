@@ -860,23 +860,35 @@ class Runner(object):
     def output_master_filename(self):
         return self.save_resource(RES_OUTPUT_MASTER, SUBDIRNAME_PARAMS)
 
+    def make_viterbi_filenames(self, dirpath):
+        """
+        make viterbi filenames for a particular dirpath
+        """
+        viterbi_dirpath = dirpath / SUBDIRNAME_VITERBI
+        num_windows = self.num_windows
+
+        viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_windows)
+                                + EXT_BED)
+        return [viterbi_dirpath / viterbi_filename_fmt % index
+                for index in xrange(num_windows)]
+
     @memoized_property
     def viterbi_filenames(self):
         self.make_subdir(SUBDIRNAME_VITERBI)
-        return self._make_viterbi_filenames(self.work_dirpath)
-
-    @memoized_property
-    def posterior_filenames(self):
-        self.make_subdir(SUBDIRNAME_POSTERIOR)
-        return map(self.make_posterior_filename, xrange(self.num_windows))
+        return self.make_viterbi_filenames(self.work_dirpath)
 
     @memoized_property
     def recover_viterbi_filenames(self):
         recover_dirpath = self.recover_dirpath
         if recover_dirpath:
-            return self._make_viterbi_filenames(recover_dirpath)
+            return self.make_viterbi_filenames(recover_dirpath)
         else:
             return None
+
+    @memoized_property
+    def posterior_filenames(self):
+        self.make_subdir(SUBDIRNAME_POSTERIOR)
+        return map(self.make_posterior_filename, xrange(self.num_windows))
 
     @memoized_property
     def recover_posterior_filenames(self):
@@ -1370,15 +1382,6 @@ class Runner(object):
         self.input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(input_master_filename, self.params_dirpath,
                                    self.clobber, instance_index)
-
-    def _make_viterbi_filenames(self, dirpath):
-        viterbi_dirpath = dirpath / SUBDIRNAME_VITERBI
-        num_windows = self.num_windows
-
-        viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_windows)
-                                + EXT_BED)
-        return [viterbi_dirpath / viterbi_filename_fmt % index
-                for index in xrange(num_windows)]
 
     def load_supervision(self):
         supervision_type = self.supervision_type
@@ -2097,7 +2100,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         return True
 
-    def _queue_identify(self, restartable_jobs, window_index, prefix_job_name,
+    def queue_identify(self, restartable_jobs, window_index, prefix_job_name,
                         prog, kwargs, output_filenames):
         prog = self.prog_factory(prog)
         job_name = self.make_job_name_identify(prefix_job_name, window_index)
@@ -2171,11 +2174,10 @@ to find the winning instance anyway.""" % thread.instance_index)
         # XXX: kill submitted jobs on exception
         with Session() as session:
             self.session = session
-
             restartable_jobs = RestartableJobDict(session, self.job_log_file)
 
             for window_index, window_len in self.window_lens_sorted():
-                queue_identify_custom = partial(self._queue_identify,
+                queue_identify_custom = partial(self.queue_identify,
                                                 restartable_jobs, window_index)
 
                 if (self.identify
