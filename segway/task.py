@@ -189,7 +189,7 @@ def replace_args_filelistname(args, temp_filepaths, ext):
     """
     replace the filelistnames in arguments with temporary filenames
     """
-    fd, filelistname = mkstemp(EXT_LIST + extsep, extsep + ext)
+    fd, filelistname = mkstemp(suffix=extsep + EXT_LIST, prefix=ext + extsep)
     filelistpath = path(filelistname)
 
     # side-effect on args, temp_filepaths
@@ -207,7 +207,7 @@ def print_to_fd(fd, line):
         print >>outfile, line
 
 def run_posterior_save_bed(coord, resolution, outfilename, num_labels,
-                           genomedata_dirname, float_filename, int_filename,
+                           genomedataname, float_filename, int_filename,
                            distribution, track_indexes_text, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed and needs to be reduced
     # convert from tuple
@@ -227,7 +227,7 @@ def run_posterior_save_bed(coord, resolution, outfilename, num_labels,
                                                  EXT_FLOAT)
     int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
 
-    with Genome(genomedata_dirname) as genome:
+    with Genome(genomedataname) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     try:
@@ -259,7 +259,7 @@ def run_posterior_save_bed(coord, resolution, outfilename, num_labels,
 
 
 def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
-                         genomedata_dirname, float_filename, int_filename,
+                         genomedataname, float_filename, int_filename,
                          distribution, track_indexes_text, *args):
     # convert from tuple
     args = list(args)
@@ -280,7 +280,7 @@ def run_viterbi_save_bed(coord, resolution, outfilename, num_labels,
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                    EXT_FLOAT)
 
-    with Genome(genomedata_dirname) as genome:
+    with Genome(genomedataname) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     try:

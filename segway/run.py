@@ -183,7 +183,9 @@ SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
 BED_FILEBASENAME = extjoin(PKG, EXT_BED, EXT_GZ) # "segway.bed.gz"
+BED_FILEBASEFMT = extjoin(PKG, "%d", EXT_BED, EXT_GZ) # "segway.%d.bed.gz"
 BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ) # "posterior%s.bed.gz"
+BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ) # "posterior%s.%%d.bed.gz"
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 
@@ -565,7 +567,7 @@ class Runner(object):
                 raise ValueError("unrecognized task: %s" % task)
 
     def set_option(self, name, value):
-        if value is not None:
+        if value:
             setattr(self, name, value)
 
     options_to_attrs = [("recover", "recover_dirname"),
@@ -955,11 +957,21 @@ class Runner(object):
 
     @memoized_property
     def bed_filename(self):
-        return self.work_dirpath / BED_FILEBASENAME
+        if self.num_worlds == 0:
+            basename = BED_FILEBASENAME
+        else:
+            basename = BED_FILEBASEFMT
+
+        return self.work_dirpath / basename
 
     @memoized_property
     def bedgraph_filename(self):
-        return self.work_dirpath / BEDGRAPH_FILEBASENAME
+        if self.num_worlds == 0:
+            basename = BEDGRAPH_FILEBASENAME
+        else:
+            basename = BEDGRAPH_FILEBASEFMT
+
+        return self.work_dirpath / basename
 
     @memoized_property
     def train_prog(self):
@@ -997,7 +1009,7 @@ class Runner(object):
 
     @memoized_property
     def num_tracks(self):
-        return len(self.track_indexes)
+        return len(self.head_trackname_list)
 
     @memoized_property
     def num_windows(self):
@@ -2185,11 +2197,12 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             restartable_jobs.wait()
 
-        if self.identify:
-            IdentifySaver(self)()
+        for world in xrange(self.num_worlds):
+            if self.identify:
+                IdentifySaver(self)(world)
 
-        if self.posterior:
-            PosteriorSaver(self)()
+            if self.posterior:
+                PosteriorSaver(self)(world)
 
     def make_script_filename(self, prefix):
         return self.make_filename(prefix, EXT_SH, subdirname=SUBDIRNAME_LOG)
@@ -2260,7 +2273,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                             # in case you tested multiple num_segs
                             self.save_include()
 
-                        if self.posterior and self.recover_dirname:
+                        if (self.posterior and (self.recover_dirname
+                                                or self.num_worlds != 1)):
                             raise NotImplementedError # XXX
 
                         self.run_identify_posterior()

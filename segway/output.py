@@ -26,6 +26,20 @@ def make_bed_attrs(mapping):
 
     return "track %s" % res
 
+def make_filename(fmt, world):
+    """
+    allow filename that's missing %d, unless world != 0
+    """
+    if not fmt:
+        return fmt
+
+    try:
+        return fmt % world
+    except TypeError:
+        if world != 0:
+            raise
+        return fmt
+
 class IdentifySaver(Copier):
     copy_attrs = ["bed_filename", "unquoted_tracknames", "uuid",
                   "viterbi_filenames", "bigbed_filename"]
@@ -47,9 +61,9 @@ class IdentifySaver(Copier):
 
         return make_bed_attrs(attrs)
 
-    def concatenate(self):
+    def concatenate(self, world):
         # the final bed filename, not the individual viterbi_filenames
-        outfilename = self.bed_filename
+        outfilename = make_filename(self.bed_filename, world)
 
         # values for comparison to combine adjoining segments
         last_line = ""
@@ -110,12 +124,12 @@ class IdentifySaver(Copier):
             # write the very last line of all files
             outfile.write(last_line)
 
-    def __call__(self):
-        self.concatenate()
+    def __call__(self, world):
+        self.concatenate(world)
 
-        bed_filename = self.bed_filename
+        bed_filename = make_filename(self.bed_filename, world)
         layer(bed_filename, make_layer_filename(bed_filename),
-              bigbed_outfilename=self.bigbed_filename)
+              bigbed_outfilename=make_filename(self.bigbed_filename, world))
 
 
 class PosteriorSaver(Copier):
@@ -128,9 +142,9 @@ class PosteriorSaver(Copier):
     def make_header(self, num_seg):
         return self.header_tmpl % (num_seg, num_seg)
 
-    def __call__(self):
+    def __call__(self, world):
         # the final bedgraph filename, not the individual posterior_filenames
-        outfilename = self.bedgraph_filename
+        outfilename = make_filename(self.bedgraph_filename, world)
 
         for num_seg in xrange(self.num_segs):
             # values for comparison to combine adjoining segments
