@@ -969,7 +969,7 @@ class Runner(object):
 
     @memoized_property
     def bed_filename(self):
-        if self.num_worlds == 0:
+        if self.num_worlds == 1:
             basename = BED_FILEBASENAME
         else:
             basename = BED_FILEBASEFMT
@@ -978,7 +978,7 @@ class Runner(object):
 
     @memoized_property
     def bedgraph_filename(self):
-        if self.num_worlds == 0:
+        if self.num_worlds == 1:
             basename = BEDGRAPH_FILEBASENAME
         else:
             basename = BEDGRAPH_FILEBASEFMT
@@ -1486,7 +1486,7 @@ class Runner(object):
 
     def make_gmtk_kwargs(self):
         """
-        universal args to gmtkEMtrain, gmtkViterbi, gmtkJT
+        shared args to gmtkEMtrain, gmtkViterbi, gmtkJT
         """
         res = dict(strFile=self.structure_filename,
                    verbosity=self.verbosity,
@@ -1584,7 +1584,7 @@ class Runner(object):
             del environment["PYTHONINSPECT"]
         except KeyError:
             pass
-        job_tmpl.jobEnvironment = environ
+        job_tmpl.jobEnvironment = environment
 
         if output_filename is None:
             output_filename = self.output_dirpath / job_name
@@ -2101,7 +2101,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         return True
 
     def queue_identify(self, restartable_jobs, window_index, prefix_job_name,
-                        prog, kwargs, output_filenames):
+                       prog, kwargs, output_filenames):
         prog = self.prog_factory(prog)
         job_name = self.make_job_name_identify(prefix_job_name, window_index)
         output_filename = output_filenames[window_index]

@@ -26,23 +26,20 @@ def make_bed_attrs(mapping):
 
     return "track %s" % res
 
-def make_filename(fmt, world):
-    """
-    allow filename that's missing %d, unless world != 0
-    """
-    if not fmt:
-        return fmt
+class OutputSaver(Copier):
+    def make_filename(self, fmt, world):
+        """
+        if there are multiple worlds, do another level of substitution
+        """
+        if not fmt or self.num_worlds == 1:
+            return fmt
 
-    try:
         return fmt % world
-    except TypeError:
-        if world != 0:
-            raise
-        return fmt
 
-class IdentifySaver(Copier):
+class IdentifySaver(OutputSaver):
     copy_attrs = ["bed_filename", "unquoted_tracknames", "uuid",
-                  "viterbi_filenames", "bigbed_filename", "window_coords"]
+                  "viterbi_filenames", "bigbed_filename", "window_coords",
+                  "num_worlds"]
 
     attrs = dict(visibility="dense",
                  viewLimits="0:1",
@@ -69,7 +66,7 @@ class IdentifySaver(Copier):
 
     def concatenate(self, world):
         # the final bed filename, not the individual viterbi_filenames
-        outfilename = make_filename(self.bed_filename, world)
+        outfilename = self.make_filename(self.bed_filename, world)
         window_coords = self.window_coords
 
         # values for comparison to combine adjoining segments
@@ -138,13 +135,14 @@ class IdentifySaver(Copier):
     def __call__(self, world):
         self.concatenate(world)
 
-        bed_filename = make_filename(self.bed_filename, world)
+        bed_filename = self.make_filename(self.bed_filename, world)
         layer(bed_filename, make_layer_filename(bed_filename),
-              bigbed_outfilename=make_filename(self.bigbed_filename, world))
+              bigbed_outfilename=self.make_filename(self.bigbed_filename, world))
 
 
-class PosteriorSaver(Copier):
-    copy_attrs = ["bedgraph_filename", "num_segs", "posterior_filenames"]
+class PosteriorSaver(OutputSaver):
+    copy_attrs = ["bedgraph_filename", "num_segs", "posterior_filenames",
+                  "num_worlds"]
     header_tmpl = "track type=bedGraph name=posterior.%d \
         description=\"Segway posterior probability of label %d\" \
         visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
@@ -155,7 +153,7 @@ class PosteriorSaver(Copier):
 
     def __call__(self, world):
         # the final bedgraph filename, not the individual posterior_filenames
-        outfilename = make_filename(self.bedgraph_filename, world)
+        outfilename = self.make_filename(self.bedgraph_filename, world)
 
         for num_seg in xrange(self.num_segs):
             # values for comparison to combine adjoining segments

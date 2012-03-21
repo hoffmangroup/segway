@@ -5,7 +5,7 @@ __version__ = "$Revision$"
 
 # common stuff: needs to be in a different file from __init__ because
 # it is imported by lsf.py and sge.py
-# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 from tempfile import gettempdir
@@ -24,7 +24,7 @@ BASH_CMD = "bash"
 RES_WRAPPER = "segway-wrapper.sh"
 
 MSG_EDGE = """
-Ran through entire memory usage progression reached without success.
+Ran through entire memory usage progression without success.
 This is probably not related to memory usage, however. Check for errors in %s.
 See the Troubleshooting section of the Segway documentation."""
 
