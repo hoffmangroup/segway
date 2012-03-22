@@ -1,12 +1,10 @@
+Overview:
 Segway has an acceptance testing system that you can use by running
-./test.sh. It will test a full training task, identification and generating 
-posterior probability on test data (data/test.genomedata), using previously
-generated starting parameters (data/input.master). It then compares the test
- runs (test.XXXXXX where XXXXXX represents random alphanumeric characters)
-with previous "golden" runs (data/traindir, data/identifydir). To
-generate a new input.master run `new=1 ./test.sh`, but keep in mind
-that the results will not be the same.
+./test_all.sh. The test_all script will go into each test/ child directory and execute the script named ./run.sh if one exists.
 
+Generally, each run.sh will run segway train and identify on a small dataset, then compare those results to a golden run in a touchstone/ directory. This test behavoir is not mandatory, and arbitrary tests may be added by creating a directory with a run.sh file. 
+
+Golden Runs:
 Segway produces some output that will change depending on the version,
 the date, or randomly (UUIDs are used for each run). These golden runs
 have been changed to be templates with regular expressions (regexes)

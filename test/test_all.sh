@@ -12,6 +12,21 @@ if [[ $# != 0 || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     exit 2
 fi
 
-for dir in data simpleseg simpleconcat; do
-    "$dir/run.sh" || true # XXX: remove this after touchstones are written
+# This may be used later for specifying a subset of tests
+# for dir in data simpleseg simpleconcat; do
+#     "$dir/run.sh"
+# done
+
+TEST_ROOT="$(pwd)"
+
+find -maxdepth 2 -name "run.sh" -type f | while read file
+do
+    echo "Running $(dirname $file)"
+    cd $(dirname $file)
+    ./run.sh
+    if [ $? != 0 ]; then
+	echo "Test script $file exited with status $?"
+	exit $?
+    fi
+    cd $TEST_ROOT
 done
