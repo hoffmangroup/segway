@@ -26,7 +26,7 @@ from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
                     get_chrom_coords, make_prefix_fmt,
                     SUPERVISION_LABEL_OFFSET, SUPERVISION_SEMISUPERVISED,
-                    SUPERVISION_UNSUPERVISED, USE_MFSDG)
+                    SUPERVISION_UNSUPERVISED, USE_MFSDG, Window)
 
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
@@ -358,7 +358,7 @@ class Observations(object):
         """
         exclude_coords = self.exclude_coords
 
-        window_coords = []
+        windows = []
 
         for chrom, starts, ends in self.generate_coords(genome):
             chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
@@ -394,9 +394,9 @@ class Observations(object):
                 start, end = new_windows[0]
 
                 for world in xrange(self.num_worlds):
-                    window_coords.append((world, chrom, start, end))
+                    windows.append(Window(world, chrom, start, end))
 
-        self.window_coords = window_coords
+        self.windows = windows
 
     def save_window(self, float_filename, int_filename, float_data,
                     seq_data=None, supervision_data=None):
@@ -472,7 +472,7 @@ class Observations(object):
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
 
-        for window_index, (world, chrom, start, end) in enumerate(self.window_coords):
+        for window_index, (world, chrom, start, end) in enumerate(self.windows):
             float_filepath, int_filepath = \
                 print_filepaths_custom(chrom, window_index)
 

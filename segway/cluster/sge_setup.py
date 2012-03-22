@@ -7,7 +7,7 @@ sge_setup: setup mem_requested on each node
 
 __version__ = "$Revision$"
 
-# Copyright 2010 Michael M. Hoffman <mmh1@uw.edu>
+# Copyright 2010, 2012 Michael M. Hoffman <mmh1@uw.edu>
 
 import sys
 from tempfile import NamedTemporaryFile
@@ -27,13 +27,14 @@ OUTPUT_RECORD_SEPARATOR = \
     "----------------------------------------------------------------------------\n"
 
 def sge_setup():
-    tempfile = NamedTemporaryFile("w", suffix=".txt", prefix="qconf.")
+    tempfile = NamedTemporaryFile("w", suffix=".txt", prefix="qconf.",
+                                  delete=False)
 
     prior_complex_text = QCONF_PROG.getoutput(sc=True)
     print >>tempfile, prior_complex_text
     print >>tempfile, "mem_requested\tmr\tMEMORY\t<=\tYES\tYES\t0\t10"
-    # XXX: after Python 2.6, use tempfile.close() with NamedTemporaryFile(delete=False)
-    tempfile.flush()
+
+    tempfile.close()
 
     QCONF_PROG(Mc=tempfile.name)
 

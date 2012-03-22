@@ -5,7 +5,7 @@ __version__ = "$Revision$"
 
 # Copyright 2008-2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from contextlib import closing
 from functools import partial
 from gzip import open as _gzip_open
@@ -112,35 +112,13 @@ def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
 
-# NamedTemporaryDir is based somewhat on Python 2.5.2
-# tempfile._TemporaryFileWrapper
-#
-# Original Copyright (c) 2001, 2002, 2003, 2004, 2005, 2006 Python
-# Software Foundation; All Rights Reserved
-#
-# License at http://www.python.org/download/releases/2.5.2/license/
+_Window = namedtuple("Window", ["world", "chrom", "start", "end"])
 
-# XXX: submit for inclusion in core
-# XXX: is this still in use?
-class NamedTemporaryDir(object):
-    def __init__(self, *args, **kwargs):
-        self.name = mkdtemp(*args, **kwargs)
-        self.close_called = False
-        self.rmtree = shutil.rmtree # want a function, not an unbound method
+class Window(_Window):
+    __slots__ = ()
 
-    def __enter__(self):
-        return self
-
-    def close(self):
-        if not self.close_called:
-            self.close_called = True
-            self.rmtree(self.name)
-
-    def __del__(self):
-        self.close()
-
-    def __exit__(self, exc, value, tb):
-        self.close()
+    def __len__(self):
+        return self.end - self.start
 
 def copy_attrs(src, dst, attrs):
     for attr in attrs:

@@ -38,7 +38,7 @@ class OutputSaver(Copier):
 
 class IdentifySaver(OutputSaver):
     copy_attrs = ["bed_filename", "unquoted_tracknames", "uuid",
-                  "viterbi_filenames", "bigbed_filename", "window_coords",
+                  "viterbi_filenames", "bigbed_filename", "windows",
                   "num_worlds"]
 
     attrs = dict(visibility="dense",
@@ -60,14 +60,13 @@ class IdentifySaver(OutputSaver):
 
     def get_world_indexes(self, world):
         return [index
-                for index, (window_world, chrom, start, end)
-                in enumerate(self.window_coords)
-                if world == window_world]
+                for index, window in enumerate(self.windows)
+                if world == window.world]
 
     def concatenate(self, world):
         # the final bed filename, not the individual viterbi_filenames
         outfilename = self.make_filename(self.bed_filename, world)
-        window_coords = self.window_coords
+        windows = self.windows
 
         # values for comparison to combine adjoining segments
         last_line = ""
@@ -81,7 +80,7 @@ class IdentifySaver(OutputSaver):
 
             for window_index, viterbi_filename in \
                     enumerate(self.viterbi_filenames):
-                if window_coords[window_index][0] != world:
+                if windows[window_index].world != world:
                     continue
 
                 with open(viterbi_filename) as viterbi_file:

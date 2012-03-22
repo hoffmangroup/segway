@@ -189,7 +189,6 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
         if word == "visibility=dense":
             trackline[word_index] = "visibility=full"
 
-    # XXX: inefficient. Python 2.7+'s collections.OrderedDict would be better
     for key, value in trackline_updates.iteritems():
         start = key + "="
         for word_index, word in enumerate(trackline):

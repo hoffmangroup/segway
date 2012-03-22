@@ -9,13 +9,13 @@ __version__ = "$Revision$"
 
 # Copyright 2008-2012 Michael M. Hoffman <mmh1@uw.edu>
 
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 from copy import copy
 from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
-from itertools import count, izip
+from itertools import count, izip, product
 from math import ceil, ldexp
 from os import environ, extsep
 import re
@@ -226,12 +226,6 @@ LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % __package__
 
-# training results
-# XXX: Python 2.6: this should really be a namedtuple, yuck
-OFFSET_NUM_SEGS = 1
-OFFSET_FILENAMES = 2 # where the filenames begin in the results
-OFFSET_PARAMS_FILENAME = 3
-
 RESOLUTION = 1
 
 SEGTRANSITION_WEIGHT_SCALE = 1.0
@@ -240,6 +234,11 @@ DIRPATH_WORK_DIR_HELP = path("WORKDIR")
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
+
+Results = namedtuple("Results", ["log_likelihood", "num_segs",
+                                 "input_master_filename", "params_filename",
+                                 "log_likelihood_filename"])
+OFFSET_FILENAMES = 2 # where the filenames begin in Results
 
 ## functions
 def quote_trackname(text):
@@ -491,7 +490,7 @@ class Runner(object):
 
         # data
         # a "window" is what GMTK calls a segment
-        self.window_coords = None
+        self.windows = None
         self.mins = None
         self.maxs = None
         self.tracknames = None # encoded/quoted version
@@ -875,7 +874,7 @@ class Runner(object):
 
     @memoized_property
     def window_lens(self):
-        return [end - start for world, chr, start, end in self.window_coords]
+        return [len(window) for window in self.windows]
 
     @memoized_property
     def posterior_triangulation_filename(self):
@@ -994,11 +993,11 @@ class Runner(object):
 
     @memoized_property
     def num_windows(self):
-        return len(self.window_coords)
+        return len(self.windows)
 
     @memoized_property
     def num_bases(self):
-        return sum(coord[3] - coord[2] for coord in self.window_coords)
+        return sum(self.window_lens)
 
     @memoized_property
     def head_tracknames(self):
@@ -1404,7 +1403,7 @@ class Runner(object):
             observations = Observations(self)
             observations.locate_windows(genome)
 
-            self.window_coords = observations.window_coords
+            self.windows = observations.windows
             self.subset_metadata(genome) # XXX: does this need to be done before save()?
 
             observations.save(genome)
@@ -1765,8 +1764,8 @@ class Runner(object):
             round_index += 1
 
         # log_likelihood, num_segs and a list of src_filenames to save
-        return (log_likelihood, self.num_segs, self.input_master_filename,
-                self.last_params_filename, self.log_likelihood_filename)
+        return Results(log_likelihood, self.num_segs, self.input_master_filename,
+                       self.last_params_filename, self.log_likelihood_filename)
 
     def save_train_options(self):
         filename = self.make_filename(TRAIN_FILEBASENAME)
@@ -1856,7 +1855,7 @@ class Runner(object):
         elif not self.dry_run:
             # only one instance
             assert len(instance_params) == 1
-            last_params_filename = instance_params[0][OFFSET_PARAMS_FILENAME]
+            last_params_filename = instance_params[0].params_filename
             copy2(last_params_filename, self.params_filename)
 
             # always overwrite params.params
@@ -1874,16 +1873,13 @@ class Runner(object):
         return res
 
     def run_train_multithread(self, num_segs_range):
-        # XXX: Python 2.6: use itertools.product()
         seg_instance_indexes = xrange(self.num_instances)
-        enumerator = enumerate((num_seg, seg_instance_index)
-                               for num_seg in num_segs_range
-                               for seg_instance_index in seg_instance_indexes)
+        enumerator = enumerate(product(num_segs_range, seg_instance_indexes))
 
         # ensure memoization before threading
         self.triangulation_dirpath
         self.jt_info_filename
-        self.include_cords
+        self.include_coords
         self.exclude_coords
         self.card_seg_countdown
         self.obs_dirpath
@@ -1955,7 +1951,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # finds the min by info_criterion (maximize log_likelihood)
         max_params = max(instance_params)
 
-        self.num_segs = max_params[OFFSET_NUM_SEGS]
+        self.num_segs = max_params.num_segs
         self.set_triangulation_filename()
 
         src_filenames = max_params[OFFSET_FILENAMES:]
@@ -2047,18 +2043,18 @@ to find the winning instance anyway.""" % thread.instance_index)
             else:
                 raise
 
-        window_coords = self.window_coords[window_index]
-        (window_world, window_chrom, window_start, window_end) = window_coords
+        window = self.windows[window_index]
+        window_chrom = window.chrom
 
         # XXX: duplicative
         row, line_coords = parse_bed4(lines[0])
         (line_chrom, line_start, line_end, seg) = line_coords
-        if line_chrom != window_chrom or int(line_start) != window_start:
+        if line_chrom != window_chrom or int(line_start) != window.start:
             return False
 
         row, line_coords = parse_bed4(lines[-1])
         (line_chrom, line_start, line_end, seg) = line_coords
-        if line_chrom != window_chrom or int(line_end) != window_end:
+        if line_chrom != window_chrom or int(line_end) != window.end:
             return False
 
         # copy the old filename to where the job's output would have
@@ -2081,18 +2077,17 @@ to find the winning instance anyway.""" % thread.instance_index)
             kind = "viterbi"
         else:
             kind = "posterior"
-        window_coord = self.window_coords[window_index]
-        window_world, window_chrom, window_start, window_end = window_coord
 
+        window = self.windows[window_index]
         float_filepath = self.float_filepaths[window_index]
         int_filepath = self.int_filepaths[window_index]
 
-        track_indexes = self.world_track_indexes[window_world]
+        track_indexes = self.world_track_indexes[window.world]
         track_indexes_text = ",".join(map(str, track_indexes))
 
         prefix_args = [find_executable("segway-task"), "run", kind,
-                       output_filename, window_chrom,
-                       window_start, window_end, self.resolution,
+                       output_filename, window.chrom,
+                       window.start, window.end, self.resolution,
                        self.num_segs, self.genomedataname, float_filepath,
                        int_filepath, self.distribution,
                        track_indexes_text]
