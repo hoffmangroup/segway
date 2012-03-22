@@ -22,11 +22,7 @@ TEST_ROOT="$(pwd)"
 find -maxdepth 2 -name "run.sh" -type f | while read file
 do
     echo "Running $(dirname $file)"
-    cd $(dirname $file)
-    ./run.sh
-    if [ $? != 0 ]; then
-	echo "Test script $file exited with status $?"
-	exit $?
-    fi
+    cd "$(dirname $file)"
+    ./run.sh || true
     cd $TEST_ROOT
 done
