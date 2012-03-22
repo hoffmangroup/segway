@@ -31,13 +31,7 @@ from tables import Filters, NoSuchNodeError, openFile
 # these are loaded by other modules indirectly
 # ignore PyFlakes warnings here
 
-try:
-    # Python 2.6
-    PKG = __package__
-except NameError:
-    PKG = "segway"
-
-PKG_DATA = ".".join([PKG, "data"])
+PKG_DATA = ".".join([__package__, "data"])
 
 FILTERS_GZIP = Filters(complevel=1)
 

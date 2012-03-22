@@ -54,7 +54,7 @@ from ._util import (data_filename,
                     make_default_filename,
                     make_filelistpath, make_prefix_fmt,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
-                    OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict, PKG,
+                    OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
@@ -75,7 +75,7 @@ NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
-TEMPDIR_PREFIX = PKG + "-"
+TEMPDIR_PREFIX = __package__ + "-"
 
 ISLAND = True
 
@@ -182,8 +182,8 @@ PREFIX_JOB_NAME_POSTERIOR = "jt"
 SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
-BED_FILEBASENAME = extjoin(PKG, EXT_BED, EXT_GZ) # "segway.bed.gz"
-BED_FILEBASEFMT = extjoin(PKG, "%d", EXT_BED, EXT_GZ) # "segway.%d.bed.gz"
+BED_FILEBASENAME = extjoin(__package__, EXT_BED, EXT_GZ) # "segway.bed.gz"
+BED_FILEBASEFMT = extjoin(__package__, "%d", EXT_BED, EXT_GZ) # "segway.%d.bed.gz"
 BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ) # "posterior%s.bed.gz"
 BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ) # "posterior%s.%%d.bed.gz"
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
@@ -224,7 +224,7 @@ TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 COMMENT_POSTERIOR_TRIANGULATION = \
-    "%% triangulation modified for posterior decoding by %s" % PKG
+    "%% triangulation modified for posterior decoding by %s" % __package__
 
 # training results
 # XXX: Python 2.6: this should really be a namedtuple, yuck
@@ -242,37 +242,6 @@ DIRPATH_WORK_DIR_HELP = path("WORKDIR")
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
 
 ## functions
-try:
-    # XXX: new in version 2.6? 2.7?
-    from itertools import permutations
-except ImportError:
-    # copied from
-    # http://docs.python.org/library/itertools.html#itertools.permutations
-    def permutations(iterable, r=None):
-        # permutations('ABCD', 2) --> AB AC AD BA BC BD CA CB CD DA DB DC
-        # permutations(range(3)) --> 012 021 102 120 201 210
-        pool = tuple(iterable)
-        n = len(pool)
-        r = n if r is None else r
-        if r > n:
-            return
-        indices = range(n)
-        cycles = range(n, n-r, -1)
-        yield tuple(pool[i] for i in indices[:r])
-        while n:
-            for i in reversed(range(r)):
-                cycles[i] -= 1
-                if cycles[i] == 0:
-                    indices[i:] = indices[i+1:] + indices[i:i+1]
-                    cycles[i] = n - i
-                else:
-                    j = cycles[i]
-                    indices[i], indices[-j] = indices[-j], indices[i]
-                    yield tuple(pool[i] for i in indices[:r])
-                    break
-            else:
-                return
-
 def quote_trackname(text):
     # legal characters are ident in GMTK_FileTokenizer.ll:
     # {alpha})({alpha}|{dig}|\_|\-)* (alpha is [A-za-z], dig is [0-9])
@@ -2211,7 +2180,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def make_run_msg(self):
         now = datetime.now()
-        pkg_desc = working_set.find(Requirement.parse(PKG))
+        pkg_desc = working_set.find(Requirement.parse(__package__))
         run_msg = "## %s run %s at %s" % (pkg_desc, self.uuid, now)
 
         cmdline_top_filename = self.make_script_filename(PREFIX_CMDLINE_TOP)

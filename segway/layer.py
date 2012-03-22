@@ -20,7 +20,7 @@ from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native
 from ._util import (BED_SCORE, BED_STRAND, get_label_color,
-                    maybe_gzip_open, PassThroughDict, PKG, SUFFIX_BED,
+                    maybe_gzip_open, PassThroughDict, SUFFIX_BED,
                     SUFFIX_TAB)
 
 BED_START = "0"
@@ -206,7 +206,7 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
     outfile = maybe_gzip_open(outfilename, "w")
 
     if bigbed_outfilename:
-        temp_file = NamedTemporaryFile(prefix=PKG, suffix=SUFFIX_BED)
+        temp_file = NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_BED)
         bigbed_infilename = temp_file.name
         outfile = Tee(outfile, temp_file)
 
@@ -267,7 +267,7 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
             #     with temp_file
             #         print >>temp_file, "blah"
             #     print temp_file.name
-            with NamedTemporaryFile(prefix=PKG, suffix=SUFFIX_TAB) as sizes_file:
+            with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB) as sizes_file:
                 for chrom, end in ends.iteritems():
                     print >>sizes_file, "\t".join([chrom, str(end)])
 

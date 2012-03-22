@@ -10,7 +10,7 @@ __version__ = "$Revision$"
 
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename
-from ._util import Copier, maybe_gzip_open, PKG
+from ._util import Copier, maybe_gzip_open
 
 INDEX_BED_START = 1
 
@@ -47,11 +47,11 @@ class IdentifySaver(OutputSaver):
                  autoScale="off")
 
     name_tmpl = "%s.%s"
-    desc_tmpl = "%s segmentation of %%s" % PKG
+    desc_tmpl = "%s segmentation of %%s" % __package__
 
     def make_header(self):
         attrs = self.attrs.copy()
-        attrs["name"] = self.name_tmpl % (PKG, self.uuid)
+        attrs["name"] = self.name_tmpl % (__package__, self.uuid)
 
         description = self.desc_tmpl % ", ".join(self.unquoted_tracknames)
         attrs["description"] = description
