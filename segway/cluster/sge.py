@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
 
 from math import ceil
 from resource import getrlimit, RLIMIT_STACK
@@ -13,7 +13,8 @@ from .._util import MB
 from .common import _JobTemplateFactory, make_native_spec
 
 # qsub -w: switches off job validation
-NATIVE_SPEC_DEFAULT = dict(w="n")
+# qsub -j: switches off merging output and error
+NATIVE_SPEC_DEFAULT = dict(w="n", j="n")
 
 try:
     STACK_LIMIT = min(num for num in getrlimit(RLIMIT_STACK)

@@ -14,6 +14,11 @@ fi
 
 filenames="$(find . -name 'test-*' -type d)"
 
+if [ ! "$filenames" ]; then
+    echo "already clean"
+    exit 0
+fi
+
 echo "$filenames"
 echo -ne "OK to delete these files (yes/no)? "
 

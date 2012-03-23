@@ -212,7 +212,8 @@ TRAIN_OPTION_TYPES = \
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
          distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
-         num_segs=int, num_subsegs=int, track_specs=[str])
+         num_segs=int, num_subsegs=int, track_specs=[str],
+         reverse_worlds=[int])
 
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
@@ -234,6 +235,9 @@ DIRPATH_WORK_DIR_HELP = path("WORKDIR")
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
 THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
+
+# -gpr option for GMTK when reversing
+REVERSE_GPR = "^0:-1:0"
 
 Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "input_master_filename", "params_filename",
@@ -507,6 +511,7 @@ class Runner(object):
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
+        self.reverse_worlds = set([])
 
         # flags
         self.clobber = False
@@ -562,6 +567,7 @@ class Runner(object):
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
                         ("max_train_rounds", "max_em_iters"),
+                        ("reverse_world", "reverse_worlds"),
                         ("track", "track_specs")]
 
     @classmethod
@@ -1608,10 +1614,13 @@ class Runner(object):
         for window_index, window_len in self.window_lens_sorted():
             acc_filename = make_acc_filename_custom(window_index)
             kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
-                                **kwargs)
+                                 **kwargs)
 
             # -dirichletPriors T only on the first window
             kwargs_window["dirichletPriors"] = (window_index == 0)
+
+            if self.is_in_reversed_world(window_index):
+                kwargs_window["gpr"] = REVERSE_GPR
 
             num_frames = self.window_lens[window_index]
 
@@ -2110,9 +2119,15 @@ to find the winning instance anyway.""" % thread.instance_index)
                    cliqueTableNormalize="0.0",
                    **self.make_gmtk_kwargs())
 
+        if self.is_in_reversed_world(window_index):
+            res["gpr"] = REVERSE_GPR
+
         res.update(extra_kwargs)
 
         return res
+
+    def is_in_reversed_world(self, window_index):
+        return self.windows[window_index].world in self.reverse_worlds
 
     def run_identify_posterior(self):
         self.instance_index = "identify"
@@ -2370,6 +2385,11 @@ def parse_options(args):
                          metavar="SCALE",
                          help="exponent for segment transition probability "
                          " (default %f)" % SEGTRANSITION_WEIGHT_SCALE)
+
+        group.add_option("--reverse-world", action="append", type=int,
+                         default=[], metavar="WORLD",
+                         help="reverse sequences in concatenated world WORLD"
+                         " (0-based)")
 
     with OptionGroup(parser, "Technical variables") as group:
         group.add_option("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
