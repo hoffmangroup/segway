@@ -25,13 +25,16 @@ fi
 
 set -x
 
-# seed from python -c "import random; print random.randrange(2**32)"
-# SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
+#original recover data was generated with the commented-out command below
+#seed from python -c "import random; print random.randrange(2**32)"
+# SEGWAY_RAND_SEED=1081871764 segway "$cluster_arg" \
 #     --include-coords=../include-coords.bed \
 #     --tracks-from=../tracks.txt --num-labels=4 \
 #     train ../simpleseg.genomedata traindir
 
-#segway "$cluster_arg" --include-coords=../include-coords.bed \
-    #identify ../simpleseg.genomedata traindir identifydir
+segway "$cluster_arg" --recover=../recover/traindir/ --include-coords=../include-coords.bed --tracks-from=../tracks.txt --num-labels=4 train ../simpleseg.genomedata traindir
+
+segway "$cluster_arg" --include-coords=../include-coords.bed \
+    identify ../simpleseg.genomedata traindir identifydir
 
 #../../compare_directory.py ../touchstone .
