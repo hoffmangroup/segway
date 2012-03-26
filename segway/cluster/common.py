@@ -28,6 +28,8 @@ Ran through entire memory usage progression without success.
 This is probably not related to memory usage, however. Check for errors in %s.
 See the Troubleshooting section of the Segway documentation."""
 
+NULL_FILENAME = "/dev/null"
+
 class JobError(RuntimeError):
     pass
 
@@ -52,7 +54,7 @@ class _JobTemplateFactory(object):
             # no hostname = execution host
             # XXX: should add drmaa.const.PLACEHOLDER_WD to
             # beginning of relative paths--those that don't start with "/"
-            template.outputPath = ":" + output_filename
+            template.outputPath = ":" + NULL_FILENAME
             template.errorPath = ":" + error_filename
 
         self.template = template
@@ -89,7 +91,7 @@ class _JobTemplateFactory(object):
         # ulimit args are in kibibytes
         mem_limit_kb = str(calc_mem_limit(self.mem_limit) // KB)
         wrapper_cmdline = [BASH_CMD, data_filename(RES_WRAPPER), mem_limit_kb,
-                           gettempdir()]
+                           gettempdir(), self.output_filename]
 
         return wrapper_cmdline + self.args
 

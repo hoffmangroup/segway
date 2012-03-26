@@ -1042,6 +1042,7 @@ class Runner(object):
                 or len(self.tied_tracknames) == len(self.tied_track_indexes_list))
 
         res = array(zip(*self.tied_track_indexes_list))
+        assert len(res) == self.num_worlds
 
         if __debug__:
             if self.num_worlds == 1:

@@ -5,7 +5,8 @@ mem_limit_kb="$1"
 
 ## the original temporary dir used by the submitting program (usually is /tmp)
 submit_tmpdir="$2"
-shift 2
+stdout_filename="$3"
+shift 3
 
 # -c 0: no core dump files
 # -v: virtual memory
@@ -34,4 +35,4 @@ on_exit ()
 trap on_exit EXIT
 
 ## start a subshell so that going over ulimit only kills the subshell
-"$@"
+"$@" > "$stdout_filename"

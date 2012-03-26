@@ -3,13 +3,13 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
 
 from math import ceil
 import sys
 
 from .._util import MB
-from .common import _JobTemplateFactory, make_native_spec
+from .common import _JobTemplateFactory, make_native_spec, NULL_FILENAME
 
 # pbs_drmaa requires that keep_completed be set on the server or queue
 # level in order to keep job information and allow its inspection
@@ -25,7 +25,7 @@ class JobTemplateFactory(_JobTemplateFactory):
         # XXX: Jay says that these must be absolute paths. I think you
         # should be able to prepend drmaa.const.PLACEHOLDER_WD to the
         # path to get it to work, but I can't test this
-        self.template.outputPath = self.output_filename.abspath()
+        self.template.outputPath = NULL_FILENAME
         self.template.errorPath = self.error_filename.abspath()
 
     def make_res_req(self, mem_usage, tmp_usage):
