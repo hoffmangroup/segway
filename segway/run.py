@@ -649,12 +649,15 @@ class Runner(object):
         for track_spec in res.track_specs:
             # local to each value of track_spec
             current_tracknames = track_spec.split(",")
+            current_tracknames_set = frozenset(current_tracknames)
 
-            if not used_tracknames.isdisjoint(current_tracknames):
+            assert len(current_tracknames_set) == len(current_tracknames)
+
+            if not used_tracknames.isdisjoint(current_tracknames_set):
                 raise ValueError("can't tie one track in multiple groups")
 
             include_tracknames.extend(current_tracknames)
-            used_tracknames |= frozenset(current_tracknames)
+            used_tracknames |= current_tracknames_set
 
             head_trackname = current_tracknames[0]
             head_trackname_list.append(head_trackname)
