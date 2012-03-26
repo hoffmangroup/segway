@@ -12,11 +12,9 @@ from gzip import open as _gzip_open
 from itertools import repeat
 from math import floor, log10
 from os import extsep
-import shutil
 from string import Template
 import sys
 import re
-from tempfile import mkdtemp
 
 import colorbrewer
 from numpy import (append, array, diff, empty, insert, intc, zeros)

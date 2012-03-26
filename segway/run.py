@@ -511,7 +511,7 @@ class Runner(object):
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
-        self.reverse_worlds = set([])
+        self.reverse_worlds = [] # XXXopt: this should be a set
 
         # flags
         self.clobber = False
@@ -2087,6 +2087,9 @@ to find the winning instance anyway.""" % thread.instance_index)
         else:
             kind = "posterior"
 
+        # "0" or "1"
+        is_reverse = str(int(self.is_in_reversed_world(window_index)))
+
         window = self.windows[window_index]
         float_filepath = self.float_filepaths[window_index]
         int_filepath = self.int_filepaths[window_index]
@@ -2096,7 +2099,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
-                       window.start, window.end, self.resolution,
+                       window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.genomedataname, float_filepath,
                        int_filepath, self.distribution,
                        track_indexes_text]
