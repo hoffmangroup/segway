@@ -12,7 +12,7 @@ if [[ $# != 0 || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
     exit 2
 fi
 
-filenames="$(find . -name 'test-*' -maxdepth 2 -type d)"
+filenames="$(find . -maxdepth 2 -type d -name 'test-*')"
 
 if [ ! "$filenames" ]; then
     echo "already clean"
