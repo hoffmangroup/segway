@@ -127,35 +127,42 @@ def find_overlaps_exclude(start, end, exclude_coords):
 
     # does nothing if exclude_coords is empty
 
-    if exclude_coords is None:
+    if exclude_coords is None or len(exclude_coords) == 0:
         return [[start, end]]
 
-    res = []
+    include_coords = [[start, end]]
 
     for exclude_start, exclude_end in exclude_coords:
-        if exclude_start > end or exclude_end <= start:
-            # cases A, B
-            res.append([start, end])
-        elif exclude_start <= start:
-            if exclude_end >= end:
-                # case C
-                pass
-            else:
-                # case D
-                res.append([exclude_end, end])
-        elif exclude_start > start:
-            if exclude_end >= end:
-                # case E
-                res.append([start, exclude_start])
-            else:
-                # case F
-                res.append([start, exclude_start])
-                res.append([exclude_end, end])
+        new_include_coords = []
 
-        else:
-            assert False # can't happen
+        for include_coord in include_coords:
+            start, end = include_coord
 
-    return res
+            if exclude_start > end or exclude_end <= start:
+                # cases A, B
+                new_include_coords.append([start, end])
+            elif exclude_start <= start:
+                if exclude_end >= end:
+                    # case C
+                    pass
+                else:
+                    # case D
+                    new_include_coords.append([exclude_end, end])
+            elif exclude_start > start:
+                if exclude_end >= end:
+                    # case E
+                    new_include_coords.append([start, exclude_start])
+                else:
+                    # case F
+                    new_include_coords.append([start, exclude_start])
+                    new_include_coords.append([exclude_end, end])
+
+            else:
+                assert False # can't happen
+
+        include_coords = new_include_coords
+
+    return include_coords
 
 def downsample_add(inarray, resolution):
     # downsample presence data into num_datapoints
@@ -271,6 +278,16 @@ def _save_window(float_filename, int_filename, float_data, resolution,
 
     int_data.tofile(int_filename)
 
+def process_new_windows(new_windows, starts, ends):
+    if not new_windows: # nothing left
+        return None, None
+    elif len(new_windows) > 1:
+        new_starts, new_ends = zip(*new_windows)
+        update_starts(starts, ends, new_starts, new_ends)
+        return None, None
+
+    return new_windows[0]
+
 class Observations(object):
     copy_attrs = ["include_coords", "exclude_coords", "max_frames",
                   "num_tracks", "float_filelistpath", "int_filelistpath",
@@ -324,6 +341,9 @@ class Observations(object):
             return self.generate_coords_all(genome)
 
     def skip_or_split_window(self, start, end):
+        """
+        skip short windows or skip long windows
+        """
         max_frames = self.max_frames
         num_bases_window = end - start
         num_frames = ceildiv(num_bases_window, self.resolution)
@@ -373,25 +393,15 @@ class Observations(object):
 
                 new_windows = find_overlaps_exclude(start, end,
                                                     chr_exclude_coords)
-
-                if not new_windows: # nothing left
+                start, end = process_new_windows(new_windows, starts, ends)
+                if start is None:
                     continue
-                elif len(new_windows) > 1:
-                    new_starts, new_ends = zip(*new_windows)
-                    update_starts(starts, ends, new_starts, new_ends)
-                    continue
-                start, end = new_windows[0]
 
+                # skip or split long sequences
                 new_windows = self.skip_or_split_window(start, end)
-
-                # XXX: repetitive
-                if not new_windows:
+                start, end = process_new_windows(new_windows, starts, ends)
+                if start is None:
                     continue
-                elif len(new_windows) > 1:
-                    new_starts, new_ends = zip(*new_windows)
-                    update_starts(starts, ends, new_starts, new_ends)
-                    continue
-                start, end = new_windows[0]
 
                 for world in xrange(self.num_worlds):
                     windows.append(Window(world, chrom, start, end))
