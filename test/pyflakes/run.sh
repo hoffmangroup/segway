@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 
+# Checks all .py files in segway install using ./flymake-pyflakes script
+# which itself should run pyflakes on all of the python files.
+# $Revision$
+# Copyright 2010, 2011 Michael M. Hoffman <mmh1@uw.edu>
+
 set -o nounset -o pipefail -o errexit
 
 if [ $# != 0 ]; then
