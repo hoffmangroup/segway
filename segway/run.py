@@ -30,7 +30,7 @@ from warnings import warn
 
 from genomedata import Genome
 from numpy import (arange, arcsinh, array, empty, finfo, float32, intc,
-                   int64, NINF, square, vstack, zeros)
+                   int64, inf, square, vstack, zeros)
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -1992,11 +1992,11 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def recover_train_instance(self):
         """
-        returns last_log_likelihood, log_likelihood, round_idnex
-        NINF, NINF, 0 if there is no recovery
+        returns last_log_likelihood, log_likelihood, round_index
+        -inf, -inf, 0 if there is no recovery
         """
-        last_log_likelihood = NINF
-        log_likelihood = NINF
+        last_log_likelihood = -inf
+        log_likelihood = -inf
         final_round_index = 0
 
         if self.recover_dirpath:
