@@ -20,4 +20,6 @@ if [ -z $PYFLAKES_PATH ]; then
     exit 127
 fi
 
+echo "Checking with Pyflakes"
+
 find ../.. -name "*.py" -exec ./flymake-pyflakes.sh {} +
