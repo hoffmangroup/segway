@@ -15,4 +15,4 @@ if [ -z $PYFLAKES_PATH ]; then
     exit 127
 fi
 
-#find ../.. -name "*.py" -exec ./flymake-pyflakes.sh {} +
+find ../.. -name "*.py" -exec ./flymake-pyflakes.sh {} +
