@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
-## test.sh: test segway
-## run this from the parent
+## run.sh: test segway concatenated runs
 
 ## $Revision: -1 $
 
