@@ -1057,6 +1057,17 @@ class Runner(object):
     def num_worlds(self):
         return len(self.world_tracknames)
 
+    @memoized_property
+    def instance_make_new_params(self):
+        """
+        should I make new parameters in each instance?
+        """
+        return self.num_instances > 1 or isinstance(self.num_segs, slice)
+
+    @memoized_property
+    def num_segs_range(self):
+        return slice2range(self.num_segs)
+
     def transform(self, num):
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
             return arcsinh(num)
@@ -1712,8 +1723,7 @@ class Runner(object):
         prog(**kwargs)
 
     def run_triangulate(self):
-        num_segs_range = slice2range(self.num_segs)
-        for num_segs in num_segs_range:
+        for num_segs in self.num_segs_range:
             self.run_triangulate_single(num_segs)
 
     def run_train_round(self, instance_index, round_index, **kwargs):
@@ -1739,15 +1749,16 @@ class Runner(object):
         self.last_params_filename = curr_params_filename
 
     def run_train_instance(self):
-        # make new files if there is more than one instance
         self.set_triangulation_filename()
 
+        # make new files if there is more than one instance
         new = self.instance_make_new_params
 
         instance_index = self.instance_index
         self.set_log_likelihood_filenames(instance_index, new)
         self.set_params_filename(instance_index, new)
 
+        # get previous (or initial) values
         last_log_likelihood, log_likelihood, round_index = \
             self.recover_train_instance()
 
@@ -1761,19 +1772,20 @@ class Runner(object):
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
 
+        if self.dry_run:
+            self.run_train_round(self.instance_index, round_index, **kwargs)
+            return Results(None, None, None, None, None)
+
+        return self.progress_train_instance(last_log_likelihood,
+                                            log_likelihood,
+                                            round_index, kwargs)
+
+    def progress_train_instance(self, last_log_likelihood, log_likelihood,
+                                round_index, kwargs):
         while (round_index < self.max_em_iters and
                is_training_progressing(last_log_likelihood, log_likelihood)):
-            self.run_train_round(instance_index, round_index, **kwargs)
-
-            if self.dry_run:
-                return (None, None, None, None)
-
             last_log_likelihood = log_likelihood
             log_likelihood = self.load_log_likelihood()
-
-            # print >>sys.stderr, "log likelihood = %s" % log_likelihood
-            # print >>sys.stderr, "info criterion = %s" % info_criterion
-
             round_index += 1
 
         # log_likelihood, num_segs and a list of src_filenames to save
@@ -1819,9 +1831,11 @@ class Runner(object):
         if self.params_filename is not None:
             self.params_filenames = [self.params_filename]
 
-    def run_train(self):
-        num_instances = self.num_instances
-        assert num_instances >= 1
+    def setup_train(self):
+        """
+        return value: dst_filenames
+        """
+        assert self.num_instances >= 1
 
         # save the destination file for input_master as we will be
         # generating new input masters for each start
@@ -1835,10 +1849,7 @@ class Runner(object):
         self.input_master_filename = input_master_filename
 
         # should I make new parameters in each instance?
-        instance_make_new_params = (num_instances > 1
-                                    or isinstance(self.num_segs, slice))
-        self.instance_make_new_params = instance_make_new_params
-        if not instance_make_new_params:
+        if not self.instance_make_new_params:
             self.save_input_master()
 
         ## save file locations to tab-delimited file
@@ -1848,21 +1859,16 @@ class Runner(object):
             # do not overwrite existing file
             input_master_filename = None
 
-        dst_filenames = [input_master_filename,
-                         self.params_filename,
-                         self.log_likelihood_filename]
+        return [input_master_filename, self.params_filename,
+                self.log_likelihood_filename]
 
-        ## which thread runner should I use?
-        num_segs_range = slice2range(self.num_segs)
-
-        if len(num_segs_range) > 1 or num_instances > 1:
-            run_train_func = self.run_train_multithread
+    def get_thread_run_func(self):
+        if len(self.num_segs_range) > 1 or self.num_instances > 1:
+            return self.run_train_multithread
         else:
-            run_train_func = self.run_train_singlethread
+            return self.run_train_singlethread
 
-        ## this is where the actual training takes place
-        instance_params = run_train_func(num_segs_range)
-
+    def finish_train(self, instance_params, dst_filenames):
         if self.instance_make_new_params:
             self.proc_train_results(instance_params, dst_filenames)
         elif not self.dry_run:
@@ -1873,6 +1879,16 @@ class Runner(object):
 
             # always overwrite params.params
             copy2(last_params_filename, self.make_params_filename())
+
+    def run_train(self):
+        dst_filenames = self.setup_train()
+
+        run_train_func = self.get_thread_run_func()
+
+        ## this is where the actual training takes place
+        instance_params = run_train_func(self.num_segs_range)
+
+        self.finish_train(instance_params, dst_filenames)
 
     def run_train_singlethread(self, num_segs_range):
         # having a single-threaded version makes debugging much easier
@@ -1980,6 +1996,13 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def recover_filename(self, resource):
         instance_index = self.instance_index
+
+        # only want "input.master" not "input.0.master" if there is
+        # only one instance
+        if (not self.instance_make_new_params
+            and resource == InputMasterSaver.resource_name):
+            instance_index = None
+
         old_filename = make_default_filename(resource,
                                              self.recover_params_dirpath,
                                              instance_index)
@@ -1993,7 +2016,8 @@ to find the winning instance anyway.""" % thread.instance_index)
     def recover_train_instance(self):
         """
         returns last_log_likelihood, log_likelihood, round_index
-        -inf, -inf, 0 if there is no recovery
+        -inf, -inf, 0 if there is no recovery--this is also used to set initial
+        values
         """
         last_log_likelihood = -inf
         log_likelihood = -inf
@@ -2005,6 +2029,11 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             self.input_master_filename = \
                 self.recover_filename(InputMasterSaver.resource_name)
+
+            if self.instance_make_new_params:
+                log_likelihood_instance_index = instance_index
+            else:
+                log_likelihood_instance_index = None
 
             recover_log_likelihood_tab_filename = \
                 self.make_log_likelihood_tab_filename(instance_index,
