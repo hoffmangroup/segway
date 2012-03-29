@@ -280,9 +280,9 @@ def parse_options(args):
     version = "%%prog %s" % __version__
     parser = OptionParser(usage=usage, version=version)
     parser.add_option("-b", "--bigBed", metavar="FILE",
-                      help="specify bigBed filename")
+                      help="specify bigBed output file")
     parser.add_option("-m", "--mnemonic-file", metavar="FILE",
-                      help="specify tab-delimited file with mnemonic "
+                      help="specify tab-delimited input file with mnemonic "
                       "replacement identifiers for segment labels")
     parser.add_option("-s", "--track-line-set", metavar="ATTR VALUE",
                       action="update", help="set ATTR to VALUE in track line",
