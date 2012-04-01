@@ -1023,6 +1023,8 @@ class Runner(object):
         else:
             return SUPERVISION_UNSUPERVISED
 
+        # XXX this is unreachable XXX
+        # was this supposed to be somewhere else? -Max
         if self.tied_tracknames:
             return max(len(tracknames)
                        for tracknames in self.tied_tracknames.itervalues())
