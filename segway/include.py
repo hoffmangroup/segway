@@ -13,7 +13,8 @@ from ._util import Saver
 class IncludeSaver(Saver):
     resource_name = "segway.inc.tmpl"
     copy_attrs = ["card_seg_countdown", "card_supervision_label", "max_frames",
-                  "num_segs", "num_subsegs", "resolution", "ruler_scale"]
+                  "num_segs", "num_subsegs", "resolution", "ruler_scale",
+                  "measure_prop", "virtual_evidence"]
 
     def make_mapping(self):
         num_segs = self.num_segs
@@ -29,11 +30,16 @@ class IncludeSaver(Saver):
             raise ValueError(msg)
         ruler_scale_scaled = ruler_scale // resolution
 
+        measure_prop = (1 if self.measure_prop else 0)
+        virtual_evidence = (1 if self.virtual_evidence else 0)
+
         return dict(card_seg=num_segs,
                     card_subseg=self.num_subsegs,
                     card_presence=resolution+1,
                     card_segCountDown=self.card_seg_countdown,
                     card_supervisionLabel=self.card_supervision_label,
                     card_frameIndex=self.max_frames,
-                    ruler_scale=ruler_scale_scaled)
+                    ruler_scale=ruler_scale_scaled,
+                    measure_prop=measure_prop,
+                    virual_evidence=virtual_evidence)
 

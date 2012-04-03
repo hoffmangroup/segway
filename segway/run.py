@@ -59,6 +59,7 @@ from ._util import (data_filename,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
+                    VIRTUAL_EVIDENCE_NONE, VIRTUAL_EVIDENCE_INCLUDE,
                     USE_MFSDG, VITERBI_PROG)
 
 # set once per file run
@@ -195,6 +196,8 @@ SUBDIRNAME_LIKELIHOOD = "likelihood"
 SUBDIRNAME_OBS = "observations"
 SUBDIRNAME_POSTERIOR = "posterior"
 SUBDIRNAME_VITERBI = "viterbi"
+# XXXmax
+SUBDIRNAME_MEASURE_PROP = "measure_prop"
 
 SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
@@ -483,6 +486,9 @@ class Runner(object):
         self.supervision_coords = None
         self.supervision_labels = None
 
+        # XXXmax
+        self.measure_prop_type = None
+
         self.card_supervision_label = -1
 
         self.include_tracknames = []
@@ -547,6 +553,8 @@ class Runner(object):
                         ("observations", "obs_dirname"),
                         ("bed", "bed_filename"),
                         ("semisupervised", "supervision_filename"),
+                        ("measure_prop",),
+                        ("virtual_evidence", "virtual_evidence_filename"),
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
@@ -696,6 +704,12 @@ class Runner(object):
     def posterior_jt_info_filename(self):
         return self.make_filename(PREFIX_JT_INFO, "posterior", EXT_TXT,
                                   subdirname=SUBDIRNAME_LOG)
+
+    # XXXmax
+    @memoized_property
+    def virtual_evidence_obs_list_filename(self):
+        return self.make_filename("ve", "list",
+                                  subdirname=SUBDIRNAME_OBS)
 
     @memoized_property
     def work_dirpath(self):
@@ -1405,6 +1419,24 @@ class Runner(object):
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
 
+    # XXXmax
+    def load_virtual_evidence(self):
+        if not self.virtual_evidence:
+            return
+        raise NotImplementedError
+
+    # XXXmax
+    def load_measure_prop(self):
+        if not self.measure_prop:
+            return
+        raise NotImplementedError
+
+    # XXXmax
+    def run_measure_prop(self):
+        if not self.measure_prop:
+            return
+        raise NotImplementedError
+
     def save_structure(self):
         self.structure_filename, _ = \
             StructureSaver(self)(self.structure_filename, self.work_dirname,
@@ -1738,6 +1770,9 @@ class Runner(object):
             self.queue_train_parallel(last_params_filename, instance_index,
                                       round_index, **kwargs)
         restartable_jobs.wait()
+
+        if self.measure_prop():
+            self.run_measure_prop()
 
         restartable_jobs = \
             self.queue_train_bundle(last_params_filename, curr_params_filename,
@@ -2367,6 +2402,14 @@ def parse_options(args):
         group.add_option("--semisupervised", metavar="FILE",
                          help="semisupervised segmentation with labels in "
                          "FILE (default none)")
+
+        # XXXmax
+        group.add_option("--measure-prop", action="store_true",
+                         help="perform concatenated segmentation in measure-prop mode ")
+
+        # XXXmax
+        group.add_option("--virtual-evidence", metavar="FILE",
+                         help="supply virtual evidence in FILE (default none)")
 
     with OptionGroup(parser, "Intermediate files") as group:
         group.add_option("-o", "--observations", metavar="DIR",

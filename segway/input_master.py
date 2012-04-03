@@ -600,6 +600,21 @@ class MXParamSpec(ParamSpec):
     object_tmpl = "1 mx_${seg}_${subseg}_${track} 1 dpmf_always" \
         " mc_${distribution}_${seg}_${subseg}_${track}"
 
+# XXXmax
+class VirtualEvidenceSpec(ParamSpec):
+    type_name = "VE_CPT"
+    copy_attrs = ParamSpec.copy_attrs + ["measure_prop", "virtual_evidence"]
+
+    make_ve_spec(self, name):
+        tmpl = "seg_%s 1 ${card_seg} ${ve_obs_list_filename} nfs:${card_seg} nis:0 fmt:binary END"
+        return tmpl % name
+
+    generate_objects(self):
+        if self.measure_prop:
+            yield self.make_ve_spec("measureprop")
+        if self.virtual_evidence
+            yield self.make_ve_spec("virtualevidence")
+
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
     copy_attrs = ["tracknames", "num_bases", "num_segs", "num_subsegs",
@@ -607,7 +622,8 @@ class InputMasterSaver(Saver):
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
-                  "gmtk_include_filename_relative", "head_trackname_list"]
+                  "gmtk_include_filename_relative", "head_trackname_list",
+                  "measure_prop", "measure_prop"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
@@ -621,6 +637,12 @@ class InputMasterSaver(Saver):
         fullnum_subsegs = num_segs * num_subsegs
 
         include_filename = self.gmtk_include_filename_relative
+
+        if self.virtual_evidence_type == VIRTUAL_EVIDENCE_INCLUDE:
+            ve_obs_filename = self.virtual_evidence_obs_filename
+        else:
+            ve_obs_filename = "undefined"
+
 
         dt_spec = DTParamSpec(self)
 
@@ -674,5 +696,7 @@ class InputMasterSaver(Saver):
         mx_spec = MXParamSpec(self)
         name_collection_spec = NameCollectionParamSpec(self)
         card_seg = num_segs
+
+        ve_spec = VirtualEvidenceSpec(self)
 
         return locals() # dict of vars set in this function

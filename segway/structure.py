@@ -11,7 +11,7 @@ __version__ = "$Revision$"
 from itertools import count, izip
 
 from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
-                    USE_MFSDG)
+                    USE_MFSDG, VIRTUAL_EVIDENCE_INCLUDE)
 
 MAX_WEIGHT_SCALE = 25
 
@@ -23,9 +23,10 @@ def make_weight_scale(scale):
 
 class StructureSaver(Saver):
     resource_name = "segway.str.tmpl"
+    # XXXmax
     copy_attrs = ["num_tracks", "num_datapoints", "use_dinucleotide",
                   "window_lens", "resolution", "tracknames", "supervision_type",
-                  "gmtk_include_filename_relative", "head_tracknames"]
+                  "gmtk_include_filename_relative", "head_tracknames", "virtual_evidence_type"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -107,6 +108,13 @@ class StructureSaver(Saver):
             add_observation(observation_items, "supervision.tmpl",
                             track_index=next_int_track_index)
             next_int_track_index += 1
+
+        # XXXmax
+        print "adding VE line with self.virtual_evidence_type=%s" % self.virtual_evidence_type
+        if self.measure_prop:
+            add_observation(observation_items, "virtual_evidence.tmpl", name="measureprop", macro="MEASURE_PROP")
+        if self.virtual_evidence:
+            add_observation(observation_items, "virtual_evidence.tmpl", name="virtualevidence", macro="VIRTUAL_EVIDENCE")
 
         assert observation_items # must be at least one track
         observations = "\n".join(observation_items)
