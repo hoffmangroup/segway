@@ -1,14 +1,3 @@
-This is a set of simple data files that should have a
-predictable segmentation.  They define a region
-chr1	0	8000
-and two tracks, "testtrack1" and "testtrack2".  The region should
-be segmented using 4 labels, in which case it should get the
-segmentation:
-01230123
-where each number represents a 1000-bp segment with the 
-corresponding label.
+The make-genomedata.sh script creates the simpleseg.genomedata genomedata archive from testtrack1A.bedgraph,  testtrack1B.bedgraph, chr1.fa
 
-testtrack1 and testtrack2 each take the values 0 or 1.
-
-The sequence is "cgcgcg..." in the label-0 segment and 
-"atatat..." elsewhere.
+run.sh creates a temporary directory and runs segway against simpleseg.genomedata, generating 4 labels.
