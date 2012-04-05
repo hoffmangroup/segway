@@ -12,3 +12,8 @@ testtrack1 and testtrack2 each take the values 0 or 1.
 
 The sequence is "cgcgcg..." in the label-0 segment and 
 "atatat..." elsewhere.
+
+
+TODO:
+
+Create identify recover test. Currently only have a training recovery test. Identify only generates one cluster job, so creating an identify recovery option may require a new, larger, genomedata archive.
