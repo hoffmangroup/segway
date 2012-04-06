@@ -41,5 +41,5 @@ class IncludeSaver(Saver):
                     card_frameIndex=self.max_frames,
                     ruler_scale=ruler_scale_scaled,
                     measure_prop=measure_prop,
-                    virual_evidence=virtual_evidence)
+                    virtual_evidence=virtual_evidence)
 

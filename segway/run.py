@@ -59,7 +59,6 @@ from ._util import (data_filename,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
-                    VIRTUAL_EVIDENCE_NONE, VIRTUAL_EVIDENCE_INCLUDE,
                     USE_MFSDG, VITERBI_PROG)
 
 # set once per file run
@@ -487,7 +486,7 @@ class Runner(object):
         self.supervision_labels = None
 
         # XXXmax
-        self.measure_prop_type = None
+        self.virtual_evidence_filename = None
 
         self.card_supervision_label = -1
 
@@ -707,8 +706,13 @@ class Runner(object):
 
     # XXXmax
     @memoized_property
-    def virtual_evidence_obs_list_filename(self):
-        return self.make_filename("ve", "list",
+    def virtual_evidence_ve_list_filename(self):
+        return self.make_filename("virtual_evidence_ve", "list",
+                                  subdirname=SUBDIRNAME_OBS)
+    # XXXmax
+    @memoized_property
+    def measure_prop_ve_list_filename(self):
+        return self.make_filename("measure_prop_ve", "list",
                                   subdirname=SUBDIRNAME_OBS)
 
     @memoized_property
@@ -1042,6 +1046,13 @@ class Runner(object):
                        for tracknames in self.tied_tracknames.itervalues())
         else:
             return 1
+
+    @memoized_property
+    def virtual_evidence(self):
+        if not self.virtual_evidence_filename is None:
+            return True
+        else:
+            return False
 
     @memoized_property
     def world_tracknames(self):
@@ -1423,19 +1434,24 @@ class Runner(object):
     def load_virtual_evidence(self):
         if not self.virtual_evidence:
             return
-        raise NotImplementedError
+        self.virtual_evidence_ve_list_filename
+        print >>sys.stderr, "load_virtual_evidence not implemented!"
+        #raise NotImplementedError
 
     # XXXmax
     def load_measure_prop(self):
         if not self.measure_prop:
             return
-        raise NotImplementedError
+        self.measure_prop_ve_list_filename
+        print >>sys.stderr, "load_measure_prop not implemented!"
+        #raise NotImplementedError
 
     # XXXmax
     def run_measure_prop(self):
         if not self.measure_prop:
             return
-        raise NotImplementedError
+        print >>sys.stderr, "run_measure_prop not implemented!"
+        #raise NotImplementedError
 
     def save_structure(self):
         self.structure_filename, _ = \
@@ -1447,6 +1463,10 @@ class Runner(object):
         assert not ((self.identify or self.posterior) and self.train)
 
         self.load_supervision()
+
+        self.load_measure_prop()
+
+        self.load_virtual_evidence()
 
         # need to open Genomedata archive first in order to determine
         # self.tracknames and self.num_tracks
@@ -1771,7 +1791,7 @@ class Runner(object):
                                       round_index, **kwargs)
         restartable_jobs.wait()
 
-        if self.measure_prop():
+        if self.measure_prop:
             self.run_measure_prop()
 
         restartable_jobs = \

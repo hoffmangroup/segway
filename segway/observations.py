@@ -295,7 +295,7 @@ class Observations(object):
                   "distribution", "train", "identify", "supervision_type",
                   "supervision_coords", "supervision_labels",
                   "use_dinucleotide", "world_track_indexes", "clobber",
-                  "num_worlds", "virtual_evidence_type"]
+                  "num_worlds"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)

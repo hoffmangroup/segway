@@ -11,7 +11,7 @@ __version__ = "$Revision$"
 from itertools import count, izip
 
 from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
-                    USE_MFSDG, VIRTUAL_EVIDENCE_INCLUDE)
+                    USE_MFSDG)
 
 MAX_WEIGHT_SCALE = 25
 
@@ -26,7 +26,8 @@ class StructureSaver(Saver):
     # XXXmax
     copy_attrs = ["num_tracks", "num_datapoints", "use_dinucleotide",
                   "window_lens", "resolution", "tracknames", "supervision_type",
-                  "gmtk_include_filename_relative", "head_tracknames", "virtual_evidence_type"]
+                  "gmtk_include_filename_relative", "head_tracknames",
+                  "virtual_evidence", "measure_prop"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -110,7 +111,6 @@ class StructureSaver(Saver):
             next_int_track_index += 1
 
         # XXXmax
-        print "adding VE line with self.virtual_evidence_type=%s" % self.virtual_evidence_type
         if self.measure_prop:
             add_observation(observation_items, "virtual_evidence.tmpl", name="measureprop", macro="MEASURE_PROP")
         if self.virtual_evidence:

@@ -603,17 +603,20 @@ class MXParamSpec(ParamSpec):
 # XXXmax
 class VirtualEvidenceSpec(ParamSpec):
     type_name = "VE_CPT"
-    copy_attrs = ParamSpec.copy_attrs + ["measure_prop", "virtual_evidence"]
+    copy_attrs = ParamSpec.copy_attrs + ["measure_prop", "virtual_evidence",
+                                         "num_segs",
+                                         "measure_prop_ve_list_filename", "virtual_evidence_ve_list_filename"]
 
-    make_ve_spec(self, name):
-        tmpl = "seg_%s 1 ${card_seg} ${ve_obs_list_filename} nfs:${card_seg} nis:0 fmt:binary END"
-        return tmpl % name
+    # XXX do this in the ${key} form of the rest of the specs
+    def make_ve_spec(self, name, filename):
+        tmpl = "seg_%s 1 %s %s nfs:%s nis:0 fmt:binary END"
+        return tmpl % (name, self.num_segs, filename, self.num_segs)
 
-    generate_objects(self):
+    def generate_objects(self):
         if self.measure_prop:
-            yield self.make_ve_spec("measureprop")
-        if self.virtual_evidence
-            yield self.make_ve_spec("virtualevidence")
+            yield self.make_ve_spec("measureprop", self.measure_prop_ve_list_filename)
+        if self.virtual_evidence:
+            yield self.make_ve_spec("virtualevidence", self.virtual_evidence_ve_list_filename)
 
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
@@ -623,7 +626,8 @@ class InputMasterSaver(Saver):
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
                   "gmtk_include_filename_relative", "head_trackname_list",
-                  "measure_prop", "measure_prop"]
+                  "measure_prop", "virtual_evidence",
+                  "measure_prop_ve_list_filename", "virtual_evidence_ve_list_filename"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
@@ -637,12 +641,6 @@ class InputMasterSaver(Saver):
         fullnum_subsegs = num_segs * num_subsegs
 
         include_filename = self.gmtk_include_filename_relative
-
-        if self.virtual_evidence_type == VIRTUAL_EVIDENCE_INCLUDE:
-            ve_obs_filename = self.virtual_evidence_obs_filename
-        else:
-            ve_obs_filename = "undefined"
-
 
         dt_spec = DTParamSpec(self)
 
