@@ -23,12 +23,13 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA, DISTRIBUTION_NO
                     resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED, USE_MFSDG)
 
+# allow setting random seed for testing purposes
 try:
     seed_text = environ["SEGWAY_RAND_SEED"]
 except KeyError:
     pass
 else:
-    seed(int(seed_text)) # for testing purposes
+    seed(int(seed_text))
 
 if USE_MFSDG:
     # because tying not implemented yet

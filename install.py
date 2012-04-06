@@ -718,6 +718,7 @@ class EasyInstaller(Installer):
         # Make sure easy_install (setuptools) is installed
         try:
             import setuptools
+            setuptools # silence PyFlakes warning
         except ImportError:
             raise InstallationError("Setuptools necessary for easy_install")
 

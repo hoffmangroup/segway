@@ -248,11 +248,12 @@ OFFSET_FILENAMES = 2 # where the filenames begin in Results
 def quote_trackname(text):
     # legal characters are ident in GMTK_FileTokenizer.ll:
     # {alpha})({alpha}|{dig}|\_|\-)* (alpha is [A-za-z], dig is [0-9])
-    res = text.replace("_", "_5f")
-    res = res.replace(".", "_2e")
+    res = text.replace("_", "_5F")
+    res = res.replace(".", "_2E")
 
-    # quote eliminates everything except for _.-, replaces with % escapes
-    res = quote(res)
+    # quote eliminates everything that doesn't match except for "_.-",
+    # replaces with % escapes
+    res = quote(res, safe="") # safe="" => quote "/" too
     res = res.replace("%", "_")
 
     # add stub to deal with non-alphabetic first characters
@@ -1023,14 +1024,6 @@ class Runner(object):
         else:
             return SUPERVISION_UNSUPERVISED
 
-        # XXX this is unreachable XXX
-        # was this supposed to be somewhere else? -Max
-        if self.tied_tracknames:
-            return max(len(tracknames)
-                       for tracknames in self.tied_tracknames.itervalues())
-        else:
-            return 1
-
     @memoized_property
     def world_tracknames(self):
         # XXX: add support for some heads having only one trackname
@@ -1786,6 +1779,8 @@ class Runner(object):
                                 round_index, kwargs):
         while (round_index < self.max_em_iters and
                is_training_progressing(last_log_likelihood, log_likelihood)):
+            self.run_train_round(self.instance_index, round_index, **kwargs)
+
             last_log_likelihood = log_likelihood
             log_likelihood = self.load_log_likelihood()
             round_index += 1
@@ -2031,11 +2026,6 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             self.input_master_filename = \
                 self.recover_filename(InputMasterSaver.resource_name)
-
-            if self.instance_make_new_params:
-                log_likelihood_instance_index = instance_index
-            else:
-                log_likelihood_instance_index = None
 
             recover_log_likelihood_tab_filename = \
                 self.make_log_likelihood_tab_filename(instance_index,

@@ -15,7 +15,7 @@ ulimit -c 0 -v "$mem_limit_kb" -m "$mem_limit_kb" || exit 201
 
 if [ "${LSB_JOBID:-}" ]; then
     # this way, the post-exec script can delete it easily
-    export TMPDIR="$(mktemp -dt "segway.$LSB_JOBID")"
+    export TMPDIR="$(mktemp -dt "segway.$LSB_JOBID.XXXXXXXXXX")"
 else
     export TMPDIR="$(mktemp -dt segway.XXXXXXXXXX)"
 fi

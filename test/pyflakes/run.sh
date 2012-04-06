@@ -12,9 +12,7 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-PYFLAKES_PATH=$(type -P pyflakes) || true
-
-if [ -z $PYFLAKES_PATH ]; then
+if ! python -c 'import pyflakes'; then
     echo "ERROR: Cannot find pyflakes installation."
     echo "skipping pyflakes check"
     exit 127
@@ -22,4 +20,6 @@ fi
 
 echo "Checking with Pyflakes"
 
-find ../.. -name "*.py" -exec ./flymake-pyflakes.sh {} +
+find ../.. -wholename ../../dist -prune -or -wholename ../../build -prune \
+    -or -wholename '../../ez_setup.py' -prune \
+    -or -name "*.py" -exec ./flymake-pyflakes.sh {} +
