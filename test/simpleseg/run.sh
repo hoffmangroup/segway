@@ -32,4 +32,4 @@ SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
 segway "$cluster_arg" --include-coords="../include-coords.bed" \
     identify "../simpleseg.genomedata" traindir identifydir
 
-../../compare_directory.py ../touchstone .
+../../compare_directory.py ../simpleseg/touchstone ../simpleseg/${TMPDIR#"./"}
