@@ -1,0 +1,6 @@
+#if ${macro}==1
+   variable: ${name} {
+       type : discrete observed value 1 cardinality 2;
+       conditionalparents : seg(0) using VirtualEvidenceCPT("seg_${name}")
+   }
+#endif /* ${macro}==1 */
