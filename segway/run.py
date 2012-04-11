@@ -487,6 +487,7 @@ class Runner(object):
 
         # XXXmax
         self.virtual_evidence_filename = None
+        self.measure_prop = False
 
         self.card_supervision_label = -1
 
