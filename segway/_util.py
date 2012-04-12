@@ -358,7 +358,6 @@ def read_posterior(infile, num_frames, num_labels):
 def make_filelistpath(dirpath, ext):
     return dirpath / extjoin(ext, EXT_LIST)
 
-# XXX: these next three functions are spaghetti
 def make_default_filename(resource, dirname="WORKDIR", instance_index=None):
     resource_part = resource.rpartition(".tmpl")
     stem = resource_part[0] or resource_part[2]
@@ -370,35 +369,26 @@ def make_default_filename(resource, dirname="WORKDIR", instance_index=None):
 
     return path(dirname) / filebasename
 
-def make_template_filename(filename, resource, dirname=None, clobber=False,
-                           instance_index=None):
-    """
-    returns (filename, is_new)
-    """
-    if filename:
-        if not clobber and path(filename).exists():
-            return filename, False
-        # else filename is unchanged
-    else:
-        # filename is None
-        filename = make_default_filename(resource, dirname, instance_index)
+def save_substituted_resource(filename, resource, mapping):
+    with open(filename, "w+") as outfile:
+        tmpl = Template(data_string(resource))
+        text = tmpl.substitute(mapping)
 
-    return filename, True
+        outfile.write(text)
 
-def save_template(filename, resource, mapping, dirname=None,
-                  clobber=False, instance_index=None):
+def save_template(filename, resource, mapping, dirname=None, clobber=False,
+                  instance_index=None):
     """
     creates a temporary file if filename is None or empty
     """
-    filename, is_new = make_template_filename(filename, resource, dirname,
-                                              clobber, instance_index)
+    if filename:
+        is_new = clobber or not path(filename).exists()
+    else:
+        filename = make_default_filename(resource, dirname, instance_index)
+        is_new = True
 
     if is_new:
-        with open(filename, "w+") as outfile:
-            tmpl = Template(data_string(resource))
-            text = tmpl.substitute(mapping)
-
-            outfile.write(text)
+        save_substituted_resource(filename, resource, mapping)
 
     return filename, is_new
 
