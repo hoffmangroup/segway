@@ -16,7 +16,7 @@ from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, product
-from math import ceil, ldexp
+from math import ceil, ldexp, log
 from os import environ, extsep
 import re
 from shutil import copy2
@@ -27,6 +27,7 @@ from time import sleep
 from urllib import quote
 from uuid import uuid1
 from warnings import warn
+import struct
 
 from genomedata import Genome
 from numpy import (arange, arcsinh, array, empty, finfo, float32, intc,
@@ -48,11 +49,11 @@ from .structure import StructureSaver
 from ._util import (data_filename,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
-                    EXT_INT, EXT_PARAMS, EXT_TAB,
+                    EXT_INT, EXT_PARAMS, EXT_TAB, EXT_LIST,
                     extjoin, extjoin_not_none, GB,
                     ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     make_default_filename,
-                    make_filelistpath, make_prefix_fmt,
+                    make_filelistpath, make_prefix_fmt, ceildiv,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
                     OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
@@ -489,6 +490,8 @@ class Runner(object):
         # XXXmax
         self.virtual_evidence_filename = None
         self.measure_prop = False
+        self.virtual_evidence_ve_obs_filenames = []
+        self.measure_prop_ve_obs_filenames = []
 
         self.card_supervision_label = -1
 
@@ -709,14 +712,13 @@ class Runner(object):
     # XXXmax
     @memoized_property
     def virtual_evidence_ve_list_filename(self):
-        return self.make_filename("virtual_evidence_ve", "list",
+        return self.make_filename("virtual_evidence_ve", EXT_LIST,
                                   subdirname=SUBDIRNAME_OBS)
     # XXXmax
     @memoized_property
     def measure_prop_ve_list_filename(self):
-        return self.make_filename("measure_prop_ve", "list",
+        return self.make_filename("measure_prop_ve", EXT_LIST,
                                   subdirname=SUBDIRNAME_OBS)
-
     @memoized_property
     def work_dirpath(self):
         return path(self.work_dirname)
@@ -1435,18 +1437,37 @@ class Runner(object):
         #raise NotImplementedError
 
     # XXXmax
+    # Must be called after Runner.windows is set
     def load_measure_prop(self):
         if not self.measure_prop:
             return
-        self.measure_prop_ve_list_filename
-        print >>sys.stderr, "load_measure_prop not implemented!"
-        #raise NotImplementedError
+        print >>sys.stderr, "running load_measure_prop..."
+
+        ve_list_fname = self.measure_prop_ve_list_filename
+
+        ve_line_fmt = str(self.num_segs) + "f"
+        ve_line = [.99] + [.01/(self.num_segs-1) for i in range(self.num_segs-1)]
+        log_ve_line = map(log, ve_line)
+
+        print "windows:", self.windows
+
+        self.measure_prop_ve_fnames = []
+        with open(ve_list_fname, "w") as ve_list_file:
+            for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                ve_obs_fname = self.make_filename("measure_prop_ve_obs", window_index, EXT_LIST, subdirname=SUBDIRNAME_OBS)
+                self.measure_prop_ve_fnames.append(ve_obs_fname)
+                ve_list_file.write(ve_obs_fname + "\n")
+                with open(ve_obs_fname, "w") as obs:
+                    num_frames = ceildiv(end-start, self.resolution)
+                    for frame_index in range(num_frames):
+                        obs.write(struct.pack(ve_line_fmt, *log_ve_line))
+
 
     # XXXmax
-    def run_measure_prop(self):
+    def update_measure_prop(self):
         if not self.measure_prop:
             return
-        print >>sys.stderr, "run_measure_prop not implemented!"
+        print >>sys.stderr, "update_measure_prop not implemented!"
         #raise NotImplementedError
 
     def save_structure(self):
@@ -1459,10 +1480,6 @@ class Runner(object):
         assert not ((self.identify or self.posterior) and self.train)
 
         self.load_supervision()
-
-        self.load_measure_prop()
-
-        self.load_virtual_evidence()
 
         # need to open Genomedata archive first in order to determine
         # self.tracknames and self.num_tracks
@@ -1479,6 +1496,9 @@ class Runner(object):
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
+
+        self.load_measure_prop()
+        self.load_virtual_evidence()
 
         if self.train:
             self.set_log_likelihood_filenames()
@@ -1787,8 +1807,7 @@ class Runner(object):
                                       round_index, **kwargs)
         restartable_jobs.wait()
 
-        if self.measure_prop:
-            self.run_measure_prop()
+        self.update_measure_prop()
 
         restartable_jobs = \
             self.queue_train_bundle(last_params_filename, curr_params_filename,

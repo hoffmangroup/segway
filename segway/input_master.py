@@ -610,7 +610,7 @@ class VirtualEvidenceSpec(ParamSpec):
 
     # XXX do this in the ${key} form of the rest of the specs
     def make_ve_spec(self, name, filename):
-        tmpl = "seg_%s 1 %s %s nfs:%s nis:0 fmt:binary END"
+        tmpl = "seg_%s 1 %s 2 %s nfs:%s nis:0 fmt:binary END"
         return tmpl % (name, self.num_segs, filename, self.num_segs)
 
     def generate_objects(self):
