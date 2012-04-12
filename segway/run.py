@@ -1438,12 +1438,15 @@ class Runner(object):
 
     # XXXmax
     # Must be called after Runner.windows is set
+    # Must be called seperately for each instance
     def load_measure_prop(self):
         if not self.measure_prop:
             return
         print >>sys.stderr, "running load_measure_prop..."
 
         ve_list_fname = self.measure_prop_ve_list_filename
+        instance_index = self.instance_index
+        round_index = 0 # load_measure_prop happens in the first round
 
         ve_line_fmt = str(self.num_segs) + "f"
         ve_line = [.99] + [.01/(self.num_segs-1) for i in range(self.num_segs-1)]
@@ -1454,7 +1457,7 @@ class Runner(object):
         self.measure_prop_ve_fnames = []
         with open(ve_list_fname, "w") as ve_list_file:
             for window_index, (world, chrom, start, end) in enumerate(self.windows):
-                ve_obs_fname = self.make_filename("measure_prop_ve_obs", window_index, EXT_LIST, subdirname=SUBDIRNAME_OBS)
+                ve_obs_fname = self.make_filename("measure_prop_ve_obs", instance_index, round_index, window_index, EXT_LIST, subdirname=SUBDIRNAME_OBS)
                 self.measure_prop_ve_fnames.append(ve_obs_fname)
                 ve_list_file.write(ve_obs_fname + "\n")
                 with open(ve_obs_fname, "w") as obs:
@@ -1468,6 +1471,14 @@ class Runner(object):
         if not self.measure_prop:
             return
         print >>sys.stderr, "update_measure_prop not implemented!"
+
+        instance_index = self.instance_index
+        round_index = self.round_index
+
+        # run MP
+        # - create graph, trans, labels
+        # -
+
         #raise NotImplementedError
 
     def save_structure(self):
@@ -1497,7 +1508,6 @@ class Runner(object):
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
 
-        self.load_measure_prop()
         self.load_virtual_evidence()
 
         if self.train:
@@ -1807,7 +1817,7 @@ class Runner(object):
                                       round_index, **kwargs)
         restartable_jobs.wait()
 
-        self.update_measure_prop()
+        self.update_measure_prop(round_index)
 
         restartable_jobs = \
             self.queue_train_bundle(last_params_filename, curr_params_filename,
@@ -1827,6 +1837,8 @@ class Runner(object):
         instance_index = self.instance_index
         self.set_log_likelihood_filenames(instance_index, new)
         self.set_params_filename(instance_index, new)
+
+        self.load_measure_prop()
 
         # get previous (or initial) values
         last_log_likelihood, log_likelihood, round_index = \
