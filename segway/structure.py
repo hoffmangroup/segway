@@ -24,8 +24,8 @@ def make_weight_scale(scale):
 class StructureSaver(Saver):
     resource_name = "segway.str.tmpl"
     copy_attrs = ["num_tracks", "num_datapoints", "use_dinucleotide",
-                  "window_lens", "resolution", "tracknames", "supervision_type",
-                  "gmtk_include_filename_relative", "head_tracknames"]
+                  "window_lens", "resolution", "supervision_type",
+                  "gmtk_include_filename_relative", "head_trackname_list"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -50,6 +50,10 @@ class StructureSaver(Saver):
     def make_mapping(self):
         num_tracks = self.num_tracks
         num_datapoints = self.num_datapoints
+        head_trackname_list = self.head_trackname_list
+
+        assert (len(self.head_trackname_list) == num_tracks
+                == len(num_datapoints))
 
         if self.use_dinucleotide:
             max_num_datapoints_track = sum(self.window_lens)
@@ -58,9 +62,7 @@ class StructureSaver(Saver):
 
         observation_items = []
 
-        head_tracknames = self.head_tracknames
-
-        zipper = izip(count(), self.tracknames, num_datapoints)
+        zipper = izip(count(), head_trackname_list, num_datapoints)
         for track_index, trackname, num_datapoints_track in zipper:
             # relates current num_datapoints to total number of
             # possible positions. This is better than making the
@@ -78,9 +80,8 @@ class StructureSaver(Saver):
             # weight_scale = 1.0
             # assert weight_scale == 1.0
 
-            head_trackname = head_tracknames[trackname]
             conditionalparents_spec = \
-                self.make_conditionalparents_spec(head_trackname)
+                self.make_conditionalparents_spec(trackname)
             weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
