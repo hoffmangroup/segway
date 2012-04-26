@@ -9,6 +9,8 @@ __version__ = "$Revision$"
 
 # Copyright 2008-2012 Michael M. Hoffman <mmh1@uw.edu>
 
+import pdb
+
 from collections import defaultdict, namedtuple
 from copy import copy
 from datetime import datetime
@@ -38,14 +40,15 @@ from path import path
 from pkg_resources import Requirement, working_set
 from tabdelim import DictReader, ListWriter
 
-from .bed import parse_bed4, read_native
+from .bed import parse_bed4, read_native, read as read_bed3
 from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
                       RestartableJobDict, Session)
 from .include import IncludeSaver
 from .input_master import InputMasterSaver
-from .observations import Observations
+from .observations import Observations, find_overlaps_include # XXX move find_overlaps_include to _util
 from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
+from .measure_prop import MeasurePropRunner
 from ._util import (data_filename,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
@@ -60,7 +63,10 @@ from ._util import (data_filename,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
-                    USE_MFSDG, VITERBI_PROG)
+                    USE_MFSDG, VITERBI_PROG,
+                    VIRTUAL_EVIDENCE_FULL_LIST_FILENAME,
+                    VIRTUAL_EVIDENCE_WINDOW_LIST_FILENAME_TMPL,
+                    VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL)
 
 # set once per file run
 UUID = uuid1().hex
@@ -490,8 +496,8 @@ class Runner(object):
         # XXXmax
         self.virtual_evidence_filename = None
         self.measure_prop = False
-        self.virtual_evidence_ve_obs_filenames = []
-        self.measure_prop_ve_obs_filenames = []
+        self.mp_runner = None
+        self.measure_prop_ve_dirpath = None # set by MeasurePropRunner
 
         self.card_supervision_label = -1
 
@@ -709,16 +715,52 @@ class Runner(object):
         return self.make_filename(PREFIX_JT_INFO, "posterior", EXT_TXT,
                                   subdirname=SUBDIRNAME_LOG)
 
-    # XXXmax
     @memoized_property
-    def virtual_evidence_ve_list_filename(self):
-        return self.make_filename("virtual_evidence_ve", EXT_LIST,
-                                  subdirname=SUBDIRNAME_OBS)
-    # XXXmax
+    def virtual_evidence_dirpath(self):
+        res = self.make_filename("virtual_evidence", subdirname=SUBDIRNAME_OBS)
+        self.make_dir(res)
+        return res
+
     @memoized_property
-    def measure_prop_ve_list_filename(self):
-        return self.make_filename("measure_prop_ve", EXT_LIST,
-                                  subdirname=SUBDIRNAME_OBS)
+    def virtual_evidence_ve_full_list_filename(self):
+        return (self.virtual_evidence_dirpath / VIRTUAL_EVIDENCE_FULL_LIST_FILENAME)
+
+    @memoized_property
+    def virtual_evidence_ve_window_list_filenames(self):
+        return [((self.virtual_evidence_dirpath / VIRTUAL_EVIDENCE_WINDOW_LIST_FILENAME_TMPL)
+                 % window_index) for window_index in range(len(self.windows))]
+
+    @memoized_property
+    def virtual_evidence_ve_obs_filenames(self):
+        return [((self.virtual_evidence_dirpath / VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL)
+                 % window_index) for window_index in range(len(self.windows))]
+
+    @memoized_property
+    def uniform_ve_dirname(self):
+        res = self.obs_dirpath / "uniform_ve"
+        self.make_dir(res)
+        return res
+
+    def make_measure_prop_ve_full_list_filename(self, instance_index, round_index):
+        return (self.measure_prop_ve_dirpath
+                / VIRTUAL_EVIDENCE_FULL_LIST_FILENAME)
+
+    def make_measure_prop_ve_window_list_filenames(self, instance_index, round_index):
+        return [((self.measure_prop_ve_dirpath
+                 / VIRTUAL_EVIDENCE_WINDOW_LIST_FILENAME_TMPL)
+                 % window_index) for window_index in range(len(self.windows))]
+
+    def make_measure_prop_ve_obs_filenames(self):
+        return [((self.measure_prop_ve_dirpath
+                 / VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL)
+                 % window_index) for window_index in range(len(self.windows))]
+
+    def make_mp_posterior_workdir(self, instance_index, round_index):
+        res = self.posterior_dirname / ("measure_prop.%s.%s" % (instance_index, round_index))
+        if not res.isdir():
+            self.make_dir(res)
+        return res
+
     @memoized_property
     def work_dirpath(self):
         return path(self.work_dirname)
@@ -885,8 +927,13 @@ class Runner(object):
             return None
 
     @memoized_property
-    def posterior_filenames(self):
+    def posterior_dirname(self):
         self.make_subdir(SUBDIRNAME_POSTERIOR)
+        return path(self.work_dirpath) / SUBDIRNAME_POSTERIOR
+
+    @memoized_property
+    def posterior_filenames(self):
+        self.posterior_dirname
         return map(self.make_posterior_filename, xrange(self.num_windows))
 
     @memoized_property
@@ -1097,7 +1144,8 @@ class Runner(object):
         else:
             return num
 
-    def make_cpp_options(self, input_params_filename=None,
+    def make_cpp_options(self, task, instance_index="identify", round_index="identify",
+                         window_index="all", input_params_filename=None,
                          output_params_filename=None):
         directives = {}
 
@@ -1112,6 +1160,18 @@ class Runner(object):
         directives["CARD_FRAMEINDEX"] = self.max_frames
         directives["SEGTRANSITION_WEIGHT_SCALE"] = \
             self.segtransition_weight_scale
+
+        if task == "train":
+            if self.measure_prop:
+                directives["MEAUSURE_PROP_VE_LIST_FILENAME"] = self.make_measure_prop_ve_full_list_filename(instance_index, round_index)
+            if self.virtual_evidence:
+                directives["VIRTUAL_EVIDENCE_VE_LIST_FILENAME"] = self.virtual_evidence_ve_full_list_filename
+        if task == "identify":
+            if self.measure_prop:
+                directives["MEAUSURE_PROP_VE_LIST_FILENAME"] = self.make_measure_prop_ve_window_list_filenames(instance_index, round_index)[window_index]
+            if self.virtual_evidence:
+                directives["VIRTUAL_EVIDENCE_VE_LIST_FILENAME"] = self.virtual_evidence_ve_window_list_filename[window_index]
+
 
         res = " ".join(CPP_DIRECTIVE_FMT % item
                        for item in directives.iteritems())
@@ -1411,6 +1471,8 @@ class Runner(object):
                 start = datum.chromStart
                 end = datum.chromEnd
 
+                # XXX change check_overlapping_supervision labels to do something
+                # that's not supervision-specific
                 check_overlapping_supervision_labels(start, end, chrom,
                                                      supervision_coords)
 
@@ -1432,54 +1494,86 @@ class Runner(object):
     def load_virtual_evidence(self):
         if not self.virtual_evidence:
             return
-        self.virtual_evidence_ve_list_filename
-        print >>sys.stderr, "load_virtual_evidence not implemented!"
-        #raise NotImplementedError
 
-    # XXXmax
-    # Must be called after Runner.windows is set
-    # Must be called seperately for each instance
-    def load_measure_prop(self):
-        if not self.measure_prop:
-            return
-        print >>sys.stderr, "running load_measure_prop..."
+        virtual_evidence_coords = defaultdict(list)
+        virtual_evidence_evidence = defaultdict(list)
 
-        ve_list_fname = self.measure_prop_ve_list_filename
-        instance_index = self.instance_index
-        round_index = 0 # load_measure_prop happens in the first round
+        if self.resolution != 1:
+            raise NotImplementedError # XXX
 
-        ve_line_fmt = str(self.num_segs) + "f"
-        ve_line = [.99] + [.01/(self.num_segs-1) for i in range(self.num_segs-1)]
-        log_ve_line = map(log, ve_line)
+        with open(self.virtual_evidence_filename, "r") as virtual_evidence_file:
+            for datum in read_bed3(virtual_evidence_file):
+                chrom = datum.chrom
+                start = int(datum.chromStart)
+                end = int(datum.chromEnd)
+                try:
+                    evidence = map(float, datum._words[3:])
+                except ValueError:
+                    print >>sys.stderr, """
+                    Error reading virtual evidence file: %s
+                    Virtual evidence values must be floats
+                    """ % self.virtual_evidence_filename
+                    raise
 
-        print "windows:", self.windows
+                if self.num_worlds != 1:
+                    chrom_split = chrom.split(".", 1)
+                    if len(chrom_split) != 2:
+                        raise ValueError("""
+                                         Error reading virtual evidence file: %s
+                                         When running with concatenated tracks, the chrom field
+                                         must have the format <world>.<chrom>
+                                         """ % (self.virtual_evidence_filename))
+                    world = int(chrom_split[0])
+                    chrom = chrom_split[1]
+                else:
+                    world = 0
 
-        self.measure_prop_ve_fnames = []
-        with open(ve_list_fname, "w") as ve_list_file:
+                check_overlapping_supervision_labels(start, end, (world, chrom),
+                                                     virtual_evidence_coords)
+
+                virtual_evidence_coords[(world, chrom)].append((start, end))
+
+
+                assert(len(evidence) == self.num_segs)
+
+                virtual_evidence_evidence[(world, chrom)].append(evidence)
+
+        def make_obs_iter():
             for window_index, (world, chrom, start, end) in enumerate(self.windows):
-                ve_obs_fname = self.make_filename("measure_prop_ve_obs", instance_index, round_index, window_index, EXT_LIST, subdirname=SUBDIRNAME_OBS)
-                self.measure_prop_ve_fnames.append(ve_obs_fname)
-                ve_list_file.write(ve_obs_fname + "\n")
-                with open(ve_obs_fname, "w") as obs:
-                    num_frames = ceildiv(end-start, self.resolution)
-                    for frame_index in range(num_frames):
-                        obs.write(struct.pack(ve_line_fmt, *log_ve_line))
+                def make_window_iter():
+                    window_overlaps = find_overlaps_include(start, end,
+                                                            virtual_evidence_coords[(world, chrom)],
+                                                            virtual_evidence_evidence[(world, chrom)])
+                    window_overlaps = sorted(window_overlaps, key=lambda overlap: overlap[0])
+
+                    cur = start
+                    overlap_index = 0
+                    evidence_fmt = "%sf" % self.num_segs
+                    uniform_evidence = [log(float(1)/self.num_segs) for i in range(self.num_segs)]
+                    while True:
+                        # set the region from cur to the next window as uniform
+                        if overlap_index >= len(window_overlaps):
+                            overlap_start = end
+                        else:
+                            overlap_start, overlap_end, evidence = window_overlaps[overlap_index]
+                        for i in range(overlap_start - cur):
+                            yield uniform_evidence
+                        cur = overlap_start
+                        if overlap_index >= len(window_overlaps):
+                            break
+
+                        # set the overlapping region according to the virtual evidence file
+                        for i in range(overlap_end - cur):
+                            yield evidence
+
+                        cur = overlap_end
+                        overlap_index += 1
+                yield make_window_iter()
 
 
-    # XXXmax
-    def update_measure_prop(self):
-        if not self.measure_prop:
-            return
-        print >>sys.stderr, "update_measure_prop not implemented!"
+        write_virtual_evidence(obs_iter, self.virtual_evidence_dirpath,
+                               self.windows, self.num_segs)
 
-        instance_index = self.instance_index
-        round_index = self.round_index
-
-        # run MP
-        # - create graph, trans, labels
-        # -
-
-        #raise NotImplementedError
 
     def save_structure(self):
         self.structure_filename, _ = \
@@ -1698,7 +1792,8 @@ class Runner(object):
 
     def queue_train_parallel(self, input_params_filename, instance_index,
                              round_index, **kwargs):
-        kwargs["cppCommandOptions"] = self.make_cpp_options(input_params_filename)
+        kwargs["cppCommandOptions"] = self.make_cpp_options("train", instance_index, round_index,
+                                                            input_params_filename=input_params_filename)
 
         res = RestartableJobDict(self.session, self.job_log_file)
 
@@ -1731,8 +1826,9 @@ class Runner(object):
         acc_filename = self.make_acc_filename(instance_index,
                                               GMTK_INDEX_PLACEHOLDER)
 
-        cpp_options = self.make_cpp_options(input_params_filename,
-                                            output_params_filename)
+        cpp_options = self.make_cpp_options("train", instance_index, round_index,
+                                            input_params_filename=input_params_filename,
+                                            output_params_filename=output_params_filename)
 
         last_window = self.num_windows - 1
 
@@ -1788,7 +1884,7 @@ class Runner(object):
 
         self.set_triangulation_filename(num_segs, num_subsegs)
 
-        cpp_options = self.make_cpp_options()
+        cpp_options = self.make_cpp_options("triangulate")
         kwargs = dict(strFile=self.structure_filename,
                       cppCommandOptions=cpp_options,
                       outputTriangulatedFile=self.triangulation_filename,
@@ -1812,12 +1908,13 @@ class Runner(object):
         last_params_filename = self.last_params_filename
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
+        if self.measure_prop and (round_index > 0):
+            self.mp_runner.update(instance_index, round_index, last_params_filename)
+
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
                                       round_index, **kwargs)
         restartable_jobs.wait()
-
-        self.update_measure_prop(round_index)
 
         restartable_jobs = \
             self.queue_train_bundle(last_params_filename, curr_params_filename,
@@ -1838,8 +1935,6 @@ class Runner(object):
         self.set_log_likelihood_filenames(instance_index, new)
         self.set_params_filename(instance_index, new)
 
-        self.load_measure_prop()
-
         # get previous (or initial) values
         last_log_likelihood, log_likelihood, round_index = \
             self.recover_train_instance()
@@ -1847,6 +1942,10 @@ class Runner(object):
         if round_index == 0:
             # if round > 0, this is set by self.recover_train_instance()
             self.save_input_master(instance_index, new)
+
+        if self.measure_prop:
+            self.mp_runner = MeasurePropRunner(self)
+            self.mp_runner.load(instance_index)
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
@@ -2186,13 +2285,14 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         return True
 
-    def queue_identify(self, restartable_jobs, window_index, prefix_job_name,
-                       prog, kwargs, output_filenames):
+    def queue_identify(self, restartable_jobs, window_index, params_filename,
+                       prefix_job_name, prog, kwargs, output_filenames):
         prog = self.prog_factory(prog)
         job_name = self.make_job_name_identify(prefix_job_name, window_index)
         output_filename = output_filenames[window_index]
+        print >>sys.stderr, "queue_identify: output_filename=%s" % output_filename
 
-        kwargs = self.get_identify_kwargs(window_index, kwargs)
+        kwargs = self.get_identify_kwargs(window_index, kwargs, params_filename)
 
         if prog == VITERBI_PROG:
             kind = "viterbi"
@@ -2226,8 +2326,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         restartable_jobs.queue(restartable_job)
 
-    def get_identify_kwargs(self, window_index, extra_kwargs):
-        cpp_command_options = self.make_cpp_options(self.params_filename)
+    def get_identify_kwargs(self, window_index, extra_kwargs, params_filename):
+        cpp_command_options = self.make_cpp_options("identify", window_index=window_index,
+                                                    input_params_filename=params_filename)
 
         res = dict(inputMasterFile=self.input_master_filename,
                    cppCommandOptions=cpp_command_options,
@@ -2244,16 +2345,17 @@ to find the winning instance anyway.""" % thread.instance_index)
     def is_in_reversed_world(self, window_index):
         return self.windows[window_index].world in self.reverse_worlds
 
-    def run_identify_posterior(self):
-        self.instance_index = "identify"
+    # Used by run_identify_posterior and MeasurePropRunner.update
+    # XXX How does this know which type of VE files to use?
+    def run_identify_posterior_jobs(self, identify, posterior,
+                                    viterbi_filenames,
+                                    posterior_filenames,
+                                    params_filename=None,
+                                    instance_index="identify",
+                                    round_index="identify"):
 
-        ## setup files
-        if not self.input_master_filename:
-            warn("Input master not specified. Generating.")
-            self.save_input_master()
-
-        viterbi_filenames = self.viterbi_filenames
-        posterior_filenames = self.posterior_filenames
+        if params_filename is None:
+            params_filename = self.params_filename
 
         # -: standard output, processed by segway-task
         viterbi_kwargs = dict(triFile=self.triangulation_filename,
@@ -2265,33 +2367,59 @@ to find the winning instance anyway.""" % thread.instance_index)
                                 doDistributeEvidence=True,
                                 **self.get_posterior_clique_print_ranges())
 
+        session = self.session
+        restartable_jobs = RestartableJobDict(session, self.job_log_file)
+        if self.measure_prop:
+            measure_prop_ve_list_filenames = self.make_measure_prop_ve_window_list_filenames(instance_index, round_index)
+
+        for window_index, window_len in self.window_lens_sorted():
+
+            if self.measure_prop:
+                measure_prop_ve_list_filename = measure_prop_ve_list_filenames[window_index]
+            virtual_evidence_ve_list_filename = self.virtual_evidence_ve_window_list_filenames[window_index]
+
+            queue_identify_custom = partial(self.queue_identify,
+                                            restartable_jobs, window_index,
+                                            params_filename)
+
+            if (identify
+                and not self.recover_viterbi_window(window_index)):
+                queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
+                                      VITERBI_PROG, viterbi_kwargs,
+                                      viterbi_filenames)
+
+            if posterior:
+                queue_identify_custom(PREFIX_JOB_NAME_POSTERIOR,
+                                      POSTERIOR_PROG, posterior_kwargs,
+                                      posterior_filenames)
+
+        # XXX: ask on DRMAA mailing list--how to allow
+        # KeyboardInterrupt here?
+
+        if self.dry_run:
+            return
+
+        restartable_jobs.wait()
+        print >>sys.stderr, "Done with run_identify_posterior_jobs."
+
+
+    def run_identify_posterior(self):
+        self.instance_index = "identify"
+
+        ## setup files
+        if not self.input_master_filename:
+            warn("Input master not specified. Generating.")
+            self.save_input_master()
+
+        viterbi_filenames = self.viterbi_filenames
+        posterior_filenames = self.posterior_filenames
+        print >>sys.stderr, "posterior_filenames: ", repr(posterior_filenames)
+
         # XXX: kill submitted jobs on exception
         with Session() as session:
             self.session = session
-            restartable_jobs = RestartableJobDict(session, self.job_log_file)
-
-            for window_index, window_len in self.window_lens_sorted():
-                queue_identify_custom = partial(self.queue_identify,
-                                                restartable_jobs, window_index)
-
-                if (self.identify
-                    and not self.recover_viterbi_window(window_index)):
-                    queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
-                                          VITERBI_PROG, viterbi_kwargs,
-                                          viterbi_filenames)
-
-                if self.posterior:
-                    queue_identify_custom(PREFIX_JOB_NAME_POSTERIOR,
-                                          POSTERIOR_PROG, posterior_kwargs,
-                                          posterior_filenames)
-
-            # XXX: ask on DRMAA mailing list--how to allow
-            # KeyboardInterrupt here?
-
-            if self.dry_run:
-                return
-
-            restartable_jobs.wait()
+            self.run_identify_posterior_jobs(self.identify, self.posterior,
+                                             viterbi_filenames, posterior_filenames)
 
         for world in xrange(self.num_worlds):
             if self.identify:
@@ -2371,7 +2499,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
                         if (self.posterior and (self.recover_dirname
                                                 or self.num_worlds != 1)):
-                            raise NotImplementedError # XXX
+                            print >>sys.stderr, "Running posterior even though it's listed as not implemented!"
+                            #raise NotImplementedError # XXX
 
                         self.run_identify_posterior()
 
@@ -2454,6 +2583,10 @@ def parse_options(args):
         # XXXmax
         group.add_option("--virtual-evidence", metavar="FILE",
                          help="supply virtual evidence in FILE (default none)")
+
+        # XXXmax
+        group.add_option("--virtual-evidence-dir", metavar="DIR",
+                         help="supply virtual evidence in DIR (default none)")
 
     with OptionGroup(parser, "Intermediate files") as group:
         group.add_option("-o", "--observations", metavar="DIR",

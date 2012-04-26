@@ -42,6 +42,10 @@ EXT_MASTER = "master"
 EXT_PARAMS = "params"
 EXT_TAB = "tab"
 
+VIRTUAL_EVIDENCE_FULL_LIST_FILENAME = "full" + extsep + EXT_LIST
+VIRTUAL_EVIDENCE_WINDOW_LIST_FILENAME_TMPL = "window" + extsep + "%s" + extsep + EXT_LIST
+VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL = "obs" + extsep + "%s" + extsep + EXT_LIST
+
 SUFFIX_BED = extsep + EXT_BED
 SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_TAB = extsep + EXT_TAB

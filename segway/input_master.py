@@ -605,19 +605,18 @@ class MXParamSpec(ParamSpec):
 class VirtualEvidenceSpec(ParamSpec):
     type_name = "VE_CPT"
     copy_attrs = ParamSpec.copy_attrs + ["measure_prop", "virtual_evidence",
-                                         "num_segs",
-                                         "measure_prop_ve_list_filename", "virtual_evidence_ve_list_filename"]
+                                         "num_segs", ]
 
     # XXX do this in the ${key} form of the rest of the specs
-    def make_ve_spec(self, name, filename):
+    def make_ve_spec(self, name, ve_list_filename_macro):
         tmpl = "seg_%s 1 %s 2 %s nfs:%s nis:0 fmt:binary END"
-        return tmpl % (name, self.num_segs, filename, self.num_segs)
+        return tmpl % (name, self.num_segs, ve_list_filename_macro, self.num_segs)
 
     def generate_objects(self):
         if self.measure_prop:
-            yield self.make_ve_spec("measureprop", self.measure_prop_ve_list_filename)
+            yield self.make_ve_spec("measureprop", "MEAUSURE_PROP_VE_LIST_FILENAME")
         if self.virtual_evidence:
-            yield self.make_ve_spec("virtualevidence", self.virtual_evidence_ve_list_filename)
+            yield self.make_ve_spec("virtualevidence", "VIRTUAL_EVIDENCE_VE_LIST_FILENAME")
 
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
@@ -627,8 +626,7 @@ class InputMasterSaver(Saver):
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
                   "gmtk_include_filename_relative", "head_trackname_list",
-                  "measure_prop", "virtual_evidence",
-                  "measure_prop_ve_list_filename", "virtual_evidence_ve_list_filename"]
+                  "measure_prop", "virtual_evidence"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
