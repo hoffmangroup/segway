@@ -146,9 +146,39 @@ def make_layer_filename(filename):
 
     return ".layered.bed".join([left, right])
 
+def make_csv(seq):
+    return ",".join(map(str, seq))
+
+def update_trackline(trackline, updates):
+    if not trackline:
+        trackline = TRACKLINE_DEFAULT[:]
+
+    for word_index, word in enumerate(trackline):
+        if word == "visibility=dense":
+            trackline[word_index] = "visibility=full"
+
+    for key, value in updates.iteritems():
+        start = key + "="
+        for word_index, word in enumerate(trackline):
+            if word.startswith(start):
+                trackline[word_index] = '%s="%s"' % (key, value)
+                break
+
+def get_color(datum, label, label_key):
+    try:
+        return datum.itemRgb
+    except AttributeError:
+        # assign color if it's missing
+        try:
+            label_int = int(label)
+        except ValueError:
+            label_int = label_key
+
+        return get_label_color(label_int)
+
 # XXX: don't define coordinates in non-contiguous areas
 def layer(infilename="-", outfilename="-", mnemonic_filename=None,
-          trackline_updates={}, bigbed_outfilename=None):
+          trackline_updates={}, bigbed_outfilename=None, do_recolor=False):
     # dict of lists of tuples of ints
     segments_dict = defaultdict(list)
     colors = {} # overwritten each time
@@ -158,48 +188,25 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
 
     with maybe_gzip_open(infilename) as infile:
         trackline, reader = get_trackline_and_reader_native(infile)
-        if not trackline:
-            trackline = TRACKLINE_DEFAULT[:]
-
         for datum in reader:
             try:
                 assert datum.strand in ACCEPTABLE_STRANDS
             except AttributeError:
-                pass
+                pass # no strand
 
             label = datum.name
-
-            # XXX: somewhat duplicative of segtools.__init__.Annotations
             label_key = label_dict[label]
 
             segment = (datum.chromStart, datum.chromEnd, label_key)
             segments_dict[datum.chrom].append(segment)
 
-            try:
-                colors[label] = datum.itemRgb
-            except AttributeError:
-                try:
-                    label_int = int(label)
-                except ValueError:
-                    label_int = label_key
+            colors[label] = get_color(datum, label, label_key)
 
-                colors[label] = get_label_color(label_int)
-
-    for word_index, word in enumerate(trackline):
-        if word == "visibility=dense":
-            trackline[word_index] = "visibility=full"
-
-    for key, value in trackline_updates.iteritems():
-        start = key + "="
-        for word_index, word in enumerate(trackline):
-            if word.startswith(start):
-                trackline[word_index] = '%s="%s"' % (key, value)
-                break
-
+    update_trackline(trackline, trackline_updates)
     labels_sorted = uniquify(ordering + sorted(colors.iterkeys()))
 
     # only do this if you have mnemonics
-    if mnemonics:
+    if do_recolor and mnemonics:
         colors = recolor(mnemonics, labels_sorted)
 
     outfile = maybe_gzip_open(outfilename, "w")
@@ -227,23 +234,29 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
                 label_key = label_dict[label]
                 color = colors[label]
 
-                segments_label_key_rows = segments_array[:, OFFSET_LABEL] == label_key
-                segments_label_key = segments_array[segments_label_key_rows,
+                # find all the rows for this label
+                segments_label_rows = segments_array[:, OFFSET_LABEL] == label_key
+
+                # extract just the starts and ends
+                segments_label = segments_array[segments_label_rows,
                                                 OFFSET_START:OFFSET_END+1]
 
-                # XXX: this will probably break when there is a zero
-                # in the data
-                segments_label_key_augmented = vstack([(0, 0), segments_label_key,
-                                                   (end-1, end)])
+                # pad on beginning and end if necessary
+                segments_label_list = [segments_label]
+                if segments_label[0, OFFSET_START] != 0:
+                    segments_label_list.insert(0, (0, 0))
+                if segments_label[-1, OFFSET_END] != end:
+                    segments_label_list.append(0, (end-1, end))
 
-                block_count = str(len(segments_label_key_augmented))
+                segments_label = vstack(segments_label_list)
 
-                # XXX: repetitive _str
-                block_sizes = diff(segments_label_key_augmented).ravel()
-                block_sizes_str = ",".join(map(str, block_sizes))
+                block_count = str(len(segments_label))
 
-                block_starts = segments_label_key_augmented[:, 0]
-                block_starts_str = ",".join(map(str, block_starts))
+                block_sizes = diff(segments_label).ravel()
+                block_sizes_str = make_csv(block_sizes)
+
+                block_starts = segments_label[:, 0]
+                block_starts_str = make_csv(block_starts)
 
                 # this just passes through the label itself if there
                 # are no mnemonics
@@ -284,6 +297,9 @@ def parse_options(args):
     parser.add_option("-m", "--mnemonic-file", metavar="FILE",
                       help="specify tab-delimited input file with mnemonic "
                       "replacement identifiers for segment labels")
+    parser.add_option("--no-recolor", action="store_false",
+                      dest="recolor", default=True,
+                      help="don't recolor labels")
     parser.add_option("-s", "--track-line-set", metavar="ATTR VALUE",
                       action="update", help="set ATTR to VALUE in track line",
                       default={})
@@ -302,6 +318,7 @@ def main(args=sys.argv[1:]):
     return layer(mnemonic_filename=options.mnemonic_file,
                  trackline_updates=options.track_line_set,
                  bigbed_outfilename=options.bigBed,
+                 do_recolor=options.recolor,
                  *args)
 
 if __name__ == "__main__":
