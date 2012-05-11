@@ -10,6 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2008-2012 Michael M. Hoffman <mmh1@uw.edu>
 
 import pdb
+import os
 
 from collections import defaultdict, namedtuple
 from copy import copy
@@ -49,6 +50,7 @@ from .observations import Observations, find_overlaps_include # XXX move find_ov
 from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
 from .measure_prop import MeasurePropRunner
+from .virtual_evidence import write_virtual_evidence
 from ._util import (data_filename,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
@@ -495,7 +497,7 @@ class Runner(object):
 
         # XXXmax
         self.virtual_evidence_filename = None
-        self.measure_prop = False
+        self.measure_prop_graph_filepath = False
         self.mp_runner = None
         self.measure_prop_ve_dirpath = None # set by MeasurePropRunner
 
@@ -563,7 +565,7 @@ class Runner(object):
                         ("observations", "obs_dirname"),
                         ("bed", "bed_filename"),
                         ("semisupervised", "supervision_filename"),
-                        ("measure_prop",),
+                        ("measure_prop","measure_prop_graph_filepath"),
                         ("virtual_evidence", "virtual_evidence_filename"),
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
@@ -817,7 +819,10 @@ class Runner(object):
 
                 # XXX: eventually, should read ruler scale from file
                 # instead of using as a command-line option
-                assert len_slice.step == ruler_scale
+                try:
+                    assert len_slice.step == ruler_scale
+                except:
+                    pdb.set_trace() # XXX
 
                 len_tuple = (len_slice.start, len_slice.stop, len_slice.step)
                 len_row = zeros((SEG_TABLE_WIDTH))
@@ -1162,15 +1167,15 @@ class Runner(object):
             self.segtransition_weight_scale
 
         if task == "train":
-            if self.measure_prop:
+            if self.measure_prop_graph_filepath:
                 directives["MEAUSURE_PROP_VE_LIST_FILENAME"] = self.make_measure_prop_ve_full_list_filename(instance_index, round_index)
             if self.virtual_evidence:
                 directives["VIRTUAL_EVIDENCE_VE_LIST_FILENAME"] = self.virtual_evidence_ve_full_list_filename
         if task == "identify":
-            if self.measure_prop:
+            if self.measure_prop_graph_filepath:
                 directives["MEAUSURE_PROP_VE_LIST_FILENAME"] = self.make_measure_prop_ve_window_list_filenames(instance_index, round_index)[window_index]
             if self.virtual_evidence:
-                directives["VIRTUAL_EVIDENCE_VE_LIST_FILENAME"] = self.virtual_evidence_ve_window_list_filename[window_index]
+                directives["VIRTUAL_EVIDENCE_VE_LIST_FILENAME"] = self.virtual_evidence_ve_window_list_filenames[window_index]
 
 
         res = " ".join(CPP_DIRECTIVE_FMT % item
@@ -1498,9 +1503,6 @@ class Runner(object):
         virtual_evidence_coords = defaultdict(list)
         virtual_evidence_evidence = defaultdict(list)
 
-        if self.resolution != 1:
-            raise NotImplementedError # XXX
-
         with open(self.virtual_evidence_filename, "r") as virtual_evidence_file:
             for datum in read_bed3(virtual_evidence_file):
                 chrom = datum.chrom
@@ -1540,30 +1542,60 @@ class Runner(object):
 
         def make_obs_iter():
             for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                resolution = self.resolution
+
                 def make_window_iter():
                     window_overlaps = find_overlaps_include(start, end,
                                                             virtual_evidence_coords[(world, chrom)],
                                                             virtual_evidence_evidence[(world, chrom)])
                     window_overlaps = sorted(window_overlaps, key=lambda overlap: overlap[0])
 
+                    def round_up_to_resolution(pos, start, resolution):
+                        return ceildiv(pos-start,resolution)*resolution + start
+                    def round_down_to_resolution(pos, start, resolution):
+                        return int((pos-start)/resolution)*resolution + start
+
                     cur = start
                     overlap_index = 0
                     evidence_fmt = "%sf" % self.num_segs
                     uniform_evidence = [log(float(1)/self.num_segs) for i in range(self.num_segs)]
                     while True:
-                        # set the region from cur to the next window as uniform
+                        # after the last overlap, just set the rest of the window to
+                        # uniform and then break
                         if overlap_index >= len(window_overlaps):
                             overlap_start = end
+                            # for the last frame, round up to the resolution
+                            overlap_start = round_up_to_resolution(overlap_start, start, resolution)
+                            #overlap_start += resolution - ((overlap_start - start) % resolution)
+                            overlap_end = overlap_start
                         else:
                             overlap_start, overlap_end, evidence = window_overlaps[overlap_index]
-                        for i in range(overlap_start - cur):
+                            # lock overlap to resolution by extending the overlap if need be
+                            overlap_start = round_down_to_resolution(overlap_start, start, resolution)
+                            #overlap_start -= (overlap_start - start) % resolution
+                            overlap_end = round_up_to_resolution(overlap_end, start, resolution)
+                            #overlap_end += resolution - ((overlap_end - start) % resolution)
+
+                        try:
+                            #assert ((end - start) % resolution == 0)
+                            assert ((overlap_start - start) % resolution == 0)
+                            assert ((overlap_end - start) % resolution == 0)
+                            assert ((overlap_end - overlap_start) % resolution == 0)
+                            assert ((overlap_start - cur) % resolution == 0)
+                        except:
+                            #pdb.set_trace() # XXX
+                            raise
+
+                        # set the region from cur to the next window as uniform
+                        for i in range(int((overlap_start - cur) / resolution)):
                             yield uniform_evidence
                         cur = overlap_start
+
                         if overlap_index >= len(window_overlaps):
                             break
 
                         # set the overlapping region according to the virtual evidence file
-                        for i in range(overlap_end - cur):
+                        for i in range(int((overlap_end - cur) / resolution)):
                             yield evidence
 
                         cur = overlap_end
@@ -1571,7 +1603,7 @@ class Runner(object):
                 yield make_window_iter()
 
 
-        write_virtual_evidence(obs_iter, self.virtual_evidence_dirpath,
+        write_virtual_evidence(make_obs_iter(), self.virtual_evidence_dirpath,
                                self.windows, self.num_segs)
 
 
@@ -1908,7 +1940,7 @@ class Runner(object):
         last_params_filename = self.last_params_filename
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
-        if self.measure_prop and (round_index > 0):
+        if self.measure_prop_graph_filepath and (round_index > 0):
             self.mp_runner.update(instance_index, round_index, last_params_filename)
 
         restartable_jobs = \
@@ -1943,7 +1975,7 @@ class Runner(object):
             # if round > 0, this is set by self.recover_train_instance()
             self.save_input_master(instance_index, new)
 
-        if self.measure_prop:
+        if self.measure_prop_graph_filepath:
             self.mp_runner = MeasurePropRunner(self)
             self.mp_runner.load(instance_index)
 
@@ -2369,12 +2401,12 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         session = self.session
         restartable_jobs = RestartableJobDict(session, self.job_log_file)
-        if self.measure_prop:
+        if self.measure_prop_graph_filepath:
             measure_prop_ve_list_filenames = self.make_measure_prop_ve_window_list_filenames(instance_index, round_index)
 
         for window_index, window_len in self.window_lens_sorted():
 
-            if self.measure_prop:
+            if self.measure_prop_graph_filepath:
                 measure_prop_ve_list_filename = measure_prop_ve_list_filenames[window_index]
             virtual_evidence_ve_list_filename = self.virtual_evidence_ve_window_list_filenames[window_index]
 
@@ -2577,8 +2609,8 @@ def parse_options(args):
                          "FILE (default none)")
 
         # XXXmax
-        group.add_option("--measure-prop", action="store_true",
-                         help="perform concatenated segmentation in measure-prop mode ")
+        group.add_option("--measure-prop", metavar="FILE",
+                         help="run with measure prop graph in FILE (default none)")
 
         # XXXmax
         group.add_option("--virtual-evidence", metavar="FILE",

@@ -67,7 +67,6 @@ class _JobTemplateFactory(object):
         """
         res = self.template
 
-        print >>sys.stderr, "trial_index: %s" % trial_index
         try:
             mem_usage = self.mem_usage_progression[trial_index]
         except IndexError:

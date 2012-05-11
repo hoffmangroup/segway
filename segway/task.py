@@ -11,8 +11,10 @@ __version__ = "$Revision$"
 
 from errno import ENOENT
 from os import extsep, fdopen
+import os
 import re
 import sys
+import uuid
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
@@ -145,41 +147,49 @@ def save_bed(outfilename, *args, **kwargs):
 def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num_labels,
                             infile):
     print >>sys.stderr, "got here 10"
+    sys.stderr.flush()
     if do_reverse:
         raise NotImplementedError
 
     print >>sys.stderr, "got here 11"
+    sys.stderr.flush()
     (chrom, start, end) = coord
     num_frames = ceildiv(end - start, resolution)
     probs = read_posterior(infile, num_frames, num_labels)
     probs_rounded = empty(probs.shape, int)
     print >>sys.stderr, "got here 12"
+    sys.stderr.flush()
 
     outfilenames = []
     for label_index in xrange(num_labels):
         outfilenames.append(outfilename_tmpl % label_index)
     print >>sys.stderr, "got here 13"
+    sys.stderr.flush()
 
     # scale, round, and cast to int
     (probs * POSTERIOR_SCALE_FACTOR).round(out = probs_rounded)
     print >>sys.stderr, "got here 14"
+    sys.stderr.flush()
 
     # print array columns as text to each outfile
     zipper = zip(outfilenames, probs_rounded.T, xrange(num_labels))
     for outfilename, probs_rounded_label, label_index in zipper:
         # run-length encoding on the probs_rounded_label
         print >>sys.stderr, "got here 15"
+        sys.stderr.flush()
 
         outfile = open(outfilename, "w")
         pos, = where(diff(probs_rounded_label) != 0)
         pos = r_[start, pos[:]+start+1, end]
         print >>sys.stderr, "got here 16"
+        sys.stderr.flush()
 
         for bed_start, bed_end in zip(pos[:-1], pos[1:]):
             chrom_start = str(bed_start)
             chrom_end = str(bed_end)
             value = str(probs_rounded_label[bed_start-start])
             print >>sys.stderr, "got here 17"
+            sys.stderr.flush()
 
             row = [chrom, chrom_start, chrom_end, value]
             print >>outfile, "\t".join(row)
@@ -231,6 +241,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
     # XXX: this whole function is duplicative of run_viterbi_save_bed and needs to be reduced
     # convert from tuple
     print >>sys.stderr, "got here 1"
+    sys.stderr.flush()
     args = list(args)
 
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
@@ -238,11 +249,13 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
     (chrom, start, end) = coord
     track_indexes = make_track_indexes(track_indexes_text)
     print >>sys.stderr, "got here 2"
+    sys.stderr.flush()
 
     float_filepath = TEMP_DIRPATH / float_filename
     int_filepath = TEMP_DIRPATH / int_filename
     temp_filepaths = [float_filepath, int_filepath]
     print >>sys.stderr, "got here 3"
+    sys.stderr.flush()
 
     # XXX: should do something to ensure of1 matches with int, of2 with float
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
@@ -250,18 +263,22 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
     int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
 
     print >>sys.stderr, "got here 4"
+    sys.stderr.flush()
     with Genome(genomedataname) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     print >>sys.stderr, "got here 5"
+    sys.stderr.flush()
     try:
         print >>sys.stderr, "got here 6"
+        sys.stderr.flush()
         print_to_fd(float_filelistfd, float_filename)
         print_to_fd(int_filelistfd, int_filename)
 
         _save_window(float_filename, int_filename, continuous_cells,
                      resolution, distribution)
         print >>sys.stderr, "got here 6.1"
+        sys.stderr.flush()
 
         # XXXopt: does this actually free the memory? or do we need to
         # use a subprocess to do the loading?
@@ -269,13 +286,16 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
         # remove from memory
         del continuous_cells
 
-        print >>sys.stderr, "got here 6.2"
+        print >>sys.stderr, "starting GMTK..."
+        sys.stderr.flush()
         output = POSTERIOR_PROG.getoutput(*args)
-        print >>sys.stderr, "got here 6.3"
+        print >>sys.stderr, "done with GMTK."
+        sys.stderr.flush()
     except:
         raise
     finally:
         print >>sys.stderr, "got here 7"
+        sys.stderr.flush()
         for filepath in temp_filepaths:
             # don't raise a nested exception if the file was never created
             try:
@@ -285,8 +305,10 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
                     pass
 
     print >>sys.stderr, "got here 8"
+    sys.stderr.flush()
     lines = output.splitlines()
     print >>sys.stderr, "got here 9"
+    sys.stderr.flush()
     return read_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                    int(num_labels), lines)
 
@@ -333,7 +355,9 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
         for filepath in temp_filepaths:
             # don't raise a nested exception if the file was never created
             try:
+                # XXX commented this out so that I can look at the files -- need to uncomment it
                 filepath.remove()
+                pass
             except OSError, err:
                 if err.errno == ENOENT:
                     pass
@@ -355,11 +379,16 @@ def task(verb, kind, outfilename, chrom, start, end, resolution, reverse, *args)
     reverse = int(reverse)
 
     print >>sys.stderr, "running task(verb=%s, kind=%s, outfilename=%s, chrom=%s, start=%s, end=%s, resolution=%s, reverse=%s, args=%s)" % (verb, kind, outfilename, chrom, start, end, resolution, reverse, args)
+    sys.stderr.flush()
 
     TASKS[verb, kind]((chrom, start, end), resolution, reverse, outfilename, *args)
     print >>sys.stderr, "done with TASK."
+    sys.stderr.flush()
 
 def main(args=sys.argv[1:]):
+    # XXX
+    #logfile = open(path(TEMP_DIRPATH) / "log", "w")
+    #sys.stderr = logfile
     if len(args) < 7:
         print >>sys.stderr, \
             "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"

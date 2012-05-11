@@ -13,21 +13,25 @@ shift 3
 # -m: per process memory limit (no effect on newer Linuxes)
 ulimit -c 0 -v "$mem_limit_kb" -m "$mem_limit_kb" || exit 201
 
-if [ "${LSB_JOBID:-}" ]; then
-    # this way, the post-exec script can delete it easily
-    export TMPDIR="$(mktemp -dt "segway.$LSB_JOBID.XXXXXXXXXX")"
-else
-    export TMPDIR="$(mktemp -dt segway.XXXXXXXXXX)"
-fi
+#if [ "${LSB_JOBID:-}" ]; then
+    ## this way, the post-exec script can delete it easily
+    #export TMPDIR="$(mktemp -dt "segway.$LSB_JOBID.XXXXXXXXXX")"
+#else
+    #export TMPDIR="$(mktemp -dt segway.XXXXXXXXXX)"
+#fi
+export TMPDIR=$(mktemp -d "/net/noble/vol2/home/maxwl/mp/tmp/segway-obs-files/obs.XXXXXXXXX")
 
 on_exit ()
 {
-    rm -rf "$TMPDIR"
+    # XXX
+    #rm -rf "$TMPDIR"
 
     # delete any arguments that begin with $submit_tmpdir
     for arg in "$@"; do
         if [[ "$arg" == "$submit_tmpdir"* ]]; then
-            rm -rf "$TMPDIR" 2>/dev/null || true
+            # XXX
+            #rm -rf "$TMPDIR" 2>/dev/null || true
+            :
         fi
     done
 }

@@ -6,6 +6,9 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
+import pdb # XXX
+import os
+
 ## Copyright 2012 Michael M. Hoffman <mmh1@uw.edu>
 
 from cStringIO import StringIO
@@ -229,20 +232,16 @@ def _save_window(float_filename, int_filename, float_data, resolution,
                  distribution, seq_data=None, supervision_data=None):
     # input function in GMTK_ObservationMatrix.cc:
     # ObservationMatrix::readBinSentence
-    print >>sys.stderr, "got here 99"
 
     # Input per frame is a series of float32s, followed by a series of
     # int32s. It is better to optimize both sides here by sticking all
     # the floats in one file, and the ints in another one.
     int_blocks = []
     if float_data is not None:
-        print >>sys.stderr, "got here 100"
         if distribution == DISTRIBUTION_ASINH_NORMAL:
-            print >>sys.stderr, "got here 101"
             float_data = arcsinh(float_data)
 
         if (not USE_MFSDG) or resolution > 1:
-            print >>sys.stderr, "got here 102"
             mask_missing = isnan(float_data)
 
             # output -> presence_data -> int_blocks
@@ -262,32 +261,25 @@ def _save_window(float_filename, int_filename, float_data, resolution,
             if not USE_MFSDG:
                 float_data[mask_missing] = 0.0
 
-            print >>sys.stderr, "got here 103"
             float_data = downsample_add(float_data, resolution)
             float_data /= num_datapoints_min_1
 
-        print >>sys.stderr, "got here 104"
         float_data.tofile(float_filename)
 
-    print >>sys.stderr, "got here 105"
     if seq_data is not None:
         assert resolution == 1 # not implemented yet
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
-    print >>sys.stderr, "got here 106"
     if supervision_data is not None:
         assert resolution == 1 # not implemented yet
         int_blocks.append(supervision_data)
 
-    print >>sys.stderr, "got here 107"
     if int_blocks:
         int_data = column_stack(int_blocks)
     else:
         int_data = array([], dtype=DTYPE_OBS_INT)
 
-    print >>sys.stderr, "got here 108"
     int_data.tofile(int_filename)
-    print >>sys.stderr, "got here 109"
 
 def process_new_windows(new_windows, starts, ends):
     if not new_windows: # nothing left
