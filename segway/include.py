@@ -14,7 +14,7 @@ class IncludeSaver(Saver):
     resource_name = "segway.inc.tmpl"
     copy_attrs = ["card_seg_countdown", "card_supervision_label", "max_frames",
                   "num_segs", "num_subsegs", "resolution", "ruler_scale",
-                  "measure_prop", "virtual_evidence"]
+                  "measure_prop_graph_filepath", "virtual_evidence"]
 
     def make_mapping(self):
         num_segs = self.num_segs
@@ -30,7 +30,7 @@ class IncludeSaver(Saver):
             raise ValueError(msg)
         ruler_scale_scaled = ruler_scale // resolution
 
-        measure_prop = (1 if self.measure_prop else 0)
+        measure_prop = (1 if self.measure_prop_graph_filepath else 0)
         virtual_evidence = (1 if self.virtual_evidence else 0)
 
         return dict(card_seg=num_segs,

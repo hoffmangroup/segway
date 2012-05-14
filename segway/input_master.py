@@ -604,7 +604,7 @@ class MXParamSpec(ParamSpec):
 # XXXmax
 class VirtualEvidenceSpec(ParamSpec):
     type_name = "VE_CPT"
-    copy_attrs = ParamSpec.copy_attrs + ["measure_prop", "virtual_evidence",
+    copy_attrs = ParamSpec.copy_attrs + ["measure_prop_graph_filepath", "virtual_evidence",
                                          "num_segs", ]
 
     # XXX do this in the ${key} form of the rest of the specs
@@ -613,7 +613,7 @@ class VirtualEvidenceSpec(ParamSpec):
         return tmpl % (name, self.num_segs, ve_list_filename_macro, self.num_segs)
 
     def generate_objects(self):
-        if self.measure_prop:
+        if self.measure_prop_graph_filepath:
             yield self.make_ve_spec("measureprop", "MEAUSURE_PROP_VE_LIST_FILENAME")
         if self.virtual_evidence:
             yield self.make_ve_spec("virtualevidence", "VIRTUAL_EVIDENCE_VE_LIST_FILENAME")
@@ -626,7 +626,7 @@ class InputMasterSaver(Saver):
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
                   "gmtk_include_filename_relative", "head_trackname_list",
-                  "measure_prop", "virtual_evidence"]
+                  "measure_prop_graph_filepath", "virtual_evidence"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping

@@ -27,7 +27,7 @@ class StructureSaver(Saver):
     copy_attrs = ["num_tracks", "num_datapoints", "use_dinucleotide",
                   "window_lens", "resolution", "tracknames", "supervision_type",
                   "gmtk_include_filename_relative", "head_tracknames",
-                  "virtual_evidence", "measure_prop"]
+                  "virtual_evidence", "measure_prop_graph_filepath"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -111,7 +111,7 @@ class StructureSaver(Saver):
             next_int_track_index += 1
 
         # XXXmax
-        if self.measure_prop:
+        if self.measure_prop_graph_filepath:
             add_observation(observation_items, "virtual_evidence.tmpl", name="measureprop", macro="MEASURE_PROP")
         if self.virtual_evidence:
             add_observation(observation_items, "virtual_evidence.tmpl", name="virtualevidence", macro="VIRTUAL_EVIDENCE")
