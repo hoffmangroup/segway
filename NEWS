@@ -31,6 +31,7 @@
   caused identify mode failures before
 * segway-layer: fix issue #19. Now doesn't override previous colors
   when mnemonics aren't supplied (thanks to Jay Hesselberth)
+* segway-layer: add --no-recolor option which doesn't override colors at all
 * segway-winner: fix issue #21. Now works on Python 2.5.1
 * installation: always require drmaa. setuptools extras_require wasn't that useful in practice
 * test: use fixed random seed to generate input.master every time
