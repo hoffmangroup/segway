@@ -176,16 +176,19 @@ def get_color(datum, label, label_key):
 
         return get_label_color(label_int)
 
-# XXX: don't define coordinates in non-contiguous areas
 def layer(infilename="-", outfilename="-", mnemonic_filename=None,
           trackline_updates={}, bigbed_outfilename=None, do_recolor=False):
-    # dict of lists of tuples of ints
-    segments_dict = defaultdict(list)
+    # dict of chromosomes:
+    # chromosome: list of runs
+    # run: list of segments
+    # segment: 3-tuple of ints
+    chromosomes = defaultdict(list)
     colors = {} # overwritten each time
     label_dict = IncrementingDefaultDict()
 
     mnemonics, ordering = load_mnemonics(mnemonic_filename)
 
+    # read data
     with maybe_gzip_open(infilename) as infile:
         trackline, reader = get_trackline_and_reader_native(infile)
         for datum in reader:
@@ -197,8 +200,21 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
             label = datum.name
             label_key = label_dict[label]
 
+            start = datum.chromStart
+            chromosome = chromosomes[datum.chrom]
+
+            try:
+                run = chromosome[-1]
+            except IndexError:
+                run = []
+                chromosome.append(run)
+            else:
+                if run[-1][OFFSET_END] != start:
+                    run = []
+                    chromosome.append(run)
+
             segment = (datum.chromStart, datum.chromEnd, label_key)
-            segments_dict[datum.chrom].append(segment)
+            run.append(segment)
 
             colors[label] = get_color(datum, label, label_key)
 
@@ -209,6 +225,7 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
     if do_recolor and mnemonics:
         colors = recolor(mnemonics, labels_sorted)
 
+    # write data
     outfile = maybe_gzip_open(outfilename, "w")
 
     if bigbed_outfilename:
@@ -224,49 +241,62 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
             final_outfile = outfile
         print >>final_outfile, " ".join(trackline)
 
-        for chrom, segments in segments_dict.iteritems():
-            segments_array = array(segments)
+        for chrom, chromosome in chromosomes.iteritems():
+            for run in chromosome:
+                segments = array(run)
 
-            end = segments_array.max()
-            ends[chrom] = end
+                start = segments[0, OFFSET_START]
+                end = segments[-1, OFFSET_END]
+                ends[chrom] = end
 
-            for label in labels_sorted:
-                label_key = label_dict[label]
-                color = colors[label]
+                for label in labels_sorted:
+                    label_key = label_dict[label]
+                    try:
+                        color = colors[label]
+                    except KeyError: # missing
+                        color = "128,128,128"
 
-                # find all the rows for this label
-                segments_label_rows = segments_array[:, OFFSET_LABEL] == label_key
+                    # find all the rows for this label
+                    segments_label_rows = segments[:, OFFSET_LABEL] == label_key
 
-                # extract just the starts and ends
-                segments_label = segments_array[segments_label_rows,
-                                                OFFSET_START:OFFSET_END+1]
+                    # extract just the starts and ends
+                    segments_label = segments[segments_label_rows,
+                                              OFFSET_START:OFFSET_END+1]
 
-                # pad on beginning and end if necessary
-                segments_label_list = [segments_label]
-                if segments_label[0, OFFSET_START] != 0:
-                    segments_label_list.insert(0, (0, 0))
-                if segments_label[-1, OFFSET_END] != end:
-                    segments_label_list.append(0, (end-1, end))
+                    # pad end if necessary
+                    segments_label_list = [segments_label]
+                    if not len(segments_label) or segments_label[-1, OFFSET_END] != end:
+                        # must be end-1 to end or UCSC gets cranky.
+                        # unfortunately this results in all on at the
+                        # right edge of each region
+                        segments_label_list.append((end-1, end))
 
-                segments_label = vstack(segments_label_list)
+                    # pad beginning if necessary
+                    if not len(segments_label) or segments_label[0, OFFSET_START] != 0:
+                        segments_label_list.insert(0, (start, start))
 
-                block_count = str(len(segments_label))
+                    segments_label = vstack(segments_label_list)
 
-                block_sizes = diff(segments_label).ravel()
-                block_sizes_str = make_csv(block_sizes)
+                    # reverse offset by start
+                    segments_label -= start
 
-                block_starts = segments_label[:, 0]
-                block_starts_str = make_csv(block_starts)
+                    block_count = str(len(segments_label))
 
-                # this just passes through the label itself if there
-                # are no mnemonics
-                mnemonic = mnemonics[str(label)]
+                    block_sizes = diff(segments_label).ravel()
+                    block_sizes_str = make_csv(block_sizes)
 
-                row = [chrom, BED_START, str(end), mnemonic, BED_SCORE,
-                       BED_STRAND, BED_START, str(end), color, block_count,
-                       block_sizes_str, block_starts_str]
+                    block_starts = segments_label[:, 0]
+                    block_starts_str = make_csv(block_starts)
 
-                print >>outfile, "\t".join(row)
+                    # this just passes through the label itself if there
+                    # are no mnemonics
+                    mnemonic = mnemonics[str(label)]
+
+                    row = [chrom, str(start), str(end), mnemonic, BED_SCORE,
+                           BED_STRAND, str(start), str(end), color, block_count,
+                           block_sizes_str, block_starts_str]
+
+                    print >>outfile, "\t".join(row)
 
         if bigbed_outfilename:
             outfile.flush()

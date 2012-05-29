@@ -3,18 +3,16 @@
 ## segway-clean.sh: clean up temporary files on LSF
 
 ## $Revision$
-## Copyright 2011 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2011, 2012 Michael M. Hoffman <mmh1@uw.edu>
 
-set -o nounset
-set -o pipefail
-set -o errexit
+set -o nounset -o pipefail -o errexit
 
 if [ "$#" -gt 0 ]; then
     rm -rf -- "$@"
 fi
 
 if [ "${LSB_JOBID:-}" ]; then
-    # have to add ".post" so mktemp doesn't complain when it already exists
-    POST_TMPDIR="$(mktemp -dt "segway.$LSB_JOBID.post")"
-    rm -rf "${POST_TMPDIR%%.post}"*
+    # get location used by mktemp
+    POST_TMPDIR="$(mktemp -dt "segway.$LSB_JOBID.XXXXXXXXXX")"
+    rm -rf "${POST_TMPDIR%.*}"*
 fi

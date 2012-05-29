@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
 
 from os import environ
 import sys
@@ -13,7 +13,8 @@ from path import path
 
 from .._configparser import OneSectionRawConfigParser
 from .._util import ceildiv, data_filename
-from .common import BASH_CMD, _JobTemplateFactory, make_native_spec
+from .common import BASH_CMD, _JobTemplateFactory, make_native_spec, \
+    NULL_FILENAME
 
 # use SI (not binary) prefixes. I can't find any documentation for
 # this but Tim Cutts seems to assume this is how it works
@@ -82,7 +83,7 @@ class JobTemplateFactory(_JobTemplateFactory):
         # bsub -C: core file size limit
         res_spec = make_native_spec(R=self.res_req, M=mem_limit_spec,
                                     v=mem_limit_spec,
-                                    o=self.output_filename,
+                                    o=NULL_FILENAME,
                                     e=self.error_filename,
                                     E=PREEXEC_CMDLINE,
                                     Ep=self.make_postexec_cmdline())

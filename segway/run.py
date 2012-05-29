@@ -679,6 +679,11 @@ class Runner(object):
             res.head_tracknames = head_tracknames
             res.head_trackname_list = head_trackname_list
 
+        if res.num_worlds > 0:
+            res.check_world_fmt("bed_filename")
+            res.check_world_fmt("bedgraph_filename")
+            res.check_world_fmt("bigbed_filename")
+
         return res
 
     @memoized_property
@@ -1062,6 +1067,17 @@ class Runner(object):
     @memoized_property
     def num_segs_range(self):
         return slice2range(self.num_segs)
+
+    def check_world_fmt(self, attr):
+        value = getattr(self, attr)
+        if value is None:
+            return
+
+        try:
+            value % 0
+        except TypeError:
+            raise TypeError("%s for use with multiple worlds must contain "
+                            "one format string character such as %%s" % attr)
 
     def transform(self, num):
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
@@ -2178,7 +2194,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                                 doDistributeEvidence=True,
                                 **self.get_posterior_clique_print_ranges())
 
-        # XXX: kill submitted jobs on exception
         with Session() as session:
             self.session = session
             restartable_jobs = RestartableJobDict(session, self.job_log_file)
@@ -2197,9 +2212,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                     queue_identify_custom(PREFIX_JOB_NAME_POSTERIOR,
                                           POSTERIOR_PROG, posterior_kwargs,
                                           posterior_filenames)
-
-            # XXX: ask on DRMAA mailing list--how to allow
-            # KeyboardInterrupt here?
 
             if self.dry_run:
                 return
