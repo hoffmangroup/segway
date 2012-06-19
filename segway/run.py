@@ -679,7 +679,7 @@ class Runner(object):
             res.head_tracknames = head_tracknames
             res.head_trackname_list = head_trackname_list
 
-        if res.num_worlds > 0:
+        if res.num_worlds > 1:
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")

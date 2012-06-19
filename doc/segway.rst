@@ -801,7 +801,7 @@ file (written by individual job) is corrupted or truncated. This can
 happen when you run out of disk space.
 
 If it is not immediately apparent why a job is failing, it is probably
-useful to look in ``log/run.sh`` to find the command line that Segway
+useful to look in ``log/details.sh`` to find the command line that Segway
 uses to call GMTK. Try running that to see if it gives you any clues.
 You may want to switch the GMTK option -verbosity 0 to -verbosity 30
 to get more information.
