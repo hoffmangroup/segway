@@ -15,4 +15,6 @@ cd "$TMPDIR"
 
 segway-layer -m ../mnemonics < ../segway.bed > segway.layered.bed
 
-../../compare_directory.py ../segway_layer/touchstone ../segway_layer/${TMPDIR#"./"}
+cd ..
+
+../compare_directory.py ../segway_layer/touchstone ../segway_layer/${TMPDIR#"./"}
