@@ -10,7 +10,7 @@ from contextlib import closing
 from functools import partial
 from gzip import open as _gzip_open
 from itertools import repeat
-from math import floor, log10
+from math import floor, log10, log
 from os import extsep
 from string import Template
 import sys
@@ -278,6 +278,15 @@ def is_empty_array(arr):
         return arr.shape == (0,)
     except AttributeError:
         return False
+
+def permissive_log(x):
+    # XXX all the values in this function are kind of arbitrary
+    if x < float("1e-250"):
+        # This is close to float-minumum for 4-byte floats
+        return float("-1e38")
+        #return -sys.float_info.max
+    else:
+        return log(x)
 
 def chrom_name(filename):
     return path(filename).namebase

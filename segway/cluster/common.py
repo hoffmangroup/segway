@@ -67,6 +67,8 @@ class _JobTemplateFactory(object):
         """
         res = self.template
 
+        # XXX
+        trial_index = min(trial_index, len(self.mem_usage_progression))
         try:
             mem_usage = self.mem_usage_progression[trial_index]
         except IndexError:
@@ -94,6 +96,7 @@ class _JobTemplateFactory(object):
                            gettempdir(), self.output_filename]
 
         return wrapper_cmdline + self.args
+        #return self.args
 
     def make_native_spec(self):
         # pure virtual function

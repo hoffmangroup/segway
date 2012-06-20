@@ -15,10 +15,13 @@ import os
 import re
 import sys
 import uuid
+import subprocess # XXX
+import time # XXX
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import array, empty, where, diff, r_
+from numpy import array, empty, where, diff, r_, zeros
+import numpy as np # XXX
 from path import path
 
 from .observations import _save_window
@@ -156,7 +159,9 @@ def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num
     (chrom, start, end) = coord
     num_frames = ceildiv(end - start, resolution)
     probs = read_posterior(infile, num_frames, num_labels)
-    probs_rounded = empty(probs.shape, int)
+    # XXX
+    probs_rounded = empty(probs.shape, float)
+    #probs_rounded = empty(probs.shape, int)
     print >>sys.stderr, "got here 12"
     sys.stderr.flush()
 
@@ -167,7 +172,9 @@ def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num
     sys.stderr.flush()
 
     # scale, round, and cast to int
-    (probs * POSTERIOR_SCALE_FACTOR).round(out = probs_rounded)
+    # XXX
+    #(probs * POSTERIOR_SCALE_FACTOR).round(out = probs_rounded)
+    (probs * POSTERIOR_SCALE_FACTOR).round(decimals=100, out = probs_rounded)
     print >>sys.stderr, "got here 14"
     sys.stderr.flush()
 
@@ -175,20 +182,17 @@ def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num
     zipper = zip(outfilenames, probs_rounded.T, xrange(num_labels))
     for outfilename, probs_rounded_label, label_index in zipper:
         # run-length encoding on the probs_rounded_label
-        print >>sys.stderr, "got here 15"
         sys.stderr.flush()
 
         outfile = open(outfilename, "w")
         pos, = where(diff(probs_rounded_label) != 0)
-        pos = r_[start, pos[:]+start+1, end]
-        print >>sys.stderr, "got here 16"
+        pos = r_[start, pos[:]*resolution+start+resolution, end]
         sys.stderr.flush()
 
         for bed_start, bed_end in zip(pos[:-1], pos[1:]):
             chrom_start = str(bed_start)
             chrom_end = str(bed_end)
-            value = str(probs_rounded_label[bed_start-start])
-            print >>sys.stderr, "got here 17"
+            value = str(probs_rounded_label[(bed_start-start)/resolution])
             sys.stderr.flush()
 
             row = [chrom, chrom_start, chrom_end, value]
@@ -238,10 +242,11 @@ def print_to_fd(fd, line):
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
                            genomedataname, float_filename, int_filename,
                            distribution, track_indexes_text, *args):
-    # XXX: this whole function is duplicative of run_viterbi_save_bed and needs to be reduced
-    # convert from tuple
     print >>sys.stderr, "got here 1"
     sys.stderr.flush()
+
+    # XXX: this whole function is duplicative of run_viterbi_save_bed and needs to be reduced
+    # convert from tuple
     args = list(args)
 
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
@@ -355,7 +360,6 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
         for filepath in temp_filepaths:
             # don't raise a nested exception if the file was never created
             try:
-                # XXX commented this out so that I can look at the files -- need to uncomment it
                 filepath.remove()
                 pass
             except OSError, err:
@@ -373,6 +377,7 @@ TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "posterior"): load_posterior_save_bed}
 
 def task(verb, kind, outfilename, chrom, start, end, resolution, reverse, *args):
+    print >>sys.stderr, "got here 102"
     start = int(start)
     end = int(end)
     resolution = int(resolution)
@@ -381,20 +386,29 @@ def task(verb, kind, outfilename, chrom, start, end, resolution, reverse, *args)
     print >>sys.stderr, "running task(verb=%s, kind=%s, outfilename=%s, chrom=%s, start=%s, end=%s, resolution=%s, reverse=%s, args=%s)" % (verb, kind, outfilename, chrom, start, end, resolution, reverse, args)
     sys.stderr.flush()
 
-    TASKS[verb, kind]((chrom, start, end), resolution, reverse, outfilename, *args)
+    print >>sys.stderr, "got here 103"
+    return TASKS[verb, kind]((chrom, start, end), resolution, reverse, outfilename, *args)
     print >>sys.stderr, "done with TASK."
     sys.stderr.flush()
 
 def main(args=sys.argv[1:]):
-    # XXX
-    #logfile = open(path(TEMP_DIRPATH) / "log", "w")
-    #sys.stderr = logfile
+    print >>sys.stderr, "=============== starting segway-task ===================="
+
     if len(args) < 7:
         print >>sys.stderr, \
             "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
         sys.exit(2)
 
+    print >>sys.stderr, "args:", args
+
+    # XXX This code fixes the really strange nondeterministic
+    # segfault bug.  I have no idea why it's necessary
+    args = map(lambda s: s.replace("SENTINEL_PERCENT_SIGN", "%s"), args)
+
     return task(*args)
 
 if __name__ == "__main__":
+    print >>sys.stderr, "got here (name __main__)"
+
+    print >>sys.stderr, "got here 101"
     sys.exit(main())

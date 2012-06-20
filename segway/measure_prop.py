@@ -6,6 +6,8 @@ import cPickle as pickle
 import struct
 from distutils.spawn import find_executable
 import subprocess
+import pdb
+from math import log
 
 
 from .virtual_evidence import write_virtual_evidence
@@ -14,7 +16,8 @@ from .observations import downsample_add
 from ._util import (ceildiv, Copier, memoized_property,
                     VIRTUAL_EVIDENCE_FULL_LIST_FILENAME,
                     VIRTUAL_EVIDENCE_WINDOW_LIST_FILENAME_TMPL,
-                    VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL)
+                    VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL,
+                    permissive_log)
 
 SUBDIRNAME_MEAUSURE_PROP = "measure_prop"
 MEASURE_PROP_WORKDIRNAME_TMPL = "mp.%s.%s"
@@ -23,8 +26,8 @@ MEASURE_PROP_TRANS_FILENAME = "trans.mp_trans"
 MEASURE_PROP_LABEL_FILENAME = "label.mp_label"
 MEASURE_PROP_POST_FILENAME = "post.mp_label"
 
-MU = 0.1
-NU = 0.01
+#MU = 10
+#NU = 0
 
 #################################################################
 # Graph file
@@ -194,7 +197,9 @@ def test_measure_labels():
 #################################################################
 
 class MeasurePropRunner(Copier):
-    copy_attrs = ["windows", "resolution", "num_segs", "uniform_ve_dirname", "work_dirpath", "num_worlds", "measure_prop_graph_filepath"]
+    copy_attrs = ["windows", "resolution", "num_segs", "uniform_ve_dirname",
+                  "work_dirpath", "num_worlds", "measure_prop_graph_filepath",
+                  "mu", "nu", "mp_weight"]
 
     @memoized_property
     def num_frames(self):
@@ -235,7 +240,10 @@ class MeasurePropRunner(Copier):
 
     def run_segway_posterior(self, instance_index, round_index, params_filename):
         # need to specify: MP uniform ve files, structure file, params file
-        self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
+
+        # XXX do we use VE for JT or not?
+        #self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
+
         posterior_workdir = self.runner.make_mp_posterior_workdir(instance_index,
                                                                   round_index)
         self.posterior_tmpls = [(posterior_workdir /
@@ -308,21 +316,38 @@ class MeasurePropRunner(Copier):
                         end = int(end)
                         prob = float(prob) / 100
 
-                        assert chrom == window_chrom
-                        assert start >= window_start
-                        assert end <= window_end
+                        try:
+                            assert chrom == window_chrom
+                            assert start >= window_start
+                            assert end <= window_end
+                        except:
+                            pdb.set_trace()
 
                         # segway's posteriors should line up with the resolution
-                        assert ((end - start) % self.resolution) == 0
-                        assert ((start - window_start) % self.resolution) == 0
+                        try:
+                            assert ((end - start) % self.resolution) == 0
+                            assert ((start - window_start) % self.resolution) == 0
+                        except:
+                            pdb.set_trace()
                         num_obs = ceildiv(end - start, self.resolution)
                         first_obs_index = (start - window_start) / self.resolution
                         for obs_index in range(first_obs_index, first_obs_index+num_obs):
                             posteriors[obs_index][label_index] = prob
 
+            # add psuedocounts to avoid breaking measure prop
+            for frame_index in range(window_num_frames):
+                posteriors[frame_index] = [((posteriors[frame_index][i] + 0.0001) /
+                                           (1 + 0.0001*self.num_segs))
+                                           for i in range(len(posteriors[frame_index]))]
+
             # assert distribution constraint
             for frame_index in range(window_num_frames):
-                assert (abs(sum(posteriors[frame_index]) - 1) < 0.01)
+                try:
+                    assert (abs(sum(posteriors[frame_index]) - 1) < 0.01)
+                except:
+                    print posteriors[frame_index]
+                    raise
+
 
             window_posteriors[window_index] = posteriors
 
@@ -348,13 +373,15 @@ class MeasurePropRunner(Copier):
                "-labelFile", label_filepath,
                "-outPosteriorFile", post_filepath,
                "-numClasses", str(self.num_segs),
-               "-mu", str(MU),
-               "-nu", str(NU),
+               "-mu", str(self.mu),
+               "-nu", str(self.nu),
                "-nWinSize", "1",
                "-printAccuracy", "true",
                "-measureLabels", "true",
-               "-maxIters", "200"]
+               "-maxIters", "40"] # XXX
         print >>sys.stderr, "MP command:"
+        # XXX
+        print >>sys.stderr, cmd
         print >>sys.stderr, " ".join(cmd)
         subprocess.check_call(cmd)
 
@@ -381,11 +408,28 @@ class MeasurePropRunner(Copier):
 
     def mp_post_to_ve(self, instance_index, round_index):
         posts = self.read_mp_post_file(instance_index, round_index)
+
+        # weight posteriors and add pseudocounts XXX
+        for i in range(len(posts)):
+            if ((i % 100) == 0): print "------------------------"
+            if ((i % 100) == 0): print posts[i]
+            posts[i] = map(lambda p: p**self.mp_weight, posts[i])
+            posts[i] = map(lambda p: p+0.0001, posts[i])
+            if ((i % 100) == 0): print posts[i]
+            partition = sum(posts[i])
+            posts[i] = map(lambda p: float(p) / partition, posts[i])
+            if ((i % 100) == 0): print posts[i]
+            posts[i] = map(permissive_log, posts[i])
+            if ((i % 100) == 0): print posts[i]
+
+
+
         window_posts = [None for i in range(len(self.windows))]
         for window_index, (world, chrom, start, end) in enumerate(self.windows):
             window_num_frames = ceildiv(end-start, self.resolution)
             window_posts[window_index] = posts[:window_num_frames]
             posts = posts[window_num_frames:]
+
         write_virtual_evidence(window_posts, self.runner.measure_prop_ve_dirpath,
                                self.windows, self.num_segs)
 
@@ -395,7 +439,7 @@ class MeasurePropRunner(Copier):
 
         # make uniform VE files
         def make_obs_iter():
-            ve_line = [float(1)/(self.num_segs) for i in range(self.num_segs)]
+            ve_line = [log(float(1)/(self.num_segs)) for i in range(self.num_segs)]
             for window_index, (world, chrom, start, end) in enumerate(self.windows):
                 num_frames = ceildiv(end-start, self.resolution)
                 yield (ve_line for frame_index in range(num_frames))
@@ -421,7 +465,7 @@ class MeasurePropRunner(Copier):
         self.write_mp_label_file(instance_index, round_index)
 
         # 4) write MP graph, trans files
-        self.write_mp_graph_file(instance_index, round_index)
+        #self.write_mp_graph_file(instance_index, round_index)
         self.write_mp_trans_file(instance_index, round_index)
 
         # 5) run MP

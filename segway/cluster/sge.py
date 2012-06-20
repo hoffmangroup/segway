@@ -30,6 +30,7 @@ class JobTemplateFactory(_JobTemplateFactory):
         # automatic crash when you also set a virtual memory limit and
         # then start new pthreads. Setting h_stack is necessary if you
         # are setting h_vmem.
+
         return [make_single_res_req("mem_requested", mem_usage),
                 make_single_res_req("h_vmem", self.mem_limit),
                 make_single_res_req("h_stack", STACK_LIMIT)]

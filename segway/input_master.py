@@ -10,6 +10,7 @@ __version__ = "$Revision$"
 
 from math import frexp, ldexp
 from string import Template
+import sys
 
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, sqrt, tile, vectorize, where,
@@ -29,6 +30,8 @@ try:
 except KeyError:
     pass
 else:
+    # XXX
+    print >>sys.stderr, "Seeding random number generator with: %s" % seed_text
     seed(int(seed_text))
 
 if USE_MFSDG:

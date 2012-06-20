@@ -59,6 +59,7 @@ from ._util import (data_filename,
                     ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     make_default_filename,
                     make_filelistpath, make_prefix_fmt, ceildiv,
+                    permissive_log,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
                     OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
@@ -500,6 +501,8 @@ class Runner(object):
         self.measure_prop_graph_filepath = False
         self.mp_runner = None
         self.measure_prop_ve_dirpath = None # set by MeasurePropRunner
+        self.mu = None
+        self.nu = None
 
         self.card_supervision_label = -1
 
@@ -566,6 +569,9 @@ class Runner(object):
                         ("bed", "bed_filename"),
                         ("semisupervised", "supervision_filename"),
                         ("measure_prop","measure_prop_graph_filepath"),
+                        ("measure_prop_mu","mu"),
+                        ("measure_prop_nu","nu"),
+                        ("measure_prop_weight","mp_weight"),
                         ("virtual_evidence", "virtual_evidence_filename"),
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
@@ -740,7 +746,8 @@ class Runner(object):
     @memoized_property
     def uniform_ve_dirname(self):
         res = self.obs_dirpath / "uniform_ve"
-        self.make_dir(res)
+        if not res.isdir():
+            self.make_dir(res)
         return res
 
     def make_measure_prop_ve_full_list_filename(self, instance_index, round_index):
@@ -1509,7 +1516,7 @@ class Runner(object):
                 start = int(datum.chromStart)
                 end = int(datum.chromEnd)
                 try:
-                    evidence = map(float, datum._words[3:])
+                    evidence = map(permissive_log, map(float, datum._words[3:]))
                 except ValueError:
                     print >>sys.stderr, """
                     Error reading virtual evidence file: %s
@@ -1687,6 +1694,7 @@ class Runner(object):
                    componentCache=COMPONENT_CACHE,
                    deterministicChildrenStore=DETERMINISTIC_CHILDREN_STORE,
                    jtFile=self.jt_info_filename,
+                   seed="T", # XXX
                    obsNAN=True)
 
         if ISLAND:
@@ -1756,9 +1764,15 @@ class Runner(object):
         else:
             args = gmtk_cmdline
 
+
         # this doesn't include use of segway-wrapper, which takes the
         # memory usage as an argument, and may be run multiple times
         self.log_cmdline(gmtk_cmdline, args)
+
+        # XXX This code fixes the really strange nondeterministic
+        # segfault bug.  I have no idea why it's necessary
+        args = map(str, args)
+        args = map(lambda s: s.replace("%s", "SENTINEL_PERCENT_SIGN"), args)
 
         if self.dry_run:
             return None
@@ -1769,6 +1783,7 @@ class Runner(object):
         job_tmpl.jobName = job_name
         job_tmpl.remoteCommand = ENV_CMD
         job_tmpl.args = map(str, args)
+
 
         # this is going to cause problems on heterogeneous systems
         environment = environ.copy()
@@ -2322,7 +2337,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         prog = self.prog_factory(prog)
         job_name = self.make_job_name_identify(prefix_job_name, window_index)
         output_filename = output_filenames[window_index]
-        print >>sys.stderr, "queue_identify: output_filename=%s" % output_filename
 
         kwargs = self.get_identify_kwargs(window_index, kwargs, params_filename)
 
@@ -2445,11 +2459,18 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         viterbi_filenames = self.viterbi_filenames
         posterior_filenames = self.posterior_filenames
-        print >>sys.stderr, "posterior_filenames: ", repr(posterior_filenames)
+
+        if self.measure_prop_graph_filepath:
+            self.mp_runner = MeasurePropRunner(self)
+            self.mp_runner.load("identify")
 
         # XXX: kill submitted jobs on exception
         with Session() as session:
             self.session = session
+
+            if self.measure_prop_graph_filepath:
+                self.mp_runner.update("identify", "identify", self.params_filename)
+
             self.run_identify_posterior_jobs(self.identify, self.posterior,
                                              viterbi_filenames, posterior_filenames)
 
@@ -2611,6 +2632,15 @@ def parse_options(args):
         # XXXmax
         group.add_option("--measure-prop", metavar="FILE",
                          help="run with measure prop graph in FILE (default none)")
+
+        group.add_option("--measure-prop-mu", metavar="FILE", default=1,
+                         help="mu hyperparameter for measure prop")
+
+        group.add_option("--measure-prop-nu", metavar="FILE", default=0,
+                         help="nu hyperparameter for measure prop")
+
+        group.add_option("--measure-prop-weight", type=float, default=1.0,
+                         help="weight hyperparameter for measure prop")
 
         # XXXmax
         group.add_option("--virtual-evidence", metavar="FILE",

@@ -11,8 +11,15 @@ from os import environ
 import sys
 from time import sleep
 from traceback import format_exception_only, print_stack, print_tb
+import pdb # XXX
+import cPickle as pickle
 
 try:
+    # TODO_proc: replace Session with an object that's either backed by
+    # a DRMAA session or nothing.
+    # Actually, just make a VirtualSession class here, and import drmaa session
+    # as DRMAASession.  Define Session() to return either a VirtualSession or
+    # real DRMAASession
     from drmaa import ExitTimeoutException, JobState, Session
 except RuntimeError:
     print >>sys.stderr, 'Traceback (most recent call last):'
@@ -53,6 +60,8 @@ MAX_JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
 # these settings limit job queueing to 360 at once
 
 def get_driver_name(session):
+    #TODO_proc add a drmsInfo command that either passes to the session
+    # or returns something like "NONE"
     drms_info = session.drmsInfo
 
     if drms_info.startswith("GE") or drms_info.startswith("SGE"):
@@ -84,6 +93,7 @@ class RestartableJob(object):
         # last trial index tried
         self.trial_index = -1
 
+
         self.global_mem_usage = global_mem_usage
         self.mem_usage_key = mem_usage_key
 
@@ -95,6 +105,9 @@ class RestartableJob(object):
         return "<RestartableJob '%s'>" % self.job_tmpl_factory.template.jobName
 
     def run(self):
+        # TODO_proc: have this depend on the cluster type.
+        # Process-based jobs will have to skip the job template part
+        # and just run the command
         job_tmpl_factory = self.job_tmpl_factory
 
         global_mem_usage = self.global_mem_usage
@@ -113,6 +126,7 @@ class RestartableJob(object):
         self.trial_index = trial_index
 
         job_template = job_tmpl_factory(trial_index)
+
         res = self.session.runJob(job_template)
 
         assert res
