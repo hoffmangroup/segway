@@ -20,6 +20,8 @@ from path import path
 from segway._util import maybe_gzip_open
 
 def get_dir_filenames(dirname):
+    if (not path(dirname).exists()):
+        raise IOError("Directory %s not found" % dirname)
     for dirbasename, dirnames, filenames in walk(dirname):
         dirbasepath = path(dirbasename)
         relative_dirbasename = dirbasename.partition(dirname)[2]
