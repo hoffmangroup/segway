@@ -411,16 +411,11 @@ class MeasurePropRunner(Copier):
 
         # weight posteriors and add pseudocounts XXX
         for i in range(len(posts)):
-            if ((i % 100) == 0): print "------------------------"
-            if ((i % 100) == 0): print posts[i]
             posts[i] = map(lambda p: p**self.mp_weight, posts[i])
             posts[i] = map(lambda p: p+0.0001, posts[i])
-            if ((i % 100) == 0): print posts[i]
             partition = sum(posts[i])
             posts[i] = map(lambda p: float(p) / partition, posts[i])
-            if ((i % 100) == 0): print posts[i]
             posts[i] = map(permissive_log, posts[i])
-            if ((i % 100) == 0): print posts[i]
 
 
 

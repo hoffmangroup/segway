@@ -2155,6 +2155,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
+        self.posterior_dirname
 
         threads = []
         with Session() as session:

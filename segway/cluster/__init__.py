@@ -11,25 +11,33 @@ from os import environ
 import sys
 from time import sleep
 from traceback import format_exception_only, print_stack, print_tb
-import pdb # XXX
 import cPickle as pickle
 
-try:
-    # TODO_proc: replace Session with an object that's either backed by
-    # a DRMAA session or nothing.
-    # Actually, just make a VirtualSession class here, and import drmaa session
-    # as DRMAASession.  Define Session() to return either a VirtualSession or
-    # real DRMAASession
-    from drmaa import ExitTimeoutException, JobState, Session
-except RuntimeError:
-    print >>sys.stderr, 'Traceback (most recent call last):'
-    typ, val, tb = sys.exc_info()
-    print_stack(tb.tb_frame.f_back)
-    print_tb(tb)
-    print >>sys.stderr, " ".join(format_exception_only(typ, val))
-    print >>sys.stderr
-    print >>sys.stderr, "Hint: you must run Segway on a cluster with DRMAA installed."
-    sys.exit(3)
+###########################################
+# This flag determines whether jobs are run on a cluster
+# or on the local machine. Setting
+# RUN_JOBS_LOCAL = False
+# will run jobs on the cluster (using DRMAA). Setting
+# RUN_JOBS_LOCAL = True
+# will run jobs as processes on the local machine,
+# and doesn't require DRMAA.
+RUN_JOBS_LOCAL = True
+###########################################
+
+if RUN_JOBS_LOCAL:
+    from .local import ExitTimeoutException, JobState, Session as Session
+else:
+    try:
+        from drmaa import ExitTimeoutException, JobState, Session as Session
+    except RuntimeError:
+        print >>sys.stderr, 'Traceback (most recent call last):'
+        typ, val, tb = sys.exc_info()
+        print_stack(tb.tb_frame.f_back)
+        print_tb(tb)
+        print >>sys.stderr, " ".join(format_exception_only(typ, val))
+        print >>sys.stderr
+        print >>sys.stderr, "Hint: you must run Segway on a cluster with DRMAA installed."
+        sys.exit(3)
 
 from .._util import constant
 
@@ -49,7 +57,11 @@ CLEAN_SAFE_TIME = int(3600 * 0.9)
 try:
     MIN_JOB_WAIT_SLEEP_TIME = float(environ["MIN_JOB_WAIT_SLEEP_TIME"])
 except KeyError:
-    MIN_JOB_WAIT_SLEEP_TIME = 3.0
+    if RUN_JOBS_LOCAL:
+        #MIN_JOB_WAIT_SLEEP_TIME = 0.05
+        MIN_JOB_WAIT_SLEEP_TIME = 5.0
+    else:
+        MIN_JOB_WAIT_SLEEP_TIME = 3.0
 
 ## credited for min time so that there is some buffer when considering
 ## whether to submit more jobs or not
@@ -60,8 +72,6 @@ MAX_JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
 # these settings limit job queueing to 360 at once
 
 def get_driver_name(session):
-    #TODO_proc add a drmsInfo command that either passes to the session
-    # or returns something like "NONE"
     drms_info = session.drmsInfo
 
     if drms_info.startswith("GE") or drms_info.startswith("SGE"):
@@ -71,6 +81,8 @@ def get_driver_name(session):
     # not sure what PBS and PBS Pro return here.
     elif drms_info.startswith("Torque"):
         return "pbs"
+    elif drms_info == "local_virtual_drmsInfo":
+        return "local"
     else:
         msg = ("unsupported distributed resource management system: %s"
                % drms_info)
@@ -105,9 +117,6 @@ class RestartableJob(object):
         return "<RestartableJob '%s'>" % self.job_tmpl_factory.template.jobName
 
     def run(self):
-        # TODO_proc: have this depend on the cluster type.
-        # Process-based jobs will have to skip the job template part
-        # and just run the command
         job_tmpl_factory = self.job_tmpl_factory
 
         global_mem_usage = self.global_mem_usage
