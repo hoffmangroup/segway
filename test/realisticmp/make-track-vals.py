@@ -5,30 +5,43 @@ import argparse
 import subprocess
 import random
 import gzip
+import shutil
+from path import path
 _folder_path = os.path.split(os.path.abspath(__file__))[0]
 sys.path.append(_folder_path)
 
 def main():
     parser = argparse.ArgumentParser()
     #parser.add_argument('include_coords')
-    #parser.add_argument('out')
+    parser.add_argument('outdir')
     args = parser.parse_args()
 
-    include_coords = "include-coords.bed"
-    track1 = "testtrack1.bedgraph"
-    track2 = "testtrack2.bedgraph"
-    track1_noisy = "testtrack1_noisy.bedgraph"
-    track2_noisy = "testtrack2_noisy.bedgraph"
-    correct_seg = "correct_seg.bed.gz"
+    outdir = path(args.outdir)
+    include_coords = outdir / "include-coords.bed"
+    track1 = outdir / "testtrack1_clean.bedgraph"
+    track2 = outdir / "testtrack2_clean.bedgraph"
+    track1_noisy = outdir / "testtrack1.bedgraph"
+    track2_noisy = outdir / "testtrack2.bedgraph"
+    correct_seg = outdir / "correct_seg.bed.gz"
+    tracknames = outdir / "tracknames.txt"
+    sequence = outdir / "chr1.fa"
+    genomedata = outdir / "genomedata"
+    genomedata_clean = outdir / "genomedata-clean"
+    ve_labels = outdir / "empty.ve_labels"
+    seg_table = outdir / "seg_table.bed"
 
-    num_windows = 5
-    resolution = 10
-    window_len = 1000
-    freqs = [.65, .20, .10, .05]
+
+
+    num_windows = 2
+    resolution = 100 # length of each segment
+    window_len = 10 # number of segments per window
+    #freqs = [.65, .20, .10, .05]
+    freqs = [.25, .25, .25, .25]
     # for applying random.choice
     label_population = sum(map(lambda i: [i]*int(freqs[i]*100), range(len(freqs))), [])
     track1_means = {0:0, 1:0, 2:1, 3:1}
     track2_means = {0:0, 1:1, 2:0, 3:1}
+    #variance = 0.0
     variance = 0.1
 
     include_coords_f = open(include_coords, "w")
@@ -38,13 +51,27 @@ def main():
     track2_noisy_f = open(track2_noisy, "w")
     correct_seg_f = gzip.open(correct_seg, "w")
 
+    # XXX problem: something the signal tracks isn't right
+    # rewrite this code to make it cleaner, and hopefully fix
+    # the problem in the process
+
+    windows = []
+    cur = 10000
+    for i in range(num_windows):
+        start = cur
+        end = start + resolution*window_len
+        # make space so that the window and gap together
+        # is 10x the size of the window
+        cur = end + (resolution*window_len*9)
+        windows.append((start,end))
+
     cur_pos = 0
-    for window in range(num_windows):
-        window_start = (1+window*2)*window_len*resolution
-        include_coords_f.write("chr1\t%s\t%s\n" % (window_start, window_start+window_len*resolution))
-        for i in range(window_len):
-            pos = window_start + i*resolution
+    for window_index, (window_start, window_end) in enumerate(windows):
+        include_coords_f.write("chr1\t%s\t%s\n" % (window_start, window_end))
+        assert (((window_end - window_start) % resolution) == 0)
+        for i in range((window_end-window_start)/resolution):
             label = random.choice(label_population)
+            pos = window_start + resolution*i
             correct_seg_f.write("chr1\t%s\t%s\t%s\n" % (pos, pos+resolution, label))
 
             track1_val = track1_means[label]
@@ -58,7 +85,6 @@ def main():
             track2_noisy_f.write("chr1\t%s\t%s\t%s\n" % (pos, pos+resolution, track2_val_noisy))
 
 
-
     include_coords_f.close()
     track1_f.close()
     track2_f.close()
@@ -66,24 +92,42 @@ def main():
     track2_noisy_f.close()
     correct_seg_f.close()
 
-    cmd = ["genomedata-load", "--sequence=chr1.fa",
+    total_len = windows[-1][1]
+    with open(sequence, "w") as seq_f:
+        seq_f.write(">chr1\n")
+        for i in range((total_len / 50)+10):
+            seq_f.write("a"*50)
+            seq_f.write("\n")
+
+    with open(tracknames, "w") as tracknames_f:
+        tracknames_f.write("testtrack1\ntesttrack2")
+
+    cmd = ["genomedata-load",
+           "--sequence=%s" % sequence,
            "--track=testtrack1=%s" % track1,
            "--track=testtrack2=%s" % track2,
            "--file-mode",
            "--verbose",
-           "genomedata"]
+           genomedata_clean]
     print " ".join(cmd)
     subprocess.check_call(cmd)
 
-
-    cmd2 = ["genomedata-load", "--sequence=chr1.fa",
+    cmd2 = ["genomedata-load",
+            "--sequence=%s" % sequence,
            "--track=testtrack1=%s" % track1_noisy,
            "--track=testtrack2=%s" % track2_noisy,
            "--file-mode",
            "--verbose",
-           "genomedata-noisy"]
+           genomedata]
     print " ".join(cmd2)
     subprocess.check_call(cmd2)
+
+    with open(ve_labels, "w") as f: pass # create empty file
+
+    with open(seg_table, "w") as f:
+        f.write("label\tlen\n:\t1::1\n")
+
+
 
 if __name__ == '__main__':
     main()
