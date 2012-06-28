@@ -1,0 +1,6 @@
+WARNING: mixture named 'mx_seg2_subseg0_testtrack1' did not receive any accumulated probability in EM iteration
+WARNING: Gaussian Component named 'mc_asinh_norm_seg2_subseg0_testtrack1' did not receive any accumulated probability in EM iteration. Global missed increment count is 0. Also check child mean 'mean_seg2_subseg0_testtrack1' and covar 'covar_testtrack1'
+WARNING: mixture named 'mx_seg2_subseg0_testtrack2' did not receive any accumulated probability in EM iteration
+WARNING: Gaussian Component named 'mc_asinh_norm_seg2_subseg0_testtrack2' did not receive any accumulated probability in EM iteration. Global missed increment count is 0. Also check child mean 'mean_seg2_subseg0_testtrack2' and covar 'covar_testtrack2'
+WARNING: DenseCPT named 'seg_subseg' received only -1.000000e+20 accumulated probability in EM iteration. Using previous iteraton values.
+WARNING: DenseCPT named 'seg_subseg_subseg' received only -1.000000e+20 accumulated probability in EM iteration. Using previous iteraton values.
