@@ -283,14 +283,18 @@ any inference using the :option:`--dry-run` option.
 
 Using :option:`--num-instances`\=\ *starts* will generate multiple copies of the
 ``input.master`` file, named ``input.0.master``, ``input.1.master``,
-and so on, with different randomly picked initial parameters. You may
-substitute your own ``input.master`` files but I recommend starting
-with a Segway-generated template. This will help avoid some common
-pitfalls. In particular, if you are going to perform training on your
-model, you must ensure that the ``input.master`` file retains the same
-``#ifdef`` structure for parameters you wish to train. Otherwise, the
-values discovered after one round of training will not be used in
-subsequent rounds, or in the identify or posterior stages.
+and so on, with different randomly picked initial parameters. Segway
+training results can be quite dependent on the initial parameters
+selected, so it is a good idea to try more than one. I usually use
+`--num-instances=10``.
+
+You may substitute your own ``input.master`` files but I recommend
+starting with a Segway-generated template. This will help avoid some
+common pitfalls. In particular, if you are going to perform training
+on your model, you must ensure that the ``input.master`` file retains
+the same ``#ifdef`` structure for parameters you wish to train.
+Otherwise, the values discovered after one round of training will not
+be used in subsequent rounds, or in the identify or posterior stages.
 
 You can use the :option:`--num-labels`\=\ *labels* option to specify the
 number of segment labels to use in the model (default 2). You can set

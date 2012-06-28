@@ -39,7 +39,7 @@ class OutputSaver(Copier):
 class IdentifySaver(OutputSaver):
     copy_attrs = ["bed_filename", "unquoted_tracknames", "uuid",
                   "viterbi_filenames", "bigbed_filename", "windows",
-                  "num_worlds"]
+                  "num_worlds", "num_segs"]
 
     attrs = dict(visibility="dense",
                  viewLimits="0:1",
@@ -47,13 +47,13 @@ class IdentifySaver(OutputSaver):
                  autoScale="off")
 
     name_tmpl = "%s.%s"
-    desc_tmpl = "%s segmentation of %%s" % __package__
+    desc_tmpl = "%s %%d-label segmentation of %%s" % __package__
 
     def make_header(self):
         attrs = self.attrs.copy()
         attrs["name"] = self.name_tmpl % (__package__, self.uuid)
 
-        description = self.desc_tmpl % ", ".join(self.unquoted_tracknames)
+        description = self.desc_tmpl % (self.num_segs, ", ".join(self.unquoted_tracknames))
         attrs["description"] = description
 
         return make_bed_attrs(attrs)
