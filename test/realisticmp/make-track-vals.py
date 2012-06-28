@@ -10,10 +10,21 @@ from path import path
 _folder_path = os.path.split(os.path.abspath(__file__))[0]
 sys.path.append(_folder_path)
 
+def parse_freqs(freqs):
+    ret = map(float, freqs.split(","))
+    assert (abs(sum(ret) - 1.0) < 0.01)
+    return ret
+
 def main():
     parser = argparse.ArgumentParser()
-    #parser.add_argument('include_coords')
     parser.add_argument('outdir')
+    parser.add_argument('--variance', type=float, default=0.1)
+    parser.add_argument('--seg-len', type=int, default=100) # XXX
+    parser.add_argument('--window-len', type=int, default=100, # XXX
+                        help="segs per window")
+    parser.add_argument('--num-windows', type=int, default=10) # XXX
+    parser.add_argument('--freqs', type=parse_freqs, default=[0.25,0.25,0.25,0.25],
+                        help="comma-delimited floats")
     args = parser.parse_args()
 
     outdir = path(args.outdir)
@@ -30,19 +41,15 @@ def main():
     ve_labels = outdir / "empty.ve_labels"
     seg_table = outdir / "seg_table.bed"
 
-
-
-    num_windows = 2
-    resolution = 100 # length of each segment
-    window_len = 10 # number of segments per window
-    #freqs = [.65, .20, .10, .05]
-    freqs = [.25, .25, .25, .25]
+    resolution = args.seg_len
+    window_len = args.window_len
+    num_windows = args.num_windows
+    freqs = args.freqs
     # for applying random.choice
     label_population = sum(map(lambda i: [i]*int(freqs[i]*100), range(len(freqs))), [])
     track1_means = {0:0, 1:0, 2:1, 3:1}
     track2_means = {0:0, 1:1, 2:0, 3:1}
-    #variance = 0.0
-    variance = 0.1
+    variance = args.variance
 
     include_coords_f = open(include_coords, "w")
     track1_f = open(track1, "w")
@@ -50,10 +57,6 @@ def main():
     track1_noisy_f = open(track1_noisy, "w")
     track2_noisy_f = open(track2_noisy, "w")
     correct_seg_f = gzip.open(correct_seg, "w")
-
-    # XXX problem: something the signal tracks isn't right
-    # rewrite this code to make it cleaner, and hopefully fix
-    # the problem in the process
 
     windows = []
     cur = 10000
@@ -64,6 +67,8 @@ def main():
         # is 10x the size of the window
         cur = end + (resolution*window_len*9)
         windows.append((start,end))
+
+    correct_seg_f.write("track autoScale=off description=\"segway segmentation\"\n")
 
     cur_pos = 0
     for window_index, (window_start, window_end) in enumerate(windows):

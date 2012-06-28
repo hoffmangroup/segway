@@ -1,136 +1,135 @@
 #!/usr/bin/env bash
-set -o nounset -o pipefail -o errexit -o verbose
+set -o nounset -o pipefail -o errexit
 
-if [ $# != 0 ]; then
-    echo usage: "$0"
+if [ $# != 7 ]; then
+    echo usage: "$0 workdir datadir mu nu gamma neighbors variance"
     exit 2
 fi
 
 source $HOME/mprc.sh
 echo "segway is: $(which segway)"
 
-TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
-chmod g+rx $TMPDIR
-echo >&2 "entering directory $TMPDIR"
-cd "$TMPDIR"
+OVERLAP="$HOME/ssl/bin/overlap.py"
 
+WORKDIR=$1
+echo >&2 "entering directory $WORKDIR"
+cd "$WORKDIR"
 
+DATADIR=$2
+DATADIR="../${DATADIR}"
+
+MU=$3
+NU=$4
+GAMMA=$5
+NUM_NEIGHBORS=$6
+VARIANCE=$7
 
 MEM_PROGRESSION="0.5,1.0,2.0,2.5"
-MU="0.1"
-NU="0.01"
-GAMMA="1"
-NEIGH="5"
-NUM_NEIGHBORS="10"
-NUM_INSTANCES="1"
+NUM_INSTANCES="5" # XXX
 RAND_SEED=19890506
 
 cluster_arg="--cluster-opt=-l rhel=6,testing=TRUE"
 
-mkdir data
-../make-track-vals.py data
 
-echo "------------------------------------------"
-echo "running normal...."
-echo "------------------------------------------"
+#echo "------------------------------------------"
+#echo "running normal...."
+#echo "------------------------------------------"
 
-SEGWAY_RAND_SEED=$RAND_SEED segway "$cluster_arg" \
-    --virtual-evidence="data/empty.ve_labels" \
-    --include-coords="data/include-coords.bed" \
-    --tracks-from="data/tracknames.txt" \
-    --ruler-scale=1 \
-    --seg-table="data/seg_table.bed" \
-    --num-labels="4" \
-    --mem-usage=$MEM_PROGRESSION \
-    --distribution=norm \
-    --num-instances=$NUM_INSTANCES \
-    train "data/genomedata" traindir-normal
+#SEGWAY_RAND_SEED=$RAND_SEED segway "$cluster_arg" \
+    #--virtual-evidence="$DATADIR/empty.ve_labels" \
+    #--include-coords="$DATADIR/include-coords.bed" \
+    #--tracks-from="$DATADIR/tracknames.txt" \
+    #--ruler-scale=1 \
+    #--seg-table="$DATADIR/seg_table.bed" \
+    #--num-labels="4" \
+    #--mem-usage=$MEM_PROGRESSION \
+    #--distribution=norm \
+    #--num-instances=$NUM_INSTANCES \
+    #train "$DATADIR/genomedata" traindir-normal
 
-segway "$cluster_arg" \
-    --virtual-evidence="data/empty.ve_labels" \
-    --include-coords="data/include-coords.bed" \
-    --ruler-scale=1 \
-    --seg-table="data/seg_table.bed" \
-    --mem-usage=$MEM_PROGRESSION \
-    --distribution=norm \
-    identify "data/genomedata" traindir-normal identifydir-normal
+#segway "$cluster_arg" \
+    #--virtual-evidence="$DATADIR/empty.ve_labels" \
+    #--include-coords="$DATADIR/include-coords.bed" \
+    #--ruler-scale=1 \
+    #--seg-table="$DATADIR/seg_table.bed" \
+    #--mem-usage=$MEM_PROGRESSION \
+    #--distribution=norm \
+    #identify "$DATADIR/genomedata" traindir-normal identifydir-normal
 
-segtools-overlap "data/correct_seg.bed.gz" identifydir-normal/segway.bed.gz -o overlap-normal
+#$OVERLAP "$DATADIR/correct_seg.bed.gz" identifydir-normal/segway.bed.gz 4 overlap-normal > diagonal-frac-normal
 
 
+#echo "------------------------------------------"
+#echo "running seed...."
+#echo "------------------------------------------"
+#SEGWAY_RAND_SEED=$RAND_SEED segway "$cluster_arg" \
+    #--virtual-evidence="$DATADIR/empty.ve_labels" \
+    #--include-coords="$DATADIR/include-coords.bed" \
+    #--tracks-from="$DATADIR/tracknames.txt" \
+    #--ruler-scale=1 \
+    #--seg-table="$DATADIR/seg_table.bed" \
+    #--num-labels="4" \
+    #--mem-usage=$MEM_PROGRESSION \
+    #--distribution=norm \
+    #--num-instances=$NUM_INSTANCES \
+    #train "$DATADIR/genomedata-clean" traindir-seed
 
+#segway "$cluster_arg" \
+    #--virtual-evidence="$DATADIR/empty.ve_labels" \
+    #--include-coords="$DATADIR/include-coords.bed" \
+    #--ruler-scale=1 \
+    #--seg-table="$DATADIR/seg_table.bed" \
+    #--mem-usage=$MEM_PROGRESSION \
+    #--distribution=norm \
+    #identify "$DATADIR/genomedata-clean" traindir-seed identifydir-seed
 
-echo "------------------------------------------"
-echo "running seed...."
-echo "------------------------------------------"
-SEGWAY_RAND_SEED=$RAND_SEED segway "$cluster_arg" \
-    --virtual-evidence="data/empty.ve_labels" \
-    --include-coords="data/include-coords.bed" \
-    --tracks-from="data/tracknames.txt" \
-    --ruler-scale=1 \
-    --seg-table="data/seg_table.bed" \
-    --num-labels="4" \
-    --mem-usage=$MEM_PROGRESSION \
-    --distribution=norm \
-    --num-instances=$NUM_INSTANCES \
-    train "data/genomedata-clean" traindir-seed
-
-segway "$cluster_arg" \
-    --virtual-evidence="data/empty.ve_labels" \
-    --include-coords="data/include-coords.bed" \
-    --ruler-scale=1 \
-    --seg-table="data/seg_table.bed" \
-    --mem-usage=$MEM_PROGRESSION \
-    --distribution=norm \
-    identify "data/genomedata-clean" traindir-seed identifydir-seed
-
-segtools-overlap "data/correct_seg.bed.gz" identifydir-seed/segway.bed.gz -o overlap-seed
+#$OVERLAP "$DATADIR/correct_seg.bed.gz" identifydir-seed/segway.bed.gz 4 overlap-seed > diagonal-frac-seed
 
 echo "------------------------------------------"
 echo "making MP files...."
 echo "------------------------------------------"
 /net/noble/vol4/noble/user/maxwl/noblesvn/encode/projects/measure-prop/bin/make_mp_segway_graph.py \
     ind-sim \
-    "data/include-coords.bed" \
+    "$DATADIR/include-coords.bed" \
     1 \
-    "data/mp_graph" \
+    "$DATADIR/mp_graph" \
     "--num-neighbors=$NUM_NEIGHBORS" \
-    "--segmentations=identifydir-seed/segway.bed.gz"
+    "--segmentations=$DATADIR/correct_seg.bed.gz"
 
 echo "------------------------------------------"
 echo "Running MP...."
 echo "------------------------------------------"
 
 SEGWAY_RAND_SEED=$RAND_SEED segway "$cluster_arg" \
-    --measure-prop="data/mp_graph" \
+    --measure-prop="$DATADIR/mp_graph" \
     --measure-prop-mu=$MU \
     --measure-prop-nu=$NU \
     --measure-prop-weight=$GAMMA \
-    --virtual-evidence="data/empty.ve_labels" \
-    --include-coords="data/include-coords.bed" \
-    --tracks-from="data/tracknames.txt" \
+    --virtual-evidence="$DATADIR/empty.ve_labels" \
+    --include-coords="$DATADIR/include-coords.bed" \
+    --tracks-from="$DATADIR/tracknames.txt" \
     --ruler-scale=1 \
-    --seg-table="data/seg_table.bed" \
+    --seg-table="$DATADIR/seg_table.bed" \
     --num-labels="4" \
     --mem-usage=$MEM_PROGRESSION \
     --distribution=norm \
     --num-instances=$NUM_INSTANCES \
-    train "data/genomedata" traindir-mp
+    train "$DATADIR/genomedata" traindir-mp
 
 segway "$cluster_arg" \
-    --measure-prop="data/mp_graph" \
+    --measure-prop="$DATADIR/mp_graph" \
     --measure-prop-mu=$MU \
     --measure-prop-nu=$NU \
     --measure-prop-weight=$GAMMA \
-    --virtual-evidence="data/empty.ve_labels" \
-    --include-coords="data/include-coords.bed" \
+    --virtual-evidence="$DATADIR/empty.ve_labels" \
+    --include-coords="$DATADIR/include-coords.bed" \
     --ruler-scale=1 \
-    --seg-table="data/seg_table.bed" \
+    --seg-table="$DATADIR/seg_table.bed" \
     --mem-usage=$MEM_PROGRESSION \
     --distribution=norm \
-    identify "data/genomedata" traindir-mp identifydir-mp
+    identify "$DATADIR/genomedata" traindir-mp identifydir-mp
 
-segtools-overlap "data/correct_seg.bed.gz" identifydir-mp/segway.bed.gz -o overlap-mp
+$OVERLAP "$DATADIR/correct_seg.bed.gz" identifydir-mp/segway.bed.gz 4 overlap-mp > diagonal-frac-mp
 
 
 
