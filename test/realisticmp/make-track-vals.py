@@ -10,6 +10,9 @@ from path import path
 _folder_path = os.path.split(os.path.abspath(__file__))[0]
 sys.path.append(_folder_path)
 
+BALANCED_FREQS = [0.25,0.25,0.25,0.25]
+UNBALANCED_FREQS = [0.65,0.20,0.10,0.05]
+
 def parse_freqs(freqs):
     ret = map(float, freqs.split(","))
     assert (abs(sum(ret) - 1.0) < 0.01)
@@ -19,13 +22,27 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('outdir')
     parser.add_argument('--variance', type=float, default=0.1)
-    parser.add_argument('--seg-len', type=int, default=100) # XXX
-    parser.add_argument('--window-len', type=int, default=100, # XXX
-                        help="segs per window")
-    parser.add_argument('--num-windows', type=int, default=10) # XXX
-    parser.add_argument('--freqs', type=parse_freqs, default=[0.25,0.25,0.25,0.25],
+
+    parser.add_argument('--seg-len', type=int, default=100)
+    parser.add_argument('--window-len', type=int, default=1000, help="segs per window")
+    parser.add_argument('--num-windows', type=int, default=1)
+
+    parser.add_argument('--freqs', type=parse_freqs, default=BALANCED_FREQS,
                         help="comma-delimited floats")
+    #parser.add_argument('--freqs-type', choices=["balanced", "unbalanced"])
     args = parser.parse_args()
+
+    freqs = args.freqs
+    #if args.freqs_type:
+        #assert (args.freqs == BALANCED_FREQS)
+        #if args.freqs_type == "balanced":
+            #freqs = BALANCED_FREQS
+        #elif args.freqs_type == "unbalanced":
+            #freqs = UNBALANCED_FREQS
+        #else:
+            #assert False
+
+
 
     outdir = path(args.outdir)
     include_coords = outdir / "include-coords.bed"
@@ -44,7 +61,6 @@ def main():
     resolution = args.seg_len
     window_len = args.window_len
     num_windows = args.num_windows
-    freqs = args.freqs
     # for applying random.choice
     label_population = sum(map(lambda i: [i]*int(freqs[i]*100), range(len(freqs))), [])
     track1_means = {0:0, 1:0, 2:1, 3:1}

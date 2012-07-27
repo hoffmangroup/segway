@@ -199,7 +199,7 @@ def test_measure_labels():
 class MeasurePropRunner(Copier):
     copy_attrs = ["windows", "resolution", "num_segs", "uniform_ve_dirname",
                   "work_dirpath", "num_worlds", "measure_prop_graph_filepath",
-                  "mu", "nu", "mp_weight"]
+                  "mu", "mp_weight", "nu"]
 
     @memoized_property
     def num_frames(self):
@@ -213,6 +213,7 @@ class MeasurePropRunner(Copier):
         self.runner = runner
         self.posterior_filename = None
         Copier.__init__(self, runner)
+        self.mp_weight = float(self.mp_weight)
 
     def make_mp_workdir(self, instance_index, round_index):
         res = path(self.work_dirpath /
@@ -376,7 +377,7 @@ class MeasurePropRunner(Copier):
                "-mu", str(self.mu),
                "-nu", str(self.nu),
                "-nWinSize", "1",
-               "-printAccuracy", "true",
+               "-printAccuracy", "false",
                "-measureLabels", "true",
                "-maxIters", "40"] # XXX
         print >>sys.stderr, "MP command:"
@@ -468,8 +469,6 @@ class MeasurePropRunner(Copier):
 
         # 6) convert MP posteriors to VE
         self.mp_post_to_ve(instance_index, round_index)
-
-        #raise NotImplementedError
 
 
 

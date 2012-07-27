@@ -246,7 +246,8 @@ SEGTRANSITION_WEIGHT_SCALE = 1.0
 DIRPATH_WORK_DIR_HELP = path("WORKDIR")
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
-THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
+#THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
+THREAD_START_SLEEP_TIME = 2 # XXX: this should become an option # XXX
 
 # -gpr option for GMTK when reversing
 REVERSE_GPR = "^0:-1:0"
@@ -350,7 +351,9 @@ def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
     # using x !< y instead of x >= y to give the right default answer
     # in the case of NaNs
+
     return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
+
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
@@ -503,6 +506,7 @@ class Runner(object):
         self.measure_prop_ve_dirpath = None # set by MeasurePropRunner
         self.mu = None
         self.nu = None
+        self.mp_weight = None
 
         self.card_supervision_label = -1
 
@@ -572,6 +576,7 @@ class Runner(object):
                         ("measure_prop_mu","mu"),
                         ("measure_prop_nu","nu"),
                         ("measure_prop_weight","mp_weight"),
+                        ("measure_prop_num_iters",),
                         ("virtual_evidence", "virtual_evidence_filename"),
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
@@ -2470,7 +2475,10 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.session = session
 
             if self.measure_prop_graph_filepath:
-                self.mp_runner.update("identify", "identify", self.params_filename)
+                for i in range(self.measure_prop_num_iters):
+                    instance_index = "identify"
+                    round_index = "identify_%s" % i
+                    self.mp_runner.update(instance_index, round_index, self.params_filename)
 
             self.run_identify_posterior_jobs(self.identify, self.posterior,
                                              viterbi_filenames, posterior_filenames)
@@ -2640,8 +2648,11 @@ def parse_options(args):
         group.add_option("--measure-prop-nu", metavar="FILE", default=0,
                          help="nu hyperparameter for measure prop")
 
-        group.add_option("--measure-prop-weight", type=float, default=1.0,
+        group.add_option("--measure-prop-weight", metavar="FILE", default=1.0,
                          help="weight hyperparameter for measure prop")
+
+        group.add_option("--measure-prop-num-iters", metavar="FILE", default=1, type=int,
+                         help="number of iterations to run posterior/measure prop")
 
         # XXXmax
         group.add_option("--virtual-evidence", metavar="FILE",

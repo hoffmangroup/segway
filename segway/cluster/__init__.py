@@ -21,7 +21,14 @@ import cPickle as pickle
 # RUN_JOBS_LOCAL = True
 # will run jobs as processes on the local machine,
 # and doesn't require DRMAA.
-RUN_JOBS_LOCAL = True
+try:
+    cluster_mode_text = environ["SEGWAY_CLUSTER_MODE"]
+    if cluster_mode_text == "LOCAL":
+        RUN_JOBS_LOCAL = True
+    else:
+        RUN_JOBS_LOCAL = False
+except KeyError:
+    RUN_JOBS_LOCAL = False
 ###########################################
 
 if RUN_JOBS_LOCAL:
@@ -59,7 +66,7 @@ try:
 except KeyError:
     if RUN_JOBS_LOCAL:
         #MIN_JOB_WAIT_SLEEP_TIME = 0.05
-        MIN_JOB_WAIT_SLEEP_TIME = 5.0
+        MIN_JOB_WAIT_SLEEP_TIME = 3.0
     else:
         MIN_JOB_WAIT_SLEEP_TIME = 3.0
 
@@ -170,12 +177,12 @@ class RestartableJobDict(dict):
 
         # +1 is to avoid dividing by zero when len(self) is 0
         clean_safe_sleep_time = CLEAN_SAFE_TIME / (len(self)+1)
+        #print >>sys.stderr, "clean_safe_sleep_time:", clean_safe_sleep_time
 
         return min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
 
     def is_sleep_time_gt_min(self):
         sleep_time = self.calc_sleep_time()
-        #print >>sys.stderr, "sleep_time: %s, len: %d" % (sleep_time, len(self))
         return sleep_time > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
 
     def _queue_unconditional(self, restartable_job):

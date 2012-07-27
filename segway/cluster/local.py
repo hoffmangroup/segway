@@ -16,6 +16,7 @@ from .common import _JobTemplateFactory, make_native_spec
 # qsub -j: switches off merging output and error
 NATIVE_SPEC_DEFAULT = dict(w="n", j="n")
 
+# Mimics a DRMAA job template object
 class JobTemplate(object):
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
@@ -34,8 +35,6 @@ class Job(object):
                           stdout=self.outfd,
                           stderr=self.errfd,
                           cwd=job_tmpl.workingDirectory)
-
-        pass
 
     def poll(self):
         retcode = self.proc.poll()
@@ -56,6 +55,7 @@ class Job(object):
         self.errfd.close()
 
 class JobInfo(object):
+    terminatedSignal = "LocalJobTemplateTerminatedSignal"
     def __init__(self, retcode):
         self.resourceUsage = {"cpu": "-1", "vmem": "-1", "maxvmem": "-1"}
         if not retcode is None:
@@ -78,9 +78,6 @@ class JobInfo(object):
 # Sessions are responsible for cleaning up the jobs they start
 # in __exit__.
 class Session(object):
-
-    # Mimics a DRMAA job template object
-    JobTemplate = namedtuple("JobTemplate", [])
 
     TIMEOUT_NO_WAIT = "TIMEOUT_NO_WAIT"
 

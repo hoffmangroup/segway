@@ -67,11 +67,11 @@ class _JobTemplateFactory(object):
         """
         res = self.template
 
-        # XXX
-        trial_index = min(trial_index, len(self.mem_usage_progression))
+        #trial_index = min(trial_index, len(self.mem_usage_progression)-1)
         try:
             mem_usage = self.mem_usage_progression[trial_index]
         except IndexError:
+            print >>sys.stderr, "trial_index: ", trial_index
             raise RuntimeError(MSG_EDGE % self.error_filename)
 
         self.mem_limit = int(mem_usage)

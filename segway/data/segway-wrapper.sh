@@ -19,7 +19,6 @@ if [ "${LSB_JOBID:-}" ]; then
 else
     export TMPDIR="$(mktemp -dt segway.XXXXXXXXXX)"
 fi
-export TMPDIR=$(mktemp -d "/net/noble/vol2/home/maxwl/mp/tmp/segway-obs-files/obs.XXXXXXXXX")
 
 on_exit ()
 {
