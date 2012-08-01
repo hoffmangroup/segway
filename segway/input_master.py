@@ -376,7 +376,7 @@ class DenseCPTParamSpec(TableParamSpec):
             self.calc_prob_transition_from_scaled_expected_len(LEN_SUBSEG_EXPECTED)
 
         # 0: no transition
-        # 1: subseg transition
+        # 1: subseg transition (no transition when CARD_SUBSEG == 1)
         # 2: seg transition
         probs_allow_transition = \
             array([prob_seg_self_self * prob_subseg_self_self,

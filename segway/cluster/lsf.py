@@ -56,6 +56,10 @@ class JobTemplateFactory(_JobTemplateFactory):
     set_template_output_error = False
 
     def make_res_req(self, mem_usage, tmp_usage):
+        # always specified in MB, unaffected by LSF_UNIT_FOR_LIMITS
+        # see Administering Platform LSF: Working with Resources:
+        # Understanding Resources
+
         mem_usage_mb = ceildiv(mem_usage, MB)
         tmp_usage_mb = ceildiv(tmp_usage, MB)
 
@@ -76,6 +80,12 @@ class JobTemplateFactory(_JobTemplateFactory):
 
     def make_native_spec(self):
         mem_limit_spec = ceildiv(self.mem_limit, DIVISOR_FOR_LIMITS)
+
+        # these all use the unit defined by LSF_UNIT_FOR_LIMITS
+
+        # see Administering Platform LSF: Controlling Job Execution:
+        # Runtime Resource Usage Limits: Scaling the units for
+        # resource usage limits
 
         # bsub -R: resource requirement
         # bsub -M: per-process memory limit
