@@ -164,26 +164,44 @@ def find_overlaps_exclude(start, end, exclude_coords):
 
     return include_coords
 
-def downsample_add(inarray, resolution):
-    # downsample presence data into num_datapoints
+def calc_downsampled_shape(inarray, resolution):
     full_num_rows = inarray.shape[0]
-
     downsampled_num_rows = ceildiv(full_num_rows, resolution)
-    remainder = full_num_rows % resolution
-    downsampled_shape = [downsampled_num_rows] + list(inarray.shape[1:])
+    return [downsampled_num_rows] + list(inarray.shape[1:])
 
-    res = zeros(downsampled_shape, inarray.dtype)
+def downsample_add(inarray, resolution):
+    """
+    Downsample a matrix by rows to a desired resolution, by adding up
+    data points
+
+    [1 2 4 8 16 32] downsampled to resolution 2 is:
+    [1+2 4+8 16+32]
+
+    originally: downsample presence data into num_datapoints
+    now used for all downsampling
+
+    inarray: array to be downsampled
+    resolution: desired resolution
+
+    """
+    if resolution == 1:
+        return inarray
+
+    full_num_rows = inarray.shape[0]
+    res = zeros(calc_downsampled_shape(inarray, resolution), inarray.dtype)
 
     # if there's no remainder, then only use loop 0
+    remainder = full_num_rows % resolution
     if remainder == 0:
         remainder = resolution
 
-    # loop 0: every bit
+    # loop 0: every index up to remainder
     for index in xrange(remainder):
         res += inarray[index::resolution]
 
     # loop 1: remainder
     for index in xrange(remainder, resolution):
+        # don't include the last element of res
         res[:-1] += inarray[index::resolution]
 
     return res
