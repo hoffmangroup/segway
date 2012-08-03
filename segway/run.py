@@ -540,7 +540,9 @@ class Runner(object):
                 raise ValueError("unrecognized task: %s" % task)
 
     def set_option(self, name, value):
-        if value:
+        # want to set the option when it is set to zero, but not if it is
+        # an empty list, empty str, None, etc.
+        if value or value == 0:
             setattr(self, name, value)
 
     options_to_attrs = [("recover", "recover_dirname"),
@@ -678,7 +680,8 @@ class Runner(object):
             res.head_tracknames = head_tracknames
             res.head_trackname_list = head_trackname_list
 
-        if res.num_worlds > 1:
+        # don't want to set num_worlds if tied_tracknames is empty
+        if tied_tracknames and res.num_worlds > 1:
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")

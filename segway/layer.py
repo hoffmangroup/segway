@@ -20,7 +20,7 @@ from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native
 from ._util import (BED_SCORE, BED_STRAND, get_label_color,
-                    maybe_gzip_open, PassThroughDict, SUFFIX_BED,
+                    maybe_gzip_open, memoized_property, PassThroughDict, SUFFIX_BED,
                     SUFFIX_TAB)
 
 BED_START = "0"
@@ -34,6 +34,8 @@ TRACKLINE_DEFAULT = ["track", 'description="segway-layer output"',
                      "visibility=full"]
 
 BEDTOBIGBED_PROG = OptionBuilder_ShortOptWithEquals("bedToBigBed")
+
+COLOR_DEFAULT = "128,128,128"
 
 # XXX: don't need counter, can use length
 class IncrementingDefaultDict(defaultdict):
@@ -176,72 +178,115 @@ def get_color(datum, label, label_key):
 
         return get_label_color(label_int)
 
-def layer(infilename="-", outfilename="-", mnemonic_filename=None,
-          trackline_updates={}, bigbed_outfilename=None, do_recolor=False):
-    # dict of chromosomes:
-    # chromosome: list of runs
-    # run: list of segments
-    # segment: 3-tuple of ints
-    chromosomes = defaultdict(list)
-    colors = {} # overwritten each time
-    label_dict = IncrementingDefaultDict()
+class Segmentation(defaultdict):
+    """
+    defaultdict of chromosomes:
+    chromosome: list of runs
+    run: list of segments
+    segment: 3-tuple of ints
+    """
+    def __init__(self):
+        defaultdict.__init__(self, list)
+        self.colors = {}
+        self.label_dict = IncrementingDefaultDict()
 
-    mnemonics, ordering = load_mnemonics(mnemonic_filename)
+    def load(self, infilename):
+        colors = self.colors
+        label_dict = self.label_dict
 
-    # read data
-    with maybe_gzip_open(infilename) as infile:
-        trackline, reader = get_trackline_and_reader_native(infile)
-        for datum in reader:
-            try:
-                assert datum.strand in ACCEPTABLE_STRANDS
-            except AttributeError:
-                pass # no strand
+        with maybe_gzip_open(infilename) as infile:
+            self.trackline, reader = get_trackline_and_reader_native(infile)
+            for datum in reader:
+                try:
+                    assert datum.strand in ACCEPTABLE_STRANDS
+                except AttributeError:
+                    pass # no strand
 
-            label = datum.name
-            label_key = label_dict[label]
+                label = datum.name
+                label_key = label_dict[label]
 
-            start = datum.chromStart
-            chromosome = chromosomes[datum.chrom]
+                start = datum.chromStart
+                chromosome = self[datum.chrom]
 
-            try:
-                run = chromosome[-1]
-            except IndexError:
-                run = []
-                chromosome.append(run)
-            else:
-                if run[-1][OFFSET_END] != start:
+                try:
+                    run = chromosome[-1]
+                except IndexError:
                     run = []
                     chromosome.append(run)
+                else:
+                    if run[-1][OFFSET_END] != start:
+                        run = []
+                        chromosome.append(run)
 
-            segment = (datum.chromStart, datum.chromEnd, label_key)
-            run.append(segment)
+                segment = (datum.chromStart, datum.chromEnd, label_key)
+                run.append(segment)
 
-            colors[label] = get_color(datum, label, label_key)
+                colors[label] = get_color(datum, label, label_key)
 
-    update_trackline(trackline, trackline_updates)
-    labels_sorted = uniquify(ordering + sorted(colors.iterkeys()))
+    def load_mnemonics(self, mnemonic_filename):
+        self.mnemonics, self.ordering = load_mnemonics(mnemonic_filename)
 
-    # only do this if you have mnemonics
-    if do_recolor and mnemonics:
-        colors = recolor(mnemonics, labels_sorted)
+    @memoized_property
+    def labels_sorted(self):
+        return uniquify(self.ordering + sorted(self.colors.iterkeys()))
 
-    # write data
-    outfile = maybe_gzip_open(outfilename, "w")
+    def update_trackline(self, updates):
+        self.trackline = update_trackline(self.trackline, updates)
 
-    if bigbed_outfilename:
-        temp_file = NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_BED)
-        bigbed_infilename = temp_file.name
-        outfile = Tee(outfile, temp_file)
+    def recolor(self):
+        mnemonics = self.mnemonics
 
-    ends = {}
-    with outfile as outfile:
+        # only do this if you have mnemonics
+        if mnemonics:
+            self.colors = recolor(mnemonics, self.labels_sorted)
+
+    def save(self, outfilename, bigbed_outfilename):
+        outfile = maybe_gzip_open(outfilename, "w")
+
+        if bigbed_outfilename:
+            temp_file = NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_BED)
+            bigbed_infilename = temp_file.name
+            outfile = Tee(outfile, temp_file)
+
+        with outfile as outfile:
+            ends = self.write(outfile)
+
+            if bigbed_outfilename:
+                outfile.flush()
+
+                # XXX: refactor this into a function in _util
+                # XXX: want to make a new wrapper to NamedTemporaryFile
+                # that closes after one level of context, deletes after
+                # the next
+                # with MyNamedTemporaryFile() as temp_file:
+                #     with temp_file
+                #         print >>temp_file, "blah"
+                #     print temp_file.name
+                with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB) as sizes_file:
+                    for chrom, end in ends.iteritems():
+                        print >>sizes_file, "\t".join([chrom, str(end)])
+
+                    sizes_file.flush()
+                    BEDTOBIGBED_PROG(bigbed_infilename, sizes_file.name, bigbed_outfilename)
+
+
+    def write_trackline(self, outfile):
         try:
             final_outfile = outfile._items[0]
         except AttributeError:
             final_outfile = outfile
-        print >>final_outfile, " ".join(trackline)
+        print >>final_outfile, " ".join(self.trackline)
 
-        for chrom, chromosome in chromosomes.iteritems():
+    def write(self, outfile):
+        ends = {}
+        mnemonics = self.mnemonics
+        labels_sorted = self.labels_sorted
+        label_dict = self.label_dict
+        colors = self.colors
+
+        self.write_trackline(outfile)
+
+        for chrom, chromosome in self.iteritems():
             for run in chromosome:
                 segments = array(run)
 
@@ -251,10 +296,7 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
 
                 for label in labels_sorted:
                     label_key = label_dict[label]
-                    try:
-                        color = colors[label]
-                    except KeyError: # missing
-                        color = "128,128,128"
+                    color = colors.get(label, COLOR_DEFAULT)
 
                     # find all the rows for this label
                     segments_label_rows = segments[:, OFFSET_LABEL] == label_key
@@ -298,23 +340,19 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
 
                     print >>outfile, "\t".join(row)
 
-        if bigbed_outfilename:
-            outfile.flush()
+        return ends
 
-            # XXX: refactor this into a function in _util
-            # XXX: want to make a new wrapper to NamedTemporaryFile
-            # that closes after one level of context, deletes after
-            # the next
-            # with MyNamedTemporaryFile() as temp_file:
-            #     with temp_file
-            #         print >>temp_file, "blah"
-            #     print temp_file.name
-            with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB) as sizes_file:
-                for chrom, end in ends.iteritems():
-                    print >>sizes_file, "\t".join([chrom, str(end)])
+def layer(infilename="-", outfilename="-", mnemonic_filename=None,
+          trackline_updates={}, bigbed_outfilename=None, do_recolor=False):
+    segmentation = Segmentation()
+    segmentation.load_mnemonics(mnemonic_filename)
+    segmentation.load(infilename)
+    segmentation.update_trackline(trackline_updates)
 
-                sizes_file.flush()
-                BEDTOBIGBED_PROG(bigbed_infilename, sizes_file.name, bigbed_outfilename)
+    if do_recolor:
+        segmentation.recolor()
+
+    segmentation.save(outfilename, bigbed_outfilename)
 
 def parse_options(args):
     from optplus import OptionParser
