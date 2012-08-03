@@ -680,7 +680,7 @@ class Runner(object):
             res.head_tracknames = head_tracknames
             res.head_trackname_list = head_trackname_list
 
-        # don't want to set num_worlds if tied_tracknames is empty
+        # don't prematurely memoize num_worlds if tied_tracknames is empty
         if tied_tracknames and res.num_worlds > 1:
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
