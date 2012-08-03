@@ -1277,7 +1277,7 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
-    def set_log_likelihood_filenames(self, instance_index=None, new=False):
+    def set_log_likelihood_filenames(self, instance_index=0, new=False):
         if new or not self.log_likelihood_filename:
             log_likelihood_filename = \
                 self.make_filename(PREFIX_LIKELIHOOD, instance_index,
