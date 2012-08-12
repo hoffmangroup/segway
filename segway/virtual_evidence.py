@@ -10,7 +10,7 @@ from ._util import (VIRTUAL_EVIDENCE_FULL_LIST_FILENAME,
 # obs factory is an iterator of num_windows
 # iterators of num_frames(window) floats
 def write_virtual_evidence(obs_iter, ve_dirname, windows, num_segs):
-    print >>sys.stderr, "writing virtual evidence..."
+    #print >>sys.stderr, "writing virtual evidence..."
 
     ve_dirname = path(ve_dirname)
     full_list_filename = ve_dirname / VIRTUAL_EVIDENCE_FULL_LIST_FILENAME
@@ -36,7 +36,7 @@ def write_virtual_evidence(obs_iter, ve_dirname, windows, num_segs):
     frame_fmt = "%sf" % num_segs
     for window_index, window_obs in enumerate(obs_iter):
         obs_filename = obs_filenames[window_index]
-        print >>sys.stderr, " ", obs_filename
+        #print >>sys.stderr, " ", obs_filename
         if not path(obs_filename).isfile():
             with open(obs_filename, "w") as obs_file:
                 for frame_index, obs in enumerate(window_obs):

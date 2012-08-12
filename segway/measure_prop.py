@@ -25,6 +25,8 @@ MEASURE_PROP_GRAPH_FILENAME = "graph.mp_graph"
 MEASURE_PROP_TRANS_FILENAME = "trans.mp_trans"
 MEASURE_PROP_LABEL_FILENAME = "label.mp_label"
 MEASURE_PROP_POST_FILENAME = "post.mp_label"
+MEASURE_PROP_OBJ_FILENAME = "objective.tab"
+MEASURE_PROP_OUTPUT_FILENAME = "stdout.txt"
 
 #MU = 10
 #NU = 0
@@ -199,7 +201,7 @@ def test_measure_labels():
 class MeasurePropRunner(Copier):
     copy_attrs = ["windows", "resolution", "num_segs", "uniform_ve_dirname",
                   "work_dirpath", "num_worlds", "measure_prop_graph_filepath",
-                  "mu", "mp_weight", "nu"]
+                  "mu", "mp_weight", "nu", "measure_prop_am_num_iters"]
 
     @memoized_property
     def num_frames(self):
@@ -213,7 +215,6 @@ class MeasurePropRunner(Copier):
         self.runner = runner
         self.posterior_filename = None
         Copier.__init__(self, runner)
-        self.mp_weight = float(self.mp_weight)
 
     def make_mp_workdir(self, instance_index, round_index):
         res = path(self.work_dirpath /
@@ -239,11 +240,19 @@ class MeasurePropRunner(Copier):
         return (self.make_mp_workdir(instance_index, round_index) /
                 MEASURE_PROP_POST_FILENAME)
 
+    def make_mp_obj_filename(self, instance_index, round_index):
+        return (self.make_mp_workdir(instance_index, round_index) /
+                MEASURE_PROP_OBJ_FILENAME)
+
+    def make_mp_output_filename(self, instance_index, round_index):
+        return (self.make_mp_workdir(instance_index, round_index) /
+                MEASURE_PROP_OUTPUT_FILENAME)
+
     def run_segway_posterior(self, instance_index, round_index, params_filename):
         # need to specify: MP uniform ve files, structure file, params file
 
         # XXX do we use VE for JT or not?
-        #self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
+        self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
 
         posterior_workdir = self.runner.make_mp_posterior_workdir(instance_index,
                                                                   round_index)
@@ -368,6 +377,8 @@ class MeasurePropRunner(Copier):
         trans_filepath = self.make_mp_trans_filename(instance_index, round_index)
         label_filepath = self.make_mp_label_filename(instance_index, round_index)
         post_filepath = self.make_mp_post_filename(instance_index, round_index)
+        obj_filepath = self.make_mp_obj_filename(instance_index, round_index)
+        mp_output_filepath = self.make_mp_output_filename(instance_index, round_index)
         cmd = [mp_exe,
                "-inputGraphName", graph_filepath,
                "-transductionFile", trans_filepath,
@@ -379,12 +390,14 @@ class MeasurePropRunner(Copier):
                "-nWinSize", "1",
                "-printAccuracy", "false",
                "-measureLabels", "true",
-               "-maxIters", "40"] # XXX
+               "-maxIters", str(self.measure_prop_am_num_iters),
+               "-outObjFile", obj_filepath]
         print >>sys.stderr, "MP command:"
         # XXX
-        print >>sys.stderr, cmd
+        #print >>sys.stderr, cmd
         print >>sys.stderr, " ".join(cmd)
-        subprocess.check_call(cmd)
+        with open(mp_output_filepath, "w") as mp_output:
+            subprocess.check_call(cmd, stderr=subprocess.STDOUT, stdout=mp_output)
 
     def read_mp_post_file(self, instance_index, round_index):
         header_fmt = "IH"
@@ -431,43 +444,39 @@ class MeasurePropRunner(Copier):
 
 
     def load(self, instance_index):
-        print >>sys.stderr, "running load_measure_prop..."
-
         # make uniform VE files
-        def make_obs_iter():
-            ve_line = [log(float(1)/(self.num_segs)) for i in range(self.num_segs)]
-            for window_index, (world, chrom, start, end) in enumerate(self.windows):
-                num_frames = ceildiv(end-start, self.resolution)
-                yield (ve_line for frame_index in range(num_frames))
+        #def make_obs_iter():
+            #ve_line = [log(float(1)/(self.num_segs)) for i in range(self.num_segs)]
+            #for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                #num_frames = ceildiv(end-start, self.resolution)
+                #yield (ve_line for frame_index in range(num_frames))
 
-        write_virtual_evidence(make_obs_iter(),
-                               self.uniform_ve_dirname,
-                               self.windows,
-                               self.num_segs)
+        #write_virtual_evidence(make_obs_iter(),
+                               #self.uniform_ve_dirname,
+                               #self.windows,
+                               #self.num_segs)
 
         self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
 
 
     def update(self, instance_index, round_index, params_filename):
-        print >>sys.stderr, "running update_measure_prop..."
-
-        # 2) Run gmtkJT to get posteriors for the current model
+        # 1) Run gmtkJT to get posteriors for the current model
         # This runs gmtkJT and puts the posteriors at posterior_filenames
         self.run_segway_posterior(instance_index, round_index, params_filename)
         #pickle.dump(self, open(path(self.work_dirpath) / "mp.pckl", "w"))
 
-        # 3) convert gmtkJT posteriors to MP label format
+        # 2) convert gmtkJT posteriors to MP label format
         # (the filenames are read from self.posterior_tmpls)
         self.write_mp_label_file(instance_index, round_index)
 
-        # 4) write MP graph, trans files
+        # 3) write MP graph, trans files
         #self.write_mp_graph_file(instance_index, round_index)
         self.write_mp_trans_file(instance_index, round_index)
 
-        # 5) run MP
+        # 4) run MP
         self.run_measure_prop(instance_index, round_index)
 
-        # 6) convert MP posteriors to VE
+        # 5) convert MP posteriors to VE
         self.mp_post_to_ve(instance_index, round_index)
 
 

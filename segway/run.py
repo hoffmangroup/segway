@@ -9,7 +9,6 @@ __version__ = "$Revision$"
 
 # Copyright 2008-2012 Michael M. Hoffman <mmh1@uw.edu>
 
-import pdb
 import os
 
 from collections import defaultdict, namedtuple
@@ -63,6 +62,7 @@ from ._util import (data_filename,
                     MB, memoized_property, OFFSET_START, OFFSET_END,
                     OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
+                    PREFIX_MP_OBJ,
                     SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
@@ -205,7 +205,6 @@ SUBDIRNAME_LIKELIHOOD = "likelihood"
 SUBDIRNAME_OBS = "observations"
 SUBDIRNAME_POSTERIOR = "posterior"
 SUBDIRNAME_VITERBI = "viterbi"
-# XXXmax
 SUBDIRNAME_MEASURE_PROP = "measure_prop"
 
 SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
@@ -252,10 +251,16 @@ THREAD_START_SLEEP_TIME = 2 # XXX: this should become an option # XXX
 # -gpr option for GMTK when reversing
 REVERSE_GPR = "^0:-1:0"
 
-Results = namedtuple("Results", ["log_likelihood", "num_segs",
+Results = namedtuple("Results", ["instance_index", "log_likelihood", "mp_terms", "num_segs",
                                  "input_master_filename", "params_filename",
                                  "log_likelihood_filename"])
-OFFSET_FILENAMES = 2 # where the filenames begin in Results
+OFFSET_FILENAMES = 4 # where the filenames begin in Results
+
+# Used to compare Results objects in order to find the winning instance
+def results_objective_cmp(res1, res2):
+    return cmp(objective_value(res1.log_likelihood, res1.mp_terms),
+               objective_value(res2.log_likelihood, res2.mp_terms))
+
 
 ## functions
 def quote_trackname(text):
@@ -353,6 +358,12 @@ def is_training_progressing(last_ll, curr_ll,
     # in the case of NaNs
 
     return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
+
+def objective_value(log_likelihood, mp_terms):
+    if mp_terms:
+        return log_likelihood - (mp_terms[1] - mp_terms[2])
+    else:
+        return log_likelihood
 
 
 def set_cwd_job_tmpl(job_tmpl):
@@ -507,6 +518,7 @@ class Runner(object):
         self.mu = None
         self.nu = None
         self.mp_weight = None
+        self.measure_prop_objective_tab_filename = None
 
         self.card_supervision_label = -1
 
@@ -565,7 +577,7 @@ class Runner(object):
                 raise ValueError("unrecognized task: %s" % task)
 
     def set_option(self, name, value):
-        if value:
+        if (not (value is None)) and (not (value is "")):
             setattr(self, name, value)
 
     options_to_attrs = [("recover", "recover_dirname"),
@@ -577,6 +589,7 @@ class Runner(object):
                         ("measure_prop_nu","nu"),
                         ("measure_prop_weight","mp_weight"),
                         ("measure_prop_num_iters",),
+                        ("measure_prop_am_num_iters",),
                         ("virtual_evidence", "virtual_evidence_filename"),
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
@@ -727,6 +740,10 @@ class Runner(object):
     def posterior_jt_info_filename(self):
         return self.make_filename(PREFIX_JT_INFO, "posterior", EXT_TXT,
                                   subdirname=SUBDIRNAME_LOG)
+
+    @memoized_property
+    def winner_filename(self):
+        return self.make_filename("winner")
 
     @memoized_property
     def virtual_evidence_dirpath(self):
@@ -1207,6 +1224,20 @@ class Runner(object):
 
         return log_likelihood
 
+    def load_measure_prop_objective(self, round_index):
+        self.last_mp_obj_filename = self.mp_runner.make_mp_obj_filename(self.instance_index, round_index)
+        with open(self.last_mp_obj_filename) as obj_file:
+            obj_data = dict(map(lambda line: line.split(), obj_file.readlines()))
+        objective = self.mp_weight * float(obj_data["total"])
+        term1 = self.mp_weight * float(obj_data["term1"])
+        term2 = self.mp_weight * float(obj_data["term2"])
+        term3 = self.mp_weight * float(obj_data["term3"])
+
+        with open(self.measure_prop_objective_tab_filename, "a") as logfile:
+            print >>logfile, "\t".join(map(str, [objective, term1, term2, term3]))
+
+        return [term1, term2, term3]
+
     def make_filename(self, *exts, **kwargs):
         """
         makes a filename by joining together exts
@@ -1364,6 +1395,11 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
+    def make_measure_prop_objective_tab_filename(self, instance_index, dirname):
+        return self.make_filename(PREFIX_MP_OBJ, instance_index, EXT_TAB,
+                                  dirname=dirname,
+                                  subdirname=SUBDIRNAME_LOG)
+
     def set_log_likelihood_filenames(self, instance_index=None, new=False):
         if new or not self.log_likelihood_filename:
             log_likelihood_filename = \
@@ -1376,6 +1412,11 @@ class Runner(object):
             self.log_likelihood_tab_filename = \
                 self.make_log_likelihood_tab_filename(instance_index,
                                                       self.work_dirname)
+
+            if self.measure_prop_graph_filepath:
+                self.measure_prop_objective_tab_filename = \
+                    self.make_measure_prop_objective_tab_filename(instance_index,
+                                                                  self.work_dirname)
 
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
@@ -1595,7 +1636,6 @@ class Runner(object):
                             assert ((overlap_end - overlap_start) % resolution == 0)
                             assert ((overlap_start - cur) % resolution == 0)
                         except:
-                            #pdb.set_trace() # XXX
                             raise
 
                         # set the region from cur to the next window as uniform
@@ -1617,6 +1657,18 @@ class Runner(object):
 
         write_virtual_evidence(make_obs_iter(), self.virtual_evidence_dirpath,
                                self.windows, self.num_segs)
+
+    def load_measure_prop(self):
+        def make_obs_iter():
+            ve_line = [log(float(1)/(self.num_segs)) for i in range(self.num_segs)]
+            for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                num_frames = ceildiv(end-start, self.resolution)
+                yield (ve_line for frame_index in range(num_frames))
+
+        write_virtual_evidence(make_obs_iter(),
+                               self.uniform_ve_dirname,
+                               self.windows,
+                               self.num_segs)
 
 
     def save_structure(self):
@@ -1654,6 +1706,8 @@ class Runner(object):
         self.save_include()
         self.set_params_filename()
         self.save_structure()
+
+        self.load_measure_prop()
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -1927,8 +1981,6 @@ class Runner(object):
             self.triangulation_filename = (self.triangulation_dirpath
                                            / triangulation_filebasename)
 
-        # print >>sys.stderr, ("setting triangulation_filename = %s"
-        #                     % self.triangulation_filename)
 
     def run_triangulate_single(self, num_segs, num_subsegs=None):
         # print >>sys.stderr, "running triangulation"
@@ -1961,7 +2013,9 @@ class Runner(object):
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
         if self.measure_prop_graph_filepath and (round_index > 0):
-            self.mp_runner.update(instance_index, round_index, last_params_filename)
+            for i in range(self.measure_prop_num_iters):
+                mp_round_index = "%s_%s" % (round_index, i)
+                self.mp_runner.update(instance_index, mp_round_index, last_params_filename)
 
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
@@ -1998,6 +2052,8 @@ class Runner(object):
         if self.measure_prop_graph_filepath:
             self.mp_runner = MeasurePropRunner(self)
             self.mp_runner.load(instance_index)
+        last_mp_terms = [float("nan"), float("nan"), float("nan")] # XXX
+        mp_terms = [float("nan"), float("nan"), float("nan")] # XXX
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
@@ -2007,24 +2063,37 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return Results(None, None, None, None, None)
+            return Results(None, None, None, None, None, None, None, None)
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
+                                            last_mp_terms, mp_terms,
                                             round_index, kwargs)
 
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
+                                last_mp_terms, mp_terms,
                                 round_index, kwargs):
+        print "mp_terms:", mp_terms
+        print "last_mp_terms:", last_mp_terms
+        last_objective = objective_value(last_log_likelihood, last_mp_terms)
+        objective = objective_value(log_likelihood, mp_terms)
         while (round_index < self.max_em_iters and
-               is_training_progressing(last_log_likelihood, log_likelihood)):
+               is_training_progressing(last_objective, objective)):
             self.run_train_round(self.instance_index, round_index, **kwargs)
 
             last_log_likelihood = log_likelihood
             log_likelihood = self.load_log_likelihood()
+            last_mp_terms = mp_terms
+            if (round_index > 0):
+                last_mp_round_index = "%s_%s" % (round_index, self.measure_prop_num_iters-1)
+                mp_terms = self.load_measure_prop_objective(last_mp_round_index)
+            else:
+                mp_terms = [float("nan"), float("nan"), float("nan")]
             round_index += 1
+            last_objective = objective_value(last_log_likelihood, last_mp_terms)
 
         # log_likelihood, num_segs and a list of src_filenames to save
-        return Results(log_likelihood, self.num_segs, self.input_master_filename,
+        return Results(self.instance_index, log_likelihood, mp_terms, self.num_segs, self.input_master_filename,
                        self.last_params_filename, self.log_likelihood_filename)
 
     def save_train_options(self):
@@ -2214,7 +2283,17 @@ to find the winning instance anyway.""" % thread.instance_index)
             return
 
         # finds the min by info_criterion (maximize log_likelihood)
-        max_params = max(instance_params)
+        max_params = sorted(instance_params, cmp=results_objective_cmp, reverse=True)[0]
+
+        # write winning instance index
+        print >>sys.stderr, "--------------------------------"
+        print >>sys.stderr, "--------------------------------"
+        print >>sys.stderr, "Writing winning instance to %s..." % self.winner_filename
+        print >>sys.stderr, "--------------------------------"
+        print >>sys.stderr, "--------------------------------"
+        print >>sys.stderr, "--------------------------------"
+        with open(self.winner_filename, "w") as winner_f:
+            print >>winner_f, max_params.instance_index
 
         self.num_segs = max_params.num_segs
         self.set_triangulation_filename()
@@ -2398,7 +2477,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         return self.windows[window_index].world in self.reverse_worlds
 
     # Used by run_identify_posterior and MeasurePropRunner.update
-    # XXX How does this know which type of VE files to use?
     def run_identify_posterior_jobs(self, identify, posterior,
                                     viterbi_filenames,
                                     posterior_filenames,
@@ -2452,7 +2530,6 @@ to find the winning instance anyway.""" % thread.instance_index)
             return
 
         restartable_jobs.wait()
-        print >>sys.stderr, "Done with run_identify_posterior_jobs."
 
 
     def run_identify_posterior(self):
@@ -2481,7 +2558,9 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.mp_runner.update(instance_index, round_index, self.params_filename)
 
             self.run_identify_posterior_jobs(self.identify, self.posterior,
-                                             viterbi_filenames, posterior_filenames)
+                                             viterbi_filenames, posterior_filenames,
+                                             instance_index=instance_index,
+                                             round_index=round_index)
 
         for world in xrange(self.num_worlds):
             if self.identify:
@@ -2593,6 +2672,12 @@ def parse_options(args):
                          help="append tracks from newline-delimited FILE to"
                          " list of tracks to use")
 
+        group.add_option("--file-tracks", action="store_true"
+                         help="Instead of tracks specifing tracks in a single genomedata archive,
+                         the list of tracks is presumed to specify paths to multiple archives,
+                         each of which has a track named \"continuous\". The genomedata argument
+                         is ignored.")
+
         # This is a 0-based file.
         # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
         group.add_option("--include-coords", metavar="FILE",
@@ -2642,17 +2727,20 @@ def parse_options(args):
         group.add_option("--measure-prop", metavar="FILE",
                          help="run with measure prop graph in FILE (default none)")
 
-        group.add_option("--measure-prop-mu", metavar="FILE", default=1,
+        group.add_option("--measure-prop-mu", metavar="FILE", default=1, type=float,
                          help="mu hyperparameter for measure prop")
 
-        group.add_option("--measure-prop-nu", metavar="FILE", default=0,
+        group.add_option("--measure-prop-nu", metavar="FILE", default=0, type=float,
                          help="nu hyperparameter for measure prop")
 
-        group.add_option("--measure-prop-weight", metavar="FILE", default=1.0,
+        group.add_option("--measure-prop-weight", metavar="FILE", default=1.0, type=float,
                          help="weight hyperparameter for measure prop")
 
         group.add_option("--measure-prop-num-iters", metavar="FILE", default=1, type=int,
                          help="number of iterations to run posterior/measure prop")
+
+        group.add_option("--measure-prop-am-num-iters", metavar="FILE", default=100, type=int,
+                         help="number of iterations to run alternating minimization in measure prop")
 
         # XXXmax
         group.add_option("--virtual-evidence", metavar="FILE",

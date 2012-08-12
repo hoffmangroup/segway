@@ -60,6 +60,7 @@ DISTRIBUTION_ASINH_NORMAL = "asinh_norm"
 
 PREFIX_INPUT = "input"
 PREFIX_LIKELIHOOD = "likelihood"
+PREFIX_MP_OBJ = "measure_prop_objective"
 PREFIX_PARAMS = "params"
 
 SUBDIRNAME_LOG = "log"

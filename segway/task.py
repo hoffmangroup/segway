@@ -347,15 +347,20 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
         print_to_fd(float_filelistfd, float_filename)
         print_to_fd(int_filelistfd, int_filename)
 
+        print >>sys.stderr, "got here 200"
         _save_window(float_filename, int_filename, continuous_cells,
                      resolution, distribution)
+        print >>sys.stderr, "got here 201"
 
         # XXXopt: does this work? or do we need to use a subprocess to
         # do the loading?
         # remove from memory
+        print >>sys.stderr, "got here 202"
         del continuous_cells
 
+        print >>sys.stderr, "running viterbi program..."
         output = VITERBI_PROG.getoutput(*args)
+        print >>sys.stderr, "done with viterbi program."
     finally:
         for filepath in temp_filepaths:
             # don't raise a nested exception if the file was never created
@@ -367,6 +372,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
                     pass
 
     lines = output.splitlines()
+    print >>sys.stderr, "lines:\n", lines
 
     return parse_viterbi_save_bed(coord, resolution, do_reverse, lines, outfilename,
                                   num_labels)
