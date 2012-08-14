@@ -21,7 +21,6 @@ from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
 from numpy import array, empty, where, diff, r_, zeros
-import numpy as np # XXX
 from path import path
 
 from .observations import _save_window
@@ -29,7 +28,9 @@ from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, fill_array, find_segment_starts,
                     get_label_color,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    VITERBI_PROG)
+                    VITERBI_PROG,
+                    FilesGenome, FilesChromosome, FILE_TRACKS_SENTINEL,
+                    maybe_gzip_open)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -46,6 +47,9 @@ EXT_OPTIONS[EXT_INT] = "-of2"
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
+
+def make_genomedata_paths(text):
+    return map(path, text.split(","))
 
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 def parse_viterbi(lines, do_reverse=False):
@@ -144,7 +148,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
     assert seg_end == region_end
 
 def save_bed(outfilename, *args, **kwargs):
-    with open(outfilename, "w") as outfile:
+    with maybe_gzip_open(outfilename, "w") as outfile:
         write_bed(outfile, *args, **kwargs)
 
 def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num_labels,
@@ -184,7 +188,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num
         # run-length encoding on the probs_rounded_label
         sys.stderr.flush()
 
-        outfile = open(outfilename, "w")
+        outfile = maybe_gzip_open(outfilename, "w")
         pos, = where(diff(probs_rounded_label) != 0)
         pos = r_[start, pos[:]*resolution+start+resolution, end]
         sys.stderr.flush()
@@ -253,6 +257,14 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
     # read the whole thing into memory
     (chrom, start, end) = coord
     track_indexes = make_track_indexes(track_indexes_text)
+    if genomedataname == FILE_TRACKS_SENTINEL:
+        file_tracks = True
+        genomedata_paths = make_genomedata_paths(track_indexes_text)
+        track_indexes = range(len(genomedata_paths))
+    else:
+        file_tracks = False
+        track_indexes = make_track_indexes(track_indexes_text)
+
     print >>sys.stderr, "got here 2"
     sys.stderr.flush()
 
@@ -262,6 +274,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
     print >>sys.stderr, "got here 3"
     sys.stderr.flush()
 
+
     # XXX: should do something to ensure of1 matches with int, of2 with float
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
@@ -269,7 +282,10 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
 
     print >>sys.stderr, "got here 4"
     sys.stderr.flush()
-    with Genome(genomedataname) as genome:
+
+    GenomeClass = (FilesGenome if file_tracks else Genome)
+    genomedataarg = (genomedata_paths if file_tracks else genomedataname)
+    with GenomeClass(genomedataarg) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     print >>sys.stderr, "got here 5"
@@ -328,7 +344,13 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
 
     (chrom, start, end) = coord
 
-    track_indexes = make_track_indexes(track_indexes_text)
+    if genomedataname == FILE_TRACKS_SENTINEL:
+        file_tracks = True
+        genomedata_paths = make_genomedata_paths(track_indexes_text)
+        track_indexes = range(len(genomedata_paths))
+    else:
+        file_tracks = False
+        track_indexes = make_track_indexes(track_indexes_text)
 
     float_filepath = TEMP_DIRPATH / float_filename
     int_filepath = TEMP_DIRPATH / int_filename
@@ -340,7 +362,9 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                    EXT_FLOAT)
 
-    with Genome(genomedataname) as genome:
+    GenomeClass = (FilesGenome if file_tracks else Genome)
+    genomedataarg = (genomedata_paths if file_tracks else genomedataname)
+    with GenomeClass(genomedataarg) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     try:

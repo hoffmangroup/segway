@@ -83,7 +83,7 @@ class IdentifySaver(OutputSaver):
                 if windows[window_index].world != world:
                     continue
 
-                with open(viterbi_filename) as viterbi_file:
+                with maybe_gzip_open(viterbi_filename) as viterbi_file:
                     lines = viterbi_file.readlines()
                     first_line = lines[0]
                     first_row, first_coords = parse_bed4(first_line)
@@ -166,7 +166,7 @@ class PosteriorSaver(OutputSaver):
                 print >>outfile, self.make_header(num_seg)
 
                 for posterior_filename in self.posterior_filenames:
-                    with open(posterior_filename % num_seg) as posterior_file:
+                    with maybe_gzip_open(posterior_filename % num_seg) as posterior_file:
                         lines = posterior_file.readlines()
                         first_line = lines[0]
                         first_row, first_coords = parse_bed4(first_line)

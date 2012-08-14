@@ -33,7 +33,7 @@ import struct
 
 from genomedata import Genome
 from numpy import (arange, arcsinh, array, empty, finfo, float32, intc,
-                   int64, inf, square, vstack, zeros)
+                   int64, inf, square, vstack, zeros, hstack)
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -69,7 +69,8 @@ from ._util import (data_filename,
                     USE_MFSDG, VITERBI_PROG,
                     VIRTUAL_EVIDENCE_FULL_LIST_FILENAME,
                     VIRTUAL_EVIDENCE_WINDOW_LIST_FILENAME_TMPL,
-                    VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL)
+                    VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL,
+                    FilesGenome, FilesChromosome, FILE_TRACKS_SENTINEL)
 
 # set once per file run
 UUID = uuid1().hex
@@ -577,7 +578,7 @@ class Runner(object):
                 raise ValueError("unrecognized task: %s" % task)
 
     def set_option(self, name, value):
-        if (not (value is None)) and (not (value is "")):
+        if value or value == 0 or value is False or value == []:
             setattr(self, name, value)
 
     options_to_attrs = [("recover", "recover_dirname"),
@@ -598,6 +599,7 @@ class Runner(object):
                         ("verbosity",),
                         ("split_sequences", "max_frames"),
                         ("clobber",),
+                        ("file_tracks",),
                         ("dry_run",),
                         ("input_master", "input_master_filename"),
                         ("structure", "structure_filename"),
@@ -943,7 +945,7 @@ class Runner(object):
         num_windows = self.num_windows
 
         viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_windows)
-                                + EXT_BED)
+                                + EXT_BED + "." + EXT_GZ)
         return [viterbi_dirpath / viterbi_filename_fmt % index
                 for index in xrange(num_windows)]
 
@@ -1684,7 +1686,12 @@ class Runner(object):
 
         # need to open Genomedata archive first in order to determine
         # self.tracknames and self.num_tracks
-        with Genome(self.genomedataname) as genome:
+
+        GenomeClass = (FilesGenome if self.file_tracks else Genome)
+        genomedataarg = (self.track_specs if self.file_tracks else self.genomedataname)
+        if self.file_tracks and self.num_worlds > 1:
+            raise NotImplementedError # TODO implement concat handling within FilesGenome
+        with GenomeClass(genomedataarg) as genome:
             self.set_tracknames(genome)
 
             observations = Observations(self)
@@ -1731,7 +1738,7 @@ class Runner(object):
                                   EXT_BIN, subdirname=SUBDIRNAME_ACC)
 
     def make_posterior_filename(self, window_index):
-        return self.make_filename(PREFIX_POSTERIOR, window_index, EXT_BED,
+        return self.make_filename(PREFIX_POSTERIOR, window_index, EXT_BED, EXT_GZ,
                                   subdirname=SUBDIRNAME_POSTERIOR)
 
     def make_job_name_train(self, instance_index, round_index, window_index):
@@ -2052,8 +2059,11 @@ class Runner(object):
         if self.measure_prop_graph_filepath:
             self.mp_runner = MeasurePropRunner(self)
             self.mp_runner.load(instance_index)
-        last_mp_terms = [float("nan"), float("nan"), float("nan")] # XXX
-        mp_terms = [float("nan"), float("nan"), float("nan")] # XXX
+            last_mp_terms = [float("nan"), float("nan"), float("nan")] # XXX
+            mp_terms = [float("nan"), float("nan"), float("nan")] # XXX
+        else:
+            last_mp_terms = None
+            mp_terms = None
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
@@ -2073,8 +2083,6 @@ class Runner(object):
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
                                 last_mp_terms, mp_terms,
                                 round_index, kwargs):
-        print "mp_terms:", mp_terms
-        print "last_mp_terms:", last_mp_terms
         last_objective = objective_value(last_log_likelihood, last_mp_terms)
         objective = objective_value(log_likelihood, mp_terms)
         while (round_index < self.max_em_iters and
@@ -2082,15 +2090,20 @@ class Runner(object):
             self.run_train_round(self.instance_index, round_index, **kwargs)
 
             last_log_likelihood = log_likelihood
-            log_likelihood = self.load_log_likelihood()
             last_mp_terms = mp_terms
-            if (round_index > 0):
-                last_mp_round_index = "%s_%s" % (round_index, self.measure_prop_num_iters-1)
-                mp_terms = self.load_measure_prop_objective(last_mp_round_index)
+            last_objective = objective
+
+            log_likelihood = self.load_log_likelihood()
+            if (self.measure_prop_graph_filepath):
+                if (round_index > 0):
+                    last_mp_round_index = "%s_%s" % (round_index, self.measure_prop_num_iters-1)
+                    mp_terms = self.load_measure_prop_objective(last_mp_round_index)
+                else:
+                    mp_terms = [float("nan"), float("nan"), float("nan")]
             else:
-                mp_terms = [float("nan"), float("nan"), float("nan")]
+                mp_terms = None
+            objective = objective_value(log_likelihood, mp_terms)
             round_index += 1
-            last_objective = objective_value(last_log_likelihood, last_mp_terms)
 
         # log_likelihood, num_segs and a list of src_filenames to save
         return Results(self.instance_index, log_likelihood, mp_terms, self.num_segs, self.input_master_filename,
@@ -2286,12 +2299,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         max_params = sorted(instance_params, cmp=results_objective_cmp, reverse=True)[0]
 
         # write winning instance index
-        print >>sys.stderr, "--------------------------------"
-        print >>sys.stderr, "--------------------------------"
-        print >>sys.stderr, "Writing winning instance to %s..." % self.winner_filename
-        print >>sys.stderr, "--------------------------------"
-        print >>sys.stderr, "--------------------------------"
-        print >>sys.stderr, "--------------------------------"
         with open(self.winner_filename, "w") as winner_f:
             print >>winner_f, max_params.instance_index
 
@@ -2440,12 +2447,15 @@ to find the winning instance anyway.""" % thread.instance_index)
         track_indexes = self.world_track_indexes[window.world]
         track_indexes_text = ",".join(map(str, track_indexes))
 
+        genomedataarg = (FILE_TRACKS_SENTINEL if self.file_tracks else self.genomedataname)
+        track_indexes_text_arg = (",".join(self.track_specs) if self.file_tracks else track_indexes_text)
+
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
-                       self.num_segs, self.genomedataname, float_filepath,
+                       self.num_segs, genomedataarg, float_filepath,
                        int_filepath, self.distribution,
-                       track_indexes_text]
+                       track_indexes_text_arg]
         output_filename = None
 
         num_frames = self.window_lens[window_index]
@@ -2556,6 +2566,9 @@ to find the winning instance anyway.""" % thread.instance_index)
                     instance_index = "identify"
                     round_index = "identify_%s" % i
                     self.mp_runner.update(instance_index, round_index, self.params_filename)
+            else:
+                instance_index = "identify"
+                round_index = "identify"
 
             self.run_identify_posterior_jobs(self.identify, self.posterior,
                                              viterbi_filenames, posterior_filenames,
@@ -2672,11 +2685,11 @@ def parse_options(args):
                          help="append tracks from newline-delimited FILE to"
                          " list of tracks to use")
 
-        group.add_option("--file-tracks", action="store_true"
-                         help="Instead of tracks specifing tracks in a single genomedata archive,
-                         the list of tracks is presumed to specify paths to multiple archives,
-                         each of which has a track named \"continuous\". The genomedata argument
-                         is ignored.")
+        group.add_option("--file-tracks", action="store_true", default=False,
+                         help="Instead of tracks specifing tracks in a single genomedata archive,"
+                         "the list of tracks is presumed to specify paths to multiple archives,"
+                         "each of which has a track named \"continuous\". The genomedata argument"
+                         "is ignored.")
 
         # This is a 0-based file.
         # I know because ENm008 starts at position 0 in encodeRegions.txt.gz

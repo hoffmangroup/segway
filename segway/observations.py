@@ -21,7 +21,7 @@ import sys
 from tempfile import gettempdir
 
 from numpy import (add, append, arange, arcsinh, array, column_stack, empty,
-                   invert, isnan, maximum, zeros)
+                   invert, isnan, maximum, zeros, transpose)
 from path import path
 from tabdelim import ListWriter
 
@@ -451,7 +451,8 @@ class Observations(object):
 
     def make_continuous_cells(self, world, chromosome, start, end):
         track_indexes = self.world_track_indexes[world]
-        return chromosome[start:end, track_indexes]
+        ret = chromosome[start:end, track_indexes]
+        return ret
 
     def make_supervision_cells(self, chrom, start, end):
         supervision_type = self.supervision_type

@@ -15,9 +15,11 @@ from os import extsep
 from string import Template
 import sys
 import re
+from genomedata import Genome
 
 import colorbrewer
-from numpy import (append, array, diff, empty, insert, intc, zeros)
+from numpy import (append, array, diff, empty, insert, intc, zeros,
+                   hstack, vstack, transpose)
 
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
@@ -76,6 +78,8 @@ SEG_TABLE_WIDTH = 3
 OFFSET_START = 0
 OFFSET_END = 1
 OFFSET_STEP = 2
+
+FILE_TRACKS_SENTINEL = "SEGWAY_FILE_TRACKS"
 
 data_filename = partial(resource_filename, PKG_DATA)
 data_string = partial(resource_string, PKG_DATA)
@@ -150,6 +154,119 @@ class Saver(Copier):
 class PassThroughDict(dict):
     def __missing__(self, key):
         return key
+
+
+# A class that mimics Genomedata, backed by a set of files,
+# each of which is a genomedata archive with a single
+# track named "continuous"
+class FilesGenome:
+    def __init__(self, track_filenames):
+        self.track_filenames = track_filenames
+        self.genomes = [Genome(track_filename)
+                            for track_filename
+                            in track_filenames]
+        self.entered_genome_indices = []
+
+    def __enter__(self):
+        for i, g in enumerate(self.genomes):
+            g.__enter__()
+            self.entered_genome_indices.append(i)
+        return self
+
+    def __exit__(self, exc_type, exc_value, exc_tb):
+        for i in self.entered_genome_indices:
+            self.genomes[i].__exit__(exc_type, exc_value, exc_tb)
+
+    def __getitem__(self, name):
+        return FilesChromosome([g[name] for g in self.genomes])
+
+    def __contains__(self):
+        raise NotImplementedError
+
+    def __del__(self):
+        for g in self.genomes:
+            del g
+
+    def __iter__(self):
+        # Iterate over the chromosomes in the first genome,
+        # then use __getitem__(chrom.name) on the other genomes,
+        # to ensure proper ordering and detect different sets
+        # of chromosomes
+        for first_chrom in self.genomes[0]:
+            chrom_name = first_chrom.name
+            try:
+                other_chroms = [g[chrom_name] for g in self.genomes[1:]]
+            except KeyError:
+                print >>sys.stderr, """Hint: All genomedata archives must have the same
+                                     set of chromosomes"""
+                raise
+            yield FilesChromosome([first_chrom] + other_chroms)
+
+    @property
+    def tracknames_continuous(self):
+        return self.track_filenames
+
+    @property
+    def mins(self):
+        return hstack((g.mins for g in self.genomes))
+
+    @property
+    def maxs(self):
+        return hstack((g.maxs for g in self.genomes))
+
+    @property
+    def vars(self):
+        return hstack((g.vars for g in self.genomes))
+
+    @property
+    def sums(self):
+        return hstack((g.sums for g in self.genomes))
+
+    @property
+    def sums_squares(self):
+        return hstack((g.sums_squares for g in self.genomes))
+
+    @property
+    def num_datapoints(self):
+        return hstack((g.num_datapoints for g in self.genomes))
+
+    @property
+    def means(self):
+        return hstack((g.means for g in self.genomes))
+
+class FilesChromosome:
+    def __init__(self, chroms):
+        self.chroms = chroms
+
+    def __iter__(self):
+        raise NotImplementedError
+
+
+    def __getitem__(self, key):
+        if isinstance(key, tuple):
+            base_key, track_key = key
+        else:
+            raise NotImplementedError
+
+        data = (self.chroms[track_index][base_key, 0]
+                for track_index in track_key)
+        return transpose(vstack(data))
+
+    @property
+    def name(self):
+        return self.chroms[0].name
+
+    def itercontinuous(self):
+        print >>sys.stderr, "running FilesChromosome.itercontinuous"
+        iters = [c.itercontinuous() for c in self.chroms]
+        while True:
+            # When we run out of supercontigs, this will raise StopIteration.
+            iter_res = [i.next() for i in iters]
+            supercontigs = [res[0] for res in iter_res]
+            data = (res[1] for res in iter_res)
+            yield supercontigs[0], transpose(vstack(data))
+
+        raise NotImplementedError
 
 def die(msg=""):
     if msg:

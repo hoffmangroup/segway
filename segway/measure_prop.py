@@ -7,6 +7,7 @@ import struct
 from distutils.spawn import find_executable
 import subprocess
 import pdb
+import gzip
 from math import log
 
 
@@ -17,7 +18,7 @@ from ._util import (ceildiv, Copier, memoized_property,
                     VIRTUAL_EVIDENCE_FULL_LIST_FILENAME,
                     VIRTUAL_EVIDENCE_WINDOW_LIST_FILENAME_TMPL,
                     VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL,
-                    permissive_log)
+                    permissive_log, maybe_gzip_open)
 
 SUBDIRNAME_MEAUSURE_PROP = "measure_prop"
 MEASURE_PROP_WORKDIRNAME_TMPL = "mp.%s.%s"
@@ -273,36 +274,6 @@ class MeasurePropRunner(Copier):
         with open(filepath, "w") as f:
             trans.write_to(f)
 
-    #def write_mp_graph_file(self, instance_index, round_index):
-        ## connect every node to the node at the same position in each other world
-        #filepath = self.make_mp_graph_filename(instance_index, round_index)
-        #node_indexes = {} # (world, chrom, pos) : node_index
-        #node_index = 0
-        #for window_index, (world, chrom, start, end) in enumerate(self.windows):
-            #for pos in range(start, end, self.resolution):
-                #node_indexes[world, chrom, pos] = node_index
-                #node_index += 1
-
-        #assert (len(node_indexes) == self.num_frames)
-        #neighbors = [[] for i in range(self.num_frames)]
-        #for window_index, (world, chrom, start, end) in enumerate(self.windows):
-            #other_worlds = list(set(range(self.num_worlds)) - set([world]))
-            #for pos in range(start, end, self.resolution):
-                #node_index = node_indexes[world, chrom, pos]
-                #for other_world in other_worlds:
-                    #other_node = node_indexes[other_world, chrom, pos]
-                    #neighbor_tuple = (other_node, 1)
-                    #neighbors[node_index].append(neighbor_tuple)
-
-        #nodes = [None for i in range(self.num_frames)]
-        #for node_index in range(self.num_frames):
-            #nodes[node_index] = MPGraphNode().init(node_index, neighbors[node_index])
-
-        #graph = MPGraph().init(nodes)
-
-        #with open(filepath, "w") as f:
-            #graph.write_to(f)
-
     def write_mp_label_file(self, instance_index, round_index):
         filepath = self.make_mp_label_filename(instance_index, round_index)
 
@@ -319,7 +290,7 @@ class MeasurePropRunner(Copier):
             posteriors = [[10 for i in range(self.num_segs)] for j in range(window_num_frames)]
             for label_index in range(self.num_segs):
                 post_fname = post_tmpl % label_index
-                with open(post_fname, "r") as post:
+                with maybe_gzip_open(post_fname, "r") as post:
                     for line in post:
                         row, (chrom, start, end, prob) = parse_bed4(line)
                         start = int(start)
