@@ -188,19 +188,20 @@ def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num
         # run-length encoding on the probs_rounded_label
         sys.stderr.flush()
 
-        outfile = maybe_gzip_open(outfilename, "w")
-        pos, = where(diff(probs_rounded_label) != 0)
-        pos = r_[start, pos[:]*resolution+start+resolution, end]
-        sys.stderr.flush()
-
-        for bed_start, bed_end in zip(pos[:-1], pos[1:]):
-            chrom_start = str(bed_start)
-            chrom_end = str(bed_end)
-            value = str(probs_rounded_label[(bed_start-start)/resolution])
+        #outfile = maybe_gzip_open(outfilename, "w")
+        with maybe_gzip_open(outfilename, "w") as outfile:
+            pos, = where(diff(probs_rounded_label) != 0)
+            pos = r_[start, pos[:]*resolution+start+resolution, end]
             sys.stderr.flush()
 
-            row = [chrom, chrom_start, chrom_end, value]
-            print >>outfile, "\t".join(row)
+            for bed_start, bed_end in zip(pos[:-1], pos[1:]):
+                chrom_start = str(bed_start)
+                chrom_end = str(bed_end)
+                value = str(probs_rounded_label[(bed_start-start)/resolution])
+                sys.stderr.flush()
+
+                row = [chrom, chrom_start, chrom_end, value]
+                print >>outfile, "\t".join(row)
 
 def load_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
                             infilename):

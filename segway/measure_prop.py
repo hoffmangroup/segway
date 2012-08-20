@@ -202,7 +202,8 @@ def test_measure_labels():
 class MeasurePropRunner(Copier):
     copy_attrs = ["windows", "resolution", "num_segs", "uniform_ve_dirname",
                   "work_dirpath", "num_worlds", "measure_prop_graph_filepath",
-                  "mu", "mp_weight", "nu", "measure_prop_am_num_iters"]
+                  "mu", "mp_weight", "nu", "measure_prop_am_num_iters",
+                  "measure_prop_reuse_evidence"]
 
     @memoized_property
     def num_frames(self):
@@ -252,8 +253,11 @@ class MeasurePropRunner(Copier):
     def run_segway_posterior(self, instance_index, round_index, params_filename):
         # need to specify: MP uniform ve files, structure file, params file
 
-        # XXX do we use VE for JT or not?
-        self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
+        # XXX pass this explicitly
+        mp_round_index = int(round_index.rsplit("_", 1)[-1])
+
+        if (not self.measure_prop_reuse_evidence) and (mp_round_index == 0):
+            self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
 
         posterior_workdir = self.runner.make_mp_posterior_workdir(instance_index,
                                                                   round_index)

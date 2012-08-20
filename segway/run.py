@@ -115,7 +115,8 @@ SWAP_ENDIAN = False
 
 ## option defaults
 VERBOSITY = 0
-PRIOR_STRENGTH = 0
+LEN_PRIOR_STRENGTH = 0
+GRAPH_PRIOR_STRENGTH = 0
 
 FINFO_FLOAT32 = finfo(float32)
 MACHEP_FLOAT32 = FINFO_FLOAT32.machep
@@ -222,7 +223,7 @@ TRAIN_FIELDNAMES = ["name", "value"]
 TRAIN_OPTION_TYPES = \
     dict(input_master_filename=str, structure_filename=str,
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
-         distribution=str, len_seg_strength=float,
+         distribution=str, len_seg_strength=float, graph_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
          num_segs=int, num_subsegs=int, track_specs=[str],
          reverse_worlds=[int])
@@ -520,6 +521,7 @@ class Runner(object):
         self.nu = None
         self.mp_weight = None
         self.measure_prop_objective_tab_filename = None
+        self.measure_prop_reuse_evidence = False
 
         self.card_supervision_label = -1
 
@@ -542,7 +544,8 @@ class Runner(object):
         self.num_segs = NUM_SEGS
         self.num_subsegs = NUM_SUBSEGS
         self.num_instances = NUM_INSTANCES
-        self.len_seg_strength = PRIOR_STRENGTH
+        self.len_seg_strength = LEN_PRIOR_STRENGTH
+        self.graph_seg_strength = GRAPH_PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
         self.max_frames = MAX_FRAMES
@@ -591,6 +594,7 @@ class Runner(object):
                         ("measure_prop_weight","mp_weight"),
                         ("measure_prop_num_iters",),
                         ("measure_prop_am_num_iters",),
+                        ("measure_prop_reuse_evidence",),
                         ("virtual_evidence", "virtual_evidence_filename"),
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
@@ -606,7 +610,8 @@ class Runner(object):
                         ("dont_train", "dont_train_filename"),
                         ("seg_table", "seg_table_filename"),
                         ("distribution",),
-                        ("prior_strength", "len_seg_strength"),
+                        ("len_prior_strength", "len_seg_strength"),
+                        ("graph_prior_strength", "graph_seg_strength"),
                         ("segtransition_weight_scale",),
                         ("ruler_scale",),
                         ("resolution",),
@@ -2755,6 +2760,10 @@ def parse_options(args):
         group.add_option("--measure-prop-am-num-iters", metavar="FILE", default=100, type=int,
                          help="number of iterations to run alternating minimization in measure prop")
 
+        group.add_option("--measure-prop-reuse-evidence", action="store_true",
+                         help="Use evidence from the last round of measure prop to get posteriors for"
+                         " the next round. By default, use uniform evidence.")
+
         # XXXmax
         group.add_option("--virtual-evidence", metavar="FILE",
                          help="supply virtual evidence in FILE (default none)")
@@ -2807,10 +2816,20 @@ def parse_options(args):
                          help="ruler marking every SCALE bp (default %d)" %
                          RULER_SCALE)
 
-        group.add_option("--prior-strength", type=float, metavar="RATIO",
+        group.add_option("--len-prior-strength", type=float, metavar="RATIO",
                          help="use RATIO times the number of data counts as"
                          " the number of pseudocounts for the segment length"
-                         " prior (default %f)" % PRIOR_STRENGTH)
+                         " prior (default %f)" % LEN_PRIOR_STRENGTH)
+
+        group.add_option("--graph-prior-strength", type=float, metavar="RATIO",
+                         help="use RATIO times the number of data counts as"
+                         " the number of pseudocounts for the segment transition"
+                         " prior (default %f)" % GRAPH_PRIOR_STRENGTH + "1"
+                         "(Hint: if transition A->B is never seen, it will get weight"
+                         " weight / (prob(A) + #labels*weight). )"
+                         " If you would like the minimum transition prob to be X"
+                         " and the minimum label prob is Y, set"
+                         " weight = (X - Y) / (#labels - 1)")
 
         group.add_option("--segtransition-weight-scale", type=float,
                          metavar="SCALE",

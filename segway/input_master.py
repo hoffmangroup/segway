@@ -287,7 +287,8 @@ class DenseCPTParamSpec(TableParamSpec):
     type_name = "DENSE_CPT"
     copy_attrs = TableParamSpec.copy_attrs \
         + ["resolution", "card_seg_countdown", "seg_table",
-           "seg_countdowns_initial", "len_seg_strength", "use_dinucleotide"]
+           "seg_countdowns_initial", "len_seg_strength", "graph_seg_strength",
+           "use_dinucleotide"]
 
     # see Segway paper
     probs_force_transition = array([0.0, 0.0, 1.0])
@@ -327,7 +328,7 @@ class DenseCPTParamSpec(TableParamSpec):
     def make_dense_cpt_seg_seg_spec(self):
         cpt = make_zero_diagonal_table(self.num_segs)
 
-        return self.make_table_spec("seg_seg", cpt)
+        return self.make_table_spec("seg_seg", cpt, dirichlet=self.graph_seg_strength > 0)
 
     def make_dense_cpt_seg_subseg_subseg_spec(self):
         cpt_seg = make_zero_diagonal_table(self.num_subsegs)
@@ -434,10 +435,11 @@ class DenseCPTParamSpec(TableParamSpec):
         if self.use_dinucleotide:
             yield self.make_dense_cpt_seg_dinucleotide_spec()
 
-class DirichletTabParamSpec(TableParamSpec):
+class DirichletTabParamSpec(DenseCPTParamSpec):
     type_name = "DIRICHLET_TAB"
-    copy_attrs = TableParamSpec.copy_attrs \
-        + ["len_seg_strength", "num_bases", "card_seg_countdown"]
+    copy_attrs = DenseCPTParamSpec.copy_attrs \
+        + ["len_seg_strength", "graph_seg_strength",
+           "num_bases", "card_seg_countdown"]
 
     def make_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
@@ -445,7 +447,7 @@ class DirichletTabParamSpec(TableParamSpec):
         return TableParamSpec.make_table_spec(self, dirichlet_name, table,
                                               table.ndim)
 
-    def make_dirichlet_table(self):
+    def make_len_dirichlet_table(self):
         probs = self.make_dense_cpt_segCountDown_seg_segTransition()
 
         # XXX: the ratio is not exact as num_bases is not the same as
@@ -460,12 +462,21 @@ class DirichletTabParamSpec(TableParamSpec):
 
         return pseudocounts
 
+    def make_graph_dirichlet_table(self):
+        total_pseudocounts = self.graph_seg_strength * self.num_bases
+        probs = make_zero_diagonal_table(self.num_segs)
+        pseudocounts = (probs * total_pseudocounts).astype(int)
+        return pseudocounts
+
     def generate_objects(self):
         # XXX: these called functions have confusing/duplicative names
-        dirichlet_table = self.make_dirichlet_table()
+        if (self.len_seg_strength > 0):
+            dirichlet_table = self.make_len_dirichlet_table()
+            yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION, dirichlet_table)
+        if (self.graph_seg_strength > 0):
+            dirichlet_table = self.make_graph_dirichlet_table()
+            yield self.make_table_spec("seg_seg", dirichlet_table)
 
-        yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
-                                   dirichlet_table)
 
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
@@ -626,7 +637,7 @@ class InputMasterSaver(Saver):
     copy_attrs = ["tracknames", "num_bases", "num_segs", "num_subsegs",
                   "num_tracks", "card_seg_countdown",
                   "seg_countdowns_initial", "seg_table", "distribution",
-                  "len_seg_strength", "resolution", "supervision_type",
+                  "len_seg_strength", "graph_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
                   "gmtk_include_filename_relative", "head_trackname_list",
                   "measure_prop_graph_filepath", "virtual_evidence"]
@@ -646,7 +657,7 @@ class InputMasterSaver(Saver):
 
         dt_spec = DTParamSpec(self)
 
-        if self.len_seg_strength > 0:
+        if (self.len_seg_strength > 0) or (self.graph_seg_strength > 0):
             dirichlet_spec = DirichletTabParamSpec(self)
         else:
             dirichlet_spec = ""
