@@ -30,6 +30,7 @@ from urllib import quote
 from uuid import uuid1
 from warnings import warn
 import struct
+import pdb
 
 from genomedata import Genome
 from numpy import (arange, arcsinh, array, empty, finfo, float32, intc,
@@ -40,7 +41,7 @@ from path import path
 from pkg_resources import Requirement, working_set
 from tabdelim import DictReader, ListWriter
 
-from .bed import parse_bed4, read_native, read as read_bed3
+from .bed import parse_bed4, read_native, read_native_file, read as read_bed3
 from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
                       RestartableJobDict, Session)
 from .include import IncludeSaver
@@ -504,6 +505,7 @@ class Runner(object):
 
         self.include_coords_filename = None
         self.exclude_coords_filename = None
+        self.enforce_coords = False
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
@@ -599,6 +601,7 @@ class Runner(object):
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
+                        ("enforce_coords",),
                         ("num_instances",),
                         ("verbosity",),
                         ("split_sequences", "max_frames"),
@@ -814,11 +817,11 @@ class Runner(object):
 
     @memoized_property
     def include_coords(self):
-        return load_coords(self.include_coords_filename)
+        return read_native_file(self.include_coords_filename)
 
     @memoized_property
     def exclude_coords(self):
-        return load_coords(self.exclude_coords_filename)
+        return read_native_file(self.exclude_coords_filename)
 
     @memoized_property
     def seg_table(self):
@@ -2553,6 +2556,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         ## setup files
         if not self.input_master_filename:
             warn("Input master not specified. Generating.")
+            self.make_subdir(SUBDIRNAME_PARAMS)
             self.save_input_master()
 
         viterbi_filenames = self.viterbi_filenames
@@ -2710,6 +2714,11 @@ def parse_options(args):
         group.add_option("--resolution", type=int, metavar="RES",
                          help="downsample to every RES bp (default %d)" %
                          RESOLUTION)
+
+        group.add_option("--enforce-coords", action="store_true",
+                         help="Use exactly the coordinates in include-coords."
+                         " Raises an error if any included positions are not supported by"
+                         " the genomedata archive.")
 
     with OptionGroup(parser, "Model files") as group:
         group.add_option("-i", "--input-master", metavar="FILE",

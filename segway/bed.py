@@ -6,6 +6,7 @@ __version__ = "$Revision$"
 # Copyright 2008-2012 Michael M. Hoffman <mmh1@washington.edu>
 
 from itertools import chain
+from collections import deque
 import re
 import sys
 
@@ -51,6 +52,13 @@ def read(iterator, datum_cls=Datum):
 def read_native(*args, **kwargs):
     return read(datum_cls=NativeDatum, *args, **kwargs)
 
+def read_native_file(fname, *args, **kwargs):
+    if not fname:
+        return None
+    with open(fname) as f:
+        data = list(read_native(f, *args, **kwargs))
+    return data
+
 def parse_bed4(line):
     """
     alternate fast path
@@ -58,6 +66,15 @@ def parse_bed4(line):
     row = line.split()
     chrom, start, end, seg = row[:4]
     return row, (chrom, start, end, seg)
+
+def iter_chroms(data):
+    if data:
+        chroms = set([datum.chrom for datum in data])
+        for chrom in chroms:
+            coords_list = [(datum.chromStart, datum.chromEnd) for datum in data if datum.chrom == chrom]
+            starts, ends = map(deque, zip(*coords_list))
+            yield chrom, (starts, ends)
+
 
 re_trackline_split = re.compile(r"(?:[^ =]+=([\"'])[^\1]+?\1(?= |$)|[^ ]+)")
 def get_trackline_and_reader(iterator, datum_cls=Datum):

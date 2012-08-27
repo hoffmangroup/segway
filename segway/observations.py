@@ -25,6 +25,7 @@ from numpy import (add, append, arange, arcsinh, array, column_stack, empty,
 from path import path
 from tabdelim import ListWriter
 
+from .bed import iter_chroms
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
                     get_chrom_coords, make_prefix_fmt,
@@ -298,7 +299,7 @@ class Observations(object):
                   "distribution", "train", "identify", "supervision_type",
                   "supervision_coords", "supervision_labels",
                   "use_dinucleotide", "world_track_indexes", "clobber",
-                  "num_worlds"]
+                  "num_worlds", "enforce_coords"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)
@@ -307,9 +308,7 @@ class Observations(object):
         self.int_filepaths = []
 
     def generate_coords_include(self):
-        for chrom, coords_list in self.include_coords.iteritems():
-            starts, ends = map(deque, zip(*coords_list))
-            yield chrom, starts, ends
+        return iter_chroms(self.include_coords)
 
     def generate_coords_all(self, genome):
         num_tracks = self.num_tracks
@@ -341,6 +340,7 @@ class Observations(object):
         if self.include_coords:
             return self.generate_coords_include()
         else:
+            assert not self.enforce_coords
             return self.generate_coords_all(genome)
 
     def skip_or_split_window(self, start, end):
@@ -365,7 +365,7 @@ class Observations(object):
 
             # // means floor division
             offset = (num_frames // num_new_starts)
-            new_offsets = arange(num_new_starts) * offset
+            new_offsets = arange(num_new_starts) * (offset * self.resolution)
             new_starts = start + new_offsets
             new_ends = append(new_starts[1:], end)
 
@@ -375,39 +375,51 @@ class Observations(object):
 
     def locate_windows(self, genome):
         """
-        input: Genome instance, include_coords, exclude_ coords, max_frames
+        input: Genome instance, include_coords, exclude_coords, max_frames
 
         sets: window_coords
         """
-        exclude_coords = self.exclude_coords
+        if not self.exclude_coords:
+            exclude_coords = None
+        else:
+            exclude_coords = dict(iter_chroms(self.exclude_coords))
 
-        windows = []
+        if self.enforce_coords:
+            if self.num_worlds != 1:
+                raise NotImplementedError
+            else:
+                windows = [Window(0, datum.chrom, datum.chromStart, datum.chromEnd)
+                           for datum in self.include_coords]
+        else:
+            windows = []
+            for chrom, (starts, ends) in self.generate_coords(genome):
+                if not exclude_coords:
+                    chr_exclude_coords = None
+                else:
+                    chr_exclude_coords = zip(*get_chrom_coords(exclude_coords, chrom))
 
-        for chrom, starts, ends in self.generate_coords(genome):
-            chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
+                while True:
+                    try:
+                        start = starts.popleft()
+                    except IndexError:
+                        break
 
-            while True:
-                try:
-                    start = starts.popleft()
-                except IndexError:
-                    break
+                    end = ends.popleft() # should not ever cause an IndexError
 
-                end = ends.popleft() # should not ever cause an IndexError
+                    new_windows = find_overlaps_exclude(start, end,
+                                                        chr_exclude_coords)
+                    start, end = process_new_windows(new_windows, starts, ends)
+                    if start is None:
+                        continue
 
-                new_windows = find_overlaps_exclude(start, end,
-                                                    chr_exclude_coords)
-                start, end = process_new_windows(new_windows, starts, ends)
-                if start is None:
-                    continue
+                    # skip or split long sequences
+                    new_windows = self.skip_or_split_window(start, end)
+                    start, end = process_new_windows(new_windows, starts, ends)
+                    if start is None:
+                        continue
 
-                # skip or split long sequences
-                new_windows = self.skip_or_split_window(start, end)
-                start, end = process_new_windows(new_windows, starts, ends)
-                if start is None:
-                    continue
-
-                for world in xrange(self.num_worlds):
-                    windows.append(Window(world, chrom, start, end))
+                    for world in xrange(self.num_worlds):
+                        windows.append(Window(world, chrom, start, end))
 
         self.windows = windows
 
