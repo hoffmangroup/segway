@@ -397,7 +397,6 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
                     pass
 
     lines = output.splitlines()
-    print >>sys.stderr, "lines:\n", lines
 
     return parse_viterbi_save_bed(coord, resolution, do_reverse, lines, outfilename,
                                   num_labels)
