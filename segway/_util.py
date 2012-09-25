@@ -389,7 +389,10 @@ def get_chrom_coords(coords, chrom):
     returns None if there are no coords whatsoever
     """
     if coords:
-        return coords[chrom]
+        if chrom in coords:
+            return coords[chrom]
+        else:
+            return []
 
 def is_empty_array(arr):
     try:

@@ -453,6 +453,7 @@ class DirichletTabParamSpec(DenseCPTParamSpec):
         # XXX: the ratio is not exact as num_bases is not the same as
         # the number of base-base transitions. It is surely close
         # enough, though
+        # XXX XXX XXX this should be num_frames
         total_pseudocounts = self.len_seg_strength * self.num_bases
         divisor = self.card_seg_countdown * self.num_segs
         pseudocounts_per_row = total_pseudocounts / divisor
@@ -463,7 +464,7 @@ class DirichletTabParamSpec(DenseCPTParamSpec):
         return pseudocounts
 
     def make_graph_dirichlet_table(self):
-        total_pseudocounts = self.graph_seg_strength * self.num_bases
+        total_pseudocounts = self.graph_seg_strength * self.num_segs
         probs = make_zero_diagonal_table(self.num_segs)
         pseudocounts = (probs * total_pseudocounts).astype(int)
         return pseudocounts

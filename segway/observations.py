@@ -327,7 +327,7 @@ class Observations(object):
                     ends.extend(convert_windows(attrs, "chunk_ends"))
 
             if starts:
-                yield chromosome.name, starts, ends
+                yield chromosome.name, (starts, ends)
 
     def generate_coords(self, genome):
         """

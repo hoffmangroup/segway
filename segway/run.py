@@ -134,7 +134,8 @@ assert FUDGE_EP > MACHEP_FLOAT32
 
 FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 
-LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
+#LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
+LOG_LIKELIHOOD_DIFF_FRAC = 1e-3 # XXX too small?
 
 NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 
@@ -2081,7 +2082,7 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return Results(None, None, None, None, None, None, None, None)
+            return Results(None, None, None, None, None, None, None)
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
@@ -2554,7 +2555,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         self.instance_index = "identify"
 
         ## setup files
-        if not self.input_master_filename:
+        if not self.input_master_filename or not path(self.input_master_filename).isfile():
             warn("Input master not specified. Generating.")
             self.make_subdir(SUBDIRNAME_PARAMS)
             self.save_input_master()
@@ -2831,14 +2832,8 @@ def parse_options(args):
                          " prior (default %f)" % LEN_PRIOR_STRENGTH)
 
         group.add_option("--graph-prior-strength", type=float, metavar="RATIO",
-                         help="use RATIO times the number of data counts as"
-                         " the number of pseudocounts for the segment transition"
-                         " prior (default %f)" % GRAPH_PRIOR_STRENGTH + "1"
-                         "(Hint: if transition A->B is never seen, it will get weight"
-                         " weight / (prob(A) + #labels*weight). )"
-                         " If you would like the minimum transition prob to be X"
-                         " and the minimum label prob is Y, set"
-                         " weight = (X - Y) / (#labels - 1)")
+                         help="use NUM pseudocounts for determining label-label"
+                         " transition probabilites.")
 
         group.add_option("--segtransition-weight-scale", type=float,
                          metavar="SCALE",

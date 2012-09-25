@@ -398,15 +398,12 @@ class MeasurePropRunner(Copier):
     def mp_post_to_ve(self, instance_index, round_index):
         posts = self.read_mp_post_file(instance_index, round_index)
 
-        # weight posteriors and add pseudocounts XXX
         for i in range(len(posts)):
             posts[i] = map(lambda p: p**self.mp_weight, posts[i])
-            posts[i] = map(lambda p: p+0.0001, posts[i])
+            #posts[i] = map(lambda p: p+0.0001, posts[i])
             partition = sum(posts[i])
             posts[i] = map(lambda p: float(p) / partition, posts[i])
             posts[i] = map(permissive_log, posts[i])
-
-
 
         window_posts = [None for i in range(len(self.windows))]
         for window_index, (world, chrom, start, end) in enumerate(self.windows):

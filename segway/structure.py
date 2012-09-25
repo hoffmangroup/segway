@@ -23,7 +23,6 @@ def make_weight_scale(scale):
 
 class StructureSaver(Saver):
     resource_name = "segway.str.tmpl"
-    # XXXmax
     copy_attrs = ["num_tracks", "num_datapoints", "use_dinucleotide",
                   "window_lens", "resolution", "tracknames", "supervision_type",
                   "gmtk_include_filename_relative", "head_tracknames",
