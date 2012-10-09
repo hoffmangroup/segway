@@ -231,7 +231,7 @@ class Segmentation(defaultdict):
         return uniquify(self.ordering + sorted(self.colors.iterkeys()))
 
     def update_trackline(self, updates):
-        self.trackline = update_trackline(self.trackline, updates)
+        update_trackline(self.trackline, updates)
 
     def recolor(self):
         mnemonics = self.mnemonics
@@ -271,6 +271,9 @@ class Segmentation(defaultdict):
 
 
     def write_trackline(self, outfile):
+        # If self.trackline is None then TypeErrors occur when joining/printing.
+        # This assertion can help single out trackline if it is the culprit
+        assert(self.trackline)
         try:
             final_outfile = outfile._items[0]
         except AttributeError:
