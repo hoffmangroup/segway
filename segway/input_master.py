@@ -419,7 +419,7 @@ class DenseCPTParamSpec(TableParamSpec):
         cpt = self.make_dense_cpt_segCountDown_seg_segTransition()
 
         return self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION, cpt,
-                               dirichlet=self.len_seg_strength > 0)
+                                    dirichlet=self.len_seg_strength > 0)
 
     def generate_objects(self):
         yield self.make_dense_cpt_start_seg_spec()

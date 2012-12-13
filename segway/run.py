@@ -1392,7 +1392,14 @@ class Runner(object):
 
         assert supervision_type == SUPERVISION_SEMISUPERVISED
 
+        # defaultdict of list of ints
+        # key: chrom
+        # value: list of ints (label as number)
         supervision_labels = defaultdict(list)
+
+        # defaultdict of lists of tuples
+        # key: chrom
+        # value: list of tuples (start, end)
         supervision_coords = defaultdict(list)
 
         with open(self.supervision_filename) as supervision_file:
