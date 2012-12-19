@@ -31,9 +31,9 @@ SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=2 \
     "$cluster_arg" \
     train ../test.genomedata traindir
 
-../../compare_directory.py ../traindir traindir || true # keep going
-
 segway "$cluster_arg" \
     identify+posterior ../test.genomedata traindir identifydir
 
-../../compare_directory.py ../identifydir identifydir || true
+cd ..
+
+../compare_directory.py ../data/touchstone ../data/${TMPDIR#"./"}

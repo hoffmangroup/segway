@@ -1,7 +1,7 @@
 #include "traindir/auxiliary/segway.inc"
 
 #if CARD_SEG != 4
-#error CARD_SEG must be defined to be 4 for this input master file
+#error Specified number of segment labels (CARD_SEG) does not match the number used for this input master file (4)
 #endif
 
 DT_IN_FILE inline
