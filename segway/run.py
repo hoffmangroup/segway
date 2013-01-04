@@ -53,7 +53,7 @@ from .measure_prop import MeasurePropRunner
 from .virtual_evidence import write_virtual_evidence
 from ._util import (data_filename,
                     DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
-                    DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
+                    DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_POWER_NORM, EXT_BED, EXT_FLOAT, EXT_GZ,
                     EXT_INT, EXT_PARAMS, EXT_TAB, EXT_LIST,
                     extjoin, extjoin_not_none, GB,
                     ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
@@ -78,8 +78,8 @@ UUID = uuid1().hex
 
 # XXX: I should really get some sort of Enum for this, I think Peter
 # Norvig has one
-DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
-                 DISTRIBUTION_ASINH_NORMAL]
+#DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
+                 #DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
 MIN_NUM_SEGS = 2
@@ -134,8 +134,11 @@ assert FUDGE_EP > MACHEP_FLOAT32
 
 FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 
+# This is looser criterion is supported
+# by seed-level variation
+LOG_LIKELIHOOD_DIFF_FRAC = 1e-3
 #LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
-LOG_LIKELIHOOD_DIFF_FRAC = 1e-3 # XXX too small?
+#LOG_LIKELIHOOD_DIFF_FRAC = 1e-7
 
 NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
 
@@ -1184,8 +1187,12 @@ class Runner(object):
         return slice2range(self.num_segs)
 
     def transform(self, num):
+        # XXX this is duplicative of the code in observations, and wrong
         if self.distribution == DISTRIBUTION_ASINH_NORMAL:
             return arcsinh(num)
+        elif self.distribution[:len(DISTRIBUTION_POWER_NORM)] == DISTRIBUTION_POWER_NORM:
+            power = float(self.distribution[len(DISTRIBUTION_POWER_NORM):])
+            return num ** power
         else:
             return num
 
@@ -2800,7 +2807,8 @@ def parse_options(args):
                          help="specify layered bigBed filename")
 
     with OptionGroup(parser, "Modeling variables") as group:
-        group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
+        #group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
+        group.add_option("-D", "--distribution",
                          metavar="DIST",
                          help="use DIST distribution"
                          " (default %s)" % DISTRIBUTION_DEFAULT)

@@ -20,13 +20,14 @@ from os import extsep
 import sys
 from tempfile import gettempdir
 
-from numpy import (add, append, arange, arcsinh, array, column_stack, empty,
-                   invert, isnan, maximum, zeros, transpose)
+from numpy import (absolute, add, append, any, arange, arcsinh, array, column_stack, empty, sign,
+                   invert, isnan, maximum, power as to_power, transpose, where, zeros)
+from numpy import histogram, logical_not # XXX
 from path import path
 from tabdelim import ListWriter
 
 from .bed import iter_chroms
-from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
+from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_POWER_NORM,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
                     get_chrom_coords, make_prefix_fmt,
                     SUPERVISION_LABEL_OFFSET, SUPERVISION_SEMISUPERVISED,
@@ -241,6 +242,14 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     if float_data is not None:
         if distribution == DISTRIBUTION_ASINH_NORMAL:
             float_data = arcsinh(float_data)
+        elif distribution[:len(DISTRIBUTION_POWER_NORM)] == DISTRIBUTION_POWER_NORM:
+            power = float(distribution[len(DISTRIBUTION_POWER_NORM):])
+            do_warn = any(float_data < 0) # XXX
+            if do_warn:
+                print "Warning: taking power of negative numbers (using complex abs())"
+            float_data = absolute(to_power(float_data + 0j, power)) * sign(float_data)
+            if do_warn:
+                print "Histogram of resulting values:", histogram(float_data[where(logical_not(isnan(float_data)))]) # XXX
 
         if (not USE_MFSDG) or resolution > 1:
             mask_missing = isnan(float_data)

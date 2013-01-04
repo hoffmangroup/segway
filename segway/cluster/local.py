@@ -35,6 +35,13 @@ class Job(object):
                           stdout=self.outfd,
                           stderr=self.errfd,
                           cwd=job_tmpl.workingDirectory)
+        # XXX
+        # Since this is singlethreaded, in theory waiting on each process
+        # shouldn't be slower (although it could be if we're IO-bound)
+        # On the plus side, we don't have to worry about memory conflict
+        # between the jobs.
+        # Also, I'm 99% sure it works to wait() and then wait() again later.
+        self.proc.wait()
 
     def poll(self):
         retcode = self.proc.poll()
@@ -46,7 +53,15 @@ class Job(object):
         #pass
 
     def kill(self):
-        self.proc.terminate()
+        try:
+            self.proc.terminate()
+        except OSError:
+            # In some error conditions, the job is never created.
+            # This causes proc.terminate to fail(), masking the error.
+            # We'll skip throwing an exception here so that the original
+            # error is printed.  In any case, leaking a process isn't
+            # a big deal.
+            pass
         self.proc.wait()
         self._close()
 

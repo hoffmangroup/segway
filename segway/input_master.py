@@ -19,7 +19,7 @@ from numpy.random import seed, uniform
 from os import environ
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
-                    DISTRIBUTION_ASINH_NORMAL,
+                    DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_POWER_NORM,
                     OFFSET_END, OFFSET_START, OFFSET_STEP,
                     resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED, USE_MFSDG)
@@ -39,6 +39,10 @@ if USE_MFSDG:
     COVAR_TIED = False
 else:
     COVAR_TIED = True
+
+#JITTER_STD_BOUND = 0.2
+JITTER_STD_BOUND = 1.0
+
 
 ABSOLUTE_FUDGE = 0.001
 
@@ -439,7 +443,7 @@ class DirichletTabParamSpec(DenseCPTParamSpec):
     type_name = "DIRICHLET_TAB"
     copy_attrs = DenseCPTParamSpec.copy_attrs \
         + ["len_seg_strength", "graph_seg_strength",
-           "num_bases", "card_seg_countdown"]
+           "num_bases", "card_seg_countdown", "resolution"]
 
     def make_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
@@ -454,7 +458,7 @@ class DirichletTabParamSpec(DenseCPTParamSpec):
         # the number of base-base transitions. It is surely close
         # enough, though
         # XXX XXX XXX this should be num_frames
-        total_pseudocounts = self.len_seg_strength * self.num_bases
+        total_pseudocounts = self.len_seg_strength * self.num_bases // self.resolution
         divisor = self.card_seg_countdown * self.num_segs
         pseudocounts_per_row = total_pseudocounts / divisor
 
@@ -512,7 +516,7 @@ class NameCollectionParamSpec(ParamSpec):
 class MeanParamSpec(ParamSpec):
     type_name = "MEAN"
     object_tmpl = "mean_${seg}_${subseg}_${track} 1 ${datum}"
-    jitter_std_bound = 0.2
+    jitter_std_bound = JITTER_STD_BOUND
 
     copy_attrs = ParamSpec.copy_attrs + ["means", "vars"]
 
@@ -672,7 +676,7 @@ class InputMasterSaver(Saver):
         num_free_params += fullnum_subsegs
 
         distribution = self.distribution
-        if distribution in DISTRIBUTIONS_LIKE_NORM:
+        if distribution in DISTRIBUTIONS_LIKE_NORM or distribution[:len(DISTRIBUTION_POWER_NORM)] == DISTRIBUTION_POWER_NORM:
             mean_spec = MeanParamSpec(self)
             if COVAR_TIED:
                 covar_spec = TiedCovarParamSpec(self)
