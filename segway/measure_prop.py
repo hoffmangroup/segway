@@ -431,7 +431,7 @@ class MeasurePropRunner(Copier):
         self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
 
 
-    def update(self, instance_index, round_index, params_filename):
+    def update(self, instance_index, round_index, params_filename=None):
         # 1) Run gmtkJT to get posteriors for the current model
         # This runs gmtkJT and puts the posteriors at posterior_filenames
         self.run_segway_posterior(instance_index, round_index, params_filename)

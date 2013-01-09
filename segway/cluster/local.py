@@ -28,6 +28,7 @@ class Job(object):
         err_path = job_tmpl.errorPath.split(":")[1]
         self.outfd = open(output_path, "w")
         self.errfd = open(err_path, "w")
+        self.closed = False
 
         cmd = [job_tmpl.remoteCommand] + job_tmpl.args
         self.proc = Popen(cmd,
@@ -39,9 +40,12 @@ class Job(object):
         # Since this is singlethreaded, in theory waiting on each process
         # shouldn't be slower (although it could be if we're IO-bound)
         # On the plus side, we don't have to worry about memory conflict
-        # between the jobs.
-        # Also, I'm 99% sure it works to wait() and then wait() again later.
+        # between the jobs. If you're worried about performance due to
+        # IO-bound processes, remove these two lines (and make sure you
+        # have enough memory to support all the jobs running at the same
+        # time)
         self.proc.wait()
+        self._close()
 
     def poll(self):
         retcode = self.proc.poll()
@@ -66,8 +70,10 @@ class Job(object):
         self._close()
 
     def _close(self):
-        self.outfd.close()
-        self.errfd.close()
+        if not self.closed:
+            self.outfd.close()
+            self.errfd.close()
+            self.closed = True
 
 class JobInfo(object):
     terminatedSignal = "LocalJobTemplateTerminatedSignal"

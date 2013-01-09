@@ -1728,6 +1728,7 @@ class Runner(object):
 
         self.save_include()
         self.set_params_filename()
+
         self.save_structure()
 
         self.load_measure_prop()
@@ -2582,7 +2583,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                 for i in range(self.measure_prop_num_iters):
                     instance_index = "identify"
                     round_index = "identify_%s" % i
-                    self.mp_runner.update(instance_index, round_index, self.params_filename)
+                    self.mp_runner.update(instance_index, round_index)
             else:
                 instance_index = "identify"
                 round_index = "identify"
