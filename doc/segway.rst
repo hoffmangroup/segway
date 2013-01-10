@@ -6,7 +6,7 @@
 :Organization: University of Washington
 :Address: Department of Genome Sciences, PO Box 355065
           Seattle, WA 98195-5065, United States of America
-:Copyright: 2009-2012 Michael M. Hoffman
+:Copyright: 2009-2013 Michael M. Hoffman
 :Last updated: |today|
 
 .. currentmodule:: segway
@@ -346,26 +346,35 @@ The :option:`--seg-table`\=\ *file* option allows specification of a
 various labels. Here is an example of a segment table::
 
   label	len
-  1:4	200:2200:200
-  0	200::200
-  4:	200::200
+  1:4	200:2200:50
+  0	200::50
+  4:	200::50
 
-The header line with ``label`` in one column and ``len`` in another is
-mandatory. Slices are specified with a colon as in Python, and are
-half-open. So label ``1:4`` specifies labels 1, 2, and 3. For those
-labels, segment lengths between 200 and 2200 are allowed, with a 200
-bp ruler. The ruler for every label must match each other and the
-option set with :option:`--ruler-scale`\=\ *scale*. This may become
-more free in the future. The ruler is an efficient heuristic that
-decreases the memory used during inference at the cost of also
-decreasing the precision with which the segment duration model acts.
-Essentially, it allows the duration model to switch the behavior of
-the rest of the model only after a multiple of *scale* bp has passed.
-Using ``4:`` for a label means all labels 4 or higher, and they are
-set to a minimum segment length of 200 and no maximum segment length.
+The file is tab-delimited, and the header line with ``label`` in one
+column and ``len`` in another is mandatory. The first column specifies
+a label or range of labels to which the constraints apply.  In this
+column, a range of label values may be specified using Python slice
+syntax, so label ``1:4`` specifies labels 1, 2, and 3.  Using ``4:``
+for a label, as in the last row above, means all labels 4 or higher.
+
+The second column specifies three colon-separate values: the minimum
+segment length, maximum segment length, and the ruler.  In the example
+above, for labels 1, 2 and 3, segment lengths between 200 and 2200 are
+allowed, with a 200 bp ruler. If either the minimum or maximum lengths
+are left unspecified, then no corresponding constraint is applied.
+
+The ruler is an efficient heuristic that decreases the memory used
+during inference at the cost of also decreasing the precision with
+which the segment duration model acts.  Essentially, it allows the
+duration model to switch the behavior of the rest of the model only
+after a multiple of *scale* bp has passed.  Note that the ruler for
+every label must be explicitly specified and must match all other
+ruler entries in this file, as well as the option set with
+:option:`--ruler-scale`\=\ *scale*. (This may become more free in the
+future.)
 
 Due to the lack of an epilogue in the model, it is possible to get one
-segment per sequence that actually does not meet. This is expected and
+segment per sequence that actually does not meet the minimum segment length. This is expected and
 will be fixed in a future release.
 
 Note that increasing hard minimum or maximum length constraints will
