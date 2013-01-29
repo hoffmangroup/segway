@@ -272,78 +272,80 @@ class MeasurePropRunner(Copier):
             self.runner.make_mp_posterior_workdir(instance_index, round_index)
 
     def write_mp_trans_file(self, instance_index, round_index):
+        print >>sys.stderr, "Using low-memory write_mp_trans_file"
         filepath = self.make_mp_trans_filename(instance_index, round_index)
-        trans_labels = (1 for i in range(self.num_frames))
-        trans = MPTransduction().init(trans_labels)
+        label_fmt = "i"
         with open(filepath, "w") as f:
-            trans.write_to(f)
+            for i in range(self.num_frames):
+                f.write(struct.pack(label_fmt, 1))
 
     def write_mp_label_file(self, instance_index, round_index):
+        print >>sys.stderr, "Using low-memory write_mp_label_file."
         filepath = self.make_mp_label_filename(instance_index, round_index)
 
-        # read posterior files from self.posterior_tmpls
-        window_posteriors = [None for window_index in range(len(self.windows))]
-        for window_index, (window_world, window_chrom, window_start, window_end) \
-                in enumerate(self.windows):
-            post_tmpl = self.posterior_tmpls[window_index]
-
-            # read segway posterior for this window
-            # (initialize to 10 so that if any posteriors don't get assignments,
-            # they should violate the distribution constraint)
-            window_num_frames = ceildiv(window_end - window_start, self.resolution)
-            posteriors = [[10 for i in range(self.num_segs)] for j in range(window_num_frames)]
-            for label_index in range(self.num_segs):
-                post_fname = post_tmpl % label_index
-                with maybe_gzip_open(post_fname, "r") as post:
-                    for line in post:
-                        row, (chrom, start, end, prob) = parse_bed4(line)
-                        start = int(start)
-                        end = int(end)
-                        prob = float(prob) / 100
-
-                        try:
-                            assert chrom == window_chrom
-                            assert start >= window_start
-                            assert end <= window_end
-                        except:
-                            pdb.set_trace()
-
-                        # segway's posteriors should line up with the resolution
-                        try:
-                            assert ((end - start) % self.resolution) == 0
-                            assert ((start - window_start) % self.resolution) == 0
-                        except:
-                            pdb.set_trace()
-                        num_obs = ceildiv(end - start, self.resolution)
-                        first_obs_index = (start - window_start) / self.resolution
-                        for obs_index in range(first_obs_index, first_obs_index+num_obs):
-                            posteriors[obs_index][label_index] = prob
-
-            # add psuedocounts to avoid breaking measure prop
-            for frame_index in range(window_num_frames):
-                posteriors[frame_index] = [((posteriors[frame_index][i] + 0.0001) /
-                                           (1 + 0.0001*self.num_segs))
-                                           for i in range(len(posteriors[frame_index]))]
-
-            # assert distribution constraint
-            for frame_index in range(window_num_frames):
-                try:
-                    assert (abs(sum(posteriors[frame_index]) - 1) < 0.01)
-                except:
-                    print posteriors[frame_index]
-                    raise
-
-
-            window_posteriors[window_index] = posteriors
-
-        labels = sum(window_posteriors, [])
-        assert (len(labels) == self.num_frames)
-        for node_index in range(self.num_frames):
-            assert len(labels[node_index]) == self.num_segs
-
-        mp_labels = MPMeasureLabels().init(labels)
         with open(filepath, "w") as f:
-            mp_labels.write_to(f)
+            # read posterior files from self.posterior_tmpls
+            #window_posteriors = [None for window_index in range(len(self.windows))]
+            for window_index, (window_world, window_chrom, window_start, window_end) \
+                    in enumerate(self.windows):
+                post_tmpl = self.posterior_tmpls[window_index]
+
+                # read segway posterior for this window
+                # (initialize to 10 so that if any posteriors don't get assignments,
+                # they should violate the distribution constraint)
+                window_num_frames = ceildiv(window_end - window_start, self.resolution)
+                posteriors = [[10 for i in range(self.num_segs)] for j in range(window_num_frames)]
+                for label_index in range(self.num_segs):
+                    post_fname = post_tmpl % label_index
+                    with maybe_gzip_open(post_fname, "r") as post:
+                        for line in post:
+                            row, (chrom, start, end, prob) = parse_bed4(line)
+                            start = int(start)
+                            end = int(end)
+                            prob = float(prob) / 100
+
+                            try:
+                                assert chrom == window_chrom
+                                assert start >= window_start
+                                assert end <= window_end
+                            except:
+                                pdb.set_trace()
+
+                            # segway's posteriors should line up with the resolution
+                            try:
+                                assert ((end - start) % self.resolution) == 0
+                                assert ((start - window_start) % self.resolution) == 0
+                            except:
+                                pdb.set_trace()
+                            num_obs = ceildiv(end - start, self.resolution)
+                            first_obs_index = (start - window_start) / self.resolution
+                            for obs_index in range(first_obs_index, first_obs_index+num_obs):
+                                posteriors[obs_index][label_index] = prob
+
+                # add psuedocounts to avoid breaking measure prop
+                for frame_index in range(window_num_frames):
+                    posteriors[frame_index] = [((posteriors[frame_index][i] + 0.0001) /
+                                               (1 + 0.0001*self.num_segs))
+                                               for i in range(len(posteriors[frame_index]))]
+
+                # assert distribution constraint
+                assert len(posteriors[frame_index]) == self.num_segs
+                for frame_index in range(window_num_frames):
+                    try:
+                        assert (abs(sum(posteriors[frame_index]) - 1) < 0.01)
+                    except:
+                        print posteriors[frame_index]
+                        raise
+
+                measure_label_fmt = "f"
+                for i in range(len(posteriors)):
+                    for c in range(len(posteriors[i])):
+                        f.write(struct.pack(measure_label_fmt, posteriors[i][c]))
+
+                #window_posteriors[window_index] = posteriors
+
+            #mp_labels = MPMeasureLabels().init(labels)
+                #mp_labels.write_to(f)
 
     def run_measure_prop(self, instance_index, round_index):
         mp_exe = find_executable("MP_large_scale")
@@ -368,12 +370,12 @@ class MeasurePropRunner(Copier):
                "-maxIters", str(self.measure_prop_am_num_iters),
                "-outObjFile", obj_filepath]
         print >>sys.stderr, "MP command:"
-        # XXX
-        #print >>sys.stderr, cmd
         print >>sys.stderr, " ".join(cmd)
-        with open(mp_output_filepath, "w") as mp_output:
-            subprocess.check_call(cmd, stderr=subprocess.STDOUT, stdout=mp_output)
+        #with open(mp_output_filepath, "w") as mp_output:
+            #subprocess.check_call(cmd, stderr=subprocess.STDOUT, stdout=mp_output)
+        subprocess.check_call(cmd, stderr=subprocess.STDOUT, stdout=sys.stderr)
 
+    # XXX deprecated
     def read_mp_post_file(self, instance_index, round_index):
         header_fmt = "IH"
         mp_post_filepath = self.make_mp_post_filename(instance_index, round_index)
@@ -395,9 +397,11 @@ class MeasurePropRunner(Copier):
 
         return posts
 
+    # XXX deprecated
     def mp_post_to_ve(self, instance_index, round_index):
         posts = self.read_mp_post_file(instance_index, round_index)
 
+        # Transform posteriors with mp_weight parameter, normalize and take log
         for i in range(len(posts)):
             posts[i] = map(lambda p: p**self.mp_weight, posts[i])
             #posts[i] = map(lambda p: p+0.0001, posts[i])
@@ -413,6 +417,79 @@ class MeasurePropRunner(Copier):
 
         write_virtual_evidence(window_posts, self.runner.measure_prop_ve_dirpath,
                                self.windows, self.num_segs)
+
+    # XXX duplicative of mp_post_to_ve, write_virtual_evidence, read_mp_post_file
+    def mp_post_to_ve_lowmem(self, instance_index, round_index):
+        print >>sys.stderr, "Using  mp_post_to_ve_lowmem"
+        ve_dirname = path(self.runner.measure_prop_ve_dirpath)
+
+        header_fmt = "IH"
+        mp_post_filepath = self.make_mp_post_filename(instance_index, round_index)
+
+        posts = []
+        frame_fmt = "%sf" % self.num_segs
+        with open(mp_post_filepath, "r") as f:
+            num_nodes, num_classes = struct.unpack(header_fmt,
+                                                   f.read(struct.calcsize(header_fmt)))
+            assert (num_classes == self.num_segs)
+            assert (num_nodes == self.num_frames)
+            node_fmt = "I%sf" % self.num_segs
+
+            for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                window_posts = []
+                window_num_frames = ceildiv(end-start, self.resolution)
+                for i in range(window_num_frames):
+                    # Read MP posteriors from f
+                    line = struct.unpack(node_fmt,
+                                         f.read(struct.calcsize(node_fmt)))
+                    index = line[0]
+                    post = line[1:]
+                    assert (i == index)
+
+                    # Transform posterior with mp_weight parameter, normalize and take log
+                    post = map(lambda p: p**self.mp_weight, post)
+                    partition = sum(post)
+                    post = map(lambda p: float(p) / partition, post)
+                    post = map(permissive_log, post)
+
+                    window_posts.append(post)
+
+                # write observations
+                obs_filename = (ve_dirname / VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL % window_index)
+                if not path(obs_filename).isfile():
+                    with open(obs_filename, "w") as obs_file:
+                        for frame_index, obs in enumerate(window_posts):
+                            assert (len(obs) == self.num_segs)
+                            obs_file.write(struct.pack(frame_fmt, *obs))
+
+        # Write other virtual evidence files
+        obs_filenames = [(ve_dirname /
+                          VIRTUAL_EVIDENCE_OBS_FILENAME_TMPL % window_index)
+                         for window_index in range(len(self.windows))]
+
+
+        full_list_filename = ve_dirname / VIRTUAL_EVIDENCE_FULL_LIST_FILENAME
+        window_list_filenames = [(ve_dirname /
+                                  VIRTUAL_EVIDENCE_WINDOW_LIST_FILENAME_TMPL % window_index)
+                                 for window_index in range(len(self.windows))]
+
+        # write full list
+        with open(full_list_filename, "w") as list_file:
+            list_file.write("\n".join(obs_filenames))
+
+        # write window lists
+        for window_index in range(len(self.windows)):
+            window_list_filename = window_list_filenames[window_index]
+            obs_filename = obs_filenames[window_index]
+            with open(window_list_filename, "w") as window_list_file:
+                window_list_file.write(obs_filename)
+
+
+
+
+
+
+
 
 
     def load(self, instance_index):
@@ -449,7 +526,7 @@ class MeasurePropRunner(Copier):
         self.run_measure_prop(instance_index, round_index)
 
         # 5) convert MP posteriors to VE
-        self.mp_post_to_ve(instance_index, round_index)
+        self.mp_post_to_ve_lowmem(instance_index, round_index)
 
 
 

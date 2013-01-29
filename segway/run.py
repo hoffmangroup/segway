@@ -136,7 +136,8 @@ FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 
 # This is looser criterion is supported
 # by seed-level variation
-LOG_LIKELIHOOD_DIFF_FRAC = 1e-3
+LOG_LIKELIHOOD_DIFF_FRAC = 1e-4
+#LOG_LIKELIHOOD_DIFF_FRAC = 1e-3
 #LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 #LOG_LIKELIHOOD_DIFF_FRAC = 1e-7
 
@@ -538,6 +539,9 @@ class Runner(object):
         # default is 0
         self.global_mem_usage = LockableDefaultDict(int)
 
+        self.island_lst = ISLAND_LST
+        print "setting self.island_lst = ISLAND_LST"
+
         # data
         # a "window" is what GMTK calls a segment
         self.windows = None
@@ -622,6 +626,7 @@ class Runner(object):
                         ("segtransition_weight_scale",),
                         ("ruler_scale",),
                         ("resolution",),
+                        ("island_size","island_lst"),
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
                         ("max_train_rounds", "max_em_iters"),
@@ -1782,7 +1787,7 @@ class Runner(object):
 
         if ISLAND:
             res["base"] = ISLAND_BASE
-            res["lst"] = ISLAND_LST
+            res["lst"] = self.island_lst
 
         if HASH_LOAD_FACTOR is not None:
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
@@ -2860,6 +2865,12 @@ def parse_options(args):
                          help="try each float in PROGRESSION as the number "
                          "of gibibytes of memory to allocate in turn "
                          "(default %s)" % MEM_USAGE_PROGRESSION)
+
+        group.add_option("--island-size", default=ISLAND_LST,
+                         help="Use the island algorithm for sequences of "
+                         "length larger than SIZE.  Smaller values result "
+                         "in less memory usage, but longer running time "
+                         "(default %s)." % ISLAND_LST)
 
         group.add_option("-S", "--split-sequences", metavar="SIZE",
                          default=MAX_FRAMES, type=int,

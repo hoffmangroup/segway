@@ -274,6 +274,10 @@ def _save_window(float_filename, int_filename, float_data, resolution,
             float_data = downsample_add(float_data, resolution)
             float_data /= num_datapoints_min_1
 
+        # XXX Should this go somewhere else?
+        observations_dirpath = path(float_filename).dirname()
+        if not observations_dirpath.isdir(): observations_dirpath.makedirs()
+
         float_data.tofile(float_filename)
 
     if seq_data is not None:
