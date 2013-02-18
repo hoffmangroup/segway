@@ -397,27 +397,6 @@ class MeasurePropRunner(Copier):
 
         return posts
 
-    # XXX deprecated
-    def mp_post_to_ve(self, instance_index, round_index):
-        posts = self.read_mp_post_file(instance_index, round_index)
-
-        # Transform posteriors with mp_weight parameter, normalize and take log
-        for i in range(len(posts)):
-            posts[i] = map(lambda p: p**self.mp_weight, posts[i])
-            #posts[i] = map(lambda p: p+0.0001, posts[i])
-            partition = sum(posts[i])
-            posts[i] = map(lambda p: float(p) / partition, posts[i])
-            posts[i] = map(permissive_log, posts[i])
-
-        window_posts = [None for i in range(len(self.windows))]
-        for window_index, (world, chrom, start, end) in enumerate(self.windows):
-            window_num_frames = ceildiv(end-start, self.resolution)
-            window_posts[window_index] = posts[:window_num_frames]
-            posts = posts[window_num_frames:]
-
-        write_virtual_evidence(window_posts, self.runner.measure_prop_ve_dirpath,
-                               self.windows, self.num_segs)
-
     # XXX duplicative of mp_post_to_ve, write_virtual_evidence, read_mp_post_file
     def mp_post_to_ve_lowmem(self, instance_index, round_index):
         print >>sys.stderr, "Using  mp_post_to_ve_lowmem"
@@ -444,10 +423,9 @@ class MeasurePropRunner(Copier):
                                          f.read(struct.calcsize(node_fmt)))
                     index = line[0]
                     post = line[1:]
-                    assert (i == index)
 
                     # Transform posterior with mp_weight parameter, normalize and take log
-                    post = map(lambda p: p**self.mp_weight, post)
+                    posts[i] = map(lambda p: p**(self.mp_weight / (1.0 + self.mp_weight)), posts[i])
                     partition = sum(post)
                     post = map(lambda p: float(p) / partition, post)
                     post = map(permissive_log, post)

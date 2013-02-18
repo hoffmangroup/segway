@@ -136,8 +136,8 @@ FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 
 # This is looser criterion is supported
 # by seed-level variation
-LOG_LIKELIHOOD_DIFF_FRAC = 1e-4
-#LOG_LIKELIHOOD_DIFF_FRAC = 1e-3
+LOG_LIKELIHOOD_DIFF_FRAC = 1e-3
+#LOG_LIKELIHOOD_DIFF_FRAC = 1e-4
 #LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 #LOG_LIKELIHOOD_DIFF_FRAC = 1e-7
 
@@ -540,7 +540,7 @@ class Runner(object):
         self.global_mem_usage = LockableDefaultDict(int)
 
         self.island_lst = ISLAND_LST
-        print "setting self.island_lst = ISLAND_LST"
+        self.beam = -1
 
         # data
         # a "window" is what GMTK calls a segment
@@ -627,6 +627,7 @@ class Runner(object):
                         ("ruler_scale",),
                         ("resolution",),
                         ("island_size","island_lst"),
+                        ("beam",),
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
                         ("max_train_rounds", "max_em_iters"),
@@ -1218,6 +1219,12 @@ class Runner(object):
         directives["SEGTRANSITION_WEIGHT_SCALE"] = \
             self.segtransition_weight_scale
 
+        if self.measure_prop_graph_filepath:
+            directives["MODEL_WEIGHT"] = 1.0 / (1.0 + self.mp_weight)
+        else:
+            # XXX shouldn't include if no MP
+            directives["MODEL_WEIGHT"] = 1.0
+
         if task == "train":
             if self.measure_prop_graph_filepath:
                 directives["MEAUSURE_PROP_VE_LIST_FILENAME"] = self.make_measure_prop_ve_full_list_filename(instance_index, round_index)
@@ -1736,7 +1743,8 @@ class Runner(object):
 
         self.save_structure()
 
-        self.load_measure_prop()
+        if self.measure_prop_graph_filepath:
+            self.load_measure_prop()
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -1788,6 +1796,9 @@ class Runner(object):
         if ISLAND:
             res["base"] = ISLAND_BASE
             res["lst"] = self.island_lst
+
+        if self.beam != -1:
+            res["cmbeam"] = self.beam
 
         if HASH_LOAD_FACTOR is not None:
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
@@ -2871,6 +2882,10 @@ def parse_options(args):
                          "length larger than SIZE.  Smaller values result "
                          "in less memory usage, but longer running time "
                          "(default %s)." % ISLAND_LST)
+
+        group.add_option("--beam", default=-1, type=float,
+                         help="Use beam pruning with value BEAM. "
+                         "(See GMTK documentation).")
 
         group.add_option("-S", "--split-sequences", metavar="SIZE",
                          default=MAX_FRAMES, type=int,

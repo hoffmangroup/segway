@@ -82,7 +82,12 @@ class StructureSaver(Saver):
             head_trackname = head_tracknames[trackname]
             conditionalparents_spec = \
                 self.make_conditionalparents_spec(head_trackname)
-            weight_spec = self.make_weight_spec(weight_multiplier)
+
+            if self.measure_prop_graph_filepath:
+                #weight_spec = self.make_weight_spec("MODEL_WEIGHT")
+                weight_spec = "scale MODEL_WEIGHT"
+            else:
+                weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK

@@ -11,6 +11,7 @@ frame: 0 {
    variable: seg {
       type: TYPE_SEG;
       conditionalparents: nil using DenseCPT("start_seg");
+      weight: scale MODEL_WEIGHT;
    }
 
 #if CARD_SUBSEG > 1
@@ -51,6 +52,7 @@ frame: 1 {
                           | seg(-1) using DeterministicCPT("seg_seg_copy")
                           | seg(-1) using DenseCPT("seg_seg");
       switchingparents: segTransition(0) using mapping("internal:copyParent");
+      weight: scale MODEL_WEIGHT;
    }
 
 #if CARD_SUBSEG > 1
