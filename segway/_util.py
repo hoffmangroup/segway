@@ -213,6 +213,8 @@ def init_num_obs(num_obs, continuous):
 
     return curr_num_obs
 
+# XXX: This isn't used anywhere in the codebase. Does it still
+#      belong in the code?
 def new_extrema(func, data, extrema):
     curr_extrema = func(data, 0)
 
@@ -278,7 +280,10 @@ def is_empty_array(arr):
 def chrom_name(filename):
     return path(filename).namebase
 
+
 # XXX: replace with stuff from prep_observations()
+# XXX: This isn't used anywhere in the codebase. Does it still
+#      belong in the code?
 def iter_chroms_coords(filenames, coords):
     for filename in filenames:
         print >>sys.stderr, filename
@@ -315,6 +320,8 @@ def find_segment_starts(data):
 
     return start_pos, labels
 
+# XXX: Accepts float inputs without complaint. When float inputs are given,
+#      float output is returned. Is this desirable?
 def ceildiv(dividend, divisor):
     "integer ceiling division"
 
