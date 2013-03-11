@@ -70,6 +70,10 @@ Running Segway
 
      segway identify test.genomedata traindir identifydir
 
+Note: This example spawns jobs that will run sequentially due to small segment
+size. See the :option:`--split-sequences` option for dividing segments into
+smaller pieces.
+
 Results
 -------
 
@@ -317,9 +321,9 @@ option that enables hierarchical segmentation, where each segment
 label is divided into a number of segment sublabels, each one with its
 own Gaussian emission parameters. The
 output segmentation will be defined in terms of individual sublabels,
-where the output label number |l| is defined in terms of the
-(super) segment label |l_0|, the sublabel |l_1|, and the number of
-sublabels per label |n_1| using the formula |l = l_0 n_1 + l_1|.
+where the output label number :math:`l` is defined in terms of the
+(super) segment label :math:`l_0`, the sublabel :math:`l_1`, and the number of
+sublabels per label :math:`n_1` using the formula :math:`l = l_0 n_1 + l_1`.
 Using this feature effectively may require manipulation of model
 parameters.
 
@@ -337,6 +341,8 @@ in most cases.
 
 Segment duration model
 ----------------------
+
+.. _hard-length-constraints:
 
 Hard length constraints
 ~~~~~~~~~~~~~~~~~~~~~~~
@@ -1060,39 +1066,28 @@ Frequently asked questions
 ==========================
 
 How do I make segments longer?
+------------------------------
 
-There are several ways to do this.
+There are several ways to do this:
 
-hard weight constraints
+- Soft weight constraints:
 
-XXX --seg-table
+  - :option:`--segtransition-weight-scale` will increase the strength of the
+    soft length prior for longer segments
 
-soft weight constraints
+- Hard weight constraints
 
---segtransition-weight-scale
-
-downsampling resolution
-
-Glad Segway is working for you. There are a number of parameters you can adjust to fix this. First, since your data is
-only at 50 bp resolution, you might start by using --resolution=50. This will also speed things up considerably.
-
-The --seg-table option will allow you to specify a hard minimum segment length, as described here.
-
-http://noble.gs.washington.edu/proj/segway/doc/1.1.0/segway.html#hard-length-constraints
-
-You can also set a --segtransition-weight-scale option that will increase the strength of the soft length prior for
-longer segments. I might try setting this option to be equal to the number of tracks you are using. Or maybe 10 times
-that amount.
+  - The :option:`--seg-table` option will allow you to specify a hard minimum
+    segment length, as described :ref:`here <hard-length-constraints>`.
+  - Downsampling resolution
 
 How can I make Segway go faster?
 --------------------------------
 
-resolution
-train on smaller portion of the genome
-split sequences
+- Decrease Resolution (Not currently implemented segway)
+- Train on smaller portion of the genome. Use the :option:`--include-coords`
+  option and supply a BED  file. Splitting up into smaller subsequences by
+  reducing --split-sequences can also help.
+- Split sequences
 
-Training on a subset of the genome is a good idea--at least until this is 
-done successfully. This will speed things up a lot. I'd just pick, say, 1% 
-of the genome to test on. Use the --include-coords option and supply a BED 
-file. Splitting up into smaller subsequences by reducing --split-sequences 
-can also help.
+
