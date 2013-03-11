@@ -16,11 +16,14 @@
 For a conceptual overview see the paper:
 
   Michael M. Hoffman, Orion J. Buske, Zhiping Weng, Jeff A. Bilmes,
-  William Stafford Noble. Unsupervised pattern discovery in human
-  chromatin structure through genomic segmentation. Submitted.
+  William Stafford Noble. 2012.
+  `Unsupervised pattern discovery in human chromatin structure through genomic
+  segmentation
+  <http://www.nature.com/nmeth/journal/v9/n5/full/nmeth.1937.html>`_.
+  *Nat Methods* 9:473-476.
+  `doi:10.1038/nmeth.1937 <http://dx.doi.org/10.1038/nmeth.1937>`_.
 
-Michael <mmh1 at uw dot edu> can send you a copy of the latest
-manuscript.
+`Manuscript version <http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3340533/>`_ available at PubMed Central requires no subscription.
 
 Quick start
 ===========
@@ -681,7 +684,7 @@ options (:option:`--track`, :option:`--include-coords`,
 observation files. Otherwise you are likely to get unexplained failures.
 
 You will find a full description of all the working files in the
-Files_ section.
+:ref:`workdir-files` section.
 
 Temporary files
 ---------------
@@ -847,6 +850,8 @@ runs.
 
 Names used by Segway
 ====================
+
+.. _workdir-files:
 
 Workdir files
 -------------
