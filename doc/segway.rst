@@ -1,97 +1,8 @@
-================================
- Segway |version| documentation
-================================
-:Homepage: http://noble.gs.washington.edu/proj/segway
-:Author: Michael M. Hoffman <mmh1 at uw dot edu>
-:Organization: University of Washington
-:Address: Department of Genome Sciences, PO Box 355065
-          Seattle, WA 98195-5065, United States of America
-:Copyright: 2009-2013 Michael M. Hoffman
-:Last updated: |today|
+==========================
+ Segway |version| Overview
+==========================
 
-.. currentmodule:: segway
 .. include:: <isogrk3.txt>
-.. include:: <isonum.txt>
-
-For a conceptual overview see the paper:
-
-  Michael M. Hoffman, Orion J. Buske, Zhiping Weng, Jeff A. Bilmes,
-  William Stafford Noble. 2012.
-  `Unsupervised pattern discovery in human chromatin structure through genomic
-  segmentation
-  <http://www.nature.com/nmeth/journal/v9/n5/full/nmeth.1937.html>`_.
-  *Nat Methods* 9:473-476.
-  `doi:10.1038/nmeth.1937 <http://dx.doi.org/10.1038/nmeth.1937>`_.
-
-`Manuscript version <http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3340533/>`_ available at PubMed Central requires no subscription.
-
-Quick start
-===========
-
-Installation and configuration
-------------------------------
-
-1. To install Segway in your own user directories, execute this
-   command from :program:`bash`::
-
-     python <(wget -O - http://noble.gs.washington.edu/proj/segway/install.py)
-
-2. The installer will ask you some questions where to install things
-   and will install (if necessary) HDF5, NumPy, any other
-   prerequisites, and Segway. It will also tell you about changes it
-   wants to make to your ``~/.bashrc`` to set up your environment
-   properly.
-
-3. Log out and back in to source the new ``~/.bashrc``.
-
-4. If you are using SGE, your system administrator must set up a
-   ``mem_requested`` resource for Segway to work. This can be done by
-   installing Segway and then running ``python -m
-   segway.cluster.sge_setup``.
-
-Acquiring data
---------------
-
-5. Observation data is stored with the genomedata system.
-   <http://noble.gs.washington.edu/proj/genomedata/>. There is a small
-   Genomedata archive for testing that comes with Segway, that is used
-   in the below steps. You can get it using::
-
-     wget http://noble.gs.washington.edu/proj/segway/2011/test.genomedata
-
-Running Segway
---------------
-6. Use the ``segway train`` command to discover patterns in the test
-   data. Here, we specify that we want Segway to discover four unique
-   patterns::
-
-     segway --num-labels=4 train test.genomedata traindir
-
-7. Use the ``segway identify`` command to create the segmentation,
-   which partitions the genome into regions labeled with one of the
-   four discovered patterns::
-
-     segway identify test.genomedata traindir identifydir
-
-Note: This example spawns jobs that will run sequentially due to small segment
-size. See the :option:`--split-sequences` option for dividing segments into
-smaller pieces.
-
-Results
--------
-
-8. The ``identifydir/segway.bed.gz`` file has each segment as a
-   separate line in the BED file, and can be used for further
-   processing.
-
-9. The ``identifydir/segway.layered.bed.gz`` file is designed for
-   easier visualization on a genome browser. It has thick lines where
-   a segment is present and thin lines where it is not. This is not as
-   easy for a computer to parse, but it is more useful visually.
-
-10. You can also perform further analysis of the segmentation and
-    trained parameters using Segtools
-    <http://noble.gs.washington.edu/proj/segtools/>.
 
 Installation
 ============
@@ -259,6 +170,10 @@ inference process--the windows are treated independently.
 Resolution
 ----------
 
+.. important::
+
+  The resolution feature does not work in the current Segway release.
+
 In order to speed up the inference process, you may downsample the
 data to a different resolution using the :option:`--resolution`\=\
 *res* option. This means that Segway will partition the input
@@ -268,7 +183,10 @@ result in a large speedup at the cost of losing the highest possible
 precision. However, if you are considering data that is only generated
 at a low resolution to start with, this can be an appealing option.
 
-You must use the same resolution in both training and identification.
+.. warning::
+
+  You must use the same resolution in both training and
+  identification.
 
 Model generation
 ================
@@ -342,6 +260,8 @@ using the equations |mu| = *k*\ |theta| and |sigma|:sup:`2` = *k*\
 values is less well-understood. I recommend the use of ``asinh_norm``
 in most cases.
 
+.. _segment-duration-model:
+
 Segment duration model
 ----------------------
 
@@ -383,8 +303,8 @@ ruler entries in this file, as well as the option set with
 future.)
 
 Due to the lack of an epilogue in the model, it is possible to get one
-segment per sequence that actually does not meet the minimum segment length. This is expected and
-will be fixed in a future release.
+segment per sequence that actually does not meet the minimum segment
+length. This is expected and will be fixed in a future release.
 
 Note that increasing hard minimum or maximum length constraints will
 greatly increase memory use and run time. You can decrease this
@@ -402,7 +322,8 @@ imprecision introduced by the 200-bp ruler, a region labeled in the
 supervision process with label 1 that is only 2000 bp long may also
 cause the training process to fail with a zero clique error. If this
 happens either decrease the size of the ruler, increase the size of
-the maximum segment length, or decrease the size of the supervision region.
+the maximum segment length, or decrease the size of the supervision
+region.
 
 Soft length prior
 ~~~~~~~~~~~~~~~~~
@@ -612,10 +533,10 @@ order. Mnemonics sharing the same alphabetical prefix (for example,
 ``A0`` and ``A1``) or characters before a period (for example, ``0.0``
 and ``0.1``) will be rendered with the same color.
 
-:program:`segtools-gmtk-parameters` in the Segtools package can automatically
-identify an initial hierarchical labeling of segmentation parameters.
-This can be very useful as a first approximation of assigning meaning
-to segment labels.
+:program:`segtools-gmtk-parameters` in the Segtools package can
+automatically identify an initial hierarchical labeling of
+segmentation parameters.  This can be very useful as a first
+approximation of assigning meaning to segment labels.
 
 A simple mnemonic file appears below::
 
@@ -654,322 +575,6 @@ Recovery
 --------
 Recovery is not yet supported for the posterior task.
 
-Technical matters
-=================
-
-Working files
--------------
-
-Segway must create a number of working files in order to accomplish
-its tasks, and it does this in the directory specified by the required
-*workdir* argument.
-
-The observation files can be quite large, taking up 8 bytes per track
-per position and cannot be compressed. Since they are needed multiple
-times during training, they are generated in the working directory. As
-an exception, if you turn off training and specify only the identify
-task, the files will be generated independently on temproary space on
-each machine. This is because otherwise they could take terabytes for
-identifying on the whole human genome with dozens of tracks.
-
-To change the location of the observation files, use the
-:option:`--observations`\=\ *dir* option. This can be helpful when you
-plan to conduct multiple training tasks on the same data but with
-different parameters. Be careful to finish observation writing for at
-least one task first, so all the observations will be written out,
-before trying to start the next task. If you fail to do this, race
-conditions may lead to undefined effects. Also, all data selection
-options (:option:`--track`, :option:`--include-coords`,
-:option:`--exclude-coords`) must be exactly the same when sharing
-observation files. Otherwise you are likely to get unexplained failures.
-
-You will find a full description of all the working files in the
-:ref:`workdir-files` section.
-
-Temporary files
----------------
-The **identify** and **posterior** tasks create temporary observation
-files in directories indicated by the Python `tempfile.gettempdir()`
-function, which searches for an appropriate directory as described in
-the documentation for `tempfile.tempdir`
-<http://docs.python.org/library/tempfile.html#tempfile.tempdir>. If
-you need to specify that temporary files go into a particular
-directory, set the `TMPDIR` environment variable.
-
-Distributed computing
----------------------
-Segway can currently perform the training, identification, and
-posterior tasks only using a cluster controllable with the DRMAA
-interface. I have only tested it against Sun Grid Engine and Platform
-LSF, but it should be possible to work with other DRMAA-compatible
-distributed computing systems, such as PBS Pro, PBS/TORQUE, Condor, or
-GridWay. If you are interested in using one of these systems, please
-contact Michael so he correct all the fine details. A standalone
-version is planned, but for now you must have a clustering system. Try
-installing the free SGE on your workstation if you want to run Segway
-without a full clustering system.
-
-The :option:`--cluster-opt` option allows the specification of native
-options to your clustering system---those options you might pass
-to ``qsub`` (SGE) or ``bsub`` (LSF).
-
-.. todo:  comp include SGE and LSF cluster-opt demos
-
-Memory usage
-------------
-Inference on complex models or long sequences can be memory-intensive.
-In order to work efficiently when it is not always easy to predict
-memory use in advance, Segway controls the memory use of its subtasks
-on a cluster with a trial-and-error approach. It will submit jobs to
-your clustering system specifying the amount of memory they are
-expected to take up. Your clustering system should allocate these jobs
-such that the amount of memory on one host is not overcommitted. If a
-job takes up more memory than allocated, then it will be killed and
-restarted with a larger amount of memory allocated, along the
-progression specified in gibibytes by :option:`--mem-usage`\=\
-*progression*. The default *progression* is 2,3,4,6,8,10,12,14,15.
-
-We usually train on regions of no more than 2,000,000 frames, where a
-single frame contains the number of nucleotides set by the
-:option:`--resolution` option. If you use more than that many, GMTK
-might run out of dynamic range. This manifests itself as a "zero
-clique error." Identify mode rescales probabilities at every frame so
-that this is not a problem. However, you will probably want to split
-the input sequences somewhat because larger sequences make more
-difficult work units (greater memory and run time costs) and thereby
-impede efficient parallelization. The :option:`--split-sequences`\=\
-*size* option will split up sequences into windows with *size* frames
-each. The default *size* is 2,000,000. Decreasing to 500,000 will
-greatly improve speed at the cost of more artefacts at split boundaries.
-
-Reporting
----------
-Segway produces a number of logs of its activity during tasks, which
-can be useful for analyzing its performance or troubleshooting. These
-are all in the *workdir*/log directory.
-
-Shell scripts
-~~~~~~~~~~~~~
-
-Segway produces three shell scripts in the log directory that you can
-use to replay its subtasks at different levels of abstractions. The
-top-level ``segway.sh`` records the command line used to run Segway.
-The ``run.sh`` script gives you the GMTK commands called by Segway. A
-small number of these are still produced when :option:`--dry-run` is
-specified. The ``details.sh`` script contains the exact commands
-dispatched by Segway, including wrapper commands that monitor memory
-usage, create and delete local temporary files with observation data,
-and convert GMTK's output ot BED, among other things.
-
-Summary reports
-~~~~~~~~~~~~~~~
-
-The ``jobs.tab`` file contains a tab-delimited file with each job
-Segway dispatched in a different row, reporting on job identifier
-(``jobid``), job name (``jobname``), GMTK program (``prog``), number
-of segment labels (``num_segs``), number of frames (``num_frames``),
-maximum memory usage (``maxvmem``), CPU time (``cpu``) and exit/error
-status (``exit_status``). Jobs are written as they are completed. The
-exit status is useful for determining whether the job succeeded
-(status 0) or failed (any other value, which is sometimes numeric, and
-sometimes text, depending on the clustering system used).
-
-The ``likelihood.*.tab`` files each track the progression of
-likelihood during a single instance of EM training. The file has a
-single column, one for each round of training, which contains the log
-likelihood. More positive values are better.
-
-GMTK reports
-~~~~~~~~~~~~
-The ``jt_info.txt`` and ``jt_info.posterior.txt`` files describe how
-GMTK builds a junction tree. It is of interest primarily during GMTK
-troubleshooting. You are unlikely to use it.
-
-Task output
-~~~~~~~~~~~
-
-The ``output`` directory contains the output of the actual GMTK
-commands run by Segway. The ``o`` directory contains standard output
-and the ``e`` directory contains standard error. If a job fails and
-repeats, the output from the new job is appended to the old. The
-:option:`--verbosity`\=\ *verbosity* option controls how much
-diagnostic information that GMTK writes into these files. The default
-and minimum value is ``0``. Raise this value for more information, and
-see the GMTK documentation for a description of various levels of
-verbosity. Setting :option:`verbosity`\=\ ``30`` can be particularly
-helpful in diagnosing model problems. Keep in mind that very high
-values (above ``60``) will produce tons of output---maybe
-terabytes.
-
-Performance
------------
-Some factors that affect compute time and memory requirements:
-
-* the length of the longest region you are training or identifying on
-* the number of tracks
-* the number of labels
-
-The longest region forms a bottleneck during training because Segway
-cannot start the next round of training before all regions in the
-previous round are done. So if you specify three regions, one of which
-is 10 Mbp long, and the other are 100 kbp, the 10 Mbp region is going
-to be a limiting factor. You can use :option:`--split-sequences` (see
-above) to put an upper bound on region size.
-
-Troubleshooting
-===============
-
-When Segway reports "end of memory progression reached without
-success", this usually means that dispatched GMTK tasks failed
-repeatedly. Look in ``log/jobs.tab`` to see all the jobs and whether
-they reported an error in the form of nonzero exit status. The job
-causing your Segway run to fail will probably be near the end of this
-list and have a nonzero exit status in the last column. Look in
-``output/e/``\ *instance*\ ``/``\ *jobname* to find the cause of the
-underlying error.
-
-Are your bundle jobs failing? This might be because an accumulator
-file (written by individual job) is corrupted or truncated. This can
-happen when you run out of disk space.
-
-If it is not immediately apparent why a job is failing, it is probably
-useful to look in ``log/details.sh`` to find the command line that Segway
-uses to call GMTK. Try running that to see if it gives you any clues.
-You may want to switch the GMTK option -verbosity 0 to -verbosity 30
-to get more information.
-
-An error like::
-
-  ERROR: discrete observed random variable 'presence_dnase', frame 0, line 23, specifies a feature element 14:14 that is out of discrete range ([23:45] inclusive) of observation matrix
-
-probably indicates that you are incorrectly mixing and matching
-``train.tab`` files and ``segway.str`` files from different training
-runs.
-
-/net/noble/vol2/home/avinash/shortcuts/multipass/segway_src/runs/2011/0413-segway-coordinated-jan2011/k562.coordinated/t20110414/
-
-Names used by Segway
-====================
-
-.. _workdir-files:
-
-Workdir files
--------------
-
-Segway expects to be able to create many of these files anew. To avoid
-data loss, by default, it will quit if they already exist. If you use
-the :option:`--clobber` option, Segway will overwrite the whole
-workdir instead.
-
-.. tabularcolumns:: lp{4.5in}
-
-=================================================== =====================================================
- Filename                                            Description
-=================================================== =====================================================
-``accumulators/``                                   intermediate files used to pass E-step results to
-                                                    the M-step of EM training
-|rarr| ``acc.``\ \*\ ``.bin``                       accumulator for a particular instance and
-                                                    region (reused each round)
-``auxiliary/``                                      miscelaneous model files
-|rarr| ``dont_train.list``                          defines list of hidden random variables
-                                                    that are not trained
-|rarr| ``segway.inc``                               C preprocessor (``cpp``) include file
-                                                    used in structure
-``likelihood/``                                     GMTK's report of the log likelihood for
-                                                    the most recent M-step of EM training
-|rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
-                                                    instance. Segway uses this to decide when to
-                                                    stop training
-``log/``                                            diagnostic information
-|rarr| ``details.sh``                               script file that includes the exact
-                                                    command-lines queued by Segway, with wrapper scripts
-|rarr| ``jobs.tab``                                 tab-delimeted summary of jobs queued,
-                                                    including resource informatoin and exit status
-|rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
-|rarr| ``jt_info.posterior.txt``                    log file used by GMTK when creating a junction tree
-                                                    in posterior mode
-|rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of log likelihood by training
-                                                    instance; can be used to examine  how fast
-                                                    training converges
-|rarr| ``run.sh``                                   list of commands run by Segway, not
-                                                    including wrappers
-                                                    that create and clean up temporary files such as
-                                                    observations used during identification
-|rarr| ``segway.sh``                                reports the command-line used to run Segway itself
-``observations/``                                   decompressed, and potentially large raw observation
-                                                    files created from a Genomedata archive located
-                                                    elsewhere
-|rarr| \*\ ``.``\ \*\ ``.float32``                  continuous data for a particular region
-|rarr| \*\ ``.``\ \*\ ``.int``                      indicator data (present/absent) for a particular
-                                                    region
-|rarr| ``float32.list``                             list of continuous data files
-|rarr| ``int.list``                                 list of indicator data files
-|rarr| ``observations.tab``                         tab-delimited description of observations used|rarr| Used
-                                                    to check that an existing directory specified with
-                                                    :option:`--observations` matches the data specified
-                                                    at the command-line
-``output/``                                         diagnostic output of individual GMTK jobs
-``output/e/``                                       stderr
-``output/e/0,1,``...                                stderr for a particular training instance (0, 1,
-                                                    ...)
-``output/e/identify``                               stderr for identification
-``output/o/``                                       stdout
-``params/``                                         generated and trained parameters for a given instance
-|rarr| ``input.``\ \*\ ``.master``                  generated hyperparameters and starting parameters
-|rarr| ``input.master``                             best set of hyperparameters and starting parameters
-|rarr| ``params.``\ \*\ ``.params.``\ \*            trained parameters for a given instance and round
-|rarr| ``params.``\ \*\ ``.params``                 final trained parameters for a given instance
-|rarr| ``params.params``                            best final set of trained parameters
-``segway.bed.gz``                                   segmentation in BED format
-``segway.str``                                      dynamic Bayesian network structure
-``train.tab``                                       important file locations and hyperparameters used in training, to be passed to identify
-``triangulation/``                                  triangulation files used for DBN interface
-|rarr| ``segway.str.``\ \*\ ``.``\ \*\ ``.trifile`` triangulation file
-``viterbi/``                                        intermediate BED files created during distributed Viterbi decoding,
-                                                    which get merged into ``segway.bed.gz``
-=================================================== =====================================================
-
-Job names
----------
-
-In order to watch Segway's progress on your cluster, it is helpful to
-understand how it names jobs. A job name for the training task might
-look like this::
-
-  emt0.1.34.traindir.ed03201cea2047399d4cbcc4b62f9827
-
-In this example, ``emt`` means expectation maximization training, the
-``0`` means instance 0, the ``1`` means round 1, and the ``34`` means
-window 34. The name of the training directory is ``traindir``, and
-``ed03201cea2047399d4cbcc4b62f9827`` is a universally unique
-identifier for this particular Segway run. This can be useful if you
-want to manage all of your jobs on your clustering system with
-wildcard specification. On SGE you can delete all the jobs from this
-run with::
-
-  qdel "*.ed03201cea2047399d4cbcc4b62f9827"
-
-On LSF, use::
-
-  bkill -J "*.ed03201cea2047399d4cbcc4b62f9827"
-
-Jobs created in the identify (``vit``) or posterior (``jt``) task are
-named similarly::
-
-  vit34.identifydir.4f32630d53724f08b34a8fc58793307d
-  jt34.identifydir.4f32630d53724f08b34a8fc58793307d
-
-Of course, there are no instances or rounds for the identify task, so
-only the sequence index is reported.
-
-Tracks
-------
-Tracks are named according to their name in the Genomedata archive.
-For GMTK internal use, periods are converted to underscores. There is
-a special track name ``dinucleotide``. Use this track name to model a
-dinucleotide symbol at each position with a 16-symbol multionmial
-distribution specified in the form of a conditional probability table.
-
 Python interface
 ================
 I have designed Segway such that eventually one may call different
@@ -991,31 +596,7 @@ All other interfaces (the ones that do not use a ``main()`` function)
 to Segway code are undocumented and should not be used. If you do use
 them, know that the API may change at any time without notice.
 
-Support
-=======
 
-For support of Segway, please write to the <segway-users@uw.edu> mailing
-list, rather than writing the authors directly. Using the mailing list
-will get your question answered more quickly. It also allows us to
-pool knowledge and reduce getting the same inquiries over and over.
-You can subscribe here:
-
-https://mailman1.u.washington.edu/mailman/listinfo/segway-users
-
-Specifically, if you want to report a bug or request a feature, please
-do so using the Segway issue tracker at:
-
-http://code.google.com/p/segway-genome/issues/
-
-If you do not want to read discussions about other people's use of
-Segway, but would like to hear about new releases and other important
-information, please subscribe to <segway-announce@uw.edu> by visiting
-this web page:
-
-https://mailman1.u.washington.edu/mailman/listinfo/segway-announce
-
-Announcements of this nature are sent to both ``segway-users`` and
-``segway-announce``.
 
 Command-line usage summary
 ==========================
@@ -1066,33 +647,4 @@ lines of same segment. BEDTools might be able to do this for you. You
 will have to create your own header.txt with appropriate track lines::
 
     cat header.txt <(find viterbi -type f | sort | xargs cat) | gzip -c > segway.bed.gz
-
-Frequently asked questions
-==========================
-
-How do I make segments longer?
-------------------------------
-
-There are several ways to do this:
-
-- Soft weight constraints:
-
-  - :option:`--segtransition-weight-scale` will increase the strength of the
-    soft length prior for longer segments
-
-- Hard weight constraints
-
-  - The :option:`--seg-table` option will allow you to specify a hard minimum
-    segment length, as described :ref:`here <hard-length-constraints>`.
-  - Downsampling resolution
-
-How can I make Segway go faster?
---------------------------------
-
-- Decrease Resolution (Not currently implemented segway)
-- Train on smaller portion of the genome. Use the :option:`--include-coords`
-  option and supply a BED  file. Splitting up into smaller subsequences by
-  reducing --split-sequences can also help.
-- Split sequences
-
 
