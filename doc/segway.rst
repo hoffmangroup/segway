@@ -172,7 +172,8 @@ Resolution
 
 .. important::
 
-  The resolution feature does not work in the current Segway release.
+  The resolution feature is not implemented in the current Segway
+  |version| release.
 
 In order to speed up the inference process, you may downsample the
 data to a different resolution using the :option:`--resolution`\=\
@@ -185,7 +186,7 @@ at a low resolution to start with, this can be an appealing option.
 
 .. warning::
 
-  You must use the same resolution in both training and
+  You must use the same resolution for *both* training and
   identification.
 
 Model generation

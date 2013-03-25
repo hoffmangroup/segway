@@ -9,7 +9,8 @@ Working files
 
 Segway must create a number of working files in order to accomplish
 its tasks, and it does this in the directory specified by the required
-*workdir* argument.
+*workdir* argument. When running training *workdir* is *TRAINDIR*;
+when running identification *workdir* is *IDENTIFYDIR*.
 
 The observation files can be quite large, taking up 8 bytes per track
 per position and cannot be compressed. Since they are needed multiple
@@ -58,7 +59,7 @@ installing the free SGE on your workstation if you want to run Segway
 without a full clustering system.
 
 The :option:`--cluster-opt` option allows the specification of native
-options to your clustering system===those options you might pass
+options to your clustering system --- those options you might pass
 to ``qsub`` (SGE) or ``bsub`` (LSF).
 
 .. todo:  comp include SGE and LSF cluster-opt demos

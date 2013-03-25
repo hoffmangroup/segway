@@ -15,7 +15,7 @@ Segway |version| Documentation
 :Last updated: |today|
 
 .. currentmodule:: segway
-.. include:: <isogrk3.txt>
+
 .. include:: <isonum.txt>
 
 For a conceptual overview see the paper:
