@@ -3,7 +3,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011, 2013 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011-2013 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
 from heapq import heappop, heappush
@@ -157,6 +157,9 @@ class RestartableJobDict(dict):
 
     def is_sleep_time_gt_min(self):
         sleep_time = self.calc_sleep_time()
+        # maximum value: MAX_JOB_WAIT_SLEEP_TIME
+        # minimum value: CLEAN_SAFE_TIME / (num jobs + 1)
+
         #print >>sys.stderr, "sleep_time: %s, len: %d" % (sleep_time, len(self))
         return sleep_time > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
 
