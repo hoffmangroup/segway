@@ -380,7 +380,7 @@ class Observations(object):
 
             # // means floor division
             offset = (num_frames // num_new_starts)
-            new_offsets = arange(num_new_starts) * offset
+            new_offsets = arange(num_new_starts) * (offset * self.resolution)
             new_starts = start + new_offsets
             new_ends = append(new_starts[1:], end)
 
