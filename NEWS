@@ -29,6 +29,7 @@
 * segway: add --bigBed option which calls segway-layer --bigBed
 * segway: removes PYTHONINSPECT from environment for sub-tasks, which
   caused identify mode failures before
+* segway: some changes in the way structure files work
 * segway-layer: fix issue #19. Now doesn't override previous colors
   when mnemonics aren't supplied (thanks to Jay Hesselberth)
 * segway-layer: add --no-recolor option which doesn't override colors at all
