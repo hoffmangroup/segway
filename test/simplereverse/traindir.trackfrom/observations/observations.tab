@@ -1,0 +1,3 @@
+filename	window_index	chrom	start	end
+traindir.trackfrom/observations/chr1.0000.float32	0	chr1	0	8000
+traindir.trackfrom/observations/chr1.0001.float32	1	chr1	0	8000

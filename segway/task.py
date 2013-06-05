@@ -164,17 +164,17 @@ def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num
     for outfilename, probs_rounded_label, label_index in zipper:
         # run-length encoding on the probs_rounded_label
 
-        outfile = open(outfilename, "w")
-        pos, = where(diff(probs_rounded_label) != 0)
-        pos = r_[start, pos[:]+start+1, end]
+        with open(outfilename, "w") as outfile:
+            pos, = where(diff(probs_rounded_label) != 0)
+            pos = r_[start, pos[:]+start+1, end]
 
-        for bed_start, bed_end in zip(pos[:-1], pos[1:]):
-            chrom_start = str(bed_start)
-            chrom_end = str(bed_end)
-            value = str(probs_rounded_label[bed_start-start])
+            for bed_start, bed_end in zip(pos[:-1], pos[1:]):
+                chrom_start = str(bed_start)
+                chrom_end = str(bed_end)
+                value = str(probs_rounded_label[bed_start-start])
 
-            row = [chrom, chrom_start, chrom_end, value]
-            print >>outfile, "\t".join(row)
+                row = [chrom, chrom_start, chrom_end, value]
+                print >>outfile, "\t".join(row)
 
 def load_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
                             infilename):

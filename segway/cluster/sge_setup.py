@@ -7,7 +7,7 @@ sge_setup: setup mem_requested on each node
 
 __version__ = "$Revision$"
 
-# Copyright 2010, 2012 Michael M. Hoffman <mmh1@uw.edu>
+# Copyright 2010, 2012, 2013 Michael M. Hoffman <mmh1@uw.edu>
 
 import sys
 from tempfile import NamedTemporaryFile
@@ -21,12 +21,17 @@ QSTAT_PROG = OptionBuilder_ShortOptWithSpace("qstat")
 MEM_TOTAL_STR = "hl:mem_total="
 HOSTNAME_STR = "qf:hostname="
 
+# XXX: only works if there is no user named "fakeuser" on the system
+# fix by adding random suffix and checking
 USERNAME = "fakeuser"
 
+# XXX: this may be fragile
 OUTPUT_RECORD_SEPARATOR = \
     "----------------------------------------------------------------------------\n"
 
-def sge_setup():
+def add_complex_mem_requested():
+    """add the mem_requested complex to GE configuration
+    """
     tempfile = NamedTemporaryFile("w", suffix=".txt", prefix="qconf.",
                                   delete=False)
 
@@ -36,14 +41,14 @@ def sge_setup():
 
     tempfile.close()
 
+    # XXX: would be better if this were robust to mem_requested already existing
     QCONF_PROG(Mc=tempfile.name)
 
-    # path(tempfile.name).unlink()
-
+def get_mem_totals():
     stat_texts_text = QSTAT_PROG.getoutput(F="hostname,mem_total", u=USERNAME)
     stat_texts = stat_texts_text.split(OUTPUT_RECORD_SEPARATOR)
 
-    mem_totals = {}
+    res = {}
 
     # skip header
     for stat_text in stat_texts[1:]:
@@ -55,13 +60,26 @@ def sge_setup():
             if equals == "=":
                 lines_dict[key] = value
 
-        # you might get a hostname reported multiple times for each queue
-        # we'll overwrite instead of checking for equality
-        mem_totals[lines_dict["qf:hostname"]] = lines_dict["hl:mem_total"]
+        # XXX: if hl:mem_total not specified, print a warning instead
+        # of failing
+
+        # when you have multiple queues, qstat might report values for
+        # the hostname once for each queue. we'll overwrite instead of
+        # checking for equality
+        res[lines_dict["qf:hostname"]] = lines_dict["hl:mem_total"]
+
+    return res
+
+def modify_complex_values_mem_requested():
+    mem_totals = get_mem_totals()
 
     for hostname, mem_total in mem_totals.iteritems():
         QCONF_PROG("-mattr", "exechost", "complex_values",
                    "mem_requested=%s" % mem_total, hostname)
+
+def sge_setup():
+    add_complex_mem_requested()
+    modify_complex_values_mem_requested()
 
     # extra newline at beginning to space from qconf messages
     print >>sys.stderr, """

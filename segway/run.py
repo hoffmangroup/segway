@@ -540,8 +540,9 @@ class Runner(object):
                 raise ValueError("unrecognized task: %s" % task)
 
     def set_option(self, name, value):
-        # want to set the option when it is set to zero, but not if it is
-        # an empty list, empty str, None, etc.
+        # want to actually set the Runner option when optparse option
+        # is numeric zero (int or float), but not if it is an empty
+        # list, empty str, None, False, etc.
         if value or value == 0:
             setattr(self, name, value)
 

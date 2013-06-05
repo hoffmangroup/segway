@@ -1,0 +1,162 @@
+#include "traindir.trackfrom/auxiliary/segway.inc"
+
+GRAPHICAL_MODEL model_seg
+
+frame: 0 {
+   variable: segCountDown {
+      type: TYPE_SEGCOUNTDOWN;
+      conditionalparents: seg(0) using DeterministicCPT("seg_segCountDown");
+   }
+
+   variable: seg {
+      type: TYPE_SEG;
+      conditionalparents: nil using DenseCPT("start_seg");
+   }
+
+#if CARD_SUBSEG > 1
+   variable: subseg {
+      type: TYPE_SUBSEG;
+      conditionalparents: seg(0) using DenseCPT("seg_subseg");
+   }
+#endif
+
+#ifndef USE_MFSDG
+   variable: presence__testtrack1A {
+      type: discrete observed 2:2 cardinality CARD_PRESENCE;
+
+      conditionalparents: CONDITIONALPARENTS_PRESENCE;
+   }
+#endif
+
+   variable: testtrack1A {
+      type: continuous observed 0:0;
+
+#ifdef USE_MFSDG
+      conditionalparents: CONDITIONALPARENTS_OBS
+                          using mixture collection("collection_seg_testtrack1A")
+                          MAPPING_OBS;
+#else
+      switchingparents: presence__testtrack1A(0) using mapping("internal:copyParent");
+
+      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1A") MAPPING_OBS;
+#endif
+
+      weight: scale 1.000000;
+   }
+
+#ifndef USE_MFSDG
+   variable: presence__testtrack2A {
+      type: discrete observed 3:3 cardinality CARD_PRESENCE;
+
+      conditionalparents: CONDITIONALPARENTS_PRESENCE;
+   }
+#endif
+
+   variable: testtrack2A {
+      type: continuous observed 1:1;
+
+#ifdef USE_MFSDG
+      conditionalparents: CONDITIONALPARENTS_OBS
+                          using mixture collection("collection_seg_testtrack2A")
+                          MAPPING_OBS;
+#else
+      switchingparents: presence__testtrack2A(0) using mapping("internal:copyParent");
+
+      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2A") MAPPING_OBS;
+#endif
+
+      weight: scale 1.000000;
+   }
+}
+
+frame: 1 {
+   variable: frameIndex {
+      type: discrete observed value frameNum cardinality CARD_FRAMEINDEX;
+      conditionalparents: CONDITIONALPARENTS_NIL_DISCRETE;
+   }
+
+   variable: ruler {
+      type: discrete hidden cardinality CARD_RULER;
+      conditionalparents: frameIndex(0) using DeterministicCPT("frameIndex_ruler");
+   }
+
+   variable: segCountDown {
+      type: TYPE_SEGCOUNTDOWN;
+      conditionalparents: segTransition(0), ruler(0), seg(0), segCountDown(-1)
+                          using DeterministicCPT("segTransition_ruler_seg_segCountDown_segCountDown");
+   }
+
+   variable: segTransition {
+      type: discrete hidden cardinality CARD_SEGTRANSITION;
+      conditionalparents: segCountDown(-1), seg(-1) using DenseCPT("segCountDown_seg_segTransition");
+      weight: scale SEGTRANSITION_WEIGHT_SCALE;
+   }
+
+   variable: seg {
+      type: TYPE_SEG;
+      conditionalparents: seg(-1) using DeterministicCPT("seg_seg_copy")
+                          | seg(-1) using DeterministicCPT("seg_seg_copy")
+                          | seg(-1) using DenseCPT("seg_seg");
+      switchingparents: segTransition(0) using mapping("internal:copyParent");
+   }
+
+#if CARD_SUBSEG > 1
+   variable: subseg {
+      type: TYPE_SUBSEG;
+      conditionalparents: subseg(-1) using DeterministicCPT("subseg_subseg_copy")
+                          | seg(0), subseg(-1) using DenseCPT("seg_subseg_subseg")
+                          | seg(0) using DenseCPT("seg_subseg");
+      switchingparents: segTransition(0) using mapping("internal:copyParent");
+   }
+#endif
+
+#ifndef USE_MFSDG
+   variable: presence__testtrack1A {
+      type: discrete observed 2:2 cardinality CARD_PRESENCE;
+
+      conditionalparents: CONDITIONALPARENTS_PRESENCE;
+   }
+#endif
+
+   variable: testtrack1A {
+      type: continuous observed 0:0;
+
+#ifdef USE_MFSDG
+      conditionalparents: CONDITIONALPARENTS_OBS
+                          using mixture collection("collection_seg_testtrack1A")
+                          MAPPING_OBS;
+#else
+      switchingparents: presence__testtrack1A(0) using mapping("internal:copyParent");
+
+      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1A") MAPPING_OBS;
+#endif
+
+      weight: scale 1.000000;
+   }
+
+#ifndef USE_MFSDG
+   variable: presence__testtrack2A {
+      type: discrete observed 3:3 cardinality CARD_PRESENCE;
+
+      conditionalparents: CONDITIONALPARENTS_PRESENCE;
+   }
+#endif
+
+   variable: testtrack2A {
+      type: continuous observed 1:1;
+
+#ifdef USE_MFSDG
+      conditionalparents: CONDITIONALPARENTS_OBS
+                          using mixture collection("collection_seg_testtrack2A")
+                          MAPPING_OBS;
+#else
+      switchingparents: presence__testtrack2A(0) using mapping("internal:copyParent");
+
+      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2A") MAPPING_OBS;
+#endif
+
+      weight: scale 1.000000;
+   }
+}
+
+chunk 1:1

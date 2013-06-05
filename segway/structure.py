@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2012 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2012, 2013 Michael M. Hoffman <mmh1@uw.edu>
 
 from itertools import count, izip
 
@@ -32,6 +32,8 @@ class StructureSaver(Saver):
         if resolution == 1:
             return make_weight_scale(multiplier)
         else:
+            # weight scale switches on the number of present data
+            # points that make a model frame
             return " | ".join(make_weight_scale(index * multiplier)
                               for index in xrange(resolution + 1))
 
@@ -40,12 +42,17 @@ class StructureSaver(Saver):
         this defines the parents of every observation
         """
 
-        spec = 'CONDITIONALPARENTS_OBS ' \
+        missing_spec = "CONDITIONALPARENTS_NIL_CONTINUOUS"
+        present_spec = 'CONDITIONALPARENTS_OBS ' \
             'using mixture collection("collection_seg_%s") ' \
             'MAPPING_OBS' % trackname
 
-        return " | ".join(["CONDITIONALPARENTS_NIL_CONTINUOUS"] +
-                          [spec] * self.resolution)
+        # The switching parent ("presence__...") is overloaded for
+        # both switching weight and switching conditional parents. If
+        # resolution > 1, then we repeat the present_spec as many
+        # times as necessary to match the cardinality of the switching
+        # parent
+        return " | ".join([missing_spec] + [present_spec] * self.resolution)
 
     def make_mapping(self):
         num_tracks = self.num_tracks

@@ -9,6 +9,8 @@ Installation
 
 Segway requires the following prerequisites:
 
+You need Python 2.6 or 2.7.
+
 You need either Sun Grid Engine (SGE; now called Oracle Grid Engine),
 or Platform Load Sharing Facility (LSF) and FedStage DRMAA for LSF.
 You need Graphical Models Toolkit (GMTK), which you can get at

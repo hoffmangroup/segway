@@ -245,6 +245,8 @@ def make_dinucleotide_int_data(seq):
 
 def _save_window(float_filename, int_filename, float_data, resolution,
                  distribution, seq_data=None, supervision_data=None):
+    # called by task.py as well as observation.py
+
     # input function in GMTK_ObservationMatrix.cc:
     # ObservationMatrix::readBinSentence
 
@@ -465,13 +467,32 @@ class Observations(object):
             return chromosome.seq[start:end]
 
     def make_continuous_cells(self, world, chromosome, start, end):
+        """
+        returns 2-dimensional numpy.ndarray of continuous observation
+        data for specified interval. This data is untransformed
+
+        dim 0: position
+        dim 1: track
+        """
         track_indexes = self.world_track_indexes[world]
         return chromosome[start:end, track_indexes]
 
     def make_supervision_cells(self, chrom, start, end):
+        """
+        chrom: str
+        start: int
+        end: int
+
+        returns either None (unsupervised) or 1-dimensional
+        numpy.ndarray for the region specified by chrom, start, end,
+        where each cell is the transformed label of that region
+
+        the transformation results in the cell being 0 for no supervision
+        or SUPERVISION_LABEL_OFFSET (1)+the supervision label for supervision
+        """
         supervision_type = self.supervision_type
         if supervision_type == SUPERVISION_UNSUPERVISED:
-            return
+            return # None
 
         assert supervision_type == SUPERVISION_SEMISUPERVISED
 
@@ -480,9 +501,8 @@ class Observations(object):
 
         res = zeros(end - start, dtype=DTYPE_OBS_INT)
 
-        supercontig_coords_labels = find_overlaps_include(start, end,
-                                                          coords_chrom,
-                                                          labels_chrom)
+        supercontig_coords_labels = \
+            find_overlaps_include(start, end, coords_chrom, labels_chrom)
 
         for label_start, label_end, label_index in supercontig_coords_labels:
             # adjust so that zero means no label
@@ -528,6 +548,7 @@ class Observations(object):
                 continuous_cells = \
                     self.make_continuous_cells(world, chromosome, start, end)
 
+                # data is transformed as part of _save_window()
                 save_window(float_filepath, int_filepath, continuous_cells,
                             seq_cells, supervision_cells)
 

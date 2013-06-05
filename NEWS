@@ -34,6 +34,7 @@
 * segway-layer: add --no-recolor option which doesn't override colors at all
 * segway-winner: fix issue #21. Now works on Python 2.5.1
 * installation: always require drmaa. setuptools extras_require wasn't that useful in practice
+* installation: include SLURM support if you have drivers/slurm.py installed
 * test: use fixed random seed to generate input.master every time
 * test: when files differ, output is in a form that makes it easier to diff
 * test: update for new GMTK

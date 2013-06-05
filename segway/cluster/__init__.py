@@ -61,6 +61,8 @@ def get_driver_name(session):
         return "sge"
     elif drms_info.startswith("Platform LSF"):
         return "lsf"
+    elif drms_info.startswith("SLURM"):
+        return "slurm"
     # not sure what PBS and PBS Pro return here.
     elif drms_info.startswith("Torque"):
         return "pbs"
