@@ -134,9 +134,11 @@ assert FUDGE_EP > MACHEP_FLOAT32
 
 FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 
+# Jeff suggestsed this criterion
+LOG_LIKELIHOOD_DIFF_FRAC = 1e-2
 # This is looser criterion is supported
 # by seed-level variation
-LOG_LIKELIHOOD_DIFF_FRAC = 1e-3
+#LOG_LIKELIHOOD_DIFF_FRAC = 1e-3
 #LOG_LIKELIHOOD_DIFF_FRAC = 1e-4
 #LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 #LOG_LIKELIHOOD_DIFF_FRAC = 1e-7
@@ -365,7 +367,9 @@ def is_training_progressing(last_ll, curr_ll,
     # using x !< y instead of x >= y to give the right default answer
     # in the case of NaNs
 
+    return True # XXX XXX XXX fixes number of training iterations
     return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
+
 
 def objective_value(log_likelihood, mp_terms):
     if mp_terms:
@@ -1203,6 +1207,7 @@ class Runner(object):
             return num
 
     def make_cpp_options(self, task, instance_index="identify", round_index="identify",
+                         mp_round_index = 0,
                          window_index="all", input_params_filename=None,
                          output_params_filename=None):
         directives = {}
@@ -1220,7 +1225,11 @@ class Runner(object):
             self.segtransition_weight_scale
 
         if self.measure_prop_graph_filepath:
-            directives["MODEL_WEIGHT"] = 1.0 / (1.0 + self.mp_weight)
+            if (mp_round_index == 0):
+                #directives["MODEL_WEIGHT"] = 1.0
+                directives["MODEL_WEIGHT"] = 1.0 / (1.0 + self.mp_weight)
+            else:
+                directives["MODEL_WEIGHT"] = 1.0 / (1.0 + self.mp_weight)
         else:
             # XXX shouldn't include if no MP
             directives["MODEL_WEIGHT"] = 1.0
@@ -1254,8 +1263,8 @@ class Runner(object):
 
         return log_likelihood
 
-    def load_measure_prop_objective(self, round_index):
-        self.last_mp_obj_filename = self.mp_runner.make_mp_obj_filename(self.instance_index, round_index)
+    def load_measure_prop_objective(self, round_index, mp_round_index):
+        self.last_mp_obj_filename = self.mp_runner.make_mp_obj_filename(self.instance_index, round_index, mp_round_index)
         with open(self.last_mp_obj_filename) as obj_file:
             obj_data = dict(map(lambda line: line.split(), obj_file.readlines()))
         objective = self.mp_weight * float(obj_data["total"])
@@ -1938,7 +1947,8 @@ class Runner(object):
 
     def queue_train_parallel(self, input_params_filename, instance_index,
                              round_index, **kwargs):
-        kwargs["cppCommandOptions"] = self.make_cpp_options("train", instance_index, round_index,
+        kwargs["cppCommandOptions"] = self.make_cpp_options("train", instance_index=instance_index,
+                                                            round_index=round_index,
                                                             input_params_filename=input_params_filename)
 
         res = RestartableJobDict(self.session, self.job_log_file)
@@ -1972,7 +1982,8 @@ class Runner(object):
         acc_filename = self.make_acc_filename(instance_index,
                                               GMTK_INDEX_PLACEHOLDER)
 
-        cpp_options = self.make_cpp_options("train", instance_index, round_index,
+        cpp_options = self.make_cpp_options("train", instance_index=instance_index,
+                                            round_index=round_index,
                                             input_params_filename=input_params_filename,
                                             output_params_filename=output_params_filename)
 
@@ -2053,9 +2064,8 @@ class Runner(object):
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
         if self.measure_prop_graph_filepath and (round_index > 0):
-            for i in range(self.measure_prop_num_iters):
-                mp_round_index = "%s_%s" % (round_index, i)
-                self.mp_runner.update(instance_index, mp_round_index, last_params_filename)
+            for mp_round_index in range(self.measure_prop_num_iters):
+                self.mp_runner.update(instance_index, round_index, mp_round_index, last_params_filename)
 
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
@@ -2129,8 +2139,8 @@ class Runner(object):
             log_likelihood = self.load_log_likelihood()
             if (self.measure_prop_graph_filepath):
                 if (round_index > 0):
-                    last_mp_round_index = "%s_%s" % (round_index, self.measure_prop_num_iters-1)
-                    mp_terms = self.load_measure_prop_objective(last_mp_round_index)
+                    mp_terms = self.load_measure_prop_objective\
+                            (round_index, self.measure_prop_num_iters-1)
                 else:
                     mp_terms = [float("nan"), float("nan"), float("nan")]
             else:
@@ -2458,12 +2468,14 @@ to find the winning instance anyway.""" % thread.instance_index)
         return True
 
     def queue_identify(self, restartable_jobs, window_index, params_filename,
-                       prefix_job_name, prog, kwargs, output_filenames):
+                       prefix_job_name, prog, kwargs, output_filenames,
+                       mp_round_index = 0):
         prog = self.prog_factory(prog)
         job_name = self.make_job_name_identify(prefix_job_name, window_index)
         output_filename = output_filenames[window_index]
 
-        kwargs = self.get_identify_kwargs(window_index, kwargs, params_filename)
+        kwargs = self.get_identify_kwargs(window_index, kwargs, params_filename,
+                                          mp_round_index=mp_round_index)
 
         if prog == VITERBI_PROG:
             kind = "viterbi"
@@ -2500,8 +2512,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         restartable_jobs.queue(restartable_job)
 
-    def get_identify_kwargs(self, window_index, extra_kwargs, params_filename):
+    def get_identify_kwargs(self, window_index, extra_kwargs, params_filename, mp_round_index = 0):
         cpp_command_options = self.make_cpp_options("identify", window_index=window_index,
+                                                    mp_round_index=mp_round_index,
                                                     input_params_filename=params_filename)
 
         res = dict(inputMasterFile=self.input_master_filename,
@@ -2525,7 +2538,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                                     posterior_filenames,
                                     params_filename=None,
                                     instance_index="identify",
-                                    round_index="identify"):
+                                    round_index="identify",
+                                    mp_round_index=0):
 
         if params_filename is None:
             params_filename = self.params_filename
@@ -2553,7 +2567,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             queue_identify_custom = partial(self.queue_identify,
                                             restartable_jobs, window_index,
-                                            params_filename)
+                                            params_filename, mp_round_index=mp_round_index)
 
             if (identify
                 and not self.recover_viterbi_window(window_index)):
@@ -2596,10 +2610,11 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.session = session
 
             if self.measure_prop_graph_filepath:
-                for i in range(self.measure_prop_num_iters):
+                for mp_round_index in range(self.measure_prop_num_iters):
                     instance_index = "identify"
-                    round_index = "identify_%s" % i
-                    self.mp_runner.update(instance_index, round_index)
+                    #round_index = "identify_%s" % i
+                    round_index = "identify"
+                    self.mp_runner.update(instance_index, round_index, mp_round_index)
             else:
                 instance_index = "identify"
                 round_index = "identify"
@@ -2607,7 +2622,8 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.run_identify_posterior_jobs(self.identify, self.posterior,
                                              viterbi_filenames, posterior_filenames,
                                              instance_index=instance_index,
-                                             round_index=round_index)
+                                             round_index=round_index,
+                                             mp_round_index=self.measure_prop_num_iters)
 
         for world in xrange(self.num_worlds):
             if self.identify:

@@ -258,7 +258,6 @@ class FilesChromosome:
         return self.chroms[0].name
 
     def itercontinuous(self):
-        print >>sys.stderr, "running FilesChromosome.itercontinuous"
         iters = [c.itercontinuous() for c in self.chroms]
         while True:
             # When we run out of supercontigs, this will raise StopIteration.

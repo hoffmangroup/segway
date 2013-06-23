@@ -251,7 +251,6 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
     (chrom, start, end) = coord
-    track_indexes = make_track_indexes(track_indexes_text)
     if genomedataname == FILE_TRACKS_SENTINEL:
         file_tracks = True
         genomedata_paths = make_genomedata_paths(track_indexes_text)

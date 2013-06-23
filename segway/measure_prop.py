@@ -8,7 +8,7 @@ from distutils.spawn import find_executable
 import subprocess
 import pdb
 import gzip
-from math import log
+from numpy import array, log, float64, power, sum as npsum
 
 
 from .virtual_evidence import write_virtual_evidence
@@ -21,7 +21,7 @@ from ._util import (ceildiv, Copier, memoized_property,
                     permissive_log, maybe_gzip_open)
 
 SUBDIRNAME_MEAUSURE_PROP = "measure_prop"
-MEASURE_PROP_WORKDIRNAME_TMPL = "mp.%s.%s"
+MEASURE_PROP_WORKDIRNAME_TMPL = "mp.%s.%s_%s"
 MEASURE_PROP_GRAPH_FILENAME = "graph.mp_graph"
 MEASURE_PROP_TRANS_FILENAME = "trans.mp_trans"
 MEASURE_PROP_LABEL_FILENAME = "label.mp_label"
@@ -218,10 +218,10 @@ class MeasurePropRunner(Copier):
         self.posterior_filename = None
         Copier.__init__(self, runner)
 
-    def make_mp_workdir(self, instance_index, round_index):
+    def make_mp_workdir(self, instance_index, round_index, mp_round_index):
         res = path(self.work_dirpath /
                    SUBDIRNAME_MEAUSURE_PROP /
-                   MEASURE_PROP_WORKDIRNAME_TMPL % (instance_index, round_index))
+                   MEASURE_PROP_WORKDIRNAME_TMPL % (instance_index, round_index, mp_round_index))
         if not res.isdir():
            res.makedirs()
         return res
@@ -230,64 +230,65 @@ class MeasurePropRunner(Copier):
         #return (self.make_mp_workdir(instance_index, round_index) /
                 #MEASURE_PROP_GRAPH_FILENAME)
 
-    def make_mp_trans_filename(self, instance_index, round_index):
-        return (self.make_mp_workdir(instance_index, round_index) /
+    def make_mp_trans_filename(self, instance_index, round_index, mp_round_index):
+        return (self.make_mp_workdir(instance_index, round_index, mp_round_index) /
                 MEASURE_PROP_TRANS_FILENAME)
 
-    def make_mp_label_filename(self, instance_index, round_index):
-        return (self.make_mp_workdir(instance_index, round_index) /
+    def make_mp_label_filename(self, instance_index, round_index, mp_round_index):
+        return (self.make_mp_workdir(instance_index, round_index, mp_round_index) /
                 MEASURE_PROP_LABEL_FILENAME)
 
-    def make_mp_post_filename(self, instance_index, round_index):
-        return (self.make_mp_workdir(instance_index, round_index) /
+    def make_mp_post_filename(self, instance_index, round_index, mp_round_index):
+        return (self.make_mp_workdir(instance_index, round_index, mp_round_index) /
                 MEASURE_PROP_POST_FILENAME)
 
-    def make_mp_obj_filename(self, instance_index, round_index):
-        return (self.make_mp_workdir(instance_index, round_index) /
+    def make_mp_obj_filename(self, instance_index, round_index, mp_round_index):
+        return (self.make_mp_workdir(instance_index, round_index, mp_round_index) /
                 MEASURE_PROP_OBJ_FILENAME)
 
-    def make_mp_output_filename(self, instance_index, round_index):
-        return (self.make_mp_workdir(instance_index, round_index) /
+    def make_mp_output_filename(self, instance_index, round_index, mp_round_index):
+        return (self.make_mp_workdir(instance_index, round_index, mp_round_index) /
                 MEASURE_PROP_OUTPUT_FILENAME)
 
-    def run_segway_posterior(self, instance_index, round_index, params_filename):
+    def run_segway_posterior(self, instance_index, round_index, mp_round_index, params_filename):
         # need to specify: MP uniform ve files, structure file, params file
 
-        # XXX pass this explicitly
-        mp_round_index = int(round_index.rsplit("_", 1)[-1])
+        round_index = "%s_%s" % (round_index, mp_round_index) # XXX
 
         if (not self.measure_prop_reuse_evidence) and (mp_round_index == 0):
             self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
 
-        posterior_workdir = self.runner.make_mp_posterior_workdir(instance_index,
-                                                                  round_index)
+        posterior_workdir = \
+                self.runner.make_mp_posterior_workdir(instance_index, round_index)
         self.posterior_tmpls = [(posterior_workdir /
                                  basename(self.runner.make_posterior_filename(window_index)))
                                 for window_index in range(len(self.windows))]
         self.runner.run_identify_posterior_jobs(False, True,
                                                 [], self.posterior_tmpls,
                                                 params_filename,
-                                                instance_index, round_index)
+                                                instance_index, round_index,
+                                                mp_round_index=mp_round_index)
         self.runner.measure_prop_ve_dirpath = \
             self.runner.make_mp_posterior_workdir(instance_index, round_index)
 
-    def write_mp_trans_file(self, instance_index, round_index):
+    def write_mp_trans_file(self, instance_index, round_index, mp_round_index):
         print >>sys.stderr, "Using low-memory write_mp_trans_file"
-        filepath = self.make_mp_trans_filename(instance_index, round_index)
+        filepath = self.make_mp_trans_filename(instance_index, round_index, mp_round_index)
         label_fmt = "i"
         with open(filepath, "w") as f:
             for i in range(self.num_frames):
                 f.write(struct.pack(label_fmt, 1))
 
-    def write_mp_label_file(self, instance_index, round_index):
+    def write_mp_label_file(self, instance_index, round_index, mp_round_index):
         print >>sys.stderr, "Using low-memory write_mp_label_file."
-        filepath = self.make_mp_label_filename(instance_index, round_index)
+        filepath = self.make_mp_label_filename(instance_index, round_index, mp_round_index)
 
         with open(filepath, "w") as f:
             # read posterior files from self.posterior_tmpls
             #window_posteriors = [None for window_index in range(len(self.windows))]
             for window_index, (window_world, window_chrom, window_start, window_end) \
                     in enumerate(self.windows):
+                #print >>sys.stderr, "window_index:", window_index
                 post_tmpl = self.posterior_tmpls[window_index]
 
                 # read segway posterior for this window
@@ -324,8 +325,8 @@ class MeasurePropRunner(Copier):
 
                 # add psuedocounts to avoid breaking measure prop
                 for frame_index in range(window_num_frames):
-                    posteriors[frame_index] = [((posteriors[frame_index][i] + 0.0001) /
-                                               (1 + 0.0001*self.num_segs))
+                    posteriors[frame_index] = [((posteriors[frame_index][i] + 1e-20) /
+                                               (1 + 1e-20*self.num_segs))
                                                for i in range(len(posteriors[frame_index]))]
 
                 # assert distribution constraint
@@ -337,25 +338,24 @@ class MeasurePropRunner(Copier):
                         print posteriors[frame_index]
                         raise
 
-                measure_label_fmt = "f"
+                measure_label_fmt = "%sf" % self.num_segs
                 for i in range(len(posteriors)):
-                    for c in range(len(posteriors[i])):
-                        f.write(struct.pack(measure_label_fmt, posteriors[i][c]))
+                    f.write(struct.pack(measure_label_fmt, *posteriors[i]))
 
                 #window_posteriors[window_index] = posteriors
 
             #mp_labels = MPMeasureLabels().init(labels)
                 #mp_labels.write_to(f)
 
-    def run_measure_prop(self, instance_index, round_index):
+    def run_measure_prop(self, instance_index, round_index, mp_round_index):
         mp_exe = find_executable("MP_large_scale")
         #graph_filepath = self.make_mp_graph_filename(instance_index, round_index)
         graph_filepath = self.measure_prop_graph_filepath
-        trans_filepath = self.make_mp_trans_filename(instance_index, round_index)
-        label_filepath = self.make_mp_label_filename(instance_index, round_index)
-        post_filepath = self.make_mp_post_filename(instance_index, round_index)
-        obj_filepath = self.make_mp_obj_filename(instance_index, round_index)
-        mp_output_filepath = self.make_mp_output_filename(instance_index, round_index)
+        trans_filepath = self.make_mp_trans_filename(instance_index, round_index, mp_round_index)
+        label_filepath = self.make_mp_label_filename(instance_index, round_index, mp_round_index)
+        post_filepath = self.make_mp_post_filename(instance_index, round_index, mp_round_index)
+        obj_filepath = self.make_mp_obj_filename(instance_index, round_index, mp_round_index)
+        mp_output_filepath = self.make_mp_output_filename(instance_index, round_index, mp_round_index)
         cmd = [mp_exe,
                "-inputGraphName", graph_filepath,
                "-transductionFile", trans_filepath,
@@ -375,37 +375,14 @@ class MeasurePropRunner(Copier):
             #subprocess.check_call(cmd, stderr=subprocess.STDOUT, stdout=mp_output)
         subprocess.check_call(cmd, stderr=subprocess.STDOUT, stdout=sys.stderr)
 
-    # XXX deprecated
-    def read_mp_post_file(self, instance_index, round_index):
-        header_fmt = "IH"
-        mp_post_filepath = self.make_mp_post_filename(instance_index, round_index)
-
-        posts = []
-        with open(mp_post_filepath, "r") as f:
-            num_nodes, num_classes = struct.unpack(header_fmt,
-                                                   f.read(struct.calcsize(header_fmt)))
-            assert (num_classes == self.num_segs)
-            assert (num_nodes == self.num_frames)
-            node_fmt = "I%sf" % num_classes
-            for i in range(num_nodes):
-                line = struct.unpack(node_fmt,
-                                     f.read(struct.calcsize(node_fmt)))
-                index = line[0]
-                post = line[1:]
-                assert (i == index)
-                posts.append(post)
-
-        return posts
-
     # XXX duplicative of mp_post_to_ve, write_virtual_evidence, read_mp_post_file
-    def mp_post_to_ve_lowmem(self, instance_index, round_index):
+    def mp_post_to_ve_lowmem(self, instance_index, round_index, mp_round_index):
         print >>sys.stderr, "Using  mp_post_to_ve_lowmem"
         ve_dirname = path(self.runner.measure_prop_ve_dirpath)
 
         header_fmt = "IH"
-        mp_post_filepath = self.make_mp_post_filename(instance_index, round_index)
+        mp_post_filepath = self.make_mp_post_filename(instance_index, round_index, mp_round_index)
 
-        posts = []
         frame_fmt = "%sf" % self.num_segs
         with open(mp_post_filepath, "r") as f:
             num_nodes, num_classes = struct.unpack(header_fmt,
@@ -415,6 +392,7 @@ class MeasurePropRunner(Copier):
             node_fmt = "I%sf" % self.num_segs
 
             for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                #print >>sys.stderr, "window_index:", window_index
                 window_posts = []
                 window_num_frames = ceildiv(end-start, self.resolution)
                 for i in range(window_num_frames):
@@ -422,13 +400,15 @@ class MeasurePropRunner(Copier):
                     line = struct.unpack(node_fmt,
                                          f.read(struct.calcsize(node_fmt)))
                     index = line[0]
-                    post = line[1:]
+                    post = array(line[1:], dtype=float64)
 
                     # Transform posterior with mp_weight parameter, normalize and take log
-                    posts[i] = map(lambda p: p**(self.mp_weight / (1.0 + self.mp_weight)), posts[i])
-                    partition = sum(post)
-                    post = map(lambda p: float(p) / partition, post)
-                    post = map(permissive_log, post)
+                    post = power(post, self.mp_weight / (1.0 + self.mp_weight)) + 1e-250
+                    #post = map(lambda p: p**self.mp_weight, post)
+                    #partition = sum(post)
+                    #post = map(lambda p: float(p) / partition, post)
+                    post = log(post / npsum(post))
+                    #post = map(permissive_log, post)
 
                     window_posts.append(post)
 
@@ -486,25 +466,25 @@ class MeasurePropRunner(Copier):
         self.runner.measure_prop_ve_dirpath = self.uniform_ve_dirname
 
 
-    def update(self, instance_index, round_index, params_filename=None):
+    def update(self, instance_index, round_index, mp_round_index, params_filename=None):
         # 1) Run gmtkJT to get posteriors for the current model
         # This runs gmtkJT and puts the posteriors at posterior_filenames
-        self.run_segway_posterior(instance_index, round_index, params_filename)
+        self.run_segway_posterior(instance_index, round_index, mp_round_index, params_filename)
         #pickle.dump(self, open(path(self.work_dirpath) / "mp.pckl", "w"))
 
         # 2) convert gmtkJT posteriors to MP label format
         # (the filenames are read from self.posterior_tmpls)
-        self.write_mp_label_file(instance_index, round_index)
+        self.write_mp_label_file(instance_index, round_index, mp_round_index)
 
         # 3) write MP graph, trans files
         #self.write_mp_graph_file(instance_index, round_index)
-        self.write_mp_trans_file(instance_index, round_index)
+        self.write_mp_trans_file(instance_index, round_index, mp_round_index)
 
         # 4) run MP
-        self.run_measure_prop(instance_index, round_index)
+        self.run_measure_prop(instance_index, round_index, mp_round_index)
 
         # 5) convert MP posteriors to VE
-        self.mp_post_to_ve_lowmem(instance_index, round_index)
+        self.mp_post_to_ve_lowmem(instance_index, round_index, mp_round_index)
 
 
 
