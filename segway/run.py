@@ -7,7 +7,7 @@ run: main Segway implementation
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2012 Michael M. Hoffman <mmh1@uw.edu>
+# Copyright 2008-2013 Michael M. Hoffman <mmh1@uw.edu>
 
 from collections import defaultdict, namedtuple
 from copy import copy
@@ -115,20 +115,20 @@ SIZEOF_DTYPE_OBS_INT = DTYPE_OBS_INT().nbytes
 # sizeof tmp space used per frame
 SIZEOF_FRAME_TMP = (SIZEOF_FLOAT32 + SIZEOF_DTYPE_OBS_INT)
 
-FUDGE_EP = -17 # ldexp(1, -17) = ~1e-6
+FUDGE_EP = -17  # ldexp(1, -17) = ~1e-6
 assert FUDGE_EP > MACHEP_FLOAT32
 
 FUDGE_TINY = -ldexp(TINY_FLOAT32, 6)
 
 LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
-NUM_SEQ_COLS = 2 # dinucleotide, presence_dinucleotide
+NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
-MAX_FRAMES = 2000000 # 2 million
-MEM_USAGE_BUNDLE = 100*MB # XXX: should start using this again
+MAX_FRAMES = 2000000  # 2 million
+MEM_USAGE_BUNDLE = 100 * MB  # XXX: should start using this again
 MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
 
-TMP_USAGE_BASE = 10*MB # just a guess
+TMP_USAGE_BASE = 10 * MB  # just a guess
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -181,10 +181,17 @@ PREFIX_JOB_NAME_POSTERIOR = "jt"
 SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
-BED_FILEBASENAME = extjoin(__package__, EXT_BED, EXT_GZ) # "segway.bed.gz"
-BED_FILEBASEFMT = extjoin(__package__, "%d", EXT_BED, EXT_GZ) # "segway.%d.bed.gz"
-BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ) # "posterior%s.bed.gz"
-BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ) # "posterior%s.%%d.bed.gz"
+## "segway.bed.gz"
+BED_FILEBASENAME = extjoin(__package__, EXT_BED, EXT_GZ)
+
+## "segway.%d.bed.gz"
+BED_FILEBASEFMT = extjoin(__package__, "%d", EXT_BED, EXT_GZ)
+
+## "posterior%s.bed.gz"
+BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
+
+## "posterior%s.%%d.bed.gz"
+BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ)
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 
@@ -231,9 +238,11 @@ RESOLUTION = 1
 SEGTRANSITION_WEIGHT_SCALE = 1.0
 
 DIRPATH_WORK_DIR_HELP = path("WORKDIR")
+DIRPATH_AUX = DIRPATH_WORK_DIR_HELP / SUBDIRNAME_AUX
+DIRPATH_PARAMS = DIRPATH_WORK_DIR_HELP / SUBDIRNAME_PARAMS
 
 # 62 so that it's not in sync with the 10 second job wait sleep time
-THREAD_START_SLEEP_TIME = 62 # XXX: this should become an option
+THREAD_START_SLEEP_TIME = 62  # XXX: this should become an option
 
 # -gpr option for GMTK when reversing
 REVERSE_GPR = "^0:-1:0"
@@ -241,7 +250,8 @@ REVERSE_GPR = "^0:-1:0"
 Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "input_master_filename", "params_filename",
                                  "log_likelihood_filename"])
-OFFSET_FILENAMES = 2 # where the filenames begin in Results
+OFFSET_FILENAMES = 2  # where the filenames begin in Results
+
 
 ## functions
 def quote_trackname(text):
@@ -252,15 +262,16 @@ def quote_trackname(text):
 
     # quote eliminates everything that doesn't match except for "_.-",
     # replaces with % escapes
-    res = quote(res, safe="") # safe="" => quote "/" too
+    res = quote(res, safe="")  # safe="" => quote "/" too
     res = res.replace("%", "_")
 
     # add stub to deal with non-alphabetic first characters
     if res[0] not in letters:
-        # __ should never appear in strings quoted as before
+         # __ should never appear in strings quoted as before
         res = "x__" + res
 
     return res
+
 
 def quote_spaced_str(item):
     """
@@ -273,16 +284,19 @@ def quote_spaced_str(item):
     else:
         return text
 
+
 class NoAdvance(str):
     """
     cause rewrite_strip_comments() to not consume an extra line
     """
+
 
 class NewLine(NoAdvance):
     """
     add a line rather than replacing existing
     """
     # doesn't actually have any code. used solely for class identification
+
 
 def rewrite_strip_comments(infile, outfile):
     """
@@ -309,10 +323,12 @@ def rewrite_strip_comments(infile, outfile):
             if outline is not None:
                 print >>outfile, outline
 
+
 def consume_until(iterable, text):
     for line in iterable:
         if line.startswith(text):
             break
+
 
 def slice2range(s):
     if isinstance(s, int):
@@ -333,14 +349,17 @@ def slice2range(s):
 
     return xrange(start, stop, step)
 
+
 def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
     # using x !< y instead of x >= y to give the right default answer
     # in the case of NaNs
-    return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
+    return not abs((curr_ll - last_ll) / last_ll) < min_ll_diff_frac
+
 
 def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
+
 
 def rewrite_cliques(rewriter, frame):
     """
@@ -364,18 +383,21 @@ def rewrite_cliques(rewriter, frame):
 
     return orig_num_cliques
 
+
 def make_mem_req(mem_usage):
     # double usage at this point
     mem_usage_gibibytes = ceil(mem_usage / GB)
 
     return "%dG" % mem_usage_gibibytes
 
-class Mixin_Lockable(AddableMixin):
+
+class Mixin_Lockable(AddableMixin):  # noqa
     def __init__(self, *args, **kwargs):
         self.lock = Lock()
         return AddableMixin.__init__(self, *args, **kwargs)
 
 LockableDefaultDict = Mixin_Lockable + defaultdict
+
 
 class TrainThread(Thread):
     def __init__(self, runner, session, instance_index, num_segs):
@@ -395,35 +417,40 @@ class TrainThread(Thread):
         self.runner.instance_index = self.instance_index
         self.result = self.runner.run_train_instance()
 
+
 def maybe_quote_arg(text):
-    """
-    return quoted argument, adding backslash quotes
+    """return quoted argument, adding backslash quotes
 
     XXX: would be nice if this were smarter about what needs to be
     quoted, only doing this when special characters or whitespace are
     within the arg
 
-    XXX: Enclosing characters in double quotes (`"') preserves the literal value
-of all characters within the quotes, with the exception of `$', ``',
-`\', and, when history expansion is enabled, `!'.  The characters `$'
-and ``' retain their special meaning within double quotes (*note Shell
-Expansions::).  The backslash retains its special meaning only when
-followed by one of the following characters: `$', ``', `"', `\', or
-`newline'.  Within double quotes, backslashes that are followed by one
-of these characters are removed.  Backslashes preceding characters
-without a special meaning are left unmodified.  A double quote may be
-quoted within double quotes by preceding it with a backslash.  If
-enabled, history expansion will be performed unless an `!' appearing in
-double quotes is escaped using a backslash.  The backslash preceding
-the `!' is not removed.
+    XXX: Enclosing characters in double quotes (`"') preserves the
+    literal value of all characters within the quotes, with the
+    exception of `$', ``', `\', and, when history expansion is
+    enabled, `!'. The characters `$' and ``' retain their special
+    meaning within double quotes (*note Shell Expansions::). The
+    backslash retains its special meaning only when followed by one of
+    the following characters: `$', ``', `"', `\', or `newline'. Within
+    double quotes, backslashes that are followed by one of these
+    characters are removed. Backslashes preceding characters without a
+    special meaning are left unmodified. A double quote may be quoted
+    within double quotes by preceding it with a backslash. If enabled,
+    history expansion will be performed unless an `!' appearing in
+    double quotes is escaped using a backslash. The backslash
+    preceding the `!' is not removed.
+
     """
     return '"%s"' % text.replace('"', r'\"')
+
 
 def cmdline2text(cmdline=sys.argv):
     return " ".join(maybe_quote_arg(arg) for arg in cmdline)
 
+
 def _log_cmdline(logfile, cmdline):
     print >>logfile, " ".join(map(quote_spaced_str, cmdline))
+
 
 def check_overlapping_supervision_labels(start, end, chrom, coords):
     for coord_start, coord_end in coords[chrom]:
@@ -435,6 +462,8 @@ def check_overlapping_supervision_labels(start, end, chrom, coords):
 
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
+
+
 class Runner(object):
     """
     Purpose:
@@ -464,8 +493,8 @@ class Runner(object):
         self.seg_table_filename = None
         self.supervision_filename = None
 
-        self.params_filename = None # actual params filename for this instance
-        self.params_filenames = [] # list of possible params filenames
+        self.params_filename = None  # actual params filename for this instance
+        self.params_filenames = []  # list of possible params filenames
         self.recover_dirname = None
         self.work_dirname = None
         self.log_likelihood_filename = None
@@ -486,8 +515,8 @@ class Runner(object):
         self.card_supervision_label = -1
 
         self.include_tracknames = []
-        self.tied_tracknames = {} # dict of head trackname -> tied tracknames
-        self.head_trackname_list = [] # ordered list of tied_trackname.keys()
+        self.tied_tracknames = {}  # dict of head trackname -> tied tracknames
+        self.head_trackname_list = []  # ordered list of tied_trackname.keys()
 
         # default is 0
         self.global_mem_usage = LockableDefaultDict(int)
@@ -497,7 +526,7 @@ class Runner(object):
         self.windows = None
         self.mins = None
         self.maxs = None
-        self.tracknames = None # encoded/quoted version
+        self.tracknames = None  # encoded/quoted version
         self.track_specs = []
 
         # variables
@@ -511,13 +540,14 @@ class Runner(object):
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
-        self.reverse_worlds = [] # XXXopt: this should be a set
+        self.reverse_worlds = []  # XXXopt: this should be a set
 
         # flags
         self.clobber = False
-        self.train = False # EM train # this should become an int for num_starts
+        ## XXX: this should become an int for num_starts
+        self.train = False  # EM train
         self.posterior = False
-        self.identify = False # viterbi
+        self.identify = False  # viterbi
         self.dry_run = False
         self.verbosity = VERBOSITY
         self.use_dinucleotide = None
@@ -836,7 +866,8 @@ class Runner(object):
         # (see Wikipedia)
 
         sums_squares_normalized = self.sums_squares / self.num_datapoints
-        return self.transform(sums_squares_normalized - square(self._means_untransformed))
+        return self.transform(sums_squares_normalized
+                              - square(self._means_untransformed))
 
     @memoized_property
     def dont_train_filename(self):
@@ -878,7 +909,7 @@ class Runner(object):
 
     @memoized_property
     def recover_posterior_filenames(self):
-        raise NotImplementedError # XXX
+        raise NotImplementedError  # XXX
 
     @memoized_property
     def params_dirpath(self):
@@ -1045,7 +1076,8 @@ class Runner(object):
         all track indexes, not just the heads
         """
         assert (not self.tied_tracknames
-                or len(self.tied_tracknames) == len(self.tied_track_indexes_list))
+                or len(self.tied_tracknames)
+                == len(self.tied_track_indexes_list))
 
         res = array(zip(*self.tied_track_indexes_list))
         assert len(res) == self.num_worlds
@@ -1140,6 +1172,33 @@ class Runner(object):
         # XXX: this function could use a refactor
         # there is a lot of stuff here that might not be used anywhere
         # and variable names are confusing
+
+        # tracknames: tracknames in genomedata archive
+        #  if ordinary_tracknames: redefined to be all the ordinary_tracknames we can find
+        #  used: ?
+        # include_tracknames: tracknames supplied by users
+        #  used: ?
+        # unquoted_tracknames: tracknames before quote transformation (is this tracknames or include_tracknames) XXX: rename to include_tracknames_unquoted
+        #  used: ?
+        # ordinary_tracknames: include_tracknames that aren't special
+        #  used: ?
+        # missing_tracknames: used in case of error
+        # tied_tracknames: XXX: tracknames that are tied together?
+        #  used: ?
+        # head_tracknames: XXX: head of each tie group?
+        #  used: ?
+        # head_trackname_list: XXX: list of heads?
+        #  used: ?
+
+        # track_indexes: (array of) indexes of tracknames
+        #  used: ?
+
+        # tied_track_index_map: dict of the indexes of tracknames
+        #  used: ?
+
+        # indexed_tracknames: tuples of ordinary_tracknames with their index in genome tracknames XXX: rename to ordinary_tracknames_indexed
+        #  used: ?
+
         tracknames = genome.tracknames_continuous
 
         # supplied by user: includes special tracks (like dinucleotide)
@@ -1156,8 +1215,10 @@ class Runner(object):
             # redefine tracknames:
             # tracknames, track_indexes = zip(*indexed_tracknames) won't return
             # ([], []) like we want
-            tracknames = [indexed_trackname[0] for indexed_trackname in indexed_tracknames]
-            track_indexes = [indexed_trackname[1] for indexed_trackname in indexed_tracknames]
+            tracknames = [indexed_trackname[0]
+                          for indexed_trackname in indexed_tracknames]
+            track_indexes = [indexed_trackname[1]
+                             for indexed_trackname in indexed_tracknames]
 
             # check that there aren't any missing tracks
             if len(tracknames) != len(ordinary_tracknames):
@@ -1173,11 +1234,13 @@ class Runner(object):
 
             # a dict whose values are initialized in order of access
             tied_track_index_map = defaultdict(count().next)
-            tied_track_indexes_list = [[] for _ in xrange(len(tied_tracknames))]
+            tied_track_indexes_list = [[]
+                                       for _ in xrange(len(tied_tracknames))]
 
             for trackname, index in indexed_tracknames:
                 head_trackname = head_tracknames[trackname]
-                tied_track_indexes_list_index = tied_track_index_map[head_trackname]
+                tied_track_indexes_list_index = \
+                    tied_track_index_map[head_trackname]
                 tied_track_indexes_list[tied_track_indexes_list_index].append(index)
 
         elif include_tracknames:
@@ -1187,7 +1250,7 @@ class Runner(object):
             head_trackname_list = []
             track_indexes = array([], intc)
             tied_track_indexes_list = []
-            self.float_filelistpath = None # no float data
+            self.float_filelistpath = None  # no float data
 
         else:
             # default: use all tracks in archive
@@ -1248,7 +1311,8 @@ class Runner(object):
             # special case if there is only one param filename set
             # otherwise generate "params.params" anew
             params_filename = params_filenames[0]
-        elif instance_index is not None and num_params_filenames > instance_index:
+        elif (instance_index is not None
+              and num_params_filenames > instance_index):
             params_filename = params_filenames[instance_index]
         else:
             params_filename = None
@@ -1258,7 +1322,7 @@ class Runner(object):
         # make new filenames when new is set, or params_filename is
         # not set, or the file already exists and we are training
         if (new or not params_filename
-            or (self.train and path(params_filename).exists())):
+                or (self.train and path(params_filename).exists())):
             params_filename = self.make_params_filename(instance_index)
 
         return params_filename, last_params_filename
@@ -1316,7 +1380,7 @@ class Runner(object):
             # if the error is because directory exists, but it's
             # empty, then do nothing
             if (err.errno != EEXIST or not dirpath.isdir() or
-                dirpath.listdir()):
+                    dirpath.listdir()):
                 raise
 
     def make_subdir(self, subdirname):
@@ -1446,7 +1510,8 @@ class Runner(object):
             observations.locate_windows(genome)
 
             self.windows = observations.windows
-            self.subset_metadata(genome) # XXX: does this need to be done before save()?
+            ## XXX: does this need to be done before save()?
+            self.subset_metadata(genome)
 
             observations.save(genome)
 
@@ -1625,27 +1690,30 @@ class Runner(object):
         return RestartableJob(session, job_tmpl_factory, self.global_mem_usage,
                               mem_usage_key)
 
-    def queue_train(self, instance_index, round_index, window_index, num_frames=0,
-                    **kwargs):
-        """
-        this calls Runner.queue_gmtk()
+    def queue_train(self, instance_index, round_index, window_index,
+                    num_frames=0, **kwargs):
+        """this calls Runner.queue_gmtk()
 
         if num_frames is not specified, then it is set to 0, where
-        everyone will share their min/max memory usage. Used for calls from queue_train_bundle()
+        everyone will share their min/max memory usage. Used for calls
+        from queue_train_bundle()
         """
         kwargs["inputMasterFile"] = self.input_master_filename
 
-        name = self.make_job_name_train(instance_index, round_index, window_index)
+        name = self.make_job_name_train(instance_index, round_index,
+                                        window_index)
 
         return self.queue_gmtk(self.train_prog, kwargs, name, num_frames)
 
     def queue_train_parallel(self, input_params_filename, instance_index,
                              round_index, **kwargs):
-        kwargs["cppCommandOptions"] = self.make_cpp_options(input_params_filename)
+        kwargs["cppCommandOptions"] = \
+            self.make_cpp_options(input_params_filename)
 
         res = RestartableJobDict(self.session, self.job_log_file)
 
-        make_acc_filename_custom = partial(self.make_acc_filename, instance_index)
+        make_acc_filename_custom = partial(self.make_acc_filename,
+                                           instance_index)
 
         for window_index, window_len in self.window_lens_sorted():
             acc_filename = make_acc_filename_custom(window_index)
@@ -1711,7 +1779,7 @@ class Runner(object):
             num_subsegs = self.num_subsegs
 
         if (self.triangulation_filename_is_new
-            or not self.triangulation_filename):
+                or not self.triangulation_filename):
             self.triangulation_filename_is_new = True
 
             structure_filebasename = path(self.structure_filename).name
@@ -1789,7 +1857,7 @@ class Runner(object):
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
-                      lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
+                      lldp=LOG_LIKELIHOOD_DIFF_FRAC * 100.0,
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
 
@@ -1812,8 +1880,9 @@ class Runner(object):
             round_index += 1
 
         # log_likelihood, num_segs and a list of src_filenames to save
-        return Results(log_likelihood, self.num_segs, self.input_master_filename,
-                       self.last_params_filename, self.log_likelihood_filename)
+        return Results(log_likelihood, self.num_segs,
+                       self.input_master_filename, self.last_params_filename,
+                       self.log_likelihood_filename)
 
     def save_train_options(self):
         filename = self.make_filename(TRAIN_FILEBASENAME)
@@ -1952,7 +2021,8 @@ class Runner(object):
         threads = []
         with Session() as session:
             try:
-                for instance_index, (num_seg, seg_instance_index) in enumerator:
+                for instance_index, instance_features in enumerator:
+                    num_seg, seg_instance_index = instance_features
                     # print >>sys.stderr, (
                     #    "instance_index %s, num_seg %s, seg_instance_index %s"
                     #    % (instance_index, num_seg, seg_instance_index))
@@ -2023,7 +2093,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # only want "input.master" not "input.0.master" if there is
         # only one instance
         if (not self.instance_make_new_params
-            and resource == InputMasterSaver.resource_name):
+                and resource == InputMasterSaver.resource_name):
             instance_index = None
 
         old_filename = make_default_filename(resource,
@@ -2057,9 +2127,11 @@ to find the winning instance anyway.""" % thread.instance_index)
                 self.make_log_likelihood_tab_filename(instance_index,
                                                       recover_dirname)
 
-            with open(recover_log_likelihood_tab_filename) as log_likelihood_tab_file:
+            with open(recover_log_likelihood_tab_filename) \
+                    as log_likelihood_tab_file:
                 log_likelihoods = [float(line.rstrip())
-                                   for line in log_likelihood_tab_file.readlines()]
+                                   for line
+                                   in log_likelihood_tab_file.readlines()]
 
             final_round_index = len(log_likelihoods)
             if final_round_index > 0:
@@ -2213,7 +2285,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                                 restartable_jobs, window_index)
 
                 if (self.identify
-                    and not self.recover_viterbi_window(window_index)):
+                        and not self.recover_viterbi_window(window_index)):
                     queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
                                           VITERBI_PROG, viterbi_kwargs,
                                           viterbi_filenames)
@@ -2270,7 +2342,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         self.make_subdir(SUBDIRNAME_LOG)
         run_msg = self.make_run_msg()
 
-        cmdline_short_filename = self.make_script_filename(PREFIX_CMDLINE_SHORT)
+        cmdline_short_filename = \
+            self.make_script_filename(PREFIX_CMDLINE_SHORT)
         cmdline_long_filename = self.make_script_filename(PREFIX_CMDLINE_LONG)
         job_log_filename = self.make_filename(PREFIX_JOB_LOG, EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
@@ -2297,7 +2370,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
                     if self.identify or self.posterior:
                         if self.supervision_filename:
-                            raise NotImplementedError # XXX
+                            raise NotImplementedError  # XXX
 
                         if not self.dry_run:
                             # resave now that num_segs is determined,
@@ -2306,7 +2379,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
                         if (self.posterior and (self.recover_dirname
                                                 or self.num_worlds != 1)):
-                            raise NotImplementedError # XXX
+                            raise NotImplementedError  # XXX
 
                         self.run_identify_posterior()
 
@@ -2318,6 +2391,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.make_dir(work_dirname, self.clobber)
 
         self.run(*args, **kwargs)
+
 
 def parse_options(args):
     from optplus import OptionParser, OptionGroup
@@ -2357,7 +2431,7 @@ def parse_options(args):
                          help="use or create input master in FILE"
                          " (default %s)" %
                          make_default_filename(InputMasterSaver.resource_name,
-                                               DIRPATH_WORK_DIR_HELP / SUBDIRNAME_PARAMS))
+                                               DIRPATH_PARAMS))
 
         group.add_option("-s", "--structure", metavar="FILE",
                          help="use or create structure in FILE (default %s)" %
@@ -2371,8 +2445,7 @@ def parse_options(args):
         group.add_option("--dont-train", metavar="FILE",
                          help="use FILE as list of parameters not to train"
                          " (default %s)" %
-                         make_default_filename(RES_DONT_TRAIN,
-                                               DIRPATH_WORK_DIR_HELP / SUBDIRNAME_AUX))
+                         make_default_filename(RES_DONT_TRAIN, DIRPATH_AUX))
 
         group.add_option("--seg-table", metavar="FILE",
                          help="load segment hyperparameters from FILE"
@@ -2384,7 +2457,7 @@ def parse_options(args):
 
     with OptionGroup(parser, "Intermediate files") as group:
         group.add_option("-o", "--observations", metavar="DIR",
-                          help="use or create observations in DIR"
+                         help="use or create observations in DIR"
                          " (default %s)" %
                          (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
 
@@ -2482,6 +2555,7 @@ def parse_options(args):
             parser.error("Expected 4 arguments for the identify task.")
 
     return options, args
+
 
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
