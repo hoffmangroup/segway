@@ -23,7 +23,7 @@ def make_weight_scale(scale):
 
 class StructureSaver(Saver):
     resource_name = "segway.str.tmpl"
-    copy_attrs = ["num_tracks", "num_datapoints", "use_dinucleotide",
+    copy_attrs = ["num_track_groups", "num_datapoints", "use_dinucleotide",
                   "window_lens", "resolution", "supervision_type",
                   "gmtk_include_filename_relative", "head_trackname_list"]
 
@@ -55,12 +55,11 @@ class StructureSaver(Saver):
         return " | ".join([missing_spec] + [present_spec] * self.resolution)
 
     def make_mapping(self):
-        num_tracks = self.num_tracks
+        num_track_groups = self.num_track_groups
         num_datapoints = self.num_datapoints
         head_trackname_list = self.head_trackname_list
 
-        assert (len(self.head_trackname_list) == num_tracks
-                == len(num_datapoints))
+        assert (self.num_track_groups == len(num_datapoints))
 
         if self.use_dinucleotide:
             max_num_datapoints_track = sum(self.window_lens)
