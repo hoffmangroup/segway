@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2012 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2012, 2013 Michael M. Hoffman <mmh1@uw.edu>
 
 from math import frexp, ldexp
 from string import Template
@@ -170,17 +170,17 @@ class ParamSpec(object):
         # and only one mapping is produced
         num_subsegs = self.num_subsegs
 
-        tracknames = self.head_trackname_list
+        head_tracknames = self.head_trackname_list
 
-        num_tracks = len(tracknames)
+        num_head_tracks = len(head_tracknames)
 
         for seg_index, segname in enumerate(self.make_segnames()):
-            seg_offset = num_tracks * num_subsegs * seg_index
+            seg_offset = num_head_tracks * num_subsegs * seg_index
 
             for subseg_index, subsegname in enumerate(self.make_subsegnames()):
-                subseg_offset = seg_offset + num_tracks * subseg_index
+                subseg_offset = seg_offset + num_head_tracks * subseg_index
 
-                for track_index, trackname in enumerate(tracknames):
+                for track_index, trackname in enumerate(head_tracknames):
                     track_offset = subseg_offset + track_index
 
                     # XXX: change name of index to track_offset in templates
@@ -472,14 +472,14 @@ class NameCollectionParamSpec(ParamSpec):
     def generate_objects(self):
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs
-        tracknames = self.head_trackname_list
+        head_tracknames = self.head_trackname_list
 
         substitute_header = Template(self.header_tmpl).substitute
         substitute_row = Template(self.row_tmpl).substitute
 
         fullnum_subsegs = num_segs * num_subsegs
 
-        for track_index, track in enumerate(tracknames):
+        for track_index, track in enumerate(head_tracknames):
             mapping = dict(track=track, fullnum_subsegs=fullnum_subsegs)
 
             rows = [substitute_header(mapping)]
@@ -603,7 +603,7 @@ class MXParamSpec(ParamSpec):
 
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
-    copy_attrs = ["tracknames", "num_bases", "num_segs", "num_subsegs",
+    copy_attrs = ["num_bases", "num_segs", "num_subsegs",
                   "num_tracks", "card_seg_countdown",
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "supervision_type",
