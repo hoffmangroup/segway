@@ -9,7 +9,7 @@ __version__ = "$Revision$"
 
 # Copyright 2008-2013 Michael M. Hoffman <mmh1@uw.edu>
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 from copy import copy
 from datetime import datetime
 from distutils.spawn import find_executable
@@ -471,6 +471,31 @@ class Track(object):
     def name(self):
         return quote_trackname(self.name_unquoted)
 
+
+class TrackGroup(list):
+    def _set_group(self, item):
+        assert item.group is None
+        item.group = self
+        return item
+
+    def __init__(self, items):
+        return list.__init__(self, [self._set_group(item) for item in items])
+
+    def __setitem__(self, index, item):
+        if isinstance(index, slice):
+            raise NotImplementedError
+
+        return list.__setitem__(self, index, self._set_group(item))
+
+    def append(self, item):
+        return list.append(self, self._set_group(item))
+
+    def extend(self, items):
+        return list.extend(self, [self._set_group(item) for item in items])
+
+    def insert(self, index, item):
+        return list.insert(self, index, self._set_group(item))
+
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
 
@@ -525,7 +550,7 @@ class Runner(object):
 
         self.card_supervision_label = -1
 
-        self.tracks = []
+        self.tracks = OrderedDict()
         self.track_groups = []
 
         # default is 0
@@ -642,8 +667,9 @@ class Runner(object):
 
     @classmethod
     def fromoptions(cls, args, options):
-        """
-        the usual way a Runner is created
+        """This is the usual way a Runner is created.
+
+        Calls Runner.fromargs() first.
         """
         res = cls.fromargs(args)
 
@@ -673,55 +699,26 @@ class Runner(object):
         if params_filenames:
             res.params_filenames = params_filenames
 
-        all_tracknames = []
-
-        # dict. key: str: head trackname; value: list(str: tracknames)
-        tied_tracknames = defaultdict(list)
-
-        # dict. key: str: trackname; value: head trackname
-        # inverse of tied_tracknames
-        head_tracknames = {}
-
-        # ordered list of the head tracknames
-        head_trackname_list = []
-
-        # temporary list to avoid duplicates
-        used_tracknames = set()
+        ## track option processing
+        tracks = self.tracks
+        track_groups = self.track_groups
 
         for track_spec in res.track_specs:
             # local to each value of track_spec
-            current_tracknames = track_spec.split(",")
-            current_tracknames_set = frozenset(current_tracknames)
+            spec_tracknames = track_spec.split(",")
+            track_group = TrackGroup()
 
-            assert len(current_tracknames_set) == len(current_tracknames)
+            for trackname in spec_tracknames:
+                if trackname in tracks:
+                    raise ValueError("can't tie one track in multiple groups")
 
-            if not used_tracknames.isdisjoint(current_tracknames_set):
-                raise ValueError("can't tie one track in multiple groups")
+                track = Track(trackname)
+                tracks[trackname] = track
+                track_group.append(track)
 
-            all_tracknames.extend(current_tracknames)
-            used_tracknames |= current_tracknames_set
+            track_groups.append(track_group)
 
-            head_trackname = current_tracknames[0]
-            head_trackname_list.append(head_trackname)
-            for trackname in current_tracknames:
-                tied_tracknames[head_trackname].append(trackname)
-                head_tracknames[trackname] = head_trackname
-
-        if all_tracknames:
-            # non-allowed special trackname
-            # XXX: doesn't deal with the case where it is a default
-            # trackname in input file
-            assert "supervisionLabel" not in all_tracknames
-            res.all_tracknames = all_tracknames
-
-        res.tied_tracknames = tied_tracknames
-
-        if head_tracknames:
-            res.head_tracknames = head_tracknames
-            res.head_trackname_list = head_trackname_list
-
-        # don't prematurely memoize num_worlds if tied_tracknames is empty
-        if tied_tracknames and res.num_worlds > 1:
+        if res.num_worlds > 1:
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
@@ -1113,6 +1110,8 @@ class Runner(object):
         return slice2range(self.num_segs)
 
     def check_world_fmt(self, attr):
+        """ensure that all options that need a template have it
+        """
         value = getattr(self, attr)
         if value is None:
             return
@@ -1278,6 +1277,11 @@ class Runner(object):
             tied_track_indexes_list = [[track_index]
                                        for track_index in track_indexes]
             include_tracknames_unquoted = tracknames
+
+        # non-allowed special trackname
+        # XXX: doesn't deal with the case where it is a default
+        # trackname in input file
+        assert "supervisionLabel" not in tracks
 
         # replace illegal characters in data_tracknames and head_tracknames only,
         # not include_tracknames_unquoted
