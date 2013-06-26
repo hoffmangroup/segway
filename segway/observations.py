@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2012 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2012, 2013 Michael M. Hoffman <mmh1@uw.edu>
 
 from cStringIO import StringIO
 from collections import deque
@@ -44,11 +44,13 @@ ORD_c = ord("c")
 ORD_g = ord("g")
 ORD_t = ord("t")
 
+
 class NoData(object):
     """
     sentinel for not adding an extra field to coords, so that one can
     still use None
     """
+
 
 def convert_windows(attrs, name):
     supercontig_start = attrs.start
@@ -56,10 +58,12 @@ def convert_windows(attrs, name):
 
     return edges_array.tolist()
 
+
 def update_starts(starts, ends, new_starts, new_ends):
     # reversed because extend left extends deque in reversed order
     starts.extendleft(reversed(new_starts))
     ends.extendleft(reversed(new_ends))
+
 
 def find_overlaps_include(start, end, coords, data=repeat(NoData)):
     """
@@ -99,7 +103,7 @@ def find_overlaps_include(start, end, coords, data=repeat(NoData)):
 
             # case E otherwise
         else:
-            assert False # can't happen
+            assert False  # can't happen
 
         item = [include_start, include_end]
 
@@ -109,6 +113,7 @@ def find_overlaps_include(start, end, coords, data=repeat(NoData)):
         res.append(item)
 
     return res
+
 
 def find_overlaps_exclude(start, end, exclude_coords):
     """
@@ -158,16 +163,18 @@ def find_overlaps_exclude(start, end, exclude_coords):
                     new_include_coords.append([exclude_end, end])
 
             else:
-                assert False # can't happen
+                assert False  # can't happen
 
         include_coords = new_include_coords
 
     return include_coords
 
+
 def calc_downsampled_shape(inarray, resolution):
     full_num_rows = inarray.shape[0]
     downsampled_num_rows = ceildiv(full_num_rows, resolution)
     return [downsampled_num_rows] + list(inarray.shape[1:])
+
 
 def downsample_add(inarray, resolution):
     """
@@ -206,6 +213,7 @@ def downsample_add(inarray, resolution):
 
     return res
 
+
 def make_dinucleotide_int_data(seq):
     """
     makes an array with two columns, one with 0..15=AA..TT and the other
@@ -219,7 +227,7 @@ def make_dinucleotide_int_data(seq):
 
     # rewrite all Ns as A now that you have the missingness mask
     nucleotide_int_data[nucleotide_int_data == -1] = 0
-    col_shape = (len(nucleotide_int_data)-1,)
+    col_shape = (len(nucleotide_int_data) - 1,)
 
     # first column: dinucleotide: AA..TT=0..15
     # combine, and add extra AA stub at end, which will be set missing
@@ -242,6 +250,7 @@ def make_dinucleotide_int_data(seq):
     # XXXopt: set these up properly in the first place instead of
     # column_stacking at the end
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
+
 
 def _save_window(float_filename, int_filename, float_data, resolution,
                  distribution, seq_data=None, supervision_data=None):
@@ -284,11 +293,11 @@ def _save_window(float_filename, int_filename, float_data, resolution,
         float_data.tofile(float_filename)
 
     if seq_data is not None:
-        assert resolution == 1 # not implemented yet
+        assert resolution == 1  # not implemented yet
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
     if supervision_data is not None:
-        assert resolution == 1 # not implemented yet
+        assert resolution == 1  # not implemented yet
         int_blocks.append(supervision_data)
 
     if int_blocks:
@@ -298,8 +307,9 @@ def _save_window(float_filename, int_filename, float_data, resolution,
 
     int_data.tofile(int_filename)
 
+
 def process_new_windows(new_windows, starts, ends):
-    if not new_windows: # nothing left
+    if not new_windows:  # nothing left
         return None, None
     elif len(new_windows) > 1:
         new_starts, new_ends = zip(*new_windows)
@@ -307,6 +317,7 @@ def process_new_windows(new_windows, starts, ends):
         return None, None
 
     return new_windows[0]
+
 
 class Observations(object):
     copy_attrs = ["include_coords", "exclude_coords", "max_frames",
@@ -409,7 +420,7 @@ class Observations(object):
                 except IndexError:
                     break
 
-                end = ends.popleft() # should not ever cause an IndexError
+                end = ends.popleft()  # should not ever cause an IndexError
 
                 new_windows = find_overlaps_exclude(start, end,
                                                     chr_exclude_coords)
@@ -492,7 +503,7 @@ class Observations(object):
         """
         supervision_type = self.supervision_type
         if supervision_type == SUPERVISION_UNSUPERVISED:
-            return # None
+            return  # None
 
         assert supervision_type == SUPERVISION_SEMISUPERVISED
 
@@ -507,7 +518,7 @@ class Observations(object):
         for label_start, label_end, label_index in supercontig_coords_labels:
             # adjust so that zero means no label
             label_adjusted = label_index + SUPERVISION_LABEL_OFFSET
-            res[label_start-start:label_end-start] = label_adjusted
+            res[(label_start - start):(label_end - start)] = label_adjusted
 
         return res
 
@@ -520,7 +531,8 @@ class Observations(object):
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
 
-        for window_index, (world, chrom, start, end) in enumerate(self.windows):
+        for window_index, window in enumerate(self.windows):
+            world, chrom, start, end = window
             float_filepath, int_filepath = \
                 print_filepaths_custom(chrom, window_index)
 
@@ -554,7 +566,7 @@ class Observations(object):
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
-            return closing(StringIO()) # dummy output
+            return closing(StringIO())  # dummy output
         else:
             return open(filepath, "w")
 
