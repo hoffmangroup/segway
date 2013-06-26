@@ -466,6 +466,7 @@ class Track(object):
         self.name_unquoted = name_unquoted
         self.is_data = is_data
         self.group = None
+        self.index = None
 
     @memoized_property
     def name(self):
@@ -665,6 +666,20 @@ class Runner(object):
 
         return res
 
+    def add_track_group(self, tracknames):
+        tracks = self.tracks
+        track_group = TrackGroup()
+
+        for trackname in tracknames:
+            if trackname in tracks:
+                raise ValueError("can't tie one track in multiple groups")
+
+            track = Track(trackname)
+            tracks[trackname] = track
+            track_group.append(track)
+
+        self.track_groups.append(track_group)
+
     @classmethod
     def fromoptions(cls, args, options):
         """This is the usual way a Runner is created.
@@ -700,23 +715,9 @@ class Runner(object):
             res.params_filenames = params_filenames
 
         ## track option processing
-        tracks = self.tracks
-        track_groups = self.track_groups
-
         for track_spec in res.track_specs:
             # local to each value of track_spec
-            spec_tracknames = track_spec.split(",")
-            track_group = TrackGroup()
-
-            for trackname in spec_tracknames:
-                if trackname in tracks:
-                    raise ValueError("can't tie one track in multiple groups")
-
-                track = Track(trackname)
-                tracks[trackname] = track
-                track_group.append(track)
-
-            track_groups.append(track_group)
+            self.add_track_group(track_spec.split(","))
 
         if res.num_worlds > 1:
             res.check_world_fmt("bed_filename")
@@ -1177,128 +1178,33 @@ class Runner(object):
             / filebasename
 
     def set_tracknames(self, genome):
-        # XXX: this function could use a refactor
-        # there is a lot of stuff here that might not be used anywhere
-        # and variable names are confusing
+        """Set up track groups if not done already.
 
-        # data_tracknames: tracknames in genomedata archive
-        #  if ordinary_tracknames: redefined to be all the ordinary_tracknames we can find # XXX: rename?
-        #  used: ?
+        Add index in Genomedata file for each data track.
+        """
+        tracks = self.tracks
+        if not tracks:
+            ## default: use all tracks in archive
 
-        # all_tracknames: all tracknames, including dinucleotide, supervisionLabel # XXX: rename?
-        #  used: just as input; XXX: it's supposed to be used elsewhere but is not
+            for trackname in genome.tracknames_continuous:
+                self.add_track_group([trackname])
 
-        # all_tracknames_unquoted: all_tracknames before quote transformation
-        #  used: in BED output
+        # set indexes for each track
+        for trackname, track in tracks.iteritems():
+            if not track.is_data:
+                continue
 
-        # tied_tracknames: dict of head_trackname -> tied tracknames (set in options)
-        # head_tracknames: dict key: str: trackname; value: head trackname; inverse of tied_tracknames (set in options)
-        # head_trackname_list: ordered list of tied_trackname.keys() (set in options)
-        #  all 3 set in options
+            track.index = genome.index_continuous(trackname)
 
-        # ordinary_tracknames: all_tracknames that aren't special
-        # missing_tracknames: used in case of error
-        #  both used internally here only
-
-        # track_indexes: (array of) indexes of data_tracknames
-        #  used: ?
-
-        # tied_track_index_map: dict of the indexes of head_tracknames
-        #  used: ?
-        # tied_track_indexes_list: list of the XXX
-        #  used: ?
-
-        # indexed_tracknames: tuples of ordinary_tracknames with their index in genome tracknames XXX: rename to ordinary_tracknames_indexed
-        #  used: ?
-
-        data_tracknames = genome.tracknames_continuous
-
-        # supplied by user: includes special tracks (like dinucleotide)
-        all_tracknames = self.all_tracknames
-        include_tracknames_unquoted = all_tracknames
-        ordinary_tracknames = frozenset(trackname
-                                        for trackname in all_tracknames
-                                        if trackname not in SPECIAL_TRACKNAMES)
-        if ordinary_tracknames:
-            indexed_tracknames = [(trackname, index)
-                                  for index, trackname in enumerate(data_tracknames)
-                                  if trackname in ordinary_tracknames]
-
-            # redefine data_tracknames:
-            # data_tracknames, track_indexes = zip(*indexed_tracknames) won't return
-            # ([], []) like we want
-            data_tracknames = [indexed_trackname[0]
-                               for indexed_trackname in indexed_tracknames]
-            track_indexes = [indexed_trackname[1]
-                             for indexed_trackname in indexed_tracknames]
-
-            # check that there aren't any missing tracks
-            if len(data_tracknames) != len(ordinary_tracknames):
-                missing_tracknames = ordinary_tracknames.difference(data_tracknames)
-                missing_tracknames_text = ", ".join(missing_tracknames)
-                msg = "could not find tracknames: %s" % missing_tracknames_text
-                raise ValueError(msg)
-
-            track_indexes = array(track_indexes)
-            tied_tracknames = self.tied_tracknames
-            head_tracknames = self.head_tracknames
-            head_trackname_list = self.head_trackname_list
-
-            # a dict whose values are initialized in order of access
-            tied_track_index_map = defaultdict(count().next)
-            tied_track_indexes_list = [[]
-                                       for _ in xrange(len(tied_tracknames))]
-
-            for trackname, index in indexed_tracknames:
-                head_trackname = head_tracknames[trackname]
-                tied_track_indexes_list_index = \
-                    tied_track_index_map[head_trackname]
-                tied_track_indexes_list[tied_track_indexes_list_index].append(index)
-
-        elif all_tracknames:
-            ## no ordinary_tracknames => there are special tracknames only
-            data_tracknames = []
-            head_tracknames = {}
-            head_trackname_list = []
-            track_indexes = array([], intc)
-            tied_track_indexes_list = []
-            self.float_filelistpath = None  # no float data
-
-        else:
-            # default: use all tracks in archive
-            track_indexes = arange(len(data_tracknames))
-            head_tracknames = dict(zip(data_tracknames, data_tracknames))
-            head_trackname_list = data_tracknames
-
-            assert not self.tied_tracknames
-            self.tied_tracknames = dict((trackname, [trackname])
-                                        for trackname in tracknames)
-
-            tied_track_indexes_list = [[track_index]
-                                       for track_index in track_indexes]
-            include_tracknames_unquoted = tracknames
+        if not any(track.is_data for track in tracks):
+            self.float_filelistpath = None
 
         # non-allowed special trackname
-        # XXX: doesn't deal with the case where it is a default
-        # trackname in input file
         assert "supervisionLabel" not in tracks
 
-        # replace illegal characters in data_tracknames and head_tracknames only,
-        # not include_tracknames_unquoted
-        data_tracknames = map(quote_trackname, data_tracknames)
-        head_tracknames = dict((quote_trackname(key), quote_trackname(value))
-                               for key, value in head_tracknames.iteritems())
-        head_trackname_list = map(quote_trackname, head_trackname_list)
-
         # assert: none of the quoted tracknames are the same
-        assert len(data_tracknames) == len(frozenset(data_tracknames))
-
-        self.data_tracknames = data_tracknames
-        self.head_tracknames = head_tracknames
-        self.head_trackname_list = head_trackname_list
-        self.include_tracknames_unquoted = include_tracknames_unquoted
-        self.track_indexes = track_indexes
-        self.tied_track_indexes_list = tied_track_indexes_list
+        quoted_tracknames = [track.name for track in tracks]
+        assert len(quoted_tracknames) == len(frozenset(quoted_tracknames))
 
     def get_last_params_filename(self, params_filename):
         if params_filename is not None and path(params_filename).exists():
