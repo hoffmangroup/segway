@@ -8,12 +8,12 @@ functional genomics data.
 
 __version__ = "1.2.0"
 
-# Copyright 2008-2012 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2013 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
-# required for from __future__ import division, with_statement
-assert (2, 6) <= sys.version_info <= (3, 0)
+# required for OrderedDict
+assert (2, 7) <= sys.version_info <= (3, 0)
 
 from ez_setup import use_setuptools
 use_setuptools()

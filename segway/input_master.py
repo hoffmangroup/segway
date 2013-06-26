@@ -136,7 +136,8 @@ class ParamSpec(object):
     """
     type_name = None
     object_tmpl = None
-    copy_attrs = ["distribution", "mins", "num_segs", "num_subsegs"]
+    copy_attrs = ["distribution", "mins", "num_segs", "num_subsegs",
+                  "num_track_groups", "track_groups"]
 
     def __init__(self, saver):
         # copy all variables from saver that it copied from Runner
@@ -179,23 +180,24 @@ class ParamSpec(object):
         # and only one mapping is produced
         num_subsegs = self.num_subsegs
 
-        head_tracknames = self.head_trackname_list
-
-        num_head_tracks = len(head_tracknames)
+        track_groups = self.track_groups
+        num_track_groups = self.num_track_groups
 
         for seg_index, segname in enumerate(self.make_segnames()):
-            seg_offset = num_head_tracks * num_subsegs * seg_index
+            seg_offset = num_track_groups * num_subsegs * seg_index
 
             for subseg_index, subsegname in enumerate(self.make_subsegnames()):
-                subseg_offset = seg_offset + num_head_tracks * subseg_index
+                subseg_offset = seg_offset + (num_track_groups * subseg_index)
 
-                for track_index, trackname in enumerate(head_tracknames):
-                    track_offset = subseg_offset + track_index
+                for track_group_index, track_group in enumerate(track_groups):
+                    track_offset = subseg_offset + track_group_index
 
                     # XXX: change name of index to track_offset in templates
+                    # XXX: change name of track_index to track_group_index
                     yield dict(seg=segname, subseg=subsegname, track=trackname,
                                seg_index=seg_index, subseg_index=subseg_index,
-                               track_index=track_index, index=track_offset,
+                               track_index=track_group_index,
+                               index=track_offset,
                                distribution=self.distribution)
 
     def make_data(self):
@@ -490,15 +492,19 @@ class NameCollectionParamSpec(ParamSpec):
     def generate_objects(self):
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs
-        head_tracknames = self.head_trackname_list
+        track_groups = self.track_groups
 
         substitute_header = Template(self.header_tmpl).substitute
         substitute_row = Template(self.row_tmpl).substitute
 
         fullnum_subsegs = num_segs * num_subsegs
 
-        for track_index, track in enumerate(head_tracknames):
-            mapping = dict(track=track, fullnum_subsegs=fullnum_subsegs)
+        for track_group in track_groups:
+            head_trackname = track_group[0].name
+
+            # XXX: rename in template: track -> head_trackname
+            mapping = dict(track=head_trackname,
+                           fullnum_subsegs=fullnum_subsegs)
 
             rows = [substitute_header(mapping)]
             for seg_index in xrange(num_segs):
@@ -506,7 +512,8 @@ class NameCollectionParamSpec(ParamSpec):
 
                 for subseg_index in xrange(num_subsegs):
                     subseg = "subseg%d" % subseg_index
-                    mapping = dict(seg=seg, subseg=subseg, track=track)
+                    mapping = dict(seg=seg, subseg=subseg,
+                                   track=head_trackname)
 
                     rows.append(substitute_row(mapping))
 
@@ -587,7 +594,7 @@ class GammaRealMatParamSpec(RealMatParamSpec):
         #
         # therefore:
         scales = vars / means
-        shapes = means ** 2 / vars
+        shapes = (means ** 2) / vars
 
         for mapping in self.generate_tmpl_mappings():
             track_index = mapping["track_index"]
@@ -632,11 +639,11 @@ class MXParamSpec(ParamSpec):
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
     copy_attrs = ["num_bases", "num_segs", "num_subsegs",
-                  "num_tracks", "card_seg_countdown",
+                  "num_track_groups", "card_seg_countdown",
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
-                  "gmtk_include_filename_relative", "head_trackname_list"]
+                  "gmtk_include_filename_relative"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
@@ -646,7 +653,7 @@ class InputMasterSaver(Saver):
 
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs
-        num_tracks = self.num_tracks
+        num_track_groups = self.num_track_groups
         fullnum_subsegs = num_segs * num_subsegs
 
         include_filename = self.gmtk_include_filename_relative
@@ -682,9 +689,9 @@ class InputMasterSaver(Saver):
             mc_spec = NormMCParamSpec(self)
 
             if COVAR_TIED:
-                num_free_params += (fullnum_subsegs + 1) * num_tracks
+                num_free_params += (fullnum_subsegs + 1) * num_track_groups
             else:
-                num_free_params += (fullnum_subsegs * 2) * num_tracks
+                num_free_params += (fullnum_subsegs * 2) * num_track_groups
         elif distribution == DISTRIBUTION_GAMMA:
             mean_spec = ""
             covar_spec = ""
@@ -695,7 +702,7 @@ class InputMasterSaver(Saver):
             real_mat_spec = GammaRealMatParamSpec(self)
             mc_spec = GammaMCParamSpec(self)
 
-            num_free_params += (fullnum_subsegs * 2) * num_tracks
+            num_free_params += (fullnum_subsegs * 2) * num_track_groups
         else:
             raise ValueError("distribution %s not supported" % distribution)
 

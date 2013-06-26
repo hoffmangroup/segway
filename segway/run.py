@@ -1044,8 +1044,8 @@ class Runner(object):
         return self.seg_countdowns_initial.max() + 1
 
     @memoized_property
-    def num_tracks(self):
-        return len(self.head_trackname_list)
+    def num_track_groups(self):
+        return len(self.track_groups)
 
     @memoized_property
     def num_windows(self):
@@ -1058,10 +1058,6 @@ class Runner(object):
     @memoized_property
     def head_tracknames(self):
         return PassThroughDict()
-
-    @memoized_property
-    def head_trackname_list(self):
-        return self.data_tracknames
 
     @memoized_property
     def supervision_type(self):

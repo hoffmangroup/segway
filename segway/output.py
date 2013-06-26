@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2012 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2012, 2013 Michael M. Hoffman <mmh1@uw.edu>
 
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename
@@ -37,7 +37,7 @@ class OutputSaver(Copier):
         return fmt % world
 
 class IdentifySaver(OutputSaver):
-    copy_attrs = ["bed_filename", "unquoted_tracknames", "uuid",
+    copy_attrs = ["bed_filename", "all_tracknames_unquoted", "uuid",
                   "viterbi_filenames", "bigbed_filename", "windows",
                   "num_worlds", "num_segs"]
 
@@ -53,7 +53,7 @@ class IdentifySaver(OutputSaver):
         attrs = self.attrs.copy()
         attrs["name"] = self.name_tmpl % (__package__, self.uuid)
 
-        description = self.desc_tmpl % (self.num_segs, ", ".join(self.unquoted_tracknames))
+        description = self.desc_tmpl % (self.num_segs, ", ".join(self.all_tracknames_unquoted))
         attrs["description"] = description
 
         return make_bed_attrs(attrs)
