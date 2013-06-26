@@ -321,7 +321,7 @@ def process_new_windows(new_windows, starts, ends):
 
 class Observations(object):
     copy_attrs = ["include_coords", "exclude_coords", "max_frames",
-                  "num_tracks", "float_filelistpath", "int_filelistpath",
+                  "float_filelistpath", "int_filelistpath",
                   "float_tabfilepath", "obs_dirpath", "uuid", "resolution",
                   "distribution", "train", "identify", "supervision_type",
                   "supervision_coords", "supervision_labels",
@@ -340,15 +340,11 @@ class Observations(object):
             yield chrom, starts, ends
 
     def generate_coords_all(self, genome):
-        num_tracks = self.num_tracks
-
         for chromosome in genome:
             starts = deque()
             ends = deque()
 
             for supercontig, continuous in chromosome.itercontinuous():
-                assert continuous is None or continuous.shape[1] >= num_tracks
-
                 if continuous is not None:
                     attrs = supercontig.attrs
 

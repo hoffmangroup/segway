@@ -37,7 +37,7 @@ class OutputSaver(Copier):
         return fmt % world
 
 class IdentifySaver(OutputSaver):
-    copy_attrs = ["bed_filename", "all_tracknames_unquoted", "uuid",
+    copy_attrs = ["bed_filename", "tracks", "uuid",
                   "viterbi_filenames", "bigbed_filename", "windows",
                   "num_worlds", "num_segs"]
 
@@ -53,7 +53,7 @@ class IdentifySaver(OutputSaver):
         attrs = self.attrs.copy()
         attrs["name"] = self.name_tmpl % (__package__, self.uuid)
 
-        description = self.desc_tmpl % (self.num_segs, ", ".join(self.all_tracknames_unquoted))
+        description = self.desc_tmpl % (self.num_segs, ", ".join(tracks))
         attrs["description"] = description
 
         return make_bed_attrs(attrs)

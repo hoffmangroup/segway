@@ -26,9 +26,10 @@ def make_weight_scale(scale):
 
 class StructureSaver(Saver):
     resource_name = "segway.str.tmpl"
-    copy_attrs = ["num_track_groups", "num_datapoints", "use_dinucleotide",
-                  "window_lens", "resolution", "supervision_type",
-                  "gmtk_include_filename_relative", "head_trackname_list"]
+    copy_attrs = ["num_track_groups", "num_datapoints",
+                  "use_dinucleotide", "window_lens", "resolution",
+                  "supervision_type", "track_groups",
+                  "gmtk_include_filename_relative"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -60,7 +61,6 @@ class StructureSaver(Saver):
     def make_mapping(self):
         num_track_groups = self.num_track_groups
         num_datapoints = self.num_datapoints
-        head_trackname_list = self.head_trackname_list
 
         assert (num_track_groups == len(num_datapoints))
 
@@ -71,8 +71,10 @@ class StructureSaver(Saver):
 
         observation_items = []
 
-        zipper = izip(count(), head_trackname_list, num_datapoints)
-        for track_index, trackname, num_datapoints_track in zipper:
+        zipper = izip(count(), self.track_groups, num_datapoints)
+        for track_index, track_group, num_datapoints_track in zipper:
+            trackname = track_group[0].name
+
             # relates current num_datapoints to total number of
             # possible positions. This is better than making the
             # highest num_datapoints equivalent to 1, because it

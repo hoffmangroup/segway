@@ -29,8 +29,8 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (arange, arcsinh, array, empty, finfo, float32, intc,
-                   int64, inf, square, vstack, zeros)
+from numpy import (arcsinh, array, empty, finfo, float32, int64, inf,
+                   square, vstack, zeros)
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -45,21 +45,21 @@ from .input_master import InputMasterSaver
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
-from ._util import (data_filename,
-                    DTYPE_OBS_INT, DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
-                    DISTRIBUTION_ASINH_NORMAL, EXT_BED, EXT_FLOAT, EXT_GZ,
-                    EXT_INT, EXT_PARAMS, EXT_TAB,
-                    extjoin, extjoin_not_none, GB,
+from ._util import (data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
+                    DISTRIBUTION_GAMMA, DISTRIBUTION_ASINH_NORMAL,
+                    EXT_BED, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS,
+                    EXT_TAB, extjoin, extjoin_not_none, GB,
                     ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
-                    make_default_filename,
-                    make_filelistpath, make_prefix_fmt,
-                    MB, memoized_property, OFFSET_START, OFFSET_END,
-                    OFFSET_STEP, OptionBuilder_GMTK, PassThroughDict,
-                    POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
-                    SEG_TABLE_WIDTH, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
+                    make_default_filename, make_filelistpath,
+                    make_prefix_fmt, MB, memoized_property,
+                    OFFSET_START, OFFSET_END, OFFSET_STEP,
+                    OptionBuilder_GMTK, POSTERIOR_PROG,
+                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, SEG_TABLE_WIDTH,
+                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
-                    SUPERVISION_UNSUPERVISED, SUPERVISION_SEMISUPERVISED,
-                    USE_MFSDG, VITERBI_PROG)
+                    SUPERVISION_UNSUPERVISED,
+                    SUPERVISION_SEMISUPERVISED, USE_MFSDG,
+                    VITERBI_PROG)
 
 # set once per file run
 UUID = uuid1().hex
@@ -472,6 +472,20 @@ class Track(object):
     def name(self):
         return quote_trackname(self.name_unquoted)
 
+TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
+TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
+
+
+class TrackDict(OrderedDict):
+    # XXX: do we ever actually use this as a dict? couldn't it just
+    # be a list?
+    def append(self, track):
+        name_unquoted = track.name_unquoted
+
+        assert name_unquoted not in self
+
+        self[name_unquoted] = track
+
 
 class TrackGroup(list):
     def _set_group(self, item):
@@ -551,7 +565,13 @@ class Runner(object):
 
         self.card_supervision_label = -1
 
-        self.tracks = OrderedDict()
+        # tracks: OrderedDict: all the tracks used
+        self.tracks = TrackDict()
+
+        # track_groups: list of lists: each one is a grouping of
+        # tracks that are similar to each other. Only one track from
+        # each track group is used at a time during inference. A set
+        # of tracks across groups being used at once is a "world."
         self.track_groups = []
 
         # default is 0
@@ -561,7 +581,6 @@ class Runner(object):
         # a "window" is what GMTK calls a segment
         self.windows = None
         self.mins = None
-        self.maxs = None
         self.track_specs = []
 
         # variables
@@ -585,7 +604,6 @@ class Runner(object):
         self.identify = False  # viterbi
         self.dry_run = False
         self.verbosity = VERBOSITY
-        self.use_dinucleotide = None
 
         self.__dict__.update(kwargs)
 
@@ -675,7 +693,7 @@ class Runner(object):
                 raise ValueError("can't tie one track in multiple groups")
 
             track = Track(trackname)
-            tracks[trackname] = track
+            tracks.append(track)
             track_group.append(track)
 
         self.track_groups.append(track_group)
@@ -975,12 +993,12 @@ class Runner(object):
 
     @memoized_property
     def use_dinucleotide(self):
-        return "dinucleotide" in self.all_tracknames
+        return "dinucleotide" in self.tracks
 
     @memoized_property
     def num_int_cols(self):
         if not USE_MFSDG or self.resolution > 1:
-            res = self.num_tracks
+            res = self.num_track_groups
         else:
             res = 0
 
@@ -1056,10 +1074,6 @@ class Runner(object):
         return sum(self.window_lens)
 
     @memoized_property
-    def head_tracknames(self):
-        return PassThroughDict()
-
-    @memoized_property
     def supervision_type(self):
         if self.supervision_filename:
             return SUPERVISION_SEMISUPERVISED
@@ -1067,33 +1081,24 @@ class Runner(object):
             return SUPERVISION_UNSUPERVISED
 
     @memoized_property
-    def world_tracknames(self):
-        # XXX: add support for some heads having only one trackname
-        # that is repeated
-
-        return list(zip(*self.tied_tracknames.values()))
-
-    @memoized_property
     def world_track_indexes(self):
         """
-        all track indexes, not just the heads
+        Track indexes for a particular world.
         """
-        assert (not self.tied_tracknames
-                or len(self.tied_tracknames)
-                == len(self.tied_track_indexes_list))
-
-        res = array(zip(*self.tied_track_indexes_list))
-        assert len(res) == self.num_worlds
-
-        if __debug__:
-            if self.num_worlds == 1:
-                assert (res == self.track_indexes).all()
-
-        return res
+        return [[track.index for track in world]
+                for world in zip(*self.track_groups)]
 
     @memoized_property
     def num_worlds(self):
-        return len(self.world_tracknames)
+        # XXX: add support for some heads having only one trackname
+        # that is repeated
+
+        track_groups = self.track_groups
+        res = len(track_groups[0])
+
+        assert all(len(track_group) == res for track_group in track_groups)
+
+        return res
 
     @memoized_property
     def instance_make_new_params(self):
@@ -1331,30 +1336,27 @@ class Runner(object):
                                self.clobber)
 
     def subset_metadata_attr(self, genome, name, reducer=sum):
+        """subset a single metadata attribute to only the used tracks,
+        grouping things in the same track groups together
+        """
         attr = getattr(genome, name)
 
-        tied_track_indexes_list = self.tied_track_indexes_list
-        shape = len(tied_track_indexes_list)
-        subset_array = empty(shape, attr.dtype)
-        for index, tied_track_indexes in enumerate(tied_track_indexes_list):
-            subset_array[index] = reducer(attr[tied_track_indexes])
+        track_groups = self.track_groups
 
-        if __debug__:
-            track_indexes = self.track_indexes
-            if len(self.head_trackname_list) == len(track_indexes):
-                # ensure that the results are the same as the old method
-                assert len(subset_array) == len(track_indexes)
-                assert (subset_array == attr[track_indexes]).all()
+        shape = len(track_groups)
+        subset_array = empty(shape, attr.dtype)
+
+        for track_group_index, track_group in enumerate(track_groups):
+            track_indexes = [track.index for track in track_group]
+            subset_array[track_group_index] = reducer(attr[track_indexes])
 
         setattr(self, name, subset_array)
 
     def subset_metadata(self, genome):
-        """
-        limits all the metadata attributes to only tracks that are used
+        """limits all the metadata attributes to only tracks that are used
         """
         subset_metadata_attr = self.subset_metadata_attr
         subset_metadata_attr(genome, "mins", min)
-        subset_metadata_attr(genome, "maxs", max)
         subset_metadata_attr(genome, "sums")
         subset_metadata_attr(genome, "sums_squares")
         subset_metadata_attr(genome, "num_datapoints")
@@ -1405,7 +1407,7 @@ class Runner(object):
         self.supervision_coords = supervision_coords
         self.supervision_labels = supervision_labels
 
-        self.all_tracknames.append("supervisionLabel")
+        self.tracks.append(TRACK_SUPERVISIONLABEL)
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
 
@@ -1420,8 +1422,8 @@ class Runner(object):
 
         self.load_supervision()
 
-        # need to open Genomedata archive first in order to determine
-        # self.tracknames and self.num_tracks
+        # need to open Genomedata archive first in order to finalize
+        # tracks and track_groups
         with Genome(self.genomedataname) as genome:
             self.set_tracknames(genome)
 
@@ -1498,11 +1500,12 @@ class Runner(object):
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
 
         # XXX: dinucleotide-only won't work, because it has no float data
-        assert self.float_filelistpath and self.num_tracks
+        assert (self.float_filelistpath
+                and any(track.has_data for track in tracks))
         if self.float_filelistpath:
             res.update(of1=self.float_filelistpath,
                        fmt1="binary",
-                       nf1=self.num_tracks,
+                       nf1=self.num_track_groups,
                        ni1=0,
                        iswp1=SWAP_ENDIAN)
 
@@ -1538,13 +1541,14 @@ class Runner(object):
         _log_cmdline(self.cmdline_short_file, cmdline)
         _log_cmdline(self.cmdline_long_file, args)
 
-    def calc_tmp_usage(self, num_frames, prog):
-        if prog in TMP_OBS_PROGS:
-            tmp_usage_obs = num_frames * self.num_tracks * SIZEOF_FRAME_TMP
-        else:
-            tmp_usage_obs = 0
+    def calc_tmp_usage_obs(self, num_frames, prog):
+        if prog not in TMP_OBS_PROGS:
+            return 0
 
-        return tmp_usage_obs + TMP_USAGE_BASE
+        return num_frames * self.num_track_groups * SIZEOF_FRAME_TMP
+
+    def calc_tmp_usage(self, num_frames, prog):
+        return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
     def queue_gmtk(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
@@ -1768,7 +1772,7 @@ class Runner(object):
 
         # get previous (or initial) values
         last_log_likelihood, log_likelihood, round_index = \
-            self.recover_train_instance()
+            self.make_instance_initial_results()
 
         if round_index == 0:
             # if round > 0, this is set by self.recover_train_instance()
@@ -2025,53 +2029,60 @@ to find the winning instance anyway.""" % thread.instance_index)
         path(old_filename).copy2(new_filename)
         return new_filename
 
-    def recover_train_instance(self):
+    def recover_train_instance(self, last_log_likelihood, log_likelihood):
+        instance_index = self.instance_index
+        recover_dirname = self.recover_dirname
+
+        self.input_master_filename = \
+            self.recover_filename(InputMasterSaver.resource_name)
+
+        recover_log_likelihood_tab_filepath = \
+            path(self.make_log_likelihood_tab_filename(instance_index,
+                                                       recover_dirname))
+
+        with open(recover_log_likelihood_tab_filepath) \
+                as log_likelihood_tab_file:
+            log_likelihoods = [float(line.rstrip())
+                               for line in log_likelihood_tab_file.readlines()]
+
+        final_round_index = len(log_likelihoods)
+        if final_round_index > 0:
+            log_likelihood = log_likelihoods[-1]
+        if final_round_index > 1:
+            last_log_likelihood = log_likelihoods[-2]
+
+        log_likelihood_tab_filename = self.log_likelihood_tab_filename
+        recover_log_likelihood_tab_filepath.copy2(log_likelihood_tab_filename)
+
+        old_params_filename = self.make_params_filename(instance_index,
+                                                        recover_dirname)
+        new_params_filename = self.params_filename
+        for round_index in xrange(final_round_index):
+            old_curr_params_filename = extjoin(old_params_filename,
+                                               str(round_index))
+            new_curr_params_filename = extjoin(new_params_filename,
+                                               str(round_index))
+
+            path(old_curr_params_filename).copy2(new_curr_params_filename)
+
+        self.last_params_filename = new_curr_params_filename
+
+        return last_log_likelihood, log_likelihood, final_round_index
+
+    def make_instance_initial_results(self):
         """
         returns last_log_likelihood, log_likelihood, round_index
         -inf, -inf, 0 if there is no recovery--this is also used to set initial
         values
         """
+        ## initial values:
         last_log_likelihood = -inf
         log_likelihood = -inf
         final_round_index = 0
 
         if self.recover_dirpath:
-            instance_index = self.instance_index
-            recover_dirname = self.recover_dirname
-
-            self.input_master_filename = \
-                self.recover_filename(InputMasterSaver.resource_name)
-
-            recover_log_likelihood_tab_filename = \
-                self.make_log_likelihood_tab_filename(instance_index,
-                                                      recover_dirname)
-
-            with open(recover_log_likelihood_tab_filename) \
-                    as log_likelihood_tab_file:
-                log_likelihoods = [float(line.rstrip())
-                                   for line
-                                   in log_likelihood_tab_file.readlines()]
-
-            final_round_index = len(log_likelihoods)
-            if final_round_index > 0:
-                log_likelihood = log_likelihoods[-1]
-            if final_round_index > 1:
-                last_log_likelihood = log_likelihoods[-2]
-
-            path(recover_log_likelihood_tab_filename).copy2(self.log_likelihood_tab_filename)
-
-            old_params_filename = self.make_params_filename(instance_index,
-                                                            recover_dirname)
-            new_params_filename = self.params_filename
-            for round_index in xrange(final_round_index):
-                old_curr_params_filename = extjoin(old_params_filename,
-                                                   str(round_index))
-                new_curr_params_filename = extjoin(new_params_filename,
-                                                   str(round_index))
-
-                path(old_curr_params_filename).copy2(new_curr_params_filename)
-
-            self.last_params_filename = new_curr_params_filename
+            return self.recover_train_instance(last_log_likelihood,
+                                               log_likelihood)
 
         return last_log_likelihood, log_likelihood, final_round_index
 
