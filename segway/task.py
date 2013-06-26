@@ -7,7 +7,7 @@ task: wraps a GMTK subtask to reduce size of output
 
 __version__ = "$Revision$"
 
-# Copyright 2009-2012 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009-2013 Michael M. Hoffman <mmh1@washington.edu>
 
 from errno import ENOENT
 from os import extsep, fdopen
@@ -36,13 +36,18 @@ SEG_INVALID = -1
 TEMP_DIRPATH = path(gettempdir())
 
 EXT_OPTIONS = {}
-EXT_OPTIONS[EXT_FLOAT] = "-of1" # duplicative of run.py
+EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
+
+USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
+
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
 
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
+
+
 def parse_viterbi(lines, do_reverse=False):
     """
     returns: numpy.ndarray of size (num_frames,), type DTYPE_IDENTIFY
@@ -89,7 +94,7 @@ def parse_viterbi(lines, do_reverse=False):
 
             index = int(match.group(1))
             if do_reverse:
-                index = -1 - index # -1, -2, -3, etc.
+                index = -1 - index  # -1, -2, -3, etc.
 
             val = int(match.group(2))
 
@@ -98,8 +103,10 @@ def parse_viterbi(lines, do_reverse=False):
     # shouldn't get to this point
     raise ValueError("%s did not complete successfully" % VITERBI_PROG.prog)
 
+
 # num_cols is for use by genomedata_count_condition
 # XXX: should move this function somewhere else
+
 def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
               num_cols=None):
     """
@@ -138,12 +145,14 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
     # seg_end here means the last seg_end in the loop
     assert seg_end == region_end
 
+
 def save_bed(outfilename, *args, **kwargs):
     with open(outfilename, "w") as outfile:
         write_bed(outfile, *args, **kwargs)
 
-def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num_labels,
-                            infile):
+
+def read_posterior_save_bed(coord, resolution, do_reverse,
+                            outfilename_tmpl, num_labels, infile):
     if do_reverse:
         raise NotImplementedError
 
@@ -157,7 +166,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num
         outfilenames.append(outfilename_tmpl % label_index)
 
     # scale, round, and cast to int
-    (probs * POSTERIOR_SCALE_FACTOR).round(out = probs_rounded)
+    (probs * POSTERIOR_SCALE_FACTOR).round(out=probs_rounded)
 
     # print array columns as text to each outfile
     zipper = zip(outfilenames, probs_rounded.T, xrange(num_labels))
@@ -166,35 +175,42 @@ def read_posterior_save_bed(coord, resolution, do_reverse, outfilename_tmpl, num
 
         with open(outfilename, "w") as outfile:
             pos, = where(diff(probs_rounded_label) != 0)
-            pos = r_[start, pos[:]+start+1, end]
+            pos = r_[start, pos[:] + start + 1, end]
 
             for bed_start, bed_end in zip(pos[:-1], pos[1:]):
                 chrom_start = str(bed_start)
                 chrom_end = str(bed_end)
-                value = str(probs_rounded_label[bed_start-start])
+                value = str(probs_rounded_label[bed_start - start])
 
                 row = [chrom, chrom_start, chrom_end, value]
                 print >>outfile, "\t".join(row)
 
-def load_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
-                            infilename):
+
+def load_posterior_save_bed(coord, resolution, do_reverse,
+                            outfilename, num_labels, infilename):
     with open(infilename) as infile:
         read_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                 int(num_labels), infile)
 
-def parse_viterbi_save_bed(coord, resolution, do_reverse, viterbi_lines, bed_filename, num_labels):
+
+def parse_viterbi_save_bed(coord, resolution, do_reverse,
+                           viterbi_lines, bed_filename, num_labels):
     data = parse_viterbi(viterbi_lines, do_reverse)
 
     start_pos, labels = find_segment_starts(data)
 
-    save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
+    save_bed(bed_filename, start_pos, labels, coord, resolution,
+             int(num_labels))
 
-def load_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels, infilename):
+
+def load_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
+                          num_labels, infilename):
     with open(infilename) as infile:
         lines = infile.readlines()
 
-    return parse_viterbi_save_bed(coord, resolution, do_reverse, lines, outfilename,
-                                  num_labels)
+    return parse_viterbi_save_bed(coord, resolution, do_reverse,
+                                  lines, outfilename, num_labels)
+
 
 def replace_args_filelistname(args, temp_filepaths, ext):
     """
@@ -208,20 +224,23 @@ def replace_args_filelistname(args, temp_filepaths, ext):
     try:
         args[args.index(option) + 1] = filelistname
     except ValueError:
-        pass # not going to add this filename to the command line
+        pass  # not going to add this filename to the command line
     temp_filepaths.append(filelistpath)
 
     return fd
+
 
 def print_to_fd(fd, line):
     with fdopen(fd, "w") as outfile:
         print >>outfile, line
 
-def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
-                           genomedataname, float_filename, int_filename,
-                           distribution, track_indexes_text, *args):
-    # XXX: this whole function is duplicative of run_viterbi_save_bed and needs to be reduced
-    # convert from tuple
+
+def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
+                           num_labels, genomedataname, float_filename,
+                           int_filename, distribution,
+                           track_indexes_text, *args):
+    # XXX: this whole function is duplicative of run_viterbi_save_bed
+    # and needs to be reduced convert from tuple
     args = list(args)
 
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
@@ -269,9 +288,10 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
                                    int(num_labels), lines)
 
 
-def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
-                         genomedataname, float_filename, int_filename,
-                         distribution, track_indexes_text, *args):
+def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
+                         num_labels, genomedataname, float_filename,
+                         int_filename, distribution,
+                         track_indexes_text, *args):
     # convert from tuple
     args = list(args)
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
@@ -289,7 +309,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
     # XXX: should do something to ensure of1 matches with int, of2 with float
     int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
-                                                   EXT_FLOAT)
+                                                 EXT_FLOAT)
 
     with Genome(genomedataname) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
@@ -318,26 +338,29 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename, num_labels,
 
     lines = output.splitlines()
 
-    return parse_viterbi_save_bed(coord, resolution, do_reverse, lines, outfilename,
-                                  num_labels)
+    return parse_viterbi_save_bed(coord, resolution, do_reverse,
+                                  lines, outfilename, num_labels)
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,
          ("run", "posterior"): run_posterior_save_bed,
          ("load", "posterior"): load_posterior_save_bed}
 
-def task(verb, kind, outfilename, chrom, start, end, resolution, reverse, *args):
+
+def task(verb, kind, outfilename, chrom, start, end, resolution,
+         reverse, *args):
     start = int(start)
     end = int(end)
     resolution = int(resolution)
     reverse = int(reverse)
 
-    TASKS[verb, kind]((chrom, start, end), resolution, reverse, outfilename, *args)
+    TASKS[verb, kind]((chrom, start, end), resolution, reverse,
+                      outfilename, *args)
+
 
 def main(args=sys.argv[1:]):
     if len(args) < 7:
-        print >>sys.stderr, \
-            "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
+        print >>sys.stderr, USAGE
         sys.exit(2)
 
     return task(*args)
