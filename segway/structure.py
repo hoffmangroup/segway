@@ -15,11 +15,14 @@ from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
 
 MAX_WEIGHT_SCALE = 25
 
+
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
 
+
 def make_weight_scale(scale):
     return "scale %f" % scale
+
 
 class StructureSaver(Saver):
     resource_name = "segway.str.tmpl"
@@ -59,7 +62,7 @@ class StructureSaver(Saver):
         num_datapoints = self.num_datapoints
         head_trackname_list = self.head_trackname_list
 
-        assert (self.num_track_groups == len(num_datapoints))
+        assert (num_track_groups == len(num_datapoints))
 
         if self.use_dinucleotide:
             max_num_datapoints_track = sum(self.window_lens)
@@ -94,20 +97,20 @@ class StructureSaver(Saver):
             # might avoid some extra multiplication in GMTK
             add_observation(observation_items, "observation.tmpl",
                             track=trackname, track_index=track_index,
-                            presence_index=num_tracks+track_index,
+                            presence_index=num_track_groups + track_index,
                             conditionalparents_spec=conditionalparents_spec,
                             weight_spec=weight_spec)
 
         if USE_MFSDG:
-            next_int_track_index = num_tracks+1
+            next_int_track_index = num_track_groups + 1
         else:
-            next_int_track_index = num_tracks*2
+            next_int_track_index = num_track_groups * 2
 
         # XXX: duplicative
         if self.use_dinucleotide:
             add_observation(observation_items, "dinucleotide.tmpl",
                             track_index=next_int_track_index,
-                            presence_index=next_int_track_index+1)
+                            presence_index=next_int_track_index + 1)
             next_int_track_index += 2
 
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
@@ -115,9 +118,8 @@ class StructureSaver(Saver):
                             track_index=next_int_track_index)
             next_int_track_index += 1
 
-        assert observation_items # must be at least one track
+        assert observation_items  # must be at least one track
         observations = "\n".join(observation_items)
 
         return dict(include_filename=self.gmtk_include_filename_relative,
                     observations=observations)
-
