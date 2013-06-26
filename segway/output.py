@@ -53,7 +53,8 @@ class IdentifySaver(OutputSaver):
         attrs = self.attrs.copy()
         attrs["name"] = self.name_tmpl % (__package__, self.uuid)
 
-        description = self.desc_tmpl % (self.num_segs, ", ".join(tracks))
+        tracknames = ", ".join(track.name_unquoted for track in tracks)
+        description = self.desc_tmpl % (self.num_segs, tracknames)
         attrs["description"] = description
 
         return make_bed_attrs(attrs)

@@ -9,7 +9,7 @@ __version__ = "$Revision$"
 
 # Copyright 2008-2013 Michael M. Hoffman <mmh1@uw.edu>
 
-from collections import defaultdict, namedtuple, OrderedDict
+from collections import defaultdict, namedtuple
 from copy import copy
 from datetime import datetime
 from distutils.spawn import find_executable
@@ -149,8 +149,6 @@ EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
-SPECIAL_TRACKNAMES = frozenset(["dinucleotide", "supervisionLabel"])
-
 # extensions and suffixes
 EXT_BEDGRAPH = "bedGraph"
 EXT_BIN = "bin"
@@ -252,6 +250,7 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "log_likelihood_filename"])
 OFFSET_FILENAMES = 2  # where the filenames begin in Results
 
+VITERBI_REGEX_FILTER = "^seg$"
 
 ## functions
 def quote_trackname(text):
@@ -476,24 +475,13 @@ TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
 TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
 
 
-class TrackDict(OrderedDict):
-    # XXX: do we ever actually use this as a dict? couldn't it just
-    # be a list?
-    def append(self, track):
-        name_unquoted = track.name_unquoted
-
-        assert name_unquoted not in self
-
-        self[name_unquoted] = track
-
-
 class TrackGroup(list):
     def _set_group(self, item):
         assert item.group is None
         item.group = self
         return item
 
-    def __init__(self, items):
+    def __init__(self, items=[]):
         return list.__init__(self, [self._set_group(item) for item in items])
 
     def __setitem__(self, index, item):
@@ -565,8 +553,8 @@ class Runner(object):
 
         self.card_supervision_label = -1
 
-        # tracks: OrderedDict: all the tracks used
-        self.tracks = TrackDict()
+        # tracks: list: all the tracks used
+        self.tracks = []
 
         # track_groups: list of lists: each one is a grouping of
         # tracks that are similar to each other. Only one track from
@@ -687,14 +675,16 @@ class Runner(object):
     def add_track_group(self, tracknames):
         tracks = self.tracks
         track_group = TrackGroup()
+        tracknames_unquoted = set(track.name_unquoted for track in tracks)
 
         for trackname in tracknames:
-            if trackname in tracks:
+            if trackname in tracknames_unquoted:
                 raise ValueError("can't tie one track in multiple groups")
 
             track = Track(trackname)
             tracks.append(track)
             track_group.append(track)
+            tracknames_unquoted.add(trackname)
 
         self.track_groups.append(track_group)
 
@@ -735,7 +725,7 @@ class Runner(object):
         ## track option processing
         for track_spec in res.track_specs:
             # local to each value of track_spec
-            self.add_track_group(track_spec.split(","))
+            res.add_track_group(track_spec.split(","))
 
         if res.num_worlds > 1:
             res.check_world_fmt("bed_filename")
@@ -993,7 +983,7 @@ class Runner(object):
 
     @memoized_property
     def use_dinucleotide(self):
-        return "dinucleotide" in self.tracks
+        return TRACK_DINUCLEOTIDE in self.tracks
 
     @memoized_property
     def num_int_cols(self):
@@ -1186,26 +1176,27 @@ class Runner(object):
         tracks = self.tracks
         if not tracks:
             ## default: use all tracks in archive
-
             for trackname in genome.tracknames_continuous:
                 self.add_track_group([trackname])
 
         # set indexes for each track
-        for trackname, track in tracks.iteritems():
+        for track in tracks:
             if not track.is_data:
                 continue
 
-            track.index = genome.index_continuous(trackname)
+            track.index = genome.index_continuous(track.name_unquoted)
 
         if not any(track.is_data for track in tracks):
             self.float_filelistpath = None
 
         # non-allowed special trackname
-        assert "supervisionLabel" not in tracks
+        tracknames_unquoted = [track.name_unquoted for track in tracks]
+        assert "supervisionLabel" not in tracknames_unquoted
 
         # assert: none of the quoted tracknames are the same
-        quoted_tracknames = [track.name for track in tracks]
-        assert len(quoted_tracknames) == len(frozenset(quoted_tracknames))
+        if __debug__:
+            tracknames_quoted = [track.name for track in tracks]
+            assert len(tracknames_quoted) == len(frozenset(tracknames_quoted))
 
     def get_last_params_filename(self, params_filename):
         if params_filename is not None and path(params_filename).exists():
@@ -2198,8 +2189,11 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         # -: standard output, processed by segway-task
         viterbi_kwargs = dict(triFile=self.triangulation_filename,
-                              pVitRegexFilter="^seg$",
-                              pVitValsFile="-")
+                              pVitRegexFilter=VITERBI_REGEX_FILTER,
+                              cVitRegexFilter=VITERBI_REGEX_FILTER,
+                              eVitRegexFilter=VITERBI_REGEX_FILTER,
+                              vitCaseSensitiveRegexFilter=True,
+                              vitValsFile="-")
 
         posterior_kwargs = dict(triFile=self.posterior_triangulation_filename,
                                 jtFile=self.posterior_jt_info_filename,

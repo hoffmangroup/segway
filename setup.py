@@ -13,7 +13,7 @@ __version__ = "1.2.0"
 import sys
 
 # required for OrderedDict
-assert (2, 7) <= sys.version_info <= (3, 0)
+assert (2, 6) <= sys.version_info <= (3, 0)
 
 from ez_setup import use_setuptools
 use_setuptools()
