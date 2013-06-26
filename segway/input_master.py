@@ -17,11 +17,13 @@ from numpy import (array, empty, float32, outer, sqrt, tile, vectorize, where,
 from numpy.random import seed, uniform
 from os import environ
 
-from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
-                    DISTRIBUTION_ASINH_NORMAL,
+from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
+                    DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
                     OFFSET_END, OFFSET_START, OFFSET_STEP,
-                    resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
-                    SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED, USE_MFSDG)
+                    resource_substitute, Saver,
+                    SUPERVISION_UNSUPERVISED,
+                    SUPERVISION_SEMISUPERVISED,
+                    SUPERVISION_SUPERVISED, USE_MFSDG)
 
 # allow setting random seed for testing purposes
 try:
@@ -48,23 +50,26 @@ CARD_SEGTRANSITION = 3
 LEN_SEG_EXPECTED = 100000
 LEN_SUBSEG_EXPECTED = 100
 
-JITTER_ORDERS_MAGNITUDE = 5 # log10(2**5) = 1.5 decimal orders of magnitude
+JITTER_ORDERS_MAGNITUDE = 5  # log10(2**5) = 1.5 decimal orders of magnitude
 
 DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
                                      DISTRIBUTION_ASINH_NORMAL])
+
 
 def vstack_tile(array_like, *reps):
     reps = list(reps) + [1]
 
     return tile(array_like, reps)
 
+
 def array2text(a):
     ndim = a.ndim
     if ndim == 1:
         return " ".join(map(str, a))
     else:
-        delimiter = "\n" * (ndim-1)
+        delimiter = "\n" * (ndim - 1)
         return delimiter.join(array2text(row) for row in a)
+
 
 def make_spec(name, iterable):
     """
@@ -82,15 +87,17 @@ def make_spec(name, iterable):
 
     return "\n".join(all_lines) + "\n"
 
+
 def prob_transition_from_expected_len(length):
     # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
     # see also Reynolds SM et al. PLoS Comput Biol 4:e1000213
     # ("duration modeling")
     return length / (1 + length)
 
+
 def make_zero_diagonal_table(length):
     if length == 1:
-        return array([1.0]) # always return to self
+        return array([1.0])  # always return to self
 
     prob_self_self = 0.0
     prob_self_other = (1.0 - prob_self_self) / (length - 1)
@@ -104,9 +111,11 @@ def make_zero_diagonal_table(length):
 
     return res
 
+
 def format_indexed_strs(fmt, num):
     full_fmt = fmt + "%d"
     return [full_fmt % index for index in xrange(num)]
+
 
 def jitter_cell(cell):
     """
@@ -120,14 +129,14 @@ def jitter_cell(cell):
 
 jitter = vectorize(jitter_cell)
 
+
 class ParamSpec(object):
     """
     base class for parameter specifications used in input.master files
     """
     type_name = None
     object_tmpl = None
-    copy_attrs = ["distribution", "head_trackname_list", "mins", "num_segs",
-                  "num_subsegs"]
+    copy_attrs = ["distribution", "mins", "num_segs", "num_subsegs"]
 
     def __init__(self, saver):
         # copy all variables from saver that it copied from Runner
@@ -222,17 +231,18 @@ class ParamSpec(object):
     def __str__(self):
         return make_spec(self.type_name, self.generate_objects())
 
+
 class DTParamSpec(ParamSpec):
     type_name = "DT"
     copy_attrs = ParamSpec.copy_attrs + ["seg_countdowns_initial",
                                          "supervision_type"]
 
-    def make_segCountDown_tree_spec(self, resourcename):
+    def make_segCountDown_tree_spec(self, resourcename):  # noqa
         num_segs = self.num_segs
         seg_countdowns_initial = self.seg_countdowns_initial
 
         header = ([str(num_segs)] +
-                  [str(num_seg) for num_seg in xrange(num_segs-1)] +
+                  [str(num_seg) for num_seg in xrange(num_segs - 1)] +
                   ["default"])
 
         lines = [" ".join(header)]
@@ -244,26 +254,29 @@ class DTParamSpec(ParamSpec):
 
         return resource_substitute(resourcename)(tree=tree)
 
-    def make_map_seg_segCountDown_dt_spec(self):
+    def make_map_seg_segCountDown_dt_spec(self):  # noqa
         return self.make_segCountDown_tree_spec("map_seg_segCountDown.dt.tmpl")
 
-    def make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec(self):
-        return self.make_segCountDown_tree_spec("map_segTransition_ruler_seg_segCountDown_segCountDown.dt.tmpl")
+    def make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec(self):  # noqa
+        template_name = \
+            "map_segTransition_ruler_seg_segCountDown_segCountDown.dt.tmpl"
+        return self.make_segCountDown_tree_spec(template_name)
 
     def generate_objects(self):
         yield data_string("map_frameIndex_ruler.dt.txt")
         yield self.make_map_seg_segCountDown_dt_spec()
-        yield self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec()
+        yield self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec()  # noqa
         yield data_string("map_seg_subseg_obs.dt.txt")
 
         supervision_type = self.supervision_type
         if supervision_type == SUPERVISION_SEMISUPERVISED:
-            yield data_string("map_supervisionLabel_seg_alwaysTrue_semisupervised.dt.txt")
+            yield data_string("map_supervisionLabel_seg_alwaysTrue_semisupervised.dt.txt")  # noqa
         elif supervision_type == SUPERVISION_SUPERVISED:
              # XXX: does not exist yet
-            yield data_string("map_supervisionLabel_seg_alwaysTrue_supervised.dt.txt")
+            yield data_string("map_supervisionLabel_seg_alwaysTrue_supervised.dt.txt")  # noqa
         else:
             assert supervision_type == SUPERVISION_UNSUPERVISED
+
 
 class TableParamSpec(ParamSpec):
     def make_table_spec(self, name, table, ndim, extra_rows=[]):
@@ -280,6 +293,7 @@ class TableParamSpec(ParamSpec):
     def make_dirichlet_name(name):
         return "dirichlet_%s" % name
 
+
 class DenseCPTParamSpec(TableParamSpec):
     type_name = "DENSE_CPT"
     copy_attrs = TableParamSpec.copy_attrs \
@@ -294,7 +308,7 @@ class DenseCPTParamSpec(TableParamSpec):
         if dirichlet is True, this table has a corresponding DirichletTable
         automatically generated name
         """
-        ndim = table.ndim - 1 # don't include output dim
+        ndim = table.ndim - 1  # don't include output dim
 
         if dirichlet:
             extra_rows = ["DirichletTable %s" % self.make_dirichlet_name(name)]
@@ -353,7 +367,9 @@ class DenseCPTParamSpec(TableParamSpec):
 
         return self.make_table_spec("seg_dinucleotide", table)
 
-    def calc_prob_transition_from_scaled_expected_len(self, length):
+    def calc_prob_transition(self, length):
+        """Calculate probability transition from scaled expected length.
+        """
         length_scaled = length // self.resolution
 
         prob_self_self = prob_transition_from_expected_len(length_scaled)
@@ -361,7 +377,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
         return prob_self_self, prob_self_other
 
-    def make_dense_cpt_segCountDown_seg_segTransition(self):
+    def make_dense_cpt_segCountDown_seg_segTransition(self):  # noqa
         # first values are the ones where segCountDown = 0 therefore
         # the transitions to segTransition = 2 occur early on
         card_seg_countdown = self.card_seg_countdown
@@ -370,10 +386,10 @@ class DenseCPTParamSpec(TableParamSpec):
         res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
 
         prob_seg_self_self, prob_seg_self_other = \
-            self.calc_prob_transition_from_scaled_expected_len(LEN_SEG_EXPECTED)
+            self.calc_prob_transition(LEN_SEG_EXPECTED)
 
         prob_subseg_self_self, prob_subseg_self_other = \
-            self.calc_prob_transition_from_scaled_expected_len(LEN_SUBSEG_EXPECTED)
+            self.calc_prob_transition(LEN_SUBSEG_EXPECTED)
 
         # 0: no transition
         # 1: subseg transition (no transition when CARD_SUBSEG == 1)
@@ -415,7 +431,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
         return res
 
-    def make_dense_cpt_segCountDown_seg_segTransition_spec(self):
+    def make_dense_cpt_segCountDown_seg_segTransition_spec(self):  # noqa
         cpt = self.make_dense_cpt_segCountDown_seg_segTransition()
 
         return self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION, cpt,
@@ -430,6 +446,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
         if self.use_dinucleotide:
             yield self.make_dense_cpt_seg_dinucleotide_spec()
+
 
 class DirichletTabParamSpec(TableParamSpec):
     type_name = "DIRICHLET_TAB"
@@ -464,6 +481,7 @@ class DirichletTabParamSpec(TableParamSpec):
         yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
                                    dirichlet_table)
 
+
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
     header_tmpl = "collection_seg_${track} ${fullnum_subsegs}"
@@ -494,6 +512,7 @@ class NameCollectionParamSpec(ParamSpec):
 
             yield "\n".join(rows)
 
+
 class MeanParamSpec(ParamSpec):
     type_name = "MEAN"
     object_tmpl = "mean_${seg}_${subseg}_${track} 1 ${datum}"
@@ -504,7 +523,7 @@ class MeanParamSpec(ParamSpec):
     def make_data(self):
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs
-        means = self.means # indexed by track_index
+        means = self.means  # indexed by track_index
 
         # maximum likelihood, adjusted by no more than 0.2*sd
         stds = sqrt(self.vars)
@@ -515,9 +534,10 @@ class MeanParamSpec(ParamSpec):
 
         jitter_std_bound = self.jitter_std_bound
         noise = uniform(-jitter_std_bound, jitter_std_bound,
-                         stds_tiled.shape)
+                        stds_tiled.shape)
 
         return means_tiled + (stds_tiled * noise)
+
 
 class CovarParamSpec(ParamSpec):
     type_name = "COVAR"
@@ -528,6 +548,7 @@ class CovarParamSpec(ParamSpec):
     def make_data(self):
         return vstack_tile(self.vars, self.num_segs, self.num_subsegs)
 
+
 class TiedCovarParamSpec(CovarParamSpec):
     object_tmpl = "covar_${track} 1 ${datum}"
 
@@ -537,11 +558,13 @@ class TiedCovarParamSpec(CovarParamSpec):
     def make_subsegnames(self):
         return ["any"]
 
+
 class RealMatParamSpec(ParamSpec):
     type_name = "REAL_MAT"
 
     def generate_objects(self):
         yield "matrix_weightscale_1x1 1 1 1.0"
+
 
 class GammaRealMatParamSpec(RealMatParamSpec):
     scale_tmpl = "gammascale_${seg}_${subseg}_${track} 1 1 ${datum}"
@@ -564,7 +587,7 @@ class GammaRealMatParamSpec(RealMatParamSpec):
         #
         # therefore:
         scales = vars / means
-        shapes = means**2 / vars
+        shapes = means ** 2 / vars
 
         for mapping in self.generate_tmpl_mappings():
             track_index = mapping["track_index"]
@@ -575,31 +598,36 @@ class GammaRealMatParamSpec(RealMatParamSpec):
             shape = jitter(shapes[track_index])
             yield substitute_shape(dict(datum=shape, **mapping))
 
+
 class MCParamSpec(ParamSpec):
     type_name = "MC"
+
 
 class NormMCParamSpec(MCParamSpec):
     if USE_MFSDG:
         # dimensionality component_type name mean covar weights
         object_tmpl = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
-        " mc_${distribution}_${seg}_${subseg}_${track}" \
-        " mean_${seg}_${subseg}_${track} covar_${seg}_${subseg}_${track}" \
-        " matrix_weightscale_1x1"
+            " mc_${distribution}_${seg}_${subseg}_${track}" \
+            " mean_${seg}_${subseg}_${track} covar_${seg}_${subseg}_${track}" \
+            " matrix_weightscale_1x1"
     else:
         # dimensionality component_type name mean covar
         object_tmpl = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-        " mc_${distribution}_${seg}_${subseg}_${track}" \
-        " mean_${seg}_${subseg}_${track} covar_${track}"
+            " mc_${distribution}_${seg}_${subseg}_${track}" \
+            " mean_${seg}_${subseg}_${track} covar_${track}"
+
 
 class GammaMCParamSpec(MCParamSpec):
     object_tmpl = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${subseg}_${track}" \
         " ${min_track} gammascale_${seg}_${subseg}_${track}" \
         " gammashape_${seg}_${subseg}_${track}"
 
+
 class MXParamSpec(ParamSpec):
     type_name = "MX"
     object_tmpl = "1 mx_${seg}_${subseg}_${track} 1 dpmf_always" \
         " mc_${distribution}_${seg}_${subseg}_${track}"
+
 
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
@@ -667,7 +695,6 @@ class InputMasterSaver(Saver):
             real_mat_spec = GammaRealMatParamSpec(self)
             mc_spec = GammaMCParamSpec(self)
 
-
             num_free_params += (fullnum_subsegs * 2) * num_tracks
         else:
             raise ValueError("distribution %s not supported" % distribution)
@@ -676,4 +703,4 @@ class InputMasterSaver(Saver):
         name_collection_spec = NameCollectionParamSpec(self)
         card_seg = num_segs
 
-        return locals() # dict of vars set in this function
+        return locals()  # dict of vars set in this function
