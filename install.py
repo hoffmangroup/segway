@@ -14,7 +14,7 @@ code.
 import platform
 
 PKG_VERSION = "1.2.0"
-GMTK_VERSION = "20091016"
+GMTK_VERSION = "ticket161-2"
 
 ####################### BEGIN COMMON CODE HEADER #####################
 
@@ -30,6 +30,7 @@ from string import Template
 from subprocess import call, PIPE, Popen
 from tempfile import mkdtemp
 from urllib import urlretrieve
+from re import match
 
 assert sys.version_info >= (2, 4)
 
@@ -75,7 +76,6 @@ MIN_DRMAA_VERSION = "0.4a3"
 
 LSF_DRMAA_URL = "http://downloads.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.4/lsf_drmaa-1.0.4.tar.gz"
 
-GMTK_VERSION_FILENAME = "gmtk.version"
 GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/" \
     "gmtk-%s.tar.gz" % GMTK_VERSION
 
@@ -89,25 +89,15 @@ wget $url -O $file
 if [[ ! -d $filebase ]]; then tar -xzf $file; fi
 cd $filebase
 
-mkdir -p "$dir/bin"
-mkdir tksrc/bin 2>/dev/null || true
+OPTFLAGS="${OPTFLAGS:--O3 -march=x86-64 -mtune=generic}"
+DEBUGFLAGS="${DEBUGFLAGS:--ggdb3}"
+CFLAGS=-pipe
+CXXFLAGS="$CFLAGS"
+MAKEFLAGS=("CFLAGS=$CFLAGS" "CXXFLAGS=$CXXFLAGS" "OPTFLAGS=$OPTFLAGS" "DEBUGFLAGS=$DEBUGFLAGS")
 
-if [[ "$(find . -name "*.a" -print0)" ]]; \
-then find . -name "*.a" -print0 | xargs -0 rm; \
-fi
-
-make clean "OPTFLAGS=$OPTFLAGS"
-make linux "OPTFLAGS=$OPTFLAGS"
-make depend "OPTFLAGS=$OPTFLAGS"
-
-make "OPTFLAGS=$OPTFLAGS"
-make -C featureFileIO install "OPTFLAGS=$OPTFLAGS" \
-    "INSTALL=install" "install_prefix=$dir"
-make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
-
-mkdir -p "$dir/etc"
-declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
-echo "$version" > "$dir/etc/gmtk.version"
+./configure --prefix="$dir" --with-logp=table --with-LZERO=-1.0E20
+make "${MAKEFLAGS[@]}"
+make "${MAKEFLAGS[@]}" install
 """
 
 LSF_DRMAA_INSTALL_SCRIPT = """
@@ -1200,32 +1190,18 @@ class GmtkInstaller(ScriptInstaller):
         self.env = env
         super(self.__class__, self).__init__()
 
-    def get_version_file(self, gmtkdir):
-        return os.path.join(gmtkdir, "etc", GMTK_VERSION_FILENAME)
-
     def get_version(self):
         """Returns the version in the gmtk version file or None if not found"""
-        version_file = self.get_version_file(self.env.arch_home)
-        if not os.path.isfile(version_file):
-            cmd = Popen(["which", "gmtkViterbi"], stdout=PIPE, stderr=PIPE)
-            if cmd.poll() == 0:
-                stdout = cmd.communicate()[0].strip()
-                bindir = stdout[0]
-                gmtkdir = os.path.dirname(os.path.dirname(bindir))
-                version_file = self.get_version_file(gmtkdir)
-            else:
-                return None
-
-        if version_file and os.path.isfile(version_file):
-            ifp = open(version_file)
-            try:
-                version = ifp.readline().strip()
-            finally:
-                ifp.close()
-
-            if len(version) > 0:
-                return version
-
+        # Right now we only check for version 0.1, ticket161-2
+        # Later we may only need to check the major/minor version number.
+        try:
+            cmd = Popen(["gmtkViterbi", "-version"], stdout = PIPE)
+            version_string = cmd.communicate()[0]
+            version_regexp = "GMTK 0\.1 \(Mercurial id: \w+\+ \(ticket161-2\).+"
+            if match(version_regexp, version_string):
+                return "ticket161-2"
+        except OSError:
+            return None
         return None
 
     def install(self):
