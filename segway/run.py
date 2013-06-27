@@ -1085,6 +1085,9 @@ class Runner(object):
         # that is repeated
 
         track_groups = self.track_groups
+        if not track_groups:  # use all the data in the archive
+            return 1
+
         res = len(track_groups[0])
 
         assert all(len(track_group) == res for track_group in track_groups)
