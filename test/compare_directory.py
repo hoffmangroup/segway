@@ -8,7 +8,7 @@ XXX: want to keep track of all files in new directory
 
 __version__ = "$Revision$"
 
-## Copyright 2011, 2012 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2011-2013 Michael M. Hoffman <mmh1@uw.edu>
 
 import filecmp
 from os import walk
@@ -18,6 +18,7 @@ import sys
 from path import path
 
 from segway._util import maybe_gzip_open
+
 
 def get_dir_filenames(dirname):
     if (not path(dirname).exists()):
@@ -46,6 +47,8 @@ def get_dir_filenames(dirname):
 
 # regular expression unescape
 re_unescape = re_compile(r"\(%.*?%\)")
+
+
 def make_regex(text):
     """
     make regex, escaping things that aren't with (% %)
@@ -56,16 +59,17 @@ def make_regex(text):
     last_end = 0
     for start, end in spans:
         res.append(escape(text[last_end:start]))
-        res.append(text[start+2:end-2]) # eliminate (% and %)
+        res.append(text[start + 2:end - 2])  # eliminate (% and %)
         last_end = end
     res.extend([escape(text[last_end:]), "$"])
 
     return re_compile("".join(res))
 
+
 def compare_file(template_filename, query_filename):
     # quick comparison without regexes
     if filecmp.cmp(template_filename, query_filename, shallow=False):
-        return True # files are identical, skip slow regex stuff
+        return True  # files are identical, skip slow regex stuff
 
     with maybe_gzip_open(template_filename) as template_file:
         re_template = make_regex(template_file.read())
@@ -74,6 +78,7 @@ def compare_file(template_filename, query_filename):
         match = re_template.match(query_file.read())
 
     return bool(match)
+
 
 class TestCounter(object):
     def __init__(self):
@@ -87,6 +92,7 @@ class TestCounter(object):
     def success(self):
         self.num_success += 1
 
+
 def compare_directory(template_dirname, query_dirname):
     counter = TestCounter()
     query_filenames = dict(get_dir_filenames(query_dirname))
@@ -95,28 +101,37 @@ def compare_directory(template_dirname, query_dirname):
     for template_filename_relative, template_filename in template_filenames:
         re_template_filename_relative = make_regex(template_filename_relative)
 
-        for query_filename_relative, query_filename in query_filenames.iteritems():
+        query_filenames_items = query_filenames.iteritems()
+        for query_filename_relative, query_filename in query_filenames_items:
             if re_template_filename_relative.match(query_filename_relative):
                 del query_filenames[query_filename_relative]
                 if compare_file(template_filename, query_filename):
                     counter.success()
                 else:
-                    counter.error("diff '%s' '%s'" % (template_filename, query_filename))
+                    counter.error("diff '%s' '%s'" % (template_filename,
+                                                      query_filename))
 
                 break
         else:
             counter.error("query directory missing %s" % template_filename)
 
     for query_filename_relative in query_filenames.iterkeys():
-        counter.error("template directory missing %s" % query_filename_relative)
+        counter.error("template directory missing %s"
+                      % query_filename_relative)
 
     if counter.num_error == 0:
-        print >>sys.stderr, "PASS: %s and %s: %d files match" % (template_dirname, query_dirname, counter.num_success)
+        msg = "PASS: %s and %s: %d files match" % (template_dirname,
+                                                   query_dirname,
+                                                   counter.num_success)
+        print >>sys.stderr, msg
         return 0
     else:
-        msg = "FAIL: %s and %s: %d files match; %d files mismatch" % (template_dirname, query_dirname, counter.num_success, counter.num_error)
+        msg = "FAIL: %s and %s: %d files match;" \
+              " %d files mismatch" % (template_dirname, query_dirname,
+                                      counter.num_success, counter.num_error)
         print >>sys.stderr, msg
         return 1
+
 
 def parse_options(args):
     from optparse import OptionParser
@@ -131,6 +146,7 @@ def parse_options(args):
         parser.error("incorrect number of arguments")
 
     return options, args
+
 
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
