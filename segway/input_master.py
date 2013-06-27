@@ -191,11 +191,13 @@ class ParamSpec(object):
 
                 for track_group_index, track_group in enumerate(track_groups):
                     track_offset = subseg_offset + track_group_index
+                    head_trackname = track_group[0].name
 
                     # XXX: change name of index to track_offset in templates
                     # XXX: change name of track_index to track_group_index
-                    yield dict(seg=segname, subseg=subsegname, track=trackname,
-                               seg_index=seg_index, subseg_index=subseg_index,
+                    yield dict(seg=segname, subseg=subsegname,
+                               track=head_trackname, seg_index=seg_index,
+                               subseg_index=subseg_index,
                                track_index=track_group_index,
                                index=track_offset,
                                distribution=self.distribution)
@@ -643,7 +645,7 @@ class InputMasterSaver(Saver):
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
-                  "gmtk_include_filename_relative"]
+                  "gmtk_include_filename_relative", "track_groups"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
