@@ -14,7 +14,7 @@ code.
 import platform
 
 PKG_VERSION = "1.2.0"
-GMTK_VERSION = "ticket161-2"
+GMTK_VERSION = "1.0.0-ticket161-2"
 
 ####################### BEGIN COMMON CODE HEADER #####################
 
@@ -1194,12 +1194,15 @@ class GmtkInstaller(ScriptInstaller):
         """Returns the version in the gmtk version file or None if not found"""
         # Right now we only check for version 0.1, ticket161-2
         # Later we may only need to check the major/minor version number.
+        import pdb; pdb.set_trace()
         try:
             cmd = Popen(["gmtkViterbi", "-version"], stdout = PIPE)
             version_string = cmd.communicate()[0]
-            version_regexp = "GMTK 0\.1 \(Mercurial id: \w+\+ \(ticket161-2\).+"
-            if match(version_regexp, version_string):
-                return "ticket161-2"
+            version_regexp = "GMTK ([0-9.]+) \(Mercurial id: \w+\+ \(ticket161-2\).+"
+            version_match = match(version_regexp, version_string)
+            if version_match:
+                major_minor_version = version_match.group(1)
+                return  major_minor_version + "-" + "ticket161-2"
         except OSError:
             return None
         return None
