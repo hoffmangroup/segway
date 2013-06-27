@@ -252,6 +252,7 @@ OFFSET_FILENAMES = 2  # where the filenames begin in Results
 
 VITERBI_REGEX_FILTER = "^seg$"
 
+
 ## functions
 def quote_trackname(text):
     # legal characters are ident in GMTK_FileTokenizer.ll:
@@ -1492,7 +1493,8 @@ class Runner(object):
 
         # XXX: dinucleotide-only won't work, because it has no float data
         assert (self.float_filelistpath
-                and any(track.has_data for track in tracks))
+                and any(track.is_data for track in self.tracks))
+
         if self.float_filelistpath:
             res.update(of1=self.float_filelistpath,
                        fmt1="binary",
@@ -2193,7 +2195,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                               cVitRegexFilter=VITERBI_REGEX_FILTER,
                               eVitRegexFilter=VITERBI_REGEX_FILTER,
                               vitCaseSensitiveRegexFilter=True,
-                              vitValsFile="-")
+                              mVitValsFile="-")
 
         posterior_kwargs = dict(triFile=self.posterior_triangulation_filename,
                                 jtFile=self.posterior_jt_info_filename,
