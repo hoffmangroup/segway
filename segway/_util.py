@@ -3,7 +3,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2009, 2011-2013 Michael M. Hoffman <mmh1@uw.edu>
 
 from collections import defaultdict, namedtuple
 from contextlib import closing
@@ -78,12 +78,12 @@ data_string = partial(resource_string, PKG_DATA)
 NUM_COLORS = 8
 SCHEME = colorbrewer.Dark2[NUM_COLORS]
 
-KB = 2**10
-MB = 2**20
-GB = 2**30
-TB = 2**40
-PB = 2**50
-EB = 2**60
+KB = 2 ** 10
+MB = 2 ** 20
+GB = 2 ** 30
+TB = 2 ** 40
+PB = 2 ** 50
+EB = 2 ** 60
 
 OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
@@ -103,8 +103,10 @@ SUPERVISION_SUPERVISED = 2
 
 SUPERVISION_LABEL_OFFSET = 1
 
+
 def extjoin(*args):
     return extsep.join(args)
+
 
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
@@ -112,15 +114,18 @@ def extjoin_not_none(*args):
 
 _Window = namedtuple("Window", ["world", "chrom", "start", "end"])
 
+
 class Window(_Window):
     __slots__ = ()
 
     def __len__(self):
         return self.end - self.start
 
+
 def copy_attrs(src, dst, attrs):
     for attr in attrs:
         setattr(dst, attr, getattr(src, attr))
+
 
 class Copier(object):
     copy_attrs = []
@@ -128,6 +133,7 @@ class Copier(object):
     def __init__(self, runner):
         # copy copy_attrs from runner to Copier instance
         copy_attrs(runner, self, self.copy_attrs)
+
 
 class Saver(Copier):
     resource_name = None
@@ -142,22 +148,27 @@ class Saver(Copier):
         return save_template(filename, self.resource_name, self.make_mapping(),
                              *args, **kwargs)
 
+
 class PassThroughDict(dict):
     def __missing__(self, key):
         return key
+
 
 def die(msg=""):
     if msg:
         print >>sys.stderr, msg
     sys.exit(1)
 
+
 def get_col_index(chromosome, trackname):
     return get_tracknames(chromosome).index(trackname)
+
 
 def get_label_color(label):
     color = SCHEME[label % NUM_COLORS]
 
     return ",".join(map(str, color))
+
 
 # XXX: suggest as default
 def fill_array(scalar, shape, dtype=None, *args, **kwargs):
@@ -169,12 +180,15 @@ def fill_array(scalar, shape, dtype=None, *args, **kwargs):
 
     return res
 
+
 # XXX: suggest as default
 def gzip_open(*args, **kwargs):
     return closing(_gzip_open(*args, **kwargs))
 
+
 def is_gz_filename(filename):
     return filename.endswith(SUFFIX_GZ)
+
 
 def maybe_gzip_open(filename, mode="r", *args, **kwargs):
     if filename == "-":
@@ -188,12 +202,14 @@ def maybe_gzip_open(filename, mode="r", *args, **kwargs):
             else:
                 return sys.stdin
         else:
-            raise ValueError("mode string must begin with one of 'r', 'w', or 'a'")
+            raise ValueError("mode string must begin with one of"
+                             " 'r', 'w', or 'a'")
 
     if is_gz_filename(filename):
         return gzip_open(filename, mode, *args, **kwargs)
 
     return open(filename, mode, *args, **kwargs)
+
 
 def constant(val):
     """
@@ -203,9 +219,11 @@ def constant(val):
 
 array_factory = constant(array([]))
 
+
 # XXX: replace with genomedata.Chromosome.tracknames_continuous
 def get_tracknames(chromosome):
     return chromosome.root._v_attrs.tracknames.tolist()
+
 
 def init_num_obs(num_obs, continuous):
     curr_num_obs = continuous.shape[1]
@@ -213,12 +231,6 @@ def init_num_obs(num_obs, continuous):
 
     return curr_num_obs
 
-# XXX: This isn't used anywhere in the codebase. Does it still
-#      belong in the code?
-def new_extrema(func, data, extrema):
-    curr_extrema = func(data, 0)
-
-    return func([extrema, curr_extrema], 0)
 
 # XXX: replace with iter(genomedata.Chromosome)
 def walk_supercontigs(h5file):
@@ -230,6 +242,7 @@ def walk_supercontigs(h5file):
 
         yield supercontig
 
+
 # XXX: replace with genomedata.Chromosome.itercontinuous
 def walk_continuous_supercontigs(h5file):
     for supercontig in walk_supercontigs(h5file):
@@ -237,6 +250,7 @@ def walk_continuous_supercontigs(h5file):
             yield supercontig, supercontig.continuous
         except NoSuchNodeError:
             continue
+
 
 # XXX: duplicates bed.py?
 def load_coords(filename):
@@ -263,6 +277,7 @@ def load_coords(filename):
     return defaultdict(array_factory, ((chrom, array(coords_list))
                        for chrom, coords_list in coords.iteritems()))
 
+
 def get_chrom_coords(coords, chrom):
     """
     returns empty array if there are no coords on that chromosome
@@ -271,11 +286,13 @@ def get_chrom_coords(coords, chrom):
     if coords:
         return coords[chrom]
 
+
 def is_empty_array(arr):
     try:
         return arr.shape == (0,)
     except AttributeError:
         return False
+
 
 def chrom_name(filename):
     return path(filename).namebase
@@ -284,6 +301,7 @@ def chrom_name(filename):
 # XXX: replace with stuff from prep_observations()
 # XXX: This isn't used anywhere in the codebase. Does it still
 #      belong in the code?
+
 def iter_chroms_coords(filenames, coords):
     for filename in filenames:
         print >>sys.stderr, filename
@@ -296,6 +314,7 @@ def iter_chroms_coords(filenames, coords):
 
         with openFile(filename) as chromosome:
             yield chrom, filename, chromosome, chr_include_coords
+
 
 def find_segment_starts(data):
     """
@@ -320,6 +339,7 @@ def find_segment_starts(data):
 
     return start_pos, labels
 
+
 # XXX: Accepts float inputs without complaint. When float inputs are given,
 #      float output is returned. Is this desirable?
 def ceildiv(dividend, divisor):
@@ -329,6 +349,8 @@ def ceildiv(dividend, divisor):
     return (dividend // divisor) + int(bool(dividend % divisor))
 
 re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
+
+
 def parse_posterior(iterable):
     """
     a generator.
@@ -346,6 +368,7 @@ def parse_posterior(iterable):
             group = m_posterior_entry.group
             yield (int(group(2)), int(group(3)), float(group(1)))
 
+
 def read_posterior(infile, num_frames, num_labels):
     """
     returns an array (num_frames, num_labels)
@@ -362,8 +385,10 @@ def read_posterior(infile, num_frames, num_labels):
 
     return res
 
+
 def make_filelistpath(dirpath, ext):
     return dirpath / extjoin(ext, EXT_LIST)
+
 
 def make_default_filename(resource, dirname="WORKDIR", instance_index=None):
     resource_part = resource.rpartition(".tmpl")
@@ -376,12 +401,14 @@ def make_default_filename(resource, dirname="WORKDIR", instance_index=None):
 
     return path(dirname) / filebasename
 
+
 def save_substituted_resource(filename, resource, mapping):
     with open(filename, "w+") as outfile:
         tmpl = Template(data_string(resource))
         text = tmpl.substitute(mapping)
 
         outfile.write(text)
+
 
 def save_template(filename, resource, mapping, dirname=None, clobber=False,
                   instance_index=None):
@@ -399,7 +426,8 @@ def save_template(filename, resource, mapping, dirname=None, clobber=False,
 
     return filename, is_new
 
-class memoized_property(object):
+
+class memoized_property(object):  # noqa
     def __init__(self, fget):
         self.fget = fget
         self.__doc__ = fget.__doc__
@@ -413,12 +441,15 @@ class memoized_property(object):
         setattr(instance, self.__name__, res)
         return res
 
+
 def resource_substitute(resourcename):
     return Template(data_string(resourcename)).substitute
+
 
 def make_prefix_fmt(num):
     # make sure there are sufficient leading zeros
     return "%%0%dd." % (int(floor(log10(num))) + 1)
+
 
 def main(args=sys.argv[1:]):
     pass
