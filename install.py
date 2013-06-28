@@ -1192,17 +1192,16 @@ class GmtkInstaller(ScriptInstaller):
 
     def get_version(self):
         """Returns the version in the gmtk version file or None if not found"""
-        # Right now we only check for version 0.1, ticket161-2
-        # Later we may only need to check the major/minor version number.
-        import pdb; pdb.set_trace()
         try:
             cmd = Popen(["gmtkViterbi", "-version"], stdout = PIPE)
             version_string = cmd.communicate()[0]
-            version_regexp = "GMTK ([0-9.]+) \(Mercurial id: \w+\+ \(ticket161-2\).+"
+            # Check branch too (mercurial id). This may become uneccesary later.
+            version_regexp = "GMTK ([0-9.]+) \(Mercurial id: \w+\+ \((\S+)\).+"
             version_match = match(version_regexp, version_string)
             if version_match:
                 major_minor_version = version_match.group(1)
-                return  major_minor_version + "-" + "ticket161-2"
+                branch = version_match.group(2)
+                return  major_minor_version + "-" + branch
         except OSError:
             return None
         return None
