@@ -1,6 +1,7 @@
 1.2.0:
 
-* now requires a new version of GMTK (>= 0.1 f6e7c01e2b27 (ticket161)) for increased speed
+* KNOWN ISSUE: Segway will produce incorrect segmentations if the tracks are not specified in the order they appear in the genomedata archive providing the data.
+* now requires a new version of GMTK (>= 1.0.0 80c1d70cea9d (ticket161-2)) for increased speed
 * now requires Python >=2.6 (released 3.5 years ago) and <=3.0
   (although we will switch to Python 2.7 when we need it, so if you
   are upgrading, go all the way now)
