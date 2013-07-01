@@ -16,20 +16,25 @@ import sys
 from path import path
 
 from ._util import (extjoin, EXT_MASTER, EXT_PARAMS, EXT_TAB, PREFIX_INPUT,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, SUBDIRNAME_LOG, SUBDIRNAME_PARAMS)
+                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, SUBDIRNAME_LOG,
+                    SUBDIRNAME_PARAMS)
 
 PAT_LIKELIHOOD = extjoin(PREFIX_LIKELIHOOD, "*", EXT_TAB)
+
 
 def extjoin_escape(*args):
     return escape(extsep).join(args)
 
 re_likelihood = re_compile(extjoin_escape(escape(PREFIX_LIKELIHOOD), "(.*)",
                                           escape(EXT_TAB)))
+
+
 def get_likelihood_index(filepath):
     """
     returns a str
     """
     return re_likelihood.match(filepath.name).group(1)
+
 
 def load_likelihood(filename):
     with open(filename) as infile:
@@ -39,13 +44,16 @@ def load_likelihood(filename):
 
     return float(line)
 
+
 def enumerate_likelihoods(dirpath):
     log_dirpath = dirpath / SUBDIRNAME_LOG
     for filepath in log_dirpath.files(PAT_LIKELIHOOD):
         yield get_likelihood_index(filepath), load_likelihood(filepath)
 
+
 def get_winning_instance(dirpath):
     return sorted(enumerate_likelihoods(dirpath), key=itemgetter(1, 0))[-1][0]
+
 
 def enumerate_params_filenames(dirpath, instance):
     pattern = extjoin(PREFIX_PARAMS, instance, EXT_PARAMS, "*")
@@ -53,13 +61,17 @@ def enumerate_params_filenames(dirpath, instance):
     for filename in dirpath.files(pattern):
         yield int(filename.rpartition(extsep)[2]), filename
 
+
 def get_last_params_filename(dirpath, instance):
     return sorted(enumerate_params_filenames(dirpath, instance))[-1][-1]
+
 
 def get_input_master_filename(dirpath, instance):
     return dirpath / extjoin(PREFIX_INPUT, instance, EXT_MASTER)
 
-def print_and_copy(flag, getter, dirpath, instance, final_basename, copy, clobber):
+
+def print_and_copy(flag, getter, dirpath, instance, final_basename, copy,
+                   clobber):
     if flag:
         srcpath = getter(dirpath, instance)
         print srcpath
@@ -68,6 +80,7 @@ def print_and_copy(flag, getter, dirpath, instance, final_basename, copy, clobbe
 
         if clobber or not dstpath.exists():
             srcpath.copy2(dstpath)
+
 
 def winner(dirname, params=True, input_master=True, copy=False, clobber=False):
     dirpath = path(dirname)
@@ -78,6 +91,7 @@ def winner(dirname, params=True, input_master=True, copy=False, clobber=False):
                    winning_instance, "input.master", copy, clobber)
     print_and_copy(params, get_last_params_filename, params_dirpath,
                    winning_instance, "params.params", copy, clobber)
+
 
 def parse_options(args):
     from optparse import OptionParser
@@ -101,6 +115,7 @@ def parse_options(args):
         parser.error("incorrect number of arguments")
 
     return options, args
+
 
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
