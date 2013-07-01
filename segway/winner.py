@@ -6,7 +6,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-## Copyright 2011 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2011, 2013 Michael M. Hoffman <mmh1@uw.edu>
 
 from operator import itemgetter
 from os import extsep
@@ -45,7 +45,7 @@ def enumerate_likelihoods(dirpath):
         yield get_likelihood_index(filepath), load_likelihood(filepath)
 
 def get_winning_instance(dirpath):
-    return sorted(enumerate_likelihoods(dirpath), key=itemgetter(1))[-1][0]
+    return sorted(enumerate_likelihoods(dirpath), key=itemgetter(1, 0))[-1][0]
 
 def enumerate_params_filenames(dirpath, instance):
     pattern = extjoin(PREFIX_PARAMS, instance, EXT_PARAMS, "*")
