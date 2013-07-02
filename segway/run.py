@@ -175,6 +175,8 @@ PREFIX_JOB_LOG = "jobs"
 PREFIX_JOB_NAME_TRAIN = "emt"
 PREFIX_JOB_NAME_VITERBI = "vit"
 PREFIX_JOB_NAME_POSTERIOR = "jt"
+PREFIX_JOB_NAMES = dict(identify=PREFIX_JOB_NAME_VITERBI,
+                        posterior=PREFIX_JOB_NAME_POSTERIOR)
 
 SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
@@ -251,6 +253,8 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
 OFFSET_FILENAMES = 2  # where the filenames begin in Results
 
 VITERBI_REGEX_FILTER = "^seg$"
+
+PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 
 
 ## functions
@@ -2181,7 +2185,7 @@ to find the winning instance anyway.""" % thread.instance_index)
     def is_in_reversed_world(self, window_index):
         return self.windows[window_index].world in self.reverse_worlds
 
-    def run_identify_posterior(self):
+    def setup_identify_posterior(self):
         self.instance_index = "identify"
 
         ## setup files
@@ -2189,52 +2193,60 @@ to find the winning instance anyway.""" % thread.instance_index)
             warn("Input master not specified. Generating.")
             self.save_input_master()
 
-        viterbi_filenames = self.viterbi_filenames
-        posterior_filenames = self.posterior_filenames
-
-        # -: standard output, processed by segway-task
-        viterbi_kwargs = dict(triFile=self.triangulation_filename,
-                              pVitRegexFilter=VITERBI_REGEX_FILTER,
-                              cVitRegexFilter=VITERBI_REGEX_FILTER,
-                              eVitRegexFilter=VITERBI_REGEX_FILTER,
-                              vitCaseSensitiveRegexFilter=True,
-                              mVitValsFile="-")
-
-        posterior_kwargs = dict(triFile=self.posterior_triangulation_filename,
-                                jtFile=self.posterior_jt_info_filename,
-                                doDistributeEvidence=True,
-                                **self.get_posterior_clique_print_ranges())
-
-        with Session() as session:
-            self.session = session
-            restartable_jobs = RestartableJobDict(session, self.job_log_file)
-
-            for window_index, window_len in self.window_lens_sorted():
-                queue_identify_custom = partial(self.queue_identify,
-                                                restartable_jobs, window_index)
-
-                if (self.identify
-                        and not self.recover_viterbi_window(window_index)):
-                    queue_identify_custom(PREFIX_JOB_NAME_VITERBI,
-                                          VITERBI_PROG, viterbi_kwargs,
-                                          viterbi_filenames)
-
-                if self.posterior:
-                    queue_identify_custom(PREFIX_JOB_NAME_POSTERIOR,
-                                          POSTERIOR_PROG, posterior_kwargs,
-                                          posterior_filenames)
-
-            if self.dry_run:
-                return
-
-            restartable_jobs.wait()
-
+    def save_identify_posterior(self):
         for world in xrange(self.num_worlds):
             if self.identify:
                 IdentifySaver(self)(world)
 
             if self.posterior:
                 PosteriorSaver(self)(world)
+
+    def run_identify_posterior(self):
+        self.setup_identify_posterior()
+
+        filenames = dict(identify=self.viterbi_filenames,
+                         posterior=self.posterior_filenames)
+
+        # -: standard output, processed by segway-task
+        kwargs = {"identify":
+                  dict(triFile=self.triangulation_filename,
+                       pVitRegexFilter=VITERBI_REGEX_FILTER,
+                       cVitRegexFilter=VITERBI_REGEX_FILTER,
+                       eVitRegexFilter=VITERBI_REGEX_FILTER,
+                       vitCaseSensitiveRegexFilter=True, mVitValsFile="-"),
+                  "posterior":
+                  dict(triFile=self.posterior_triangulation_filename,
+                       jtFile=self.posterior_jt_info_filename,
+                       doDistributeEvidence=True,
+                       **self.get_posterior_clique_print_ranges())}
+
+        tasks = []
+        if self.identify:
+            tasks.append("identify")
+        if self.posterior:
+            tasks.append("posterior")
+
+        with Session() as session:
+            self.session = session
+            restartable_jobs = RestartableJobDict(session, self.job_log_file)
+
+            for window_index, window_len in self.window_lens_sorted():
+                for task in tasks:
+                    if (task == "identify"
+                            and self.recover_viterbi_window(window_index)):
+                        # XXX: should be able to recover posterior also
+                        continue
+
+                    self.queue_identify(restartable_jobs, window_index,
+                                        PREFIX_JOB_NAMES[task], PROGS[task],
+                                        kwargs[task], filenames[task])
+
+            if self.dry_run:
+                return
+
+            restartable_jobs.wait()
+
+        self.save_identify_posterior()
 
     def make_script_filename(self, prefix):
         return self.make_filename(prefix, EXT_SH, subdirname=SUBDIRNAME_LOG)
