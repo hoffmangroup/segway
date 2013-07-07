@@ -21,7 +21,8 @@ except RuntimeError:
     print_tb(tb)
     print >>sys.stderr, " ".join(format_exception_only(typ, val))
     print >>sys.stderr
-    print >>sys.stderr, "Hint: you must run Segway on a cluster with DRMAA installed."
+    print >>sys.stderr, \
+        "Hint: you must run Segway on a cluster with DRMAA installed."
     sys.exit(3)
 
 from .._util import constant
@@ -48,16 +49,17 @@ except KeyError:
 ## whether to submit more jobs or not
 
 NOMINAL_MIN_JOB_WAIT_SLEEP_TIME = MIN_JOB_WAIT_SLEEP_TIME + 3
-MAX_JOB_WAIT_SLEEP_TIME = 10 # max time to wait between checking job status
+MAX_JOB_WAIT_SLEEP_TIME = 10  # max time to wait between checking job status
 
 # these settings limit job queueing to 360 at once
+
 
 def get_driver_name(session):
     drms_info = session.drmsInfo
 
     # XXX: find out what Son of Grid Engine and GridScheduler report
     if (drms_info.startswith("GE") or drms_info.startswith("SGE")
-        or drms_info.startswith("UGE")):
+            or drms_info.startswith("UGE")):
         return "sge"
     elif drms_info.startswith("Platform LSF"):
         return "lsf"
@@ -78,6 +80,7 @@ with Session() as _session:
 driver = __import__(driver_name, globals(), locals(), [driver_name], 1)
 JobTemplateFactory = driver.JobTemplateFactory
 make_native_spec = driver.make_native_spec
+
 
 class RestartableJob(object):
     def __init__(self, session, job_tmpl_factory, global_mem_usage,
@@ -112,7 +115,7 @@ class RestartableJob(object):
         # and set global_mem_usage, controlling for race conditions
         if self.trial_index == trial_index:
             with global_mem_usage.lock:
-                choices = [global_mem_usage[mem_usage_key], trial_index+1]
+                choices = [global_mem_usage[mem_usage_key], trial_index + 1]
                 trial_index = max(choices)
 
             global_mem_usage[mem_usage_key] = trial_index
@@ -134,6 +137,7 @@ class RestartableJob(object):
 
         return res
 
+
 class RestartableJobDict(dict):
     def __init__(self, session, job_log_file, *args, **kwargs):
         self.session = session
@@ -153,7 +157,7 @@ class RestartableJobDict(dict):
         # we should just stick to MIN_JOB_WAIT_SLEEP_TIME
 
         # +1 is to avoid dividing by zero when len(self) is 0
-        clean_safe_sleep_time = CLEAN_SAFE_TIME / (len(self)+1)
+        clean_safe_sleep_time = CLEAN_SAFE_TIME / (len(self) + 1)
 
         return min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
 
@@ -162,7 +166,6 @@ class RestartableJobDict(dict):
         # maximum value: MAX_JOB_WAIT_SLEEP_TIME
         # minimum value: CLEAN_SAFE_TIME / (num jobs + 1)
 
-        #print >>sys.stderr, "sleep_time: %s, len: %d" % (sleep_time, len(self))
         return sleep_time > NOMINAL_MIN_JOB_WAIT_SLEEP_TIME
 
     def _queue_unconditional(self, restartable_job):
@@ -198,7 +201,8 @@ class RestartableJobDict(dict):
         while jobids:
             # check each job individually
             for jobid in jobids:
-                # XXX: should be an improved RestartableJobDict.calc_sleep_time()
+                # XXX: should be an improved
+                # RestartableJobDict.calc_sleep_time()
                 sleep(MIN_JOB_WAIT_SLEEP_TIME)
 
                 try:
@@ -233,16 +237,16 @@ class RestartableJobDict(dict):
                 resource_usage_orig = job_info.resourceUsage
                 resource_usage = defaultdict(NA_FACTORY, resource_usage_orig)
 
-                try: # SGE
+                try:  # SGE
                     maxvmem = resource_usage_orig["maxvmem"]
-                except KeyError: # non-SGE systems
+                except KeyError:  # non-SGE systems
                     maxvmem = resource_usage["vmem"]
 
                 cpu = resource_usage["cpu"]
                 row = [jobid, jobname, prog, str(num_segs), str(num_frames),
                        maxvmem, cpu, str(exit_status)]
                 print >>self.job_log_file, "\t".join(row)
-                self.job_log_file.flush() # allow reading file now
+                self.job_log_file.flush()  # allow reading file now
 
                 del self[jobid]
 
@@ -260,9 +264,3 @@ class RestartableJobDict(dict):
                 # SVN r425 for code
 
             jobids = self.keys()
-
-def main(args=sys.argv[1:]):
-    pass
-
-if __name__ == "__main__":
-    sys.exit(main())
