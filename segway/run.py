@@ -770,6 +770,10 @@ class Runner(object):
         return self.make_filename("winner")
 
     @memoized_property
+    def tracks_spec_filename(self):
+        return self.obs_dirpath / "track_specs.txt"
+
+    @memoized_property
     def virtual_evidence_dirpath(self):
         res = self.make_filename("virtual_evidence", subdirname=SUBDIRNAME_OBS)
         self.make_dir(res)
@@ -1726,6 +1730,9 @@ class Runner(object):
 
         GenomeClass = (FilesGenome if self.file_tracks else Genome)
         genomedataarg = (self.track_specs if self.file_tracks else self.genomedataname)
+        if self.file_tracks:
+            with open(self.tracks_spec_filename, "w") as f:
+                f.write("\n".join(self.track_specs))
         if self.file_tracks and self.num_worlds > 1:
             raise NotImplementedError # TODO implement concat handling within FilesGenome
         with GenomeClass(genomedataarg) as genome:
@@ -2493,7 +2500,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         track_indexes_text = ",".join(map(str, track_indexes))
 
         genomedataarg = (FILE_TRACKS_SENTINEL if self.file_tracks else self.genomedataname)
-        track_indexes_text_arg = (",".join(self.track_specs) if self.file_tracks else track_indexes_text)
+        #track_indexes_text_arg = (",".join(self.track_specs) if self.file_tracks else track_indexes_text)
+        track_indexes_text_arg = self.tracks_spec_filename
 
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,

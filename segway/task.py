@@ -49,7 +49,8 @@ def make_track_indexes(text):
     return array(map(int, text.split(",")))
 
 def make_genomedata_paths(text):
-    return map(path, text.split(","))
+    #return map(path, text.split(","))
+    return map(lambda line: line.strip(), open(text).readlines())
 
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 def parse_viterbi(lines, do_reverse=False):
