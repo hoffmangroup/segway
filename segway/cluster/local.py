@@ -8,6 +8,7 @@ from resource import getrlimit, RLIMIT_STACK
 import sys
 from collections import namedtuple
 from subprocess import Popen
+from time import sleep
 
 from .._util import MB
 from .common import _JobTemplateFactory, make_native_spec
@@ -15,6 +16,9 @@ from .common import _JobTemplateFactory, make_native_spec
 # qsub -w: switches off job validation
 # qsub -j: switches off merging output and error
 NATIVE_SPEC_DEFAULT = dict(w="n", j="n")
+
+JOB_WAIT_SLEEP_TIME = 1 # seconds
+MAX_PARALLEL_JOBS = 32
 
 # Mimics a DRMAA job template object
 class JobTemplate(object):
@@ -36,16 +40,6 @@ class Job(object):
                           stdout=self.outfd,
                           stderr=self.errfd,
                           cwd=job_tmpl.workingDirectory)
-        # XXX
-        # Since this is singlethreaded, in theory waiting on each process
-        # shouldn't be slower (although it could be if we're IO-bound)
-        # On the plus side, we don't have to worry about memory conflict
-        # between the jobs. If you're worried about performance due to
-        # IO-bound processes, remove these two lines (and make sure you
-        # have enough memory to support all the jobs running at the same
-        # time)
-        self.proc.wait()
-        self._close()
 
     def poll(self):
         retcode = self.proc.poll()
@@ -105,7 +99,8 @@ class Session(object):
     def __init__(self):
         self.drmsInfo = "local_virtual_drmsInfo"
         self.id_counter = 1
-        self.jobs = {}
+        self.jobs = {} # {jobid : Job}
+        self.running_jobs = set() # set(jobid)
 
     def __enter__(self):
         return self
@@ -118,11 +113,23 @@ class Session(object):
         return "local_virtual_drmsInfo"
 
     def runJob(self, job_tmpl):
+        # Wait until there are fewere than MAX_PARALLEL_JOBS running
+        while len(self.running_jobs) >= MAX_PARALLEL_JOBS:
+            found_finished_job = False
+            for jobid in self.running_jobs:
+                if not (self.jobs[jobid].poll() is None):
+                    self.running_jobs.remove(jobid)
+                    found_finished_job = True
+                    break
+            if not found_finished_job:
+                sleep(JOB_WAIT_SLEEP_TIME)
+
+        # Start a process to run this job
         jobid = str(self.id_counter)
         self.id_counter += 1
         self.jobs[jobid] = Job(job_tmpl)
+        self.running_jobs.add(jobid)
         return jobid
-
 
     def wait(self, jobid, timeout):
         if timeout == Session.TIMEOUT_NO_WAIT:
@@ -130,6 +137,7 @@ class Session(object):
             retcode = job.poll()
             if not retcode is None:
                 del self.jobs[jobid]
+                self.running_jobs.discard(jobid)
                 return JobInfo(retcode)
             else:
                 raise ExitTimeoutException()
