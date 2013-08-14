@@ -193,9 +193,53 @@ class RestartableJobDict(dict):
         while self.unqueued_jobs and self.is_sleep_time_gt_min():
             self._queue_unconditional(heappop(self.unqueued_jobs)[1])
 
+    def get_job_info_exit_status(self, job_info):
+        if job_info.hasSignal:
+            res = job_info.terminatedSignal
+            # just in case this edge case ever happens
+            if res == 0:
+                return "hasSignal"
+
+            return res
+        elif job_info.wasAborted:
+            return "wasAborted"
+        elif job_info.hasExited:
+            return job_info.exitStatus
+
+        # this happens when the exit status is unknown
+        return "noExit"
+
+    def process_job(self, jobid, job_info):
+        exit_status = self.get_job_info_exit_status(job_info)
+
+        # if the job queue is already full, this will probably
+        # result in the job going to unqueued jobs for now
+        if exit_status != 0:
+            self.queue(self[jobid])
+
+        restartable_job = self[jobid]
+        jobname = restartable_job.job_tmpl_factory.template.jobName
+
+        prog, num_segs, num_frames = restartable_job.mem_usage_key
+
+        resource_usage_orig = job_info.resourceUsage
+        resource_usage = defaultdict(NA_FACTORY, resource_usage_orig)
+
+        try:  # SGE
+            maxvmem = resource_usage_orig["maxvmem"]
+        except KeyError:  # non-SGE systems
+            maxvmem = resource_usage["vmem"]
+
+        cpu = resource_usage["cpu"]
+        row = [jobid, jobname, prog, str(num_segs), str(num_frames),
+               maxvmem, cpu, str(exit_status)]
+        print >>self.job_log_file, "\t".join(row)
+        self.job_log_file.flush()  # allow reading file now
+
+        del self[jobid]
+
     def wait(self):
         session = self.session
-
         jobids = self.keys()
 
         while jobids:
@@ -211,45 +255,7 @@ class RestartableJobDict(dict):
                     # job isn't done yet
                     continue
 
-                if job_info.hasSignal:
-                    exit_status = job_info.terminatedSignal
-                    # just in case this edge case ever happens
-                    if exit_status == 0:
-                        exit_status = "hasSignal"
-                elif job_info.wasAborted:
-                    exit_status = "wasAborted"
-                elif job_info.hasExited:
-                    exit_status = job_info.exitStatus
-                else:
-                    # this happens when the exit status is unknown
-                    exit_status = "noExit"
-
-                # if the job queue is already full, this will probably
-                # result in the job going to unqueued jobs for now
-                if exit_status != 0:
-                    self.queue(self[jobid])
-
-                restartable_job = self[jobid]
-                jobname = restartable_job.job_tmpl_factory.template.jobName
-
-                prog, num_segs, num_frames = restartable_job.mem_usage_key
-
-                resource_usage_orig = job_info.resourceUsage
-                resource_usage = defaultdict(NA_FACTORY, resource_usage_orig)
-
-                try:  # SGE
-                    maxvmem = resource_usage_orig["maxvmem"]
-                except KeyError:  # non-SGE systems
-                    maxvmem = resource_usage["vmem"]
-
-                cpu = resource_usage["cpu"]
-                row = [jobid, jobname, prog, str(num_segs), str(num_frames),
-                       maxvmem, cpu, str(exit_status)]
-                print >>self.job_log_file, "\t".join(row)
-                self.job_log_file.flush()  # allow reading file now
-
-                del self[jobid]
-
+                self.process_job(jobid, job_info)
                 self.queue_unqueued_jobs()
 
                 # XXX: should be able to check
