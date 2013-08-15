@@ -8,12 +8,7 @@ __version__ = "$Revision$"
 
 ## Copyright 2013 Michael M. Hoffman <mmh1@uw.edu>
 
-from math import ceil
-from resource import getrlimit, RLIMIT_STACK
 from subprocess import Popen
-
-from .._util import MB
-from .common import _JobTemplateFactory, make_native_spec
 
 
 class JobTemplate(object):
@@ -92,7 +87,7 @@ class Session(object):
     TIMEOUT_NO_WAIT = "TIMEOUT_NO_WAIT"
 
     def __init__(self):
-        self.drmsInfo = "local_virtual_drmsInfo"
+        self.drmsInfo = "local"
         self.next_jobid = 1
         self.jobs = {}
 
@@ -102,9 +97,6 @@ class Session(object):
     def __exit__(self, type, value, traceback):
         for jobid, job in self.jobs.items():
             job.kill()
-
-    def drmsInfo(self):  # noqa
-        return "local"
 
     def runJob(self, job_tmpl):  # noqa
         jobid = str(self.next_jobid)
@@ -143,30 +135,9 @@ class ExitTimeoutException(Exception):
     "mimics drmaa.ExitTimeoutException"
 
 
-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX what is going on here?
-try:
-    STACK_LIMIT = min(num for num in getrlimit(RLIMIT_STACK) if num > 0)
-except ValueError:
-    STACK_LIMIT = 10 * MB
-
-
 class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage, tmp_usage):
         return []
-        #return [make_single_res_req("mem_requested", mem_usage),
-                #make_single_res_req("h_vmem", self.mem_limit),
-                #make_single_res_req("h_stack", STACK_LIMIT)]
 
     def make_native_spec(self):
-        # qsub -l: resource requirement
-        res_spec = make_native_spec(l=self.res_req)
-
-        res = " ".join([self.native_spec,
-                        make_native_spec(**NATIVE_SPEC_DEFAULT),
-                        res_spec])
-
-        return res
-
-def make_single_res_req(name, mem):
-    # round up to the next mebibyte
-    return "%s=%dM" % (name, ceil(mem / MB))
+        return ""
