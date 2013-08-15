@@ -3,7 +3,7 @@
 ## test_all.sh: run all tests
 
 ## $Revision$
-## Copyright 2012 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2012, 2013 Michael M. Hoffman <mmh1@uw.edu>
 
 set -o nounset -o pipefail -o errexit
 
@@ -19,7 +19,7 @@ fi
 
 TEST_ROOT="$(pwd)"
 
-find -maxdepth 2 -name "run.sh" -type f | while read file
+find -maxdepth 2 -name "run.sh" -type f | sort | while read file
 do
     echo "Running $(dirname $file)"
     cd "$(dirname $file)"
