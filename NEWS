@@ -1,30 +1,39 @@
 1.2.0:
 
-* KNOWN ISSUE: Segway will produce incorrect segmentations if the tracks are not specified in the order they appear in the genomedata archive providing the data.
-* now requires a new version of GMTK (>= 1.0.0 80c1d70cea9d (ticket161-2)) for increased speed
+* KNOWN ISSUE: Segway will produce incorrect segmentations if the
+  tracks are not specified in the order they appear in the genomedata
+  archive providing the data.
+* now requires a new version of GMTK (>= 1.0.0 80c1d70cea9d
+  (ticket161-2)) for increased speed
 * now requires Python >=2.6 (released 3.5 years ago) and <=3.0
   (although we will switch to Python 2.7 when we need it, so if you
   are upgrading, go all the way now)
 * now requires Genomedata >=1.3.1
 * default setuptools version now 0.6c11
+* segway: now has support for running without any cluster system or
+  drmaa. By default if nothing is available, or use SEGWAY_CLUSTER
+  (thanks to Max Libbrecht)
 * segway: now has experimental Torque support. PBS and PBS Pro will
   probably work with some changes--please e-mail Michael if you want
   to help with identifying the necessary changes (thanks to Jay Hesselberth)
+* segway: SEGWAY_CLUSTER environment variable allows manual
+  specification of a cluster system (e.g. export SEGWAY_CLUSTER=local)
 * segway: new escaping method from Genomedata tracknames to GMTK
   tracknames allows any arbitrary Genomedata trackname, but this means
   that previous files will be incompatible, since "_" is now replaced
   by "_5F" and "." by "_2E" (formerly both of these were "_", which
   was ambiguous)
-* segway: allow concatenated segmentation of tracks with --trackname track1,track2, which
-  gives you only one set of parameters. you may need to adjust
-  existing train.tab files to use track_specs instead of
-  include_tracknames because of other necessary changes
+* segway: allow concatenated segmentation of tracks with --trackname
+  track1,track2, which gives you only one set of parameters. you may
+  need to adjust existing train.tab files to use track_specs instead
+  of include_tracknames because of other necessary changes
 * segway: LSF: fix bug where wrapper script sometimes did not delete
   temporary observation files after a crash
 * segway: LSF: no longer generates mktemp warning messages
 * segway: more informative error message when supervision labels overlap each other
 * segway: segway.sh has cd command in addition to segway command
-* segway: MC/MX/REAL_MAT direct parameters are no longer trained (MEAN/COVAR/DENSECPT parameters are)
+* segway: MC/MX/REAL_MAT direct parameters are no longer trained
+  (MEAN/COVAR/DENSECPT parameters are)
 * segway-layer: add --bigBed option, which works if you have
   bedToBigBed in your path
 * segway: add --bigBed option which calls segway-layer --bigBed
@@ -37,6 +46,7 @@
 * segway-winner: fix issue #21. Now works on Python 2.5.1
 * installation: always require drmaa. setuptools extras_require wasn't that useful in practice
 * installation: include SLURM support if you have drivers/slurm.py installed
+* test: run pyflakes first
 * test: use fixed random seed to generate input.master every time
 * test: when files differ, output is in a form that makes it easier to diff
 * test: update for new GMTK

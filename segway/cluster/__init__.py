@@ -52,8 +52,8 @@ MAX_JOB_WAIT_SLEEP_TIME = 10  # max time to wait between checking job status
 
 
 def get_driver_name(session):
-    if DRIVER_OVERRIDE:
-        return DRIVER_OVERRIDE
+    if DRIVER_NAME_OVERRIDE:
+        return DRIVER_NAME_OVERRIDE
 
     drms_info = session.drmsInfo
 

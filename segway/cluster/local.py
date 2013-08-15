@@ -8,7 +8,10 @@ __version__ = "$Revision$"
 
 ## Copyright 2013 Michael M. Hoffman <mmh1@uw.edu>
 
+from resource import getrusage, RUSAGE_CHILDREN
 from subprocess import Popen
+
+from .common import _JobTemplateFactory, make_native_spec
 
 
 class JobTemplate(object):
@@ -58,7 +61,7 @@ class JobInfo(object):
     terminatedSignal = "LocalJobTemplateTerminatedSignal"
 
     def __init__(self, retcode):
-        self.resourceUsage = {"cpu": "-1", "vmem": "-1", "maxvmem": "-1"}
+        self.resourceUsage = self._get_resource_usage()
         if not retcode is None:
             self.hasExited = True
             self.exitStatus = retcode
@@ -71,7 +74,19 @@ class JobInfo(object):
             self.hasExited = False
             self.hasSignal = False
             self.wasAborted = False
-        pass
+
+    def _get_resource_usage(self):
+        # this generates results for all of the processes' children to date
+
+        # XXX: if you want accurate results we will have to fork a
+        # watcher for each sub-job
+
+        rusage = getrusage(RUSAGE_CHILDREN)
+
+        cpu = str(rusage.ru_utime + rusage.ru_stime)
+        vmem = str(rusage.ru_ixrss + rusage.ru_idrss)
+
+        return {"cpu": cpu, "vmem": vmem, "maxvmem": vmem}
 
 
 class Session(object):
@@ -141,3 +156,6 @@ class JobTemplateFactory(_JobTemplateFactory):
 
     def make_native_spec(self):
         return ""
+
+## here only for imports:
+make_native_spec
