@@ -5,7 +5,7 @@ __version__ = "$Revision$"
 
 # common stuff: needs to be in a different file from __init__ because
 # it is imported by lsf.py and sge.py
-# Copyright 2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011, 2012, 2013 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 from tempfile import gettempdir
@@ -81,7 +81,14 @@ class _JobTemplateFactory(object):
         return res
 
     def make_res_req(self, mem_usage, tmp_usage):
-        # pure virtual function
+        """
+        pure virtual function to be replaced in subclass
+
+        should set self.res_req; return value undefined
+
+        mem_usage: expected virtual memory use in bytes
+        tmp_usage: expected temporary space use in bytes
+        """
         raise NotImplementedError
 
     def make_args(self):
@@ -96,7 +103,12 @@ class _JobTemplateFactory(object):
         return wrapper_cmdline + self.args
 
     def make_native_spec(self):
-        # pure virtual function
+        """
+        pure virtual function to be replaced in subclass
+
+        should use self.res_req and return a string to go into
+        template.nativeSpecification
+        """
         raise NotImplementedError
 
 def make_native_spec(*args, **kwargs):
