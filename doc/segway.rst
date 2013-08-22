@@ -11,8 +11,6 @@ Segway requires the following prerequisites:
 
 You need Python 2.6 or 2.7.
 
-You need either Sun Grid Engine (SGE; now called Oracle Grid Engine),
-or Platform Load Sharing Facility (LSF) and FedStage DRMAA for LSF.
 You need Graphical Models Toolkit (GMTK), which you can get at
 <http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz>.
 You probably need to install NumPy separately.
@@ -21,7 +19,7 @@ You will need these Python packages, which will probably be installed
 automatically by ``pip install segway`` or ``easy_install segway``:
 ``genomedata>0.1.5``, ``textinput``, ``optbuild>0.1.6``,
 ``optplus>0.1.0``, ``tables>2.0.4``, ``forked-path``, ``colorbrewer``,
-``segway``, ``drmaa>=0.4a3``.
+``segway``
 
 If you are installing as an individual user, we have developed an
 ``install.py`` script that should make this easy.
@@ -31,8 +29,22 @@ If you are installing as a system administrator, we recommend using
 ``~/.pydistutils.cfg`` to install in your home directory. This should
 install many of the prerequisites as well.
 
+Standalone configuration
+------------------------
+Segway 1.2.0 now has experimental support for running without any
+cluster system. This will automatically be used when Segway fails to
+access any cluster system. You can force it by setting the
+`SEGWAY_CLUSTER` environment variable to `local`.
+
 Cluster configuration
 ---------------------
+If you want to use Segway with your cluster, you will need the
+``drmaa>=0.4a3`` Python package.
+
+You need either Sun Grid Engine (SGE; now called Oracle Grid Engine),
+Platform Load Sharing Facility (LSF) and FedStage DRMAA for LSF, or
+Torque/PBS/PBS Pro (experimental).
+
 If FedStage DRMAA for LSF is installed, Segway should be ready to go
 on LSF out of the box.
 
