@@ -595,8 +595,6 @@ Python interface
 I have designed Segway such that eventually one may call different
 components directly from within Python.
 
-.. To do so, import the following module: XXXcomp table here (from the setup.py)
-
 You can then call the appropriate module through its ``main()``
 function with the same arguments you would use at the command line.
 For example::
