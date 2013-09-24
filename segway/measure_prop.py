@@ -349,6 +349,8 @@ class MeasurePropRunner(Copier):
 
     def run_measure_prop(self, instance_index, round_index, mp_round_index):
         mp_exe = find_executable("MP_large_scale")
+        if mp_exe is None:
+            raise Exception("Could not find MP_large_scale executable!")
         #graph_filepath = self.make_mp_graph_filename(instance_index, round_index)
         graph_filepath = self.measure_prop_graph_filepath
         trans_filepath = self.make_mp_trans_filename(instance_index, round_index, mp_round_index)
