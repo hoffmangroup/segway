@@ -30,15 +30,18 @@ class Job(object):
         self.job_tmpl = job_tmpl
         output_path = job_tmpl.outputPath.split(":")[1]
         err_path = job_tmpl.errorPath.split(":")[1]
-        self.outfd = open(output_path, "w")
-        self.errfd = open(err_path, "w")
+        #self.outfd = open(output_path, "w")
+        #self.errfd = open(err_path, "w")
         self.closed = False
 
         cmd = [job_tmpl.remoteCommand] + job_tmpl.args
+        #self.proc = Popen(cmd,
+                          #env=job_tmpl.jobEnvironment,
+                          #stdout=self.outfd,
+                          #stderr=self.errfd,
+                          #cwd=job_tmpl.workingDirectory)
         self.proc = Popen(cmd,
                           env=job_tmpl.jobEnvironment,
-                          stdout=self.outfd,
-                          stderr=self.errfd,
                           cwd=job_tmpl.workingDirectory)
 
     def poll(self):
@@ -65,8 +68,8 @@ class Job(object):
 
     def _close(self):
         if not self.closed:
-            self.outfd.close()
-            self.errfd.close()
+            #self.outfd.close()
+            #self.errfd.close()
             self.closed = True
 
 class JobInfo(object):
