@@ -2500,8 +2500,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         track_indexes_text = ",".join(map(str, track_indexes))
 
         genomedataarg = (FILE_TRACKS_SENTINEL if self.file_tracks else self.genomedataname)
-        #track_indexes_text_arg = (",".join(self.track_specs) if self.file_tracks else track_indexes_text)
-        track_indexes_text_arg = self.tracks_spec_filename
+        track_indexes_text_arg = (self.tracks_spec_filename if self.file_tracks else track_indexes_text)
 
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
