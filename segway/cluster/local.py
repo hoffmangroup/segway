@@ -6,6 +6,7 @@ __version__ = "$Revision: 8497 $"
 from math import ceil
 from resource import getrlimit, RLIMIT_STACK
 import sys
+from os import environ
 from collections import namedtuple
 from subprocess import Popen
 from time import sleep
@@ -18,7 +19,18 @@ from .common import _JobTemplateFactory, make_native_spec
 NATIVE_SPEC_DEFAULT = dict(w="n", j="n")
 
 JOB_WAIT_SLEEP_TIME = 1 # seconds
-MAX_PARALLEL_JOBS = 32
+
+
+# This environment variable determines how many local
+# jobs should be run at once.
+try:
+    num_local_jobs_text = environ["SEGWAY_NUM_LOCAL_JOBS"]
+    try:
+        MAX_PARALLEL_JOBS = int(num_local_jobs_text)
+    except ValueError:
+        MAX_PARALLEL_JOBS = 32
+except KeyError:
+    MAX_PARALLEL_JOBS = 32
 
 # Mimics a DRMAA job template object
 class JobTemplate(object):
