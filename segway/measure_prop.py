@@ -362,6 +362,7 @@ class MeasurePropRunner(Copier):
                "-inputGraphName", graph_filepath,
                "-transductionFile", trans_filepath,
                "-labelFile", label_filepath,
+               "-numThreads", "32",
                "-outPosteriorFile", post_filepath,
                "-numClasses", str(self.num_segs),
                "-mu", str(self.mu),
