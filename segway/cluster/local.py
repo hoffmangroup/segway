@@ -10,6 +10,7 @@ from os import environ
 from collections import namedtuple
 from subprocess import Popen
 from time import sleep
+from threading import Event, Lock, Thread
 
 from .._util import MB
 from .common import _JobTemplateFactory, make_native_spec
@@ -47,6 +48,9 @@ class Job(object):
         self.closed = False
 
         cmd = [job_tmpl.remoteCommand] + job_tmpl.args
+        # XXX removing the stdout and stderr arguments causes
+        # outputs to go directly to stdout and stderr (rather than the
+        # output files)
         #self.proc = Popen(cmd,
                           #env=job_tmpl.jobEnvironment,
                           #stdout=self.outfd,
@@ -61,9 +65,6 @@ class Job(object):
         if not retcode is None:
             self._close()
         return retcode
-
-    #def wait(self, timeout):
-        #pass
 
     def kill(self):
         try:
@@ -117,6 +118,13 @@ class Session(object):
         self.jobs = {} # {jobid : Job}
         self.running_jobs = set() # set(jobid)
 
+        # This lock controls access to the jobs and running_jobs objects.
+        # These objects are modified in the runJob() and wait() functions.
+        # runJob() holds the lock for its full extent, so that the first thread
+        # to take the lock is the next to queue a job.  wait() holds the
+        # lock only when it finds a finished job.
+        self.lock = Lock()
+
     def __enter__(self):
         return self
 
@@ -129,6 +137,7 @@ class Session(object):
 
     def runJob(self, job_tmpl):
         # Wait until there are fewere than MAX_PARALLEL_JOBS running
+        self.lock.acquire()
         while len(self.running_jobs) >= MAX_PARALLEL_JOBS:
             found_finished_job = False
             for jobid in self.running_jobs:
@@ -144,6 +153,7 @@ class Session(object):
         self.id_counter += 1
         self.jobs[jobid] = Job(job_tmpl)
         self.running_jobs.add(jobid)
+        self.lock.release()
         return jobid
 
     def wait(self, jobid, timeout):
@@ -151,8 +161,11 @@ class Session(object):
             job = self.jobs[jobid]
             retcode = job.poll()
             if not retcode is None:
-                del self.jobs[jobid]
+                self.lock.acquire()
+                if jobid in self.jobs:
+                    del self.jobs[jobid]
                 self.running_jobs.discard(jobid)
+                self.lock.release()
                 return JobInfo(retcode)
             else:
                 raise ExitTimeoutException()
