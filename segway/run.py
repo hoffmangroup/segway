@@ -562,6 +562,7 @@ class Runner(object):
         self.graph_seg_strength = GRAPH_PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
+        self.log_likelihood_diff_frac = LOG_LIKELIHOOD_DIFF_FRAC
         self.max_frames = MAX_FRAMES
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
         self.ruler_scale = RULER_SCALE
@@ -635,6 +636,7 @@ class Runner(object):
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
                         ("max_train_rounds", "max_em_iters"),
+                        ("log_likelihood_diff_frac",),
                         ("reverse_world", "reverse_worlds"),
                         ("track", "track_specs")]
 
@@ -2114,7 +2116,7 @@ class Runner(object):
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
-                      lldp=LOG_LIKELIHOOD_DIFF_FRAC*100.0,
+                      lldp=self.log_likelihood_diff_frac*100.0,
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
 
@@ -2133,7 +2135,7 @@ class Runner(object):
         last_objective = objective_value(last_log_likelihood, last_mp_terms)
         objective = objective_value(log_likelihood, mp_terms)
         while (round_index < self.max_em_iters and
-               is_training_progressing(last_objective, objective)):
+               is_training_progressing(last_objective, objective, self.log_likelihood_diff_frac)):
             self.run_train_round(self.instance_index, round_index, **kwargs)
 
             last_log_likelihood = log_likelihood
@@ -2866,6 +2868,10 @@ def parse_options(args):
         group.add_option("--max-train-rounds", type=int, metavar="NUM",
                          help="each training instance runs a maximum of NUM"
                          " rounds (default %d)" % MAX_EM_ITERS)
+
+        group.add_option("--log-likelihood-diff-frac", type=float, metavar="FLOAT",
+                         help="Stops training when the log likelihood improves"
+                         " by less than a factor of FLOAT (default %s)" % LOG_LIKELIHOOD_DIFF_FRAC)
 
         group.add_option("--ruler-scale", type=int, metavar="SCALE",
                          help="ruler marking every SCALE bp (default %d)" %
