@@ -876,10 +876,7 @@ class Runner(object):
 
                 # XXX: eventually, should read ruler scale from file
                 # instead of using as a command-line option
-                try:
-                    assert len_slice.step == ruler_scale
-                except:
-                    pdb.set_trace() # XXX
+                assert len_slice.step == ruler_scale
 
                 len_tuple = (len_slice.start, len_slice.stop, len_slice.step)
                 len_row = zeros((SEG_TABLE_WIDTH))
