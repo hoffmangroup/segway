@@ -367,7 +367,6 @@ def is_training_progressing(last_ll, curr_ll,
     # using x !< y instead of x >= y to give the right default answer
     # in the case of NaNs
 
-    return True # XXX XXX XXX fixes number of training iterations
     return not abs((curr_ll - last_ll)/last_ll) < min_ll_diff_frac
 
 
@@ -2134,8 +2133,14 @@ class Runner(object):
                                 round_index, kwargs):
         last_objective = objective_value(last_log_likelihood, last_mp_terms)
         objective = objective_value(log_likelihood, mp_terms)
+
+        # Continue training as long as:
+        # - We haven't gone over max_em_iters
+        # - The log-likelihood is improving, unless we're using EGBR,
+        #   in which case always use max_em_iters
         while (round_index < self.max_em_iters and
-               is_training_progressing(last_objective, objective, self.log_likelihood_diff_frac)):
+               (self.measure_prop_graph_filepath or
+                is_training_progressing(last_objective, objective, self.log_likelihood_diff_frac))):
             self.run_train_round(self.instance_index, round_index, **kwargs)
 
             last_log_likelihood = log_likelihood

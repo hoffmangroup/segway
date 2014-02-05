@@ -15,8 +15,6 @@ import os
 import re
 import sys
 import uuid
-import subprocess # XXX
-import time # XXX
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
@@ -246,6 +244,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename, num_label
     sys.stderr.flush()
 
     # XXX: this whole function is duplicative of run_viterbi_save_bed and needs to be reduced
+
     # convert from tuple
     args = list(args)
 

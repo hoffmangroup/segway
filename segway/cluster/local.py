@@ -32,6 +32,7 @@ try:
         MAX_PARALLEL_JOBS = 32
 except KeyError:
     MAX_PARALLEL_JOBS = 32
+print >>sys.stderr, "Setting MAX_PARALLEL_JOBS = ", MAX_PARALLEL_JOBS # XXX
 
 # Mimics a DRMAA job template object
 class JobTemplate(object):
@@ -136,7 +137,7 @@ class Session(object):
         return "local_virtual_drmsInfo"
 
     def runJob(self, job_tmpl):
-        # Wait until there are fewere than MAX_PARALLEL_JOBS running
+        # Wait until there are fewer than MAX_PARALLEL_JOBS running
         self.lock.acquire()
         while len(self.running_jobs) >= MAX_PARALLEL_JOBS:
             found_finished_job = False
