@@ -3,7 +3,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011-2013 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011-2014 Michael M. Hoffman <mmh1@washington.edu>
 
 from collections import defaultdict
 from heapq import heappop, heappush
@@ -59,8 +59,8 @@ def get_driver_name(session):
 
     # XXX: find out what Son of Grid Engine and GridScheduler report
     if (drms_info.startswith("GE") or drms_info.startswith("SGE")
-            or drms_info.startswith("UGE")):
-        return "sge"
+            or drms_info.startswith("UGE") or drms_info.startswith("OGS/GE")):
+        return "sge" # XXX: should probably change to GE
     elif drms_info.startswith("Platform LSF"):
         return "lsf"
     elif drms_info.startswith("SLURM"):
