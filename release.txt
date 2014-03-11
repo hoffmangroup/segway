@@ -1,0 +1,30 @@
+release instructions:
+
+cd ~/src/sci-util/segway
+n001
+python setup.py install
+cd test
+./test.sh
+cd ..
+## XXX: better if you fix segway so it # runs on all systems
+release # must be done on n001
+emacsclient ~/etc/bash/load_modules.sh
+rm -r $ARCHHOME/bin/segway* $ARCHHOME/lib/segway*
+cd test
+n001
+./test.sh
+sage
+./test.sh
+XXX virtualbox
+
+XXX ship ~/src/sci-util/segway/dist/segway-XXX
+change default version in /net/noble/vol2/home/mmh1/shortcuts/modules/segway/.modulerc
+
+ebi-login
+python <(wget -O - http://noble.gs.washington.edu/proj/segway/install.py)
+cd ~/src/sci-util/segway
+svn up
+cd test
+./test.sh
+
+send e-mails with NEWS

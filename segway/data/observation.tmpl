@@ -1,0 +1,23 @@
+#ifndef USE_MFSDG
+   variable: presence__$track {
+      type: discrete observed $presence_index:$presence_index cardinality CARD_PRESENCE;
+
+      conditionalparents: CONDITIONALPARENTS_PRESENCE;
+   }
+#endif
+
+   variable: $track {
+      type: continuous observed $track_index:$track_index;
+
+#ifdef USE_MFSDG
+      conditionalparents: CONDITIONALPARENTS_OBS
+                          using mixture collection("collection_seg_$track")
+                          MAPPING_OBS;
+#else
+      switchingparents: presence__$track(0) using mapping("internal:copyParent");
+
+      conditionalparents: $conditionalparents_spec;
+#endif
+
+      weight: $weight_spec;
+   }

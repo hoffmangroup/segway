@@ -1,0 +1,12 @@
+map_supervisionLabel_seg_alwaysTrue
+2              % num parents
+% first parent is the label: 0 = no label; 1+ = (desired-1)
+% second parent is target
+    0 2 0 default
+        % no label
+        -1 1 % does not matter, observed child is always true
+
+        % label set
+        %% if the target == label - 1: then observed child is true
+        %% if the target != label - 1: then observed child is false => impossible
+        -1 { p1 == (p0-SUPERVISION_LABEL_OFFSET) }

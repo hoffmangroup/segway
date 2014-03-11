@@ -1,0 +1,14 @@
+#if CARD_SUPERVISIONLABEL >= 0
+   variable: alwaysTrue {
+     type: discrete observed value 1 cardinality CARD_BOOLEAN;
+
+     conditionalparents: supervisionLabel(0), seg(0)
+                         using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+   }
+
+   variable: supervisionLabel {
+     type: discrete observed $track_index:$track_index cardinality CARD_SUPERVISIONLABEL;
+
+     conditionalparents: CONDITIONALPARENTS_NIL_DISCRETE;
+   }
+#endif /* CARD_SUPERVISIONLABEL >= 0 */

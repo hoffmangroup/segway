@@ -1,0 +1,171 @@
+========
+ segway
+========
+by Michael Hoffman <mmh1@washington.edu>
+
+.. contents::
+
+Description
+===========
+DESCRIPTION
+
+Prerequisites
+=============
+You must have the following installed before installing segway:
+
+- Python_ 2.5.1
+- HDF5_ 1.8
+- NumPy_ 1.0.5
+
+XXX: NumPy should install automatically, but it doesn't.
+
+Additionally, the Segway setup script will automatically install
+the following packages or newer versions:
+
+- PyTables_ 2.1
+- path.py 2.2
+- setuptools 0.6c8
+- optbuild 0.1.6
+- textinput 0.1.1
+- colorbrewer 0.1.0
+
+XXX DRMAA is not automatically installed at the moment, you have to
+install it yourself. The URL is in the source to setup.py
+
+If you want DRMAA distributed job control (and you can't turn this off
+right now), it will also install:
+
+- drmaa
+
+It works with SGE or LSF. If you are using LSF, there is an additional
+prerequisite of FedStage_ DRMAA for LSF:
+
+.. _FedStage http://sourceforge.net/projects/lsf-drmaa/
+
+In order for automatic prerequisite installation to work, you either
+need write access to your Python installation's site-packages
+directory, or to configured setuptools to install into your
+home directory automatically (see hint below).
+
+.. _GCC: http://gcc.gnu.org/
+.. _HDF5: http://www.hdfgroup.org/
+.. _NumPy: http://numpy.scipy.org/
+.. _Python: http://www.python.org/
+.. _PyTables: http://www.pytables.org/
+
+If you want to use DRMAA to manage a cluster, you will need to ensure
+that DRMAA headers are in C_INCLUDE_PATH, and DRMAA libraries are in
+the default library path. For example, these two bash commands will
+set up the appropriate environment variables to use Sun Grid Engine:
+
+export C_INCLUDE_PATH="${SGE_ROOT}/include:${C_INCLUDE_PATH}"
+export LDFLAGS="${LDFLAGS} -L${SGE_ROOT}/lib/$($SGE_ROOT/util/arch)"
+
+Then install Segway.
+
+Hints on installing the prerequisites in your home directory
+------------------------------------------------------------
+To install the prerequisites, the easiest thing to do is use your
+system's package manager. This may require you to be root. If you
+aren't, here are some hints on how to install things within your home
+directory. Check to make sure the packages aren't already available on
+your system first.
+
+Configuration and directory setup
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+This will create some directories for you to store your own
+libraries. In case you are using a multiplatform system, binary
+libraries go into specific directories for each platform under your
+home directory. For example, on a Linux x86_64 system,
+platform-specific code goes in ``~/arch/Linux-x86_64``.
+
+You'll need stuff like this in your ``~/.bashrc`` to determine your
+platform and set up appropriate paths::
+
+  export ARCH=$(uname)-$(uname -m)
+
+  export PATH=${HOME}/arch/${ARCH}/bin:${HOME}/arch/${ARCH}/opt/python-2.5.1/bin:${HOME}/bin:${PATH}
+
+  unset PYTHONHOME
+
+  PYTHON_VERSION=2.5
+  export PYTHONPATH=${HOME}/arch/${ARCH}/lib/python${PYTHON_VERSION}:${HOME}/lib/python${PYTHON_VERSION}
+
+  export HDF5_DIR=${HOME}/arch/${ARCH}/opt/hdf5-1.8.1
+
+You'll also need to load this configuration for the rest of these
+hints, and create the appropriate directories. Run this from the bash
+prompt::
+
+  source ~/.bashrc
+  mkdir -p ${HOME}/arch/${ARCH}/lib/python${PYTHON_VERSION} \
+    ${HOME}/lib/python${PYTHON_VERSION} ${HOME}/arch/${ARCH}/bin \
+    ${HOME}/bin:${PATH} ${HOME}/arch/${ARCH}/opt
+
+HDF5
+~~~~
+Download the HDF5 source tarball, build, test, and install it::
+
+  wget ftp://ftp.hdfgroup.org/HDF5/current/src/hdf5-1.8.1.tar.gz
+  tar zxvf hdf5-1.8.1.tar.gz
+  cd hdf5-1.8.1
+  ./configure --prefix=${HDF5_DIR}
+  make
+  make install
+
+Python
+~~~~~~
+If you're using MacOS or Windows, there are binaries available at
+<http://www.python.org/download/>. If not, you can download the source
+tarball, build, test, and install it::
+
+  wget http://www.python.org/ftp/python/2.5.1/Python-2.5.1.tar.bz2
+  tar jxvf Python-2.5.1.tar.bz2
+  cd Python-2.5.1
+  ./configure --prefix=~/arch/${ARCH}/opt/python-2.5.1
+  LD_RUN_PATH=${HDF5_DIR}:${LD_RUN_PATH} make
+  make install
+
+Setuptools
+~~~~~~~~~~
+To get setuptools to automatically install packages within your home
+directory, put this in ``~/.pydistutils.cfg``::
+
+  [install]
+  prefix = ~
+  exec_prefix = ~/arch/$ARCH
+  install_platlib = $platbase/lib/python$py_version_short
+  install_purelib = $base/lib/python$py_version_short
+  install_scripts = $platbase/bin
+
+  [easy_install]
+  install_dir = $platbase/lib/python$py_version_short
+  script_dir = $platbase/bin
+
+You must set ``$ARCH`` as above in your .bashrc. The other variables
+will be determined by Python.
+
+Installation
+============
+python setup.py install
+
+Using
+=====
+All commands have help with --help.
+
+1. Set up your HDF5 skeletons with ``segway-load-seq`` and ``segway-name-tracks``.
+2. Populate the skeletons with data using ``segway-load-data``.
+3. Run ``segway`` on the HDF5 files.
+
+License
+=======
+Segway is distributed in the hope that it will be useful, but WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.
+
+Contact
+=======
+Please let me <mmh1@washington.edu> know if you have any
+comments on the installation or use of Segway. I would love to know
+if you get it working on a system not listed above.
+

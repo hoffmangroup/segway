@@ -1,0 +1,16 @@
+map_segTransition_ruler_seg_segCountDown_segCountDown
+4
+    0 2 2 default
+      % segTransition(0) == 2 (seg transition):
+      % reinitialize the segCountDown value based on the usual tree
+      % used at the beginning of a segment
+      2 $tree
+
+      % segTransition(0) in (0, 1) (no transition, subseg transition):
+      1 2 0 default
+            % ruler(0) == 0:
+            -1 { p3 } % not at ruler mark -> copy previous value
+
+            % ruler(0) == 1:
+            -1 { max(p3-1, 0) } % subtract 1 from previous value, or 0
+

@@ -1,0 +1,271 @@
+#!/usr/bin/env python
+"""
+General installation script for the segway package. Interacts with
+the user to configure the environment to download and install all
+dependencies and the segway package.
+
+This script is designed to be downloaded and run independently, and
+will guide the process of downloading and installing all other source
+code.
+
+(c) 2009: Orion Buske <stasis {at} uw {dot} edu>
+
+"""
+import platform
+
+PKG_VERSION = "1.2.0"
+GMTK_VERSION = "20091016"
+
+${COMMON_CODE_HEADER}
+
+MIN_HDF5_VERSION = "1.8"
+MIN_NUMPY_VERSION = "1.2"
+MIN_DRMAA_VERSION = "0.4a3"
+
+LSF_DRMAA_URL = "http://downloads.sourceforge.net/project/lsf-drmaa/lsf_drmaa/1.0.4/lsf_drmaa-1.0.4.tar.gz"
+
+GMTK_VERSION_FILENAME = "gmtk.version"
+GMTK_URL = "http://noble.gs.washington.edu/proj/segway/gmtk/" \
+    "gmtk-%s.tar.gz" % GMTK_VERSION
+
+SEGWAY_URL = "http://noble.gs.washington.edu/proj/segway/src/" \
+    "segway-%s.tar.gz" % PKG_VERSION
+
+# also has keywords: OPTFLAGS, ARCH_GCC, SSELEVEL
+GMTK_INSTALL_SCRIPT = """
+cd $tmpdir
+wget $url -O $file
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
+cd $filebase
+
+mkdir -p "$dir/bin"
+mkdir tksrc/bin 2>/dev/null || true
+
+if [[ "$(find . -name "*.a" -print0)" ]]; \
+then find . -name "*.a" -print0 | xargs -0 rm; \
+fi
+
+make clean "OPTFLAGS=$OPTFLAGS"
+make linux "OPTFLAGS=$OPTFLAGS"
+make depend "OPTFLAGS=$OPTFLAGS"
+
+make "OPTFLAGS=$OPTFLAGS"
+make -C featureFileIO install "OPTFLAGS=$OPTFLAGS" \
+    "INSTALL=install" "install_prefix=$dir"
+make -C tksrc install "OPTFLAGS=$OPTFLAGS" "install_prefix=$dir"
+
+mkdir -p "$dir/etc"
+declare -p OPTFLAGS > "$dir/etc/gmtk.build-options"
+echo "$version" > "$dir/etc/gmtk.version"
+"""
+
+LSF_DRMAA_INSTALL_SCRIPT = """
+cd $tmpdir
+wget $url -O $file
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
+cd $filebase
+./configure --prefix=$dir
+make
+make install
+"""
+
+SEGWAY_INSTALL_SCRIPT = """
+cd $tmpdir
+wget $url -O $file
+if [[ ! -d $filebase ]]; then tar -xzf $file; fi
+cd $filebase
+$python setup.py install
+"""
+
+${COMMON_CODE_BODY}
+
+class GmtkInstaller(ScriptInstaller):
+    name = "GMTK"
+    min_version = GMTK_VERSION
+    url = GMTK_URL
+    install_script = GMTK_INSTALL_SCRIPT
+
+    def __init__(self, env):
+        self.env = env
+        super(self.__class__, self).__init__()
+
+    def get_version_file(self, gmtkdir):
+        return os.path.join(gmtkdir, "etc", GMTK_VERSION_FILENAME)
+
+    def get_version(self):
+        """Returns the version in the gmtk version file or None if not found"""
+        version_file = self.get_version_file(self.env.arch_home)
+        if not os.path.isfile(version_file):
+            cmd = Popen(["which", "gmtkViterbi"], stdout=PIPE, stderr=PIPE)
+            if cmd.poll() == 0:
+                stdout = cmd.communicate()[0].strip()
+                bindir = stdout[0]
+                gmtkdir = os.path.dirname(os.path.dirname(bindir))
+                version_file = self.get_version_file(gmtkdir)
+            else:
+                return None
+
+        if version_file and os.path.isfile(version_file):
+            ifp = open(version_file)
+            try:
+                version = ifp.readline().strip()
+            finally:
+                ifp.close()
+
+            if len(version) > 0:
+                return version
+
+        return None
+
+    def install(self):
+        optflags = self.get_optflags()
+        env = {"OPTFLAGS": optflags}
+        self.script_install(dir=self.env.arch_home, safe=True, env=env)
+
+    def get_optflags(self):
+        if "OPTFLAGS" in os.environ:
+            return os.environ["OPTFLAGS"]
+
+        if "ARCH" in os.environ:
+            arch = os.environ["ARCH"]
+        else:
+            arch = "-".join([platform.system(), platform.machine()])
+
+        arch_gcc = None
+        sselevel = None
+        if arch in ["Linux-i386", "Linux-x86_64"] or arch.startswith("CYGWIN"):
+            # Determine SSELEVEL
+            sselevel = 2  # default
+            cmd = Popen('grep "^flags" /proc/cpuinfo | cut -d : -f 2',
+                        shell=True, stdout=PIPE)
+            stdout, stderr = cmd.communicate()
+            for line in stdout.split("\n"):
+                tokens = line.strip().split()
+                if "bpni" in tokens:
+                    sselevel = 3
+
+            # Determine ARCH_GCC
+            cmd = Popen('grep "^model name" /proc/cpuinfo | cut -d : -f 2',
+                        shell=True, stdout=PIPE)
+            cpu_model, stderr = cmd.communicate()
+            if "Opteron" in cpu_model:
+                arch_gcc = "opteron"
+            elif "Pentium" in cpu_model or "Xeon" in cpu_model:
+                if arch == "Linux-i386" or arch.startswith("CYGWIN"):
+                    if sselevel == 3:
+                        arch_gcc = "prescott"
+                    else:
+                        arch_gcc = "pentium4"
+                elif arch == "Linux-x86_64":
+                    arch_gcc = "nocona"
+
+        optflags = "-g -O3 -D_TABLE"
+        if arch_gcc:
+            optflags += " -march=%s" % arch_gcc
+        if sselevel:
+            optflags += " -mfpmath=sse -msse%d" % sselevel
+
+        return optflags
+
+
+class LsfDrmaaInstaller(ScriptInstaller):
+    name = "FedStage DRMAA for LSF"
+    url = LSF_DRMAA_URL
+    install_script = LSF_DRMAA_INSTALL_SCRIPT
+
+    def __init__(self, env):
+        self.env = env
+        super(self.__class__, self).__init__()
+
+    def get_version(self):
+        """Returns True if library found, None otherwise."""
+        return can_find_library("libdrmaa.so")
+
+    def install(self):
+        drmaa_dir = self.prompt_install_path(self.env.arch_home)
+        self.script_install(dir=drmaa_dir)
+        self.drmaa_dir = drmaa_dir
+
+    # XXX: save_to_var should be renamed save_var_path
+    # but this is not a PATH in that sense
+    def cleanup(self, success):
+        if success and self.drmaa_dir:
+            # Save environment variable for drmaa-python
+            filename = os.path.join(self.drmaa_dir, "libdrmaa.so")
+            self.env.shell.save_var("DRMAA_LIBRARY_PATH", filename)
+
+        super(self.__class__, self).cleanup(success)
+
+
+class DrmaaInstaller(EasyInstaller):
+    name = "drmaa"
+    min_version = MIN_DRMAA_VERSION
+    get_version = EasyInstaller.get_egg_version
+
+    def __init__(self, env):
+        self.env = env
+        super(self.__class__, self).__init__()
+
+    def start_install(self):
+        print >>sys.stderr, "\nSearching for LSF or SGE...",
+        lsf_found = self.env.has_lsf()
+        sge_found = self.env.has_sge()
+        if not (lsf_found or sge_found):
+            print >>sys.stderr, "not found."
+            print >> sys.stderr, """
+Segway can only be run where there is a cluster management system.
+I was unable to find either an LSF or SGE system.
+Please try reinstalling on a system with one of these installed.
+"""
+            return False
+
+        print >>sys.stderr, "found!"
+        if lsf_found and not sge_found:
+            # Need to download and install FedStage lsf-drmaa
+            installer = LsfDrmaaInstaller(self.env)
+            success = installer.run()
+            if not success:
+                print >>sys.stderr, "%s is required for %s" % \
+                    (installer.name, self.name)
+                return False
+
+        return True
+
+
+class SegwayInstaller(ScriptInstaller, EasyInstaller):
+    name = "Segway"
+    min_version = PKG_VERSION
+    url = SEGWAY_URL
+    install_script = SEGWAY_INSTALL_SCRIPT
+    get_version = EasyInstaller.get_egg_version
+
+    def install(self):
+        self.script_install()
+
+
+############################## MAIN #########################
+def main(args=sys.argv[1:]):
+    env = Environment()
+    env.initialize()
+
+    installers = [SetuptoolsInstaller(),
+                  Hdf5Installer(env),
+                  NumpyInstaller(),
+                  DrmaaInstaller(env),
+                  GmtkInstaller(env),
+                  PytablesInstaller(),
+                  SegwayInstaller()]
+
+    for installer in installers:
+        installer.run()
+        # Next step may need just-installed eggs, so update site list
+        env.refresh_packages()
+
+    # DONE: Test package installations?
+    TestSuite().run([PytablesTester()])
+
+    env.close()
+
+
+if __name__ == "__main__":
+    sys.exit(main())

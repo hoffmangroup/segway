@@ -1,0 +1,5 @@
+% XXXopt: good candidate for a linear combination C deterministic mapper
+
+map_seg_subseg_obs
+2       % num parents
+        -1 { p0*CARD_SUBSEG + p1 } 

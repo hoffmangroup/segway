@@ -1,0 +1,71 @@
+#include "${include_filename}"
+
+#if CARD_SEG != $card_seg
+#error Specified number of segment labels (CARD_SEG) does not match the number used for this input master file ($card_seg)
+#endif
+
+$dt_spec
+$name_collection_spec
+$dirichlet_spec
+
+DPMF_IN_FILE inline
+1
+
+0 dpmf_always 1 1.0
+
+DETERMINISTIC_CPT_IN_FILE inline
+#if CARD_SUPERVISIONLABEL == -1
+5
+#else /* CARD_SUPERVISIONLABEL != -1 */
+6
+#endif /* CARD_SUPERVISIONLABEL == -1 */
+
+0 seg_segCountDown
+1
+CARD_SEG CARD_SEGCOUNTDOWN
+map_seg_segCountDown
+
+1 frameIndex_ruler
+1
+CARD_FRAMEINDEX CARD_RULER
+map_frameIndex_ruler
+
+2 segTransition_ruler_seg_segCountDown_segCountDown
+4
+CARD_SEGTRANSITION CARD_RULER CARD_SEG CARD_SEGCOUNTDOWN CARD_SEGCOUNTDOWN
+map_segTransition_ruler_seg_segCountDown_segCountDown
+
+3 seg_seg_copy
+1
+CARD_SEG CARD_SEG
+internal:copyParent
+
+4 subseg_subseg_copy
+1
+CARD_SUBSEG CARD_SUBSEG
+internal:copyParent
+
+#if CARD_SUPERVISIONLABEL != -1
+5 supervisionLabel_seg_alwaysTrue
+2
+CARD_SUPERVISIONLABEL CARD_SEG CARD_BOOLEAN
+map_supervisionLabel_seg_alwaysTrue
+#endif
+
+#ifndef INPUT_PARAMS_FILENAME
+
+$dense_cpt_spec
+$mean_spec
+$covar_spec
+
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+
+#endif
+
+$real_mat_spec
+$mc_spec
+$mx_spec

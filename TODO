@@ -1,0 +1,11 @@
+ROADMAP:
+
+will gradually move file generation code out of segway/run.py:Runner into Saver
+classes. For example, see segway/input_master.py:InputMasterSaver
+
+Remove non-core, undocumented scripts like h5histogram
+
+* fix docs (latexpdf missing, no man target)
+* check that recovery files are there (when -r specified) before
+  spinning off threads
+
