@@ -50,6 +50,7 @@
 * test: use fixed random seed to generate input.master every time
 * test: when files differ, output is in a form that makes it easier to diff
 * test: update for new GMTK
+* prereqs: hgtools is now a prerequisite
 
 1.1.0:
 
