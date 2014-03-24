@@ -8,7 +8,7 @@ functional genomics data.
 
 __version__ = "1.2.0"
 
-# Copyright 2008-2013 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2014 Michael M. Hoffman <mmh1@washington.edu>
 
 import sys
 
@@ -48,6 +48,18 @@ install_requires = ["genomedata>1.3.1", "textinput", "optbuild>0.1.10",
                     "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
                     "colorbrewer", "drmaa>=0.4a3"]
 
+def hg_id(mgr, kind):
+    return mgr._invoke("id", "--%s" % kind).strip()
+
+def calc_version(mgr, options):
+    id_num = hg_id(mgr, "num")
+    id_id = hg_id(mgr, "id")
+    id_id = id_id.replace("+", "p")
+
+    # "rel" always comes after r, so new numbering system is preserved
+    # XXX: after 1.2.0 is released, we can change rel back to r
+    return "%s.dev-rel%s-hg%s" % (__version__, id_num, id_id)
+
 if __name__ == "__main__":
     setup(name=name,
           version=__version__,
@@ -59,10 +71,12 @@ if __name__ == "__main__":
           classifiers=classifiers,
           long_description=long_description,
           install_requires=install_requires,
+          setup_requires=["hgtools"],
           zip_safe=False, # XXX: change back, this is just for better tracebacks
 
           # XXX: this should be based off of __file__ instead
           packages=find_packages("."),
           include_package_data=True,
+          use_vcs_version={"version_handler": calc_version},
           entry_points=entry_points
           )
