@@ -7,7 +7,7 @@ run: main Segway implementation
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2013 Michael M. Hoffman <mmh1@uw.edu>
+# Copyright 2008-2014 Michael M. Hoffman <mmh1@uw.edu>
 
 from collections import defaultdict, namedtuple
 from copy import copy
@@ -1371,6 +1371,19 @@ class Runner(object):
                                    self.clobber, instance_index)
 
     def load_supervision(self):
+        # The semi-supervised mode changes the DBN structure so there is an
+        # additional "supervisionLabel" observed variable at every frame. This
+        # can then be used to deterministically force the hidden state to have
+        # a certain value at certain positions. From the Segway application's
+        # point of view, absolutely everything else is the same--it works just
+        # like unsupervised segmentation with an extra observed variable and
+        # slightly different. GMTK does all the magic here (and from GMTK's
+        # point of view, it's just a slightly different structure with a
+        # different observed variable).
+        #
+        # The *semi* part of semi-supervised is that you can do this only at
+        # certain positions and leave the rest of the genome unsupervised.
+
         supervision_type = self.supervision_type
         if supervision_type == SUPERVISION_UNSUPERVISED:
             return
