@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011, 2012, 2014 Michael M. Hoffman <mmh1@washington.edu>
 
 from os import environ
 import sys
@@ -56,16 +56,13 @@ class JobTemplateFactory(_JobTemplateFactory):
     set_template_output_error = False
 
     def make_res_req(self, mem_usage, tmp_usage):
-        # always specified in MB, unaffected by LSF_UNIT_FOR_LIMITS
-        # see Administering Platform LSF: Working with Resources:
-        # Understanding Resources
-
-        mem_usage_mb = ceildiv(mem_usage, MB)
-        tmp_usage_mb = ceildiv(tmp_usage, MB)
+        mem_usage_spec = ceildiv(mem_usage, DIVISOR_FOR_LIMITS)
+        tmp_usage_spec = ceildiv(tmp_usage, DIVISOR_FOR_LIMITS)
 
         # returns a quoted string
         return ('"select[mem>%s && tmp>%s] rusage[mem=%s, tmp=%s]"'
-                % (mem_usage_mb, tmp_usage_mb, mem_usage_mb, tmp_usage_mb))
+                % (mem_usage_spec, tmp_usage_spec,
+                   mem_usage_spec, tmp_usage_spec))
 
     def make_postexec_cmdline(self):
         assert TEMP_DIRNAME.startswith("/")
