@@ -2,6 +2,12 @@ syntax: glob
 
 build
 dist
+TAGS
+.ropeproject
 *.pyc
 *.egg-info
 *.egg
+test/*/test-*
+doc/_build
+doc/_static
+doc/_templates
