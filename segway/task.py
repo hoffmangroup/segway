@@ -16,7 +16,7 @@ import sys
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import array, empty, where, diff, r_
+from numpy import argmax, array, empty, where, diff, r_, zeros
 from path import path
 
 from .observations import _save_window
@@ -161,6 +161,13 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     probs = read_posterior(infile, num_frames, num_labels)
     probs_rounded = empty(probs.shape, int)
 
+    # Write posterior code file
+    posterior_code = argmax(probs, axis=1)
+    start_pos, labels = find_segment_starts(posterior_code)
+    bed_filename = outfilename_tmpl % "_code"
+    save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
+
+    # Write label-wise posterior bedgraph files
     outfilenames = []
     for label_index in xrange(num_labels):
         outfilenames.append(outfilename_tmpl % label_index)
