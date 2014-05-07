@@ -72,7 +72,7 @@ def parse_viterbi(lines, do_reverse=False):
 
     # Printing random variables from (P,C,E)=(1,999,0) partitions
     line = lines.next()
-    assert line.startswith("Printing random variables from (P,C,E)")
+    assert line.startswith("Printing random variables from (P',C',E')")
 
     # sentinel value
     res = fill_array(SEG_INVALID, num_frames, DTYPE_IDENTIFY)
