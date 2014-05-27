@@ -19,6 +19,10 @@ fi
 
 TEST_ROOT="$(pwd)"
 
+# Ignore deprecation warnings raised by Python 2.6
+# Temporarily set python warnings env var to ignore deprecation warnings
+export PYTHONWARNINGS="ignore::DeprecationWarning"
+
 find -maxdepth 2 -name "run.sh" -type f | sort | while read file
 do
     echo "Running $(dirname $file)"
