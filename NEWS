@@ -1,5 +1,7 @@
 1.2.0:
 
+* segway: made matching against unmodified vs. modified partitions output from
+  gmtk more lenient to match against
 * KNOWN ISSUE: Segway will produce incorrect segmentations if the
   tracks are not specified in the order they appear in the genomedata
   archive providing the data.
