@@ -16,7 +16,7 @@ from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, product
-from math import ceil, ldexp
+from math import ceil, ldexp, isnan
 from os import environ, extsep
 import re
 from shutil import copy2
@@ -358,7 +358,20 @@ def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
     # using x !< y instead of x >= y to give the right default answer
     # in the case of NaNs
-    return not abs((curr_ll - last_ll) / last_ll) < min_ll_diff_frac
+    #return not abs((curr_ll - last_ll) / last_ll) < min_ll_diff_frac
+    delta = (curr_ll - last_ll) / abs(last_ll)
+    print curr_ll, last_ll, delta
+    if (delta > min_ll_diff_frac) or isnan(delta):
+        return True
+    elif 0 <= delta < min_ll_diff_frac:
+        return False
+    elif -min_ll_diff_frac < delta < 0:
+        warn("Likelihood has decreased from previous iteration")
+        return False
+    else:
+        #raise RuntimeError("Likelihood has decreased beyond threshold")
+        #return False
+        return True
 
 
 def set_cwd_job_tmpl(job_tmpl):
