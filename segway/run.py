@@ -252,7 +252,7 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "log_likelihood_filename"])
 OFFSET_FILENAMES = 2  # where the filenames begin in Results
 
-VITERBI_REGEX_FILTER = "^seg$"
+VITERBI_REGEX_FILTER = "^[a-z]*seg$"
 
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 

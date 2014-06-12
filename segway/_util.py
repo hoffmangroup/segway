@@ -17,7 +17,7 @@ import sys
 import re
 
 import colorbrewer
-from numpy import (append, array, diff, empty, insert, intc, zeros)
+from numpy import (append, array, diff, empty, insert, intc, float_, zeros)
 
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
@@ -46,7 +46,7 @@ SUFFIX_BED = extsep + EXT_BED
 SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_TAB = extsep + EXT_TAB
 
-DTYPE_IDENTIFY = intc
+DTYPE_IDENTIFY = float_
 DTYPE_OBS_INT = intc
 DTYPE_SEG_LEN = intc
 

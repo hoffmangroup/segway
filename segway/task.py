@@ -40,12 +40,14 @@ EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
 USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
+test_out = open("task.log", "w")
 
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
 
 re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
+re_subseg = re.compile(r"^subseg\((\d+)\)=(\d+)$")
 
 
 def parse_viterbi(lines, do_reverse=False):
@@ -62,6 +64,7 @@ def parse_viterbi(lines, do_reverse=False):
 
     # Segment 0, number of frames = 1001, viteri-score = -6998.363710
     line = lines.next()
+    test_out.write(line)
     assert line.startswith("Segment ")
 
     num_frames_text = line.split(", ")[1].partition(" = ")
@@ -79,6 +82,7 @@ def parse_viterbi(lines, do_reverse=False):
 
     for line in lines:
         # Ptn-0 P': seg(0)=24,seg(1)=24
+        test_out.write(line)
         if line.startswith(MSG_SUCCESS):
             assert (res != SEG_INVALID).all()
             return res
@@ -89,6 +93,13 @@ def parse_viterbi(lines, do_reverse=False):
 
         for pair in values.split(","):
             match = re_seg.match(pair)
+            sub_match = re_subseg.match(pair)
+            if sub_match:
+                index = int(sub_match.group(1))
+                if do_reverse:
+                    index = -1 - index
+                val = int(sub_match.group(2))
+                res[index] = float(str(int(res[index])) + '.' + str(val))
             if not match:
                 continue
 
@@ -107,8 +118,7 @@ def parse_viterbi(lines, do_reverse=False):
 # num_cols is for use by genomedata_count_condition
 # XXX: should move this function somewhere else
 
-def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
-              num_cols=None):
+def write_bed(outfile, start_pos, labels, coord, resolution, num_labels, num_cols=None, num_sublabels=None, sublabels=None):
     """
     start_pos is an array
     """
@@ -134,7 +144,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
 
         chrom_start = str(seg_start)
         chrom_end = str(seg_end)
-        item_rgb = get_label_color(seg_label)
+        item_rgb = get_label_color(int(seg_label))
 
         row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
                chrom_start, chrom_end, item_rgb][:num_cols]
