@@ -22,7 +22,7 @@ from path import path
 from .observations import _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, fill_array, find_segment_starts,
-                    get_label_color, label_to_int,
+                    get_label_color,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
 
@@ -141,7 +141,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels, num_col
 
         chrom_start = str(seg_start)
         chrom_end = str(seg_end)
-        item_rgb = get_label_color(label_to_int(seg_label))
+        item_rgb = get_label_color(int(float(seg_label)))
 
         row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
                chrom_start, chrom_end, item_rgb][:num_cols]

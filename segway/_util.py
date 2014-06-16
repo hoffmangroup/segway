@@ -190,13 +190,6 @@ def is_gz_filename(filename):
     return filename.endswith(SUFFIX_GZ)
 
 
-def label_to_int(label):
-    try:
-        return int(label)
-    except ValueError:
-        return int(str(label)[0])
-
-
 def maybe_gzip_open(filename, mode="r", *args, **kwargs):
     if filename == "-":
         if mode.startswith("U"):
