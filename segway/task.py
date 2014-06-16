@@ -16,13 +16,13 @@ import sys
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import argmax, array, empty, where, diff, r_, zeros
+from numpy import argmax, array, empty, where, diff, r_
 from path import path
 
 from .observations import _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, fill_array, find_segment_starts,
-                    get_label_color,
+                    get_label_color, label_to_int,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
 
@@ -40,7 +40,6 @@ EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
 USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
-test_out = open("task.log", "w")
 
 
 def make_track_indexes(text):
@@ -64,7 +63,6 @@ def parse_viterbi(lines, do_reverse=False):
 
     # Segment 0, number of frames = 1001, viteri-score = -6998.363710
     line = lines.next()
-    test_out.write(line)
     assert line.startswith("Segment ")
 
     num_frames_text = line.split(", ")[1].partition(" = ")
@@ -78,13 +76,12 @@ def parse_viterbi(lines, do_reverse=False):
     assert line.startswith("Printing random variables from (P',C',E')")
 
     # sentinel value
-    res = fill_array(SEG_INVALID, num_frames, DTYPE_IDENTIFY)
+    res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_IDENTIFY)
 
     for line in lines:
         # Ptn-0 P': seg(0)=24,seg(1)=24
-        test_out.write(line)
         if line.startswith(MSG_SUCCESS):
-            assert (res != SEG_INVALID).all()
+            assert (res[0] != SEG_INVALID).all()
             return res
 
         assert line.startswith("Ptn-")
@@ -99,7 +96,7 @@ def parse_viterbi(lines, do_reverse=False):
                 if do_reverse:
                     index = -1 - index
                 val = int(sub_match.group(2))
-                res[index] = float(str(int(res[index])) + '.' + str(val))
+                res[1][index] = val
             if not match:
                 continue
 
@@ -109,7 +106,7 @@ def parse_viterbi(lines, do_reverse=False):
 
             val = int(match.group(2))
 
-            res[index] = val
+            res[0][index] = val
 
     # shouldn't get to this point
     raise ValueError("%s did not complete successfully" % VITERBI_PROG.prog)
@@ -144,7 +141,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels, num_col
 
         chrom_start = str(seg_start)
         chrom_end = str(seg_end)
-        item_rgb = get_label_color(int(seg_label))
+        item_rgb = get_label_color(label_to_int(seg_label))
 
         row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
                chrom_start, chrom_end, item_rgb][:num_cols]
@@ -211,10 +208,10 @@ def load_posterior_save_bed(coord, resolution, do_reverse,
 
 
 def parse_viterbi_save_bed(coord, resolution, do_reverse,
-                           viterbi_lines, bed_filename, num_labels):
+                           viterbi_lines, bed_filename, num_labels, output_seg):
     data = parse_viterbi(viterbi_lines, do_reverse)
 
-    start_pos, labels = find_segment_starts(data)
+    start_pos, labels = find_segment_starts(data, output_seg)
 
     save_bed(bed_filename, start_pos, labels, coord, resolution,
              int(num_labels))
@@ -306,7 +303,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
-                         num_labels, genomedataname, float_filename,
+                         num_labels, output_seg, genomedataname, float_filename,
                          int_filename, distribution,
                          track_indexes_text, *args):
     # convert from tuple
@@ -356,7 +353,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     lines = output.splitlines()
 
     return parse_viterbi_save_bed(coord, resolution, do_reverse,
-                                  lines, outfilename, num_labels)
+                                  lines, outfilename, num_labels, output_seg)
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,

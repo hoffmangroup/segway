@@ -73,6 +73,7 @@ DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
+OUTPUT_SEG = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 
@@ -218,7 +219,7 @@ TRAIN_OPTION_TYPES = \
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
          distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
-         num_segs=int, num_subsegs=int, track_specs=[str],
+         num_segs=int, num_subsegs=int, output_seg=str, track_specs=[str],
          reverse_worlds=[int])
 
 # templates and formats
@@ -369,8 +370,6 @@ def is_training_progressing(last_ll, curr_ll,
         warn("Likelihood has decreased from previous iteration")
         return False
     else:
-        #raise RuntimeError("Likelihood has decreased beyond threshold")
-        #return False
         return True
 
 
@@ -592,6 +591,7 @@ class Runner(object):
         # variables
         self.num_segs = NUM_SEGS
         self.num_subsegs = NUM_SUBSEGS
+        self.output_seg = OUTPUT_SEG
         self.num_instances = NUM_INSTANCES
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
@@ -658,6 +658,7 @@ class Runner(object):
                         ("resolution",),
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
+                        ("output_label", "output_seg"),
                         ("max_train_rounds", "max_em_iters"),
                         ("reverse_world", "reverse_worlds"),
                         ("track", "track_specs")]
@@ -2179,7 +2180,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
-                       self.num_segs, self.genomedataname, float_filepath,
+                       self.num_segs, self.output_seg, self.genomedataname, float_filepath,
                        int_filepath, self.distribution,
                        track_indexes_text]
         output_filename = None
@@ -2457,6 +2458,10 @@ def parse_options(args):
         group.add_option("--num-sublabels", type=int, metavar="NUM",
                          help="make NUM segment sublabels"
                          " (default %d)" % NUM_SUBSEGS)
+
+        group.add_option("--output-label", type=str,
+                         help="print out by label or sublabel or both"
+                         "  (default %s)" % OUTPUT_SEG)
 
         group.add_option("--max-train-rounds", type=int, metavar="NUM",
                          help="each training instance runs a maximum of NUM"

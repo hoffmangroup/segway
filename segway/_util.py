@@ -17,7 +17,7 @@ import sys
 import re
 
 import colorbrewer
-from numpy import (append, array, diff, empty, insert, intc, float_, zeros)
+from numpy import (absolute, append, array, diff, empty, insert, intc, maximum, zeros)
 
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
@@ -46,7 +46,7 @@ SUFFIX_BED = extsep + EXT_BED
 SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_TAB = extsep + EXT_TAB
 
-DTYPE_IDENTIFY = float_
+DTYPE_IDENTIFY = intc
 DTYPE_OBS_INT = intc
 DTYPE_SEG_LEN = intc
 
@@ -190,6 +190,13 @@ def is_gz_filename(filename):
     return filename.endswith(SUFFIX_GZ)
 
 
+def label_to_int(label):
+    try:
+        return int(label)
+    except ValueError:
+        return int(str(label)[0])
+
+
 def maybe_gzip_open(filename, mode="r", *args, **kwargs):
     if filename == "-":
         if mode.startswith("U"):
@@ -316,7 +323,7 @@ def iter_chroms_coords(filenames, coords):
             yield chrom, filename, chromosome, chr_include_coords
 
 
-def find_segment_starts(data):
+def find_segment_starts(data, output_seg="seg"):
     """
     finds the start of each segment
 
@@ -324,14 +331,24 @@ def find_segment_starts(data):
 
     returns lists of len num_segments+1, num_segments
     """
-    len_data = len(data)
+    len_data = len(data[0])
 
     # unpack tuple, ignore rest
-    end_pos, = diff(data).nonzero()
+    [seg_diffs, subseg_diffs] = absolute(diff(data))
 
+    if output_seg != "seg":
+        index = 1
+        pos_diffs = maximum(seg_diffs, subseg_diffs)
+    else:
+        index = 0
+        pos_diffs = seg_diffs
+    end_pos, = pos_diffs.nonzero()
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
-    labels = data[start_pos]
+    if output_seg == "full":
+        labels = array([str(x) + '.' + str(y) for (x, y) in zip(data[0][start_pos], data[1][start_pos])])
+    else:
+        labels = data[index][start_pos]
 
     # after generating labels, add an extraneous start position so
     # where_seg+1 doesn't go out of bounds
