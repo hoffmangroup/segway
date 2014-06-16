@@ -1,0 +1,38 @@
+Overview
+========
+
+Segway has an acceptance testing system that you can use by running
+`./test_all.sh`. The test_all script will go into each `test/` child
+directory and execute the script named .`/run.sh` if one exists.
+
+Generally, each `run.sh` will run segway train and identify on a small
+dataset, then compare those results to a golden run in a `touchstone/`
+directory. This test behavoir is not mandatory, and arbitrary tests
+may be added by creating a directory with a run.sh file.
+
+Golden Runs
+-----------
+
+Segway produces some output that will change depending on the version,
+the date, or randomly (UUIDs are used for each run). These golden runs
+have been changed to be templates with regular expressions (regexes)
+defining inexact matches. The regexes can be in filenames or file
+contents, even if the file is gzipped, and take the form of
+`(%<REGEX>%)` where `<REGEX>` is a Python regular expression (usually
+equivalent to a Perl-compatible regular expression). For example,
+there is a file named
+`data/traindir/output/e/0/emt0.0.0.traindir.(%[0-9a-f]{32}%)`, and the
+regular expression there allows any 32 hexadecimal digits, fitting the
+UUID that is uniquely generated for each Segway run.
+data/traindir/log/jobs.tab starts like this:
+
+====
+jobid	jobname	prog	num_segs	num_frames	maxvmem	cpu	exit_status
+(%[0-9]+%)	emt0.0.0.traindir.(%[0-9a-f]{32}%)	gmtkEMtrainNew	4	184355	(%[0-9]+.[0-9]+%)	(%[0-9]+.[0-9]+%)	0
+====
+
+The parts of the line that can change on each run are substituted with
+an escaped regular expression, and the deterministic parts will match
+exactly only.
+
+A unit test system is planned.
