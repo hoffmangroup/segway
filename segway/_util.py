@@ -359,6 +359,7 @@ def ceildiv(dividend, divisor):
     return (dividend // divisor) + int(bool(dividend % divisor))
 
 re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
+re_posterior_subentry = re.compile(r"^\d+: (\S+) subseg\((\d+)\)=(\d+)$")
 
 
 def parse_posterior(iterable):
@@ -373,7 +374,6 @@ def parse_posterior(iterable):
     # ignores non-matching lines
     for line in iterable:
         m_posterior_entry = re_posterior_entry.match(line.rstrip())
-
         if m_posterior_entry:
             group = m_posterior_entry.group
             yield (int(group(2)), int(group(3)), float(group(1)))

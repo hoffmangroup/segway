@@ -16,7 +16,7 @@ import sys
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import argmax, array, empty, where, diff, r_
+from numpy import argmax, array, empty, where, diff, r_, zeros
 from path import path
 
 from .observations import _save_window
@@ -56,7 +56,8 @@ def parse_viterbi(lines, do_reverse=False):
     lines = iter(lines)
 
     # Segment 0, after Island[...]
-    assert lines.next().startswith("Segment ")
+    line = lines.next()
+    assert line.startswith("Segment ")
 
     # ========
     assert lines.next().startswith("========")
@@ -159,8 +160,10 @@ def save_bed(outfilename, *args, **kwargs):
 
 
 def read_posterior_save_bed(coord, resolution, do_reverse,
-                            outfilename_tmpl, num_labels, infile):
+                            outfilename_tmpl, num_labels, infile, output_seg="seg"):
     if do_reverse:
+        raise NotImplementedError
+    if output_seg != "seg":
         raise NotImplementedError
 
     (chrom, start, end) = coord
@@ -169,8 +172,11 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     probs_rounded = empty(probs.shape, int)
 
     # Write posterior code file
-    posterior_code = argmax(probs, axis=1)
-    start_pos, labels = find_segment_starts(posterior_code)
+    posterior_code_seg = argmax(probs, axis=1)
+    # XXX: need to do posterior for subsegs as well
+    posterior_code_subseg = zeros(num_frames)
+    posterior_code = array([posterior_code_seg, posterior_code_subseg])
+    start_pos, labels = find_segment_starts(posterior_code, output_seg)
     bed_filename = outfilename_tmpl % "_code"
     save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
 
@@ -250,7 +256,7 @@ def print_to_fd(fd, line):
 
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
-                           num_labels, genomedataname, float_filename,
+                           num_labels, output_seg, genomedataname, float_filename,
                            int_filename, distribution,
                            track_indexes_text, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
@@ -286,7 +292,6 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
         # remove from memory
         del continuous_cells
-
         output = POSTERIOR_PROG.getoutput(*args)
     finally:
         for filepath in temp_filepaths:
@@ -299,7 +304,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
     lines = output.splitlines()
     return read_posterior_save_bed(coord, resolution, do_reverse, outfilename,
-                                   int(num_labels), lines)
+                                   int(num_labels), lines, output_seg)
 
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,

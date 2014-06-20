@@ -1112,6 +1112,10 @@ class Runner(object):
     def num_segs_range(self):
         return slice2range(self.num_segs)
 
+    @memoized_property
+    def num_subsegs_range(self):
+        return slice2range(self.num_subsegs)
+
     def check_world_fmt(self, attr):
         """ensure that all options that need a template have it
         """
