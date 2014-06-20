@@ -56,8 +56,7 @@ def parse_viterbi(lines, do_reverse=False):
     lines = iter(lines)
 
     # Segment 0, after Island[...]
-    line = lines.next()
-    assert line.startswith("Segment ")
+    assert lines.next().startswith("Segment ")
 
     # ========
     assert lines.next().startswith("========")
