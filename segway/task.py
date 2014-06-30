@@ -49,7 +49,7 @@ re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
 re_subseg = re.compile(r"^subseg\((\d+)\)=(\d+)$")
 
 
-def parse_viterbi(lines, do_reverse=False):
+def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     """
     returns: numpy.ndarray of size (num_frames,), type DTYPE_IDENTIFY
     """
@@ -77,17 +77,19 @@ def parse_viterbi(lines, do_reverse=False):
 
     # sentinel value
     res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_IDENTIFY)
-
     for line in lines:
         # Ptn-0 P': seg(0)=24,seg(1)=24
         if line.startswith(MSG_SUCCESS):
             assert (res[0] != SEG_INVALID).all()
-            return res
+	    if output_label != "seg":
+		assert (res[1] != SEG_INVALID).all()
+		return res
+            else:
+		return res[0]
 
         assert line.startswith("Ptn-")
 
         values = line.rpartition(": ")[2]
-
         for pair in values.split(","):
             match = re_seg.match(pair)
             sub_match = re_subseg.match(pair)
@@ -115,7 +117,8 @@ def parse_viterbi(lines, do_reverse=False):
 # num_cols is for use by genomedata_count_condition
 # XXX: should move this function somewhere else
 
-def write_bed(outfile, start_pos, labels, coord, resolution, num_labels, num_cols=None, num_sublabels=None, sublabels=None):
+def write_bed(outfile, start_pos, labels, coord, resolution, num_labels, 
+              num_cols=None, num_sublabels=None, sublabels=None):
     """
     start_pos is an array
     """
@@ -159,10 +162,10 @@ def save_bed(outfilename, *args, **kwargs):
 
 
 def read_posterior_save_bed(coord, resolution, do_reverse,
-                            outfilename_tmpl, num_labels, infile, output_seg="seg"):
+                            outfilename_tmpl, num_labels, infile, output_label="seg"):
     if do_reverse:
         raise NotImplementedError
-    if output_seg != "seg":
+    if output_label != "seg":
         raise NotImplementedError
 
     (chrom, start, end) = coord
@@ -171,11 +174,8 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     probs_rounded = empty(probs.shape, int)
 
     # Write posterior code file
-    posterior_code_seg = argmax(probs, axis=1)
-    # XXX: need to do posterior for subsegs as well
-    posterior_code_subseg = zeros(num_frames)
-    posterior_code = array([posterior_code_seg, posterior_code_subseg])
-    start_pos, labels = find_segment_starts(posterior_code, output_seg)
+    posterior_code = argmax(probs, axis=1)
+    start_pos, labels = find_segment_starts(posterior_code)
     bed_filename = outfilename_tmpl % "_code"
     save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
 
@@ -213,10 +213,10 @@ def load_posterior_save_bed(coord, resolution, do_reverse,
 
 
 def parse_viterbi_save_bed(coord, resolution, do_reverse,
-                           viterbi_lines, bed_filename, num_labels, output_seg):
-    data = parse_viterbi(viterbi_lines, do_reverse)
+                           viterbi_lines, bed_filename, num_labels, output_label):
+    data = parse_viterbi(viterbi_lines, do_reverse, output_label)
 
-    start_pos, labels = find_segment_starts(data, output_seg)
+    start_pos, labels = find_segment_starts(data, output_label)
 
     save_bed(bed_filename, start_pos, labels, coord, resolution,
              int(num_labels))
@@ -255,7 +255,7 @@ def print_to_fd(fd, line):
 
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
-                           num_labels, output_seg, genomedataname, float_filename,
+                           num_labels, output_label, genomedataname, float_filename,
                            int_filename, distribution,
                            track_indexes_text, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
@@ -303,11 +303,11 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
     lines = output.splitlines()
     return read_posterior_save_bed(coord, resolution, do_reverse, outfilename,
-                                   int(num_labels), lines, output_seg)
+                                   int(num_labels), lines, output_label)
 
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
-                         num_labels, output_seg, genomedataname, float_filename,
+                         num_labels, output_label, genomedataname, float_filename,
                          int_filename, distribution,
                          track_indexes_text, *args):
     # convert from tuple
@@ -355,9 +355,8 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                     pass
 
     lines = output.splitlines()
-
     return parse_viterbi_save_bed(coord, resolution, do_reverse,
-                                  lines, outfilename, num_labels, output_seg)
+                                  lines, outfilename, num_labels, output_label)
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,

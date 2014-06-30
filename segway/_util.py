@@ -316,7 +316,7 @@ def iter_chroms_coords(filenames, coords):
             yield chrom, filename, chromosome, chr_include_coords
 
 
-def find_segment_starts(data, output_seg="seg"):
+def find_segment_starts(data, output_label="seg"):
     """
     finds the start of each segment
 
@@ -324,24 +324,30 @@ def find_segment_starts(data, output_seg="seg"):
 
     returns lists of len num_segments+1, num_segments
     """
-    len_data = len(data[0])
+    if output_label != "seg":
+        len_data = len(data[0])
+    else:
+	len_data = len(data)
 
     # unpack tuple, ignore rest
-    [seg_diffs, subseg_diffs] = absolute(diff(data))
-
-    if output_seg != "seg":
-        index = 1
-        pos_diffs = maximum(seg_diffs, subseg_diffs)
+    #[seg_diffs, subseg_diffs] = absolute(diff(data))
+    segdiffs = absolute(diff(data))
+    
+    # if output_label is set to "full" or "subseg"
+    if output_label != "seg":
+        #pos_diffs = maximum(seg_diffs, subseg_diffs)
+	pos_diffs = maximum(segdiffs[0], segdiffs[1])
     else:
-        index = 0
-        pos_diffs = seg_diffs
+        pos_diffs = segdiffs
     end_pos, = pos_diffs.nonzero()
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
-    if output_seg == "full":
-        labels = array([str(x) + '.' + str(y) for (x, y) in zip(data[0][start_pos], data[1][start_pos])])
+    if output_label == "full":
+	labels = array(["%d.%d" % segs for segs in zip(data[0][start_pos], data[1][start_pos])])
+    elif output_label == "subseg":
+        labels = data[1][start_pos]
     else:
-        labels = data[index][start_pos]
+	labels = data[start_pos]
 
     # after generating labels, add an extraneous start position so
     # where_seg+1 doesn't go out of bounds
@@ -359,7 +365,6 @@ def ceildiv(dividend, divisor):
     return (dividend // divisor) + int(bool(dividend % divisor))
 
 re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
-re_posterior_subentry = re.compile(r"^\d+: (\S+) subseg\((\d+)\)=(\d+)$")
 
 
 def parse_posterior(iterable):
@@ -374,6 +379,7 @@ def parse_posterior(iterable):
     # ignores non-matching lines
     for line in iterable:
         m_posterior_entry = re_posterior_entry.match(line.rstrip())
+
         if m_posterior_entry:
             group = m_posterior_entry.group
             yield (int(group(2)), int(group(3)), float(group(1)))

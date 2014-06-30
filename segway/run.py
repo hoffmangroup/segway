@@ -73,7 +73,7 @@ DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
-OUTPUT_SEG = "seg"
+OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 
@@ -219,7 +219,7 @@ TRAIN_OPTION_TYPES = \
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
          distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
-         num_segs=int, num_subsegs=int, output_seg=str, track_specs=[str],
+         num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
          reverse_worlds=[int])
 
 # templates and formats
@@ -252,8 +252,6 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "input_master_filename", "params_filename",
                                  "log_likelihood_filename"])
 OFFSET_FILENAMES = 2  # where the filenames begin in Results
-
-VITERBI_REGEX_FILTER = "^[a-z]*seg$"
 
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 
@@ -580,7 +578,7 @@ class Runner(object):
         # variables
         self.num_segs = NUM_SEGS
         self.num_subsegs = NUM_SUBSEGS
-        self.output_seg = OUTPUT_SEG
+        self.output_label = OUTPUT_LABEL
         self.num_instances = NUM_INSTANCES
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
@@ -647,7 +645,7 @@ class Runner(object):
                         ("resolution",),
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
-                        ("output_label", "output_seg"),
+                        ("output_label", "output_label"),
                         ("max_train_rounds", "max_em_iters"),
                         ("reverse_world", "reverse_worlds"),
                         ("track", "track_specs")]
@@ -1111,10 +1109,6 @@ class Runner(object):
     @memoized_property
     def num_segs_range(self):
         return slice2range(self.num_segs)
-
-    @memoized_property
-    def num_subsegs_range(self):
-        return slice2range(self.num_subsegs)
 
     def check_world_fmt(self, attr):
         """ensure that all options that need a template have it
@@ -2173,7 +2167,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
-                       self.num_segs, self.output_seg, self.genomedataname, float_filepath,
+                       self.num_segs, self.output_label, self.genomedataname, float_filepath,
                        int_filepath, self.distribution,
                        track_indexes_text]
         output_filename = None
@@ -2226,6 +2220,10 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         filenames = dict(identify=self.viterbi_filenames,
                          posterior=self.posterior_filenames)
+	if self.output_label != "seg":
+	    VITERBI_REGEX_FILTER = "^(seg|subseg)$"
+	else:
+	    VITERBI_REGEX_FILTER = "^seg$"
 
         # -: standard output, processed by segway-task
         kwargs = {"identify":
@@ -2341,6 +2339,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                         if (self.posterior and (self.recover_dirname
                                                 or self.num_worlds != 1)):
                             raise NotImplementedError  # XXX
+                        if (self.posterior and self.output_label != "seg"):
+                            raise NotImplementedError  # XXX
 
                         self.run_identify_posterior()
 
@@ -2454,7 +2454,7 @@ def parse_options(args):
 
         group.add_option("--output-label", type=str,
                          help="print out by label or sublabel or both"
-                         "  (default %s)" % OUTPUT_SEG)
+                         "  (default %s)" % OUTPUT_LABEL)
 
         group.add_option("--max-train-rounds", type=int, metavar="NUM",
                          help="each training instance runs a maximum of NUM"

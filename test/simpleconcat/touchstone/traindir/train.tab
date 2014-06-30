@@ -5,7 +5,7 @@ input_master_filename	traindir/params/input.master
 len_seg_strength	0
 num_segs	4
 num_subsegs	1
-output_seg	seg
+output_label	seg
 params_filename	traindir/params/params.params
 resolution	1
 ruler_scale	10
