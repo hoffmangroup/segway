@@ -81,11 +81,11 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
         # Ptn-0 P': seg(0)=24,seg(1)=24
         if line.startswith(MSG_SUCCESS):
             assert (res[0] != SEG_INVALID).all()
-	    if output_label != "seg":
-		assert (res[1] != SEG_INVALID).all()
-		return res
+            if output_label != "seg":
+                assert (res[1] != SEG_INVALID).all()
+                return res
             else:
-		return res[0]
+                return res[0]
 
         assert line.startswith("Ptn-")
 
@@ -117,7 +117,7 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
 # num_cols is for use by genomedata_count_condition
 # XXX: should move this function somewhere else
 
-def write_bed(outfile, start_pos, labels, coord, resolution, num_labels, 
+def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
               num_cols=None, num_sublabels=None, sublabels=None):
     """
     start_pos is an array

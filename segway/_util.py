@@ -327,27 +327,27 @@ def find_segment_starts(data, output_label="seg"):
     if output_label != "seg":
         len_data = len(data[0])
     else:
-	len_data = len(data)
+        len_data = len(data)
 
     # unpack tuple, ignore rest
     #[seg_diffs, subseg_diffs] = absolute(diff(data))
     segdiffs = absolute(diff(data))
-    
+
     # if output_label is set to "full" or "subseg"
     if output_label != "seg":
         #pos_diffs = maximum(seg_diffs, subseg_diffs)
-	pos_diffs = maximum(segdiffs[0], segdiffs[1])
+        pos_diffs = maximum(segdiffs[0], segdiffs[1])
     else:
         pos_diffs = segdiffs
     end_pos, = pos_diffs.nonzero()
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
     if output_label == "full":
-	labels = array(["%d.%d" % segs for segs in zip(data[0][start_pos], data[1][start_pos])])
+        labels = array(["%d.%d" % segs for segs in zip(data[0][start_pos], data[1][start_pos])])
     elif output_label == "subseg":
         labels = data[1][start_pos]
     else:
-	labels = data[start_pos]
+        labels = data[start_pos]
 
     # after generating labels, add an extraneous start position so
     # where_seg+1 doesn't go out of bounds

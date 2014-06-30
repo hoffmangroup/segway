@@ -2220,10 +2220,10 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         filenames = dict(identify=self.viterbi_filenames,
                          posterior=self.posterior_filenames)
-	if self.output_label != "seg":
-	    VITERBI_REGEX_FILTER = "^(seg|subseg)$"
-	else:
-	    VITERBI_REGEX_FILTER = "^seg$"
+        if self.output_label != "seg":
+            VITERBI_REGEX_FILTER = "^(seg|subseg)$"
+        else:
+            VITERBI_REGEX_FILTER = "^seg$"
 
         # -: standard output, processed by segway-task
         kwargs = {"identify":
