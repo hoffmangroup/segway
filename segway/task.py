@@ -74,7 +74,13 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     # Printing random variables from (P,C,E)=(1,999,0) partitions
     line = lines.next()
     assert line.startswith("Printing random variables from")
-
+    seg_dict = { 'seg' : 0, 'subseg' : 1 }
+    # if output_label == "subseg" or "full", need to catch
+    # subseg output
+    if output_label != "seg":
+        re_seg = re.compile(r"^(seg|subseg)\((\d+)\)=(\d+)$")
+    else:
+        re_seg = re.compile(r"^(seg)\((\d+)\)=(\d+)$")
     # sentinel value
     res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_IDENTIFY)
     for line in lines:
@@ -90,27 +96,19 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
                 return res[0]
 
         assert line.startswith("Ptn-")
-
         values = line.rpartition(": ")[2]
         for pair in values.split(","):
             match = re_seg.match(pair)
-            sub_match = re_subseg.match(pair)
-            if sub_match and output_label != "seg":
-                index = int(sub_match.group(1))
-                if do_reverse:
-                    index = -1 - index
-                val = int(sub_match.group(2))
-                res[1][index] = val
             if not match:
                 continue
 
-            index = int(match.group(1))
+            index = int(match.group(2))
             if do_reverse:
                 index = -1 - index  # -1, -2, -3, etc.
 
-            val = int(match.group(2))
-
-            res[0][index] = val
+            val = int(match.group(3))
+            seg_index = seg_dict[match.group(1)]
+            res[seg_index][index] = val
 
     # shouldn't get to this point
     raise ValueError("%s did not complete successfully" % VITERBI_PROG.prog)
