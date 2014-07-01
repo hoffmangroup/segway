@@ -324,7 +324,7 @@ def find_segment_starts(data, output_label="seg"):
 
     returns lists of len num_segments+1, num_segments
     """
-    if output_label != "seg":
+    if data.ndim > 1:
         len_data = len(data[0])
     else:
         len_data = len(data)
