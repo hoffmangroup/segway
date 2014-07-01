@@ -2220,6 +2220,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         filenames = dict(identify=self.viterbi_filenames,
                          posterior=self.posterior_filenames)
+        
+        # if output_label == "subseg" or "full", need to catch
+        # superlabel and sublabel output from gmtk
         if self.output_label != "seg":
             VITERBI_REGEX_FILTER = "^(seg|subseg)$"
         else:
@@ -2453,7 +2456,9 @@ def parse_options(args):
                          " (default %d)" % NUM_SUBSEGS)
 
         group.add_option("--output-label", type=str,
-                         help="print out by label or sublabel or both"
+                         help="in the segmentation file, for each coordinate "
+                         "print only its superlabel (\"seg\"), only its "
+                         "sublabel (\"subseg\"), or both (\"full\")"
                          "  (default %s)" % OUTPUT_LABEL)
 
         group.add_option("--max-train-rounds", type=int, metavar="NUM",

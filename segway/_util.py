@@ -343,7 +343,7 @@ def find_segment_starts(data, output_label="seg"):
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
     if output_label == "full":
-        labels = array(["%d.%d" % segs for segs in zip(data[0][start_pos], data[1][start_pos])])
+        labels = array(["%d.%d" % segs for segs in zip(*data[:, start_pos])])
     elif output_label == "subseg":
         labels = data[1][start_pos]
     else:

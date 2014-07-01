@@ -81,6 +81,8 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
         # Ptn-0 P': seg(0)=24,seg(1)=24
         if line.startswith(MSG_SUCCESS):
             assert (res[0] != SEG_INVALID).all()
+            # if output_label == "subseg" or "full",
+            # res will have 2 rows
             if output_label != "seg":
                 assert (res[1] != SEG_INVALID).all()
                 return res
@@ -93,7 +95,7 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
         for pair in values.split(","):
             match = re_seg.match(pair)
             sub_match = re_subseg.match(pair)
-            if sub_match:
+            if sub_match and output_label != "seg":
                 index = int(sub_match.group(1))
                 if do_reverse:
                     index = -1 - index
@@ -165,6 +167,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
                             outfilename_tmpl, num_labels, infile, output_label="seg"):
     if do_reverse:
         raise NotImplementedError
+    # posterior not implemented in subseg or full mode
     if output_label != "seg":
         raise NotImplementedError
 
