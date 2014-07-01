@@ -16,7 +16,7 @@ import sys
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import argmax, array, empty, where, diff, r_, zeros
+from numpy import argmax, array, empty, where, diff, r_
 from path import path
 
 from .observations import _save_window
@@ -44,9 +44,6 @@ USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
-
-re_seg = re.compile(r"^seg\((\d+)\)=(\d+)$")
-re_subseg = re.compile(r"^subseg\((\d+)\)=(\d+)$")
 
 
 def parse_viterbi(lines, do_reverse=False, output_label="seg"):
@@ -292,6 +289,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
         # remove from memory
         del continuous_cells
+
         output = POSTERIOR_PROG.getoutput(*args)
     finally:
         for filepath in temp_filepaths:

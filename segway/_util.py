@@ -330,12 +330,10 @@ def find_segment_starts(data, output_label="seg"):
         len_data = len(data)
 
     # unpack tuple, ignore rest
-    #[seg_diffs, subseg_diffs] = absolute(diff(data))
     segdiffs = absolute(diff(data))
 
     # if output_label is set to "full" or "subseg"
     if output_label != "seg":
-        #pos_diffs = maximum(seg_diffs, subseg_diffs)
         pos_diffs = maximum(segdiffs[0], segdiffs[1])
     else:
         pos_diffs = segdiffs
