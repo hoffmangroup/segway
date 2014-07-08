@@ -327,6 +327,7 @@ def extract_label(label):
     else:
         return label
 
+
 def find_segment_starts(data, output_label="seg"):
     """
     finds the start of each segment
