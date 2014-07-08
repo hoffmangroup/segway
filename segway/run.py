@@ -1200,7 +1200,7 @@ class Runner(object):
 
         # non-allowed special trackname
         tracknames_unquoted = [track.name_unquoted for track in tracks]
-        #assert "supervisionLabel" not in tracknames_unquoted
+        assert "supervisionLabel" not in tracknames_unquoted
 
         # assert: none of the quoted tracknames are the same
         if __debug__:
@@ -1439,6 +1439,7 @@ class Runner(object):
         # tracks and track_groups
         with Genome(self.genomedataname) as genome:
             self.set_tracknames(genome)
+
             observations = Observations(self)
             observations.locate_windows(genome)
 

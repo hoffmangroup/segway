@@ -93,7 +93,9 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
                 return res[0]
 
         assert line.startswith("Ptn-")
+
         values = line.rpartition(": ")[2]
+
         for pair in values.split(","):
             match = re_seg.match(pair)
             if not match:
@@ -355,6 +357,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                     pass
 
     lines = output.splitlines()
+
     return parse_viterbi_save_bed(coord, resolution, do_reverse,
                                   lines, outfilename, num_labels, output_label)
 
