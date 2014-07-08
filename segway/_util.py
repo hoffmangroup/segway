@@ -316,6 +316,17 @@ def iter_chroms_coords(filenames, coords):
             yield chrom, filename, chromosome, chr_include_coords
 
 
+def extract_label(label):
+    """
+    label is either an integer or a string with a superlabel and
+    sublabel part, in which case only the superlabel part is
+    returned
+    """
+    if isinstance(label, str):
+        return int(label.split(".")[0])
+    else:
+        return label
+
 def find_segment_starts(data, output_label="seg"):
     """
     finds the start of each segment
@@ -330,13 +341,13 @@ def find_segment_starts(data, output_label="seg"):
         len_data = len(data)
 
     # unpack tuple, ignore rest
-    segdiffs = absolute(diff(data))
+    seg_diffs = absolute(diff(data))
 
     # if output_label is set to "full" or "subseg"
     if output_label != "seg":
-        pos_diffs = maximum(segdiffs[0], segdiffs[1])
+        pos_diffs = maximum(seg_diffs[0], seg_diffs[1])
     else:
-        pos_diffs = segdiffs
+        pos_diffs = seg_diffs
     end_pos, = pos_diffs.nonzero()
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
