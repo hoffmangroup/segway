@@ -2167,8 +2167,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
-                       self.num_segs, self.output_label, self.genomedataname, float_filepath,
-                       int_filepath, self.distribution,
+                       self.num_segs, self.output_label, self.genomedataname,
+                       float_filepath, int_filepath, self.distribution,
                        track_indexes_text]
         output_filename = None
 

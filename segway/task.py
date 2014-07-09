@@ -21,7 +21,7 @@ from path import path
 
 from .observations import _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
-                    EXT_INT, EXT_LIST, extract_label, fill_array, 
+                    EXT_INT, EXT_LIST, extract_superlabel, fill_array, 
                     find_segment_starts, get_label_color,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
@@ -134,17 +134,18 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
     start_pos[-1] = region_end
 
     # score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
-    color_labels = [extract_label(seg_label) for seg_label in labels]
+    label_colors = [get_label_color(extract_superlabel(seg_label)) for 
+                    seg_label in labels]
 
-    zipper = zip(start_pos[:-1], start_pos[1:], labels, color_labels)
+    zipper = zip(start_pos[:-1], start_pos[1:], labels, label_colors)
 
     # this is easily concatenated since it has no context
-    for seg_start, seg_end, seg_label, color_label in zipper:
+    for seg_start, seg_end, seg_label, label_color in zipper:
         name = str(seg_label)
 
         chrom_start = str(seg_start)
         chrom_end = str(seg_end)
-        item_rgb = get_label_color(color_label)
+        item_rgb = label_color
 
         row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
                chrom_start, chrom_end, item_rgb][:num_cols]

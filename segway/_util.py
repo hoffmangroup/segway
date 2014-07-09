@@ -17,7 +17,8 @@ import sys
 import re
 
 import colorbrewer
-from numpy import (absolute, append, array, diff, empty, insert, intc, maximum, zeros)
+from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
+                    zeros)
 
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
@@ -316,7 +317,7 @@ def iter_chroms_coords(filenames, coords):
             yield chrom, filename, chromosome, chr_include_coords
 
 
-def extract_label(label):
+def extract_superlabel(label):
     """
     label is either an integer or a string with a superlabel and
     sublabel part, in which case only the superlabel part is
