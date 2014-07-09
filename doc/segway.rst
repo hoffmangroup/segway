@@ -256,10 +256,12 @@ There is an experimental :option:`--num-sublabels`\=\ *sublabels*
 option that enables hierarchical segmentation, where each segment
 label is divided into a number of segment sublabels, each one with its
 own Gaussian emission parameters. The
-output segmentation will be defined in terms of individual sublabels,
-where the output label number :math:`l` is defined in terms of the
-(super) segment label :math:`l_0`, the sublabel :math:`l_1`, and the number of
-sublabels per label :math:`n_1` using the formula :math:`l = l_0 n_1 + l_1`.
+output segmentation will be defined according to the 
+:option:`--output-label`\=\ *output_label* option, by default *seg*, 
+which will output by (super) segment label as normal. *subseg* 
+will output in terms of individual sublabels, only printing out the 
+sublabel part, and *full* will print out both the superlabel and
+the sublabel, in the python string format ``%d.%d``.
 Using this feature effectively may require manipulation of model
 parameters.
 
