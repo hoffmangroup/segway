@@ -71,7 +71,7 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     # Printing random variables from (P,C,E)=(1,999,0) partitions
     line = lines.next()
     assert line.startswith("Printing random variables from")
-    seg_dict = { 'seg' : 0, 'subseg' : 1 }
+    seg_dict = {'seg': 0, 'subseg': 1}
     # if output_label == "subseg" or "full", need to catch
     # subseg output
     if output_label != "seg":
