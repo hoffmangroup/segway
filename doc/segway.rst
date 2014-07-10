@@ -261,7 +261,8 @@ output segmentation will be defined according to the
 which will output by (super) segment label as normal. *subseg* 
 will output in terms of individual sublabels, only printing out the 
 sublabel part, and *full* will print out both the superlabel and
-the sublabel, in the python string format ``%d.%d``.
+the sublabel, separated by a period. For example, a coordinate
+assigned superlabel 1 and sublabel 0 would display as "1.0".
 Using this feature effectively may require manipulation of model
 parameters.
 
