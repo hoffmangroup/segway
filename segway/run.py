@@ -683,6 +683,9 @@ class Runner(object):
         track_group = TrackGroup()
         tracknames_unquoted = set(track.name_unquoted for track in tracks)
 
+        # non-allowed special trackname
+        assert "supervisionLabel" not in tracknames
+
         for trackname in tracknames:
             if trackname in tracknames_unquoted:
                 raise ValueError("can't tie one track in multiple groups")
@@ -1197,10 +1200,6 @@ class Runner(object):
 
         if not any(track.is_data for track in tracks):
             self.float_filelistpath = None
-
-        # non-allowed special trackname
-        tracknames_unquoted = [track.name_unquoted for track in tracks]
-        assert "supervisionLabel" not in tracknames_unquoted
 
         # assert: none of the quoted tracknames are the same
         if __debug__:
