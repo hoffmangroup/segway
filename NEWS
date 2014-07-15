@@ -54,6 +54,7 @@
 * test: update for new GMTK
 * prereqs: hgtools is now a prerequisite
 * segway: add --output-label option to control segmentation output when using sublabels
+* segway: semi-supervised mode no longer causes assertion error
 
 1.1.0:
 
