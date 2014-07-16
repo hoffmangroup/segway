@@ -684,7 +684,10 @@ class Runner(object):
         tracknames_unquoted = set(track.name_unquoted for track in tracks)
 
         # non-allowed special trackname
-        assert "supervisionLabel" not in tracknames
+        if "supervisionLabel" in tracknames:
+            raise ValueError("'supervisionLabel' trackname is internally "
+                             "reserved and not allowed in supplied "
+                             "tracknames")
 
         for trackname in tracknames:
             if trackname in tracknames_unquoted:
