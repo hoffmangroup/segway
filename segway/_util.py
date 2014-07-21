@@ -329,7 +329,7 @@ def extract_superlabel(label):
         return label
 
 
-def find_segment_starts(data, output_label="seg"):
+def find_segment_starts(data, output_label):
     """
     finds the start of each segment
 
@@ -378,7 +378,7 @@ def ceildiv(dividend, divisor):
 re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
 
 
-def parse_posterior(iterable):
+def parse_posterior(iterable, output_label):
     """
     a generator.
     yields tuples (index, label, prob)
@@ -387,28 +387,46 @@ def parse_posterior(iterable):
     label: (int) segment label
     prob: (float) prob value
     """
+    if output_label != "seg":
+        re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+),"
+                                         "subseg\((\d+)\)=(\d+)$")
+    else:
+        re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
     # ignores non-matching lines
     for line in iterable:
         m_posterior_entry = re_posterior_entry.match(line.rstrip())
 
         if m_posterior_entry:
             group = m_posterior_entry.group
-            yield (int(group(2)), int(group(3)), float(group(1)))
+            if output_label != "seg":
+                yield (int(group(2)), (int(group(3)), int(group(5))), float(group(1)))
+            else:
+                yield (int(group(2)), int(group(3)), float(group(1)))
 
 
-def read_posterior(infile, num_frames, num_labels):
+def read_posterior(infile, num_frames, num_labels, 
+                   num_sublabels, output_label):
     """
     returns an array (num_frames, num_labels)
     """
     # XXX: should these be single precision?
-    res = zeros((num_frames, num_labels))
+    readlog = open("read.log", "w")
+    readlog.write(str(num_frames) + " " + str(num_labels) + " " + str(num_sublabels))
+    num_labels = int(num_labels)
+    num_sublabels = int(num_sublabels)
+    res = zeros((num_frames, num_labels * num_sublabels))
+    sublabel = 0
 
-    for frame_index, label, prob in parse_posterior(infile):
+    for frame_index, label, prob in parse_posterior(infile, output_label):
+        if output_label != "seg":
+            label, sublabel = label
+            seg_index = label * num_sublabels + sublabel
+        else:
+            seg_index = label
         if label >= num_labels:
             raise ValueError("saw label %s but num_labels is only %s"
                              % (label, num_labels))
-
-        res[frame_index, label] = prob
+        res[frame_index, seg_index] = prob
 
     return res
 

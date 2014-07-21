@@ -163,34 +163,50 @@ def save_bed(outfilename, *args, **kwargs):
 
 
 def read_posterior_save_bed(coord, resolution, do_reverse,
-                            outfilename_tmpl, num_labels, infile, output_label="seg"):
+                            outfilename_tmpl, num_labels, infile, 
+                            num_sublabels, output_label):
     if do_reverse:
         raise NotImplementedError
     # posterior not implemented in subseg or full mode
-    if output_label != "seg":
-        raise NotImplementedError
+    #if output_label != "seg":
+    #    raise NotImplementedError
 
     (chrom, start, end) = coord
     num_frames = ceildiv(end - start, resolution)
-    probs = read_posterior(infile, num_frames, num_labels)
+    postlog = open("post.log", "w")
+    postlog.write(str(num_frames) + " " + str(num_labels) + " " + str(num_sublabels))
+    probs = read_posterior(infile, num_frames, num_labels,
+                           num_sublabels, output_label)
     probs_rounded = empty(probs.shape, int)
 
     # Write posterior code file
     posterior_code = argmax(probs, axis=1)
-    start_pos, labels = find_segment_starts(posterior_code)
+    if output_label != "seg":
+        posterior_split = fill_array(SEG_INVALID, (2, num_frames), 
+                                     DTYPE_IDENTIFY)
+        for frame_index in xrange(num_frames):
+            total_label = posterior_code[frame_index]
+            label, sublabel = divmod(total_label, int(num_sublabels))
+            posterior_split[:,frame_index] = array([label, sublabel])
+        posterior_code = posterior_split
+    start_pos, labels = find_segment_starts(posterior_code, output_label)
     bed_filename = outfilename_tmpl % "_code"
     save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
+    if output_label != "seg":
+        num_sublabels = int(num_sublabels)
+    else:
+        num_sublabels = 1
 
     # Write label-wise posterior bedgraph files
     outfilenames = []
-    for label_index in xrange(num_labels):
+    for label_index in xrange(num_labels * num_sublabels):
         outfilenames.append(outfilename_tmpl % label_index)
 
     # scale, round, and cast to int
     (probs * POSTERIOR_SCALE_FACTOR).round(out=probs_rounded)
 
     # print array columns as text to each outfile
-    zipper = zip(outfilenames, probs_rounded.T, xrange(num_labels))
+    zipper = zip(outfilenames, probs_rounded.T, xrange(num_labels * num_sublabels))
     for outfilename, probs_rounded_label, label_index in zipper:
         # run-length encoding on the probs_rounded_label
 
@@ -208,10 +224,12 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
 
 
 def load_posterior_save_bed(coord, resolution, do_reverse,
-                            outfilename, num_labels, infilename):
+                            outfilename, num_labels, infilename,
+                            num_sublabels=1, output_label="seg"):
     with open(infilename) as infile:
         read_posterior_save_bed(coord, resolution, do_reverse, outfilename,
-                                int(num_labels), infile)
+                                int(num_labels), infile, num_sublabels,
+                                output_label)
 
 
 def parse_viterbi_save_bed(coord, resolution, do_reverse,
@@ -257,9 +275,9 @@ def print_to_fd(fd, line):
 
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
-                           num_labels, output_label, genomedataname, float_filename,
-                           int_filename, distribution,
-                           track_indexes_text, *args):
+                           num_labels, num_sublabels, output_label, 
+                           genomedataname, float_filename, int_filename,
+                           distribution, track_indexes_text, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
     args = list(args)
@@ -306,13 +324,14 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
     lines = output.splitlines()
     return read_posterior_save_bed(coord, resolution, do_reverse, outfilename,
-                                   int(num_labels), lines, output_label)
+                                   int(num_labels), lines,
+                                   num_sublabels, output_label)
 
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
-                         num_labels, output_label, genomedataname, float_filename,
-                         int_filename, distribution,
-                         track_indexes_text, *args):
+                         num_labels, num_sublabels, output_label, 
+                         genomedataname, float_filename, int_filename, 
+                         distribution, track_indexes_text, *args):
     # convert from tuple
     args = list(args)
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
