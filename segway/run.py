@@ -381,7 +381,8 @@ def rewrite_cliques(rewriter, frame, output_label):
 
     # new clique
     if output_label != "seg":
-        rewriter.send(NewLine("%d 2 seg %d subseg %d" % (orig_num_cliques, frame, frame)))
+        rewriter.send(NewLine("%d 2 seg %d subseg %d" % 
+                              (orig_num_cliques, frame, frame)))
     else:
         rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
 
@@ -977,7 +978,8 @@ class Runner(object):
 
                 components_indexed = enumerate(POSTERIOR_CLIQUE_INDICES)
                 for component_index, component in components_indexed:
-                    clique_index = rewrite_cliques(rewriter, component_index, self.output_label)
+                    clique_index = rewrite_cliques(rewriter, component_index,
+                                                   self.output_label)
                     clique_indices[component] = clique_index
 
                 for line in rewriter:
@@ -2344,8 +2346,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                         if (self.posterior and (self.recover_dirname
                                                 or self.num_worlds != 1)):
                             raise NotImplementedError  # XXX
-                        #if (self.posterior and self.output_label != "seg"):
-                        #    raise NotImplementedError  # XXX
 
                         self.run_identify_posterior()
 

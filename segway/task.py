@@ -22,7 +22,7 @@ from path import path
 from .observations import _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array, 
-                    find_segment_starts, get_label_color,
+                    find_segment_starts, get_label_color, posterior_split,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
 
@@ -167,46 +167,36 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
                             num_sublabels, output_label):
     if do_reverse:
         raise NotImplementedError
-    # posterior not implemented in subseg or full mode
-    #if output_label != "seg":
-    #    raise NotImplementedError
 
     (chrom, start, end) = coord
     num_frames = ceildiv(end - start, resolution)
-    postlog = open("post.log", "w")
-    postlog.write(str(num_frames) + " " + str(num_labels) + " " + str(num_sublabels))
     probs = read_posterior(infile, num_frames, num_labels,
-                           num_sublabels, output_label)
+                           int(num_sublabels), output_label)
     probs_rounded = empty(probs.shape, int)
 
     # Write posterior code file
     posterior_code = argmax(probs, axis=1)
     if output_label != "seg":
-        posterior_split = fill_array(SEG_INVALID, (2, num_frames), 
-                                     DTYPE_IDENTIFY)
-        for frame_index in xrange(num_frames):
-            total_label = posterior_code[frame_index]
-            label, sublabel = divmod(total_label, int(num_sublabels))
-            posterior_split[:,frame_index] = array([label, sublabel])
-        posterior_code = posterior_split
+        posterior_code = posterior_split(posterior_code, num_frames,
+                                         int(num_sublabels))
     start_pos, labels = find_segment_starts(posterior_code, output_label)
     bed_filename = outfilename_tmpl % "_code"
     save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
     if output_label != "seg":
-        num_sublabels = int(num_sublabels)
+        label_print_range = xrange(num_labels * int(num_sublabels))
     else:
-        num_sublabels = 1
+        label_print_range = xrange(num_labels)
 
     # Write label-wise posterior bedgraph files
     outfilenames = []
-    for label_index in xrange(num_labels * num_sublabels):
+    for label_index in label_print_range:
         outfilenames.append(outfilename_tmpl % label_index)
 
     # scale, round, and cast to int
     (probs * POSTERIOR_SCALE_FACTOR).round(out=probs_rounded)
 
     # print array columns as text to each outfile
-    zipper = zip(outfilenames, probs_rounded.T, xrange(num_labels * num_sublabels))
+    zipper = zip(outfilenames, probs_rounded.T, label_print_range)
     for outfilename, probs_rounded_label, label_index in zipper:
         # run-length encoding on the probs_rounded_label
 

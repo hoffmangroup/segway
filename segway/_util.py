@@ -375,8 +375,6 @@ def ceildiv(dividend, divisor):
     # int(bool) means 0 -> 0, 1+ -> 1
     return (dividend // divisor) + int(bool(dividend % divisor))
 
-re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
-
 
 def parse_posterior(iterable, output_label):
     """
@@ -399,7 +397,8 @@ def parse_posterior(iterable, output_label):
         if m_posterior_entry:
             group = m_posterior_entry.group
             if output_label != "seg":
-                yield (int(group(2)), (int(group(3)), int(group(5))), float(group(1)))
+                yield (int(group(2)), (int(group(3)), int(group(5))),
+                       float(group(1)))
             else:
                 yield (int(group(2)), int(group(3)), float(group(1)))
 
@@ -410,12 +409,7 @@ def read_posterior(infile, num_frames, num_labels,
     returns an array (num_frames, num_labels)
     """
     # XXX: should these be single precision?
-    readlog = open("read.log", "w")
-    readlog.write(str(num_frames) + " " + str(num_labels) + " " + str(num_sublabels))
-    num_labels = int(num_labels)
-    num_sublabels = int(num_sublabels)
     res = zeros((num_frames, num_labels * num_sublabels))
-    sublabel = 0
 
     for frame_index, label, prob in parse_posterior(infile, output_label):
         if output_label != "seg":
@@ -428,6 +422,21 @@ def read_posterior(infile, num_frames, num_labels,
                              % (label, num_labels))
         res[frame_index, seg_index] = prob
 
+    return res
+
+
+def posterior_split(posterior_code, num_frames, num_sublabels):
+    """
+    takes an array whose values are of the form
+    label * num_sublabels + sublabel
+    and creates an array whose values are arrays of the form
+    array([label, sublabel])
+    """
+    res = zeros((2, num_frames), DTYPE_IDENTIFY)
+    for frame_index in xrange(num_frames):
+        total_label = posterior_code[frame_index]
+        label, sublabel = divmod(total_label, num_sublabels)
+        res[:, frame_index] = array([label, sublabel])
     return res
 
 
