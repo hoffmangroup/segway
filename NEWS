@@ -55,6 +55,7 @@
 * prereqs: hgtools is now a prerequisite
 * segway: add --output-label option to control segmentation output when using sublabels
 * segway: semi-supervised mode no longer causes assertion error
+* segway: posterior task now compatible with sublabel output mode
 
 1.1.0:
 
