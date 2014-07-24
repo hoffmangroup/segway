@@ -1,13 +1,25 @@
-========
- segway
-========
-by Michael Hoffman <mmh1@washington.edu>
+======
+Segway
+======
+by Michael Hoffman <mhoffman@uhnresearch.ca>
 
-.. contents::
+|DroneIOStatus|_
+
+.. |DroneIOStatus| image:: https://drone.io/bitbucket.org/hoffmanlab/segway/status.png
+.. _DroneIOStatus: https://drone.io/bitbucket.org/hoffmanlab/segway/latest
 
 Description
 ===========
-DESCRIPTION
+The free Segway software package contains a novel method for analyzing multiple
+tracks of functional genomics data. Our method uses a dynamic Bayesian network
+(DBN) model, which enables it to analyze the entire genome at 1-bp resolution
+even in the face of heterogeneous patterns of missing data. This method is the
+first application of DBN techniques to genome-scale data and the first genomic
+segmentation method designed for use with the maximum resolution data available
+from ChIP-seq experiments without downsampling. Our software has extensive
+documentation and was designed from the outset with external users in mind.
+Researchers at other universities and institutes have already installed and
+used Segway for their own projects. 
 
 Prerequisites
 =============
@@ -17,7 +29,8 @@ You must have the following installed before installing segway:
 - HDF5_ 1.8
 - NumPy_ 1.0.5
 
-XXX: NumPy should install automatically, but it doesn't.
+.. 
+    XXX NumPy should install automatically, but it doesn't.
 
 Additionally, the Segway setup script will automatically install
 the following packages or newer versions:
@@ -29,8 +42,9 @@ the following packages or newer versions:
 - textinput 0.1.1
 - colorbrewer 0.1.0
 
-XXX DRMAA is not automatically installed at the moment, you have to
-install it yourself. The URL is in the source to setup.py
+.. 
+    XXX DRMAA is not automatically installed at the moment, you have to
+    install it yourself. The URL is in the source to setup.py
 
 If you want DRMAA distributed job control (and you can't turn this off
 right now), it will also install:
@@ -40,18 +54,10 @@ right now), it will also install:
 It works with SGE or LSF. If you are using LSF, there is an additional
 prerequisite of FedStage_ DRMAA for LSF:
 
-.. _FedStage http://sourceforge.net/projects/lsf-drmaa/
-
 In order for automatic prerequisite installation to work, you either
 need write access to your Python installation's site-packages
 directory, or to configured setuptools to install into your
 home directory automatically (see hint below).
-
-.. _GCC: http://gcc.gnu.org/
-.. _HDF5: http://www.hdfgroup.org/
-.. _NumPy: http://numpy.scipy.org/
-.. _Python: http://www.python.org/
-.. _PyTables: http://www.pytables.org/
 
 If you want to use DRMAA to manage a cluster, you will need to ensure
 that DRMAA headers are in C_INCLUDE_PATH, and DRMAA libraries are in
@@ -62,6 +68,13 @@ export C_INCLUDE_PATH="${SGE_ROOT}/include:${C_INCLUDE_PATH}"
 export LDFLAGS="${LDFLAGS} -L${SGE_ROOT}/lib/$($SGE_ROOT/util/arch)"
 
 Then install Segway.
+
+.. _GCC: http://gcc.gnu.org/
+.. _HDF5: http://www.hdfgroup.org/
+.. _NumPy: http://numpy.scipy.org/
+.. _Python: http://www.python.org/
+.. _PyTables: http://www.pytables.org/
+.. _FedStage: http://sourceforge.net/projects/lsf-drmaa/
 
 Hints on installing the prerequisites in your home directory
 ------------------------------------------------------------
@@ -165,7 +178,6 @@ FITNESS FOR A PARTICULAR PURPOSE.
 
 Contact
 =======
-Please let me <mmh1@washington.edu> know if you have any
+Please let me <mhoffman@uhnresearch.ca> know if you have any
 comments on the installation or use of Segway. I would love to know
 if you get it working on a system not listed above.
-
