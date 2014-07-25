@@ -19,10 +19,16 @@ fi
 
 TEST_ROOT="$(pwd)"
 
-find -maxdepth 2 -name "run.sh" -type f | sort | while read file
+exit_status=0
+# Avoid creating a new subshell to get an error exit status by putting the
+# search commands for "run.sh" in a process substitution (file descriptor)
+while read file
 do
     echo "Running $(dirname $file)"
     cd "$(dirname $file)"
-    ./run.sh || true
+    # Save the exit status if any of the tests fail
+    ./run.sh || { exit_status=$?; true; }
     cd $TEST_ROOT
-done
+done < <(find -maxdepth 2 -name "run.sh" -type f | sort)
+
+exit $exit_status
