@@ -182,8 +182,12 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     start_pos, labels = find_segment_starts(posterior_code, output_label)
     bed_filename = outfilename_tmpl % "_code"
     save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
-    if output_label != "seg":
+    if output_label == "subseg":
         label_print_range = xrange(num_labels * int(num_sublabels))
+    elif output_label == "full":
+        label_print_range = ["%d.%d" % divmod(label, int(num_sublabels))
+                             for label in xrange(num_labels * 
+                                                 int(num_sublabels))]
     else:
         label_print_range = xrange(num_labels)
 
