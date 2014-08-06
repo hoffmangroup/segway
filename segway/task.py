@@ -22,7 +22,7 @@ from path import path
 from .observations import _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array, 
-                    find_segment_starts, get_label_color, posterior_split,
+                    find_segment_starts, get_label_color, create_2d_array,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
 
@@ -167,27 +167,27 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
                             num_sublabels, output_label):
     if do_reverse:
         raise NotImplementedError
-
+    num_sublabels = int(num_sublabels)
     (chrom, start, end) = coord
     num_frames = ceildiv(end - start, resolution)
     probs = read_posterior(infile, num_frames, num_labels,
-                           int(num_sublabels), output_label)
+                           num_sublabels, output_label)
     probs_rounded = empty(probs.shape, int)
 
     # Write posterior code file
     posterior_code = argmax(probs, axis=1)
     if output_label != "seg":
-        posterior_code = posterior_split(posterior_code, num_frames,
-                                         int(num_sublabels))
+        posterior_code = create_2d_array(posterior_code, num_frames,
+                                         num_sublabels)
     start_pos, labels = find_segment_starts(posterior_code, output_label)
     bed_filename = outfilename_tmpl % "_code"
     save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
     if output_label == "subseg":
-        label_print_range = xrange(num_labels * int(num_sublabels))
+        label_print_range = xrange(num_labels * num_sublabels)
     elif output_label == "full":
-        label_print_range = ["%d.%d" % divmod(label, int(num_sublabels))
+        label_print_range = ["%d.%d" % divmod(label, num_sublabels)
                              for label in xrange(num_labels * 
-                                                 int(num_sublabels))]
+                                                 num_sublabels)]
     else:
         label_print_range = xrange(num_labels)
 

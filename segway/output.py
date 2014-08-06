@@ -178,9 +178,9 @@ class PosteriorSaver(OutputSaver):
         if self.output_label == "subseg":
             label_print_range = xrange(self.num_segs * self.num_subsegs)
         elif self.output_label == "full":
-            label_print_range = ["%d.%d" % divmod(label, self.num_subsegs)
+            label_print_range = ("%d.%d" % divmod(label, self.num_subsegs)
                                  for label in xrange(self.num_segs *
-                                                     self.num_subsegs)]
+                                                     self.num_subsegs))
         else:
             label_print_range = xrange(self.num_segs)
         for num_seg in label_print_range:

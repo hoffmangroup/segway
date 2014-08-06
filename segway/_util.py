@@ -384,6 +384,10 @@ def parse_posterior(iterable, output_label):
     index: (int) frame index
     label: (int) segment label
     prob: (float) prob value
+    
+    in the case that output_label is set to output sublabels as well,
+    the label variable will be of the form (int, int) for the segment
+    label and sublabel
     """
     if output_label != "seg":
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+),"
@@ -415,6 +419,9 @@ def read_posterior(infile, num_frames, num_labels,
         if output_label != "seg":
             label, sublabel = label
             seg_index = label * num_sublabels + sublabel
+            if sublabel >= num_sublabels:
+                raise ValueError("saw sublabel %s but num_sublabels is only %s"
+                                % (sublabel, num_sublabels))
         else:
             seg_index = label
         if label >= num_labels:
@@ -425,7 +432,7 @@ def read_posterior(infile, num_frames, num_labels,
     return res
 
 
-def posterior_split(posterior_code, num_frames, num_sublabels):
+def create_2d_array(posterior_code, num_frames, num_sublabels):
     """
     takes an array whose values are of the form
     label * num_sublabels + sublabel
