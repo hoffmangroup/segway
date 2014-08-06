@@ -22,7 +22,7 @@ from path import path
 from .observations import _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array, 
-                    find_segment_starts, get_label_color, create_2d_array,
+                    find_segment_starts, get_label_color, divide_posterior_array,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
 
@@ -177,7 +177,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     # Write posterior code file
     posterior_code = argmax(probs, axis=1)
     if output_label != "seg":
-        posterior_code = create_2d_array(posterior_code, num_frames,
+        posterior_code = divide_posterior_array(posterior_code, num_frames,
                                          num_sublabels)
     start_pos, labels = find_segment_starts(posterior_code, output_label)
     bed_filename = outfilename_tmpl % "_code"

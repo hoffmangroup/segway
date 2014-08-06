@@ -432,7 +432,7 @@ def read_posterior(infile, num_frames, num_labels,
     return res
 
 
-def create_2d_array(posterior_code, num_frames, num_sublabels):
+def divide_posterior_array(posterior_code, num_frames, num_sublabels):
     """
     takes an array whose values are of the form
     label * num_sublabels + sublabel
