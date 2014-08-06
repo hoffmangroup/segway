@@ -184,16 +184,18 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
     if output_label == "subseg":
         label_print_range = xrange(num_labels * num_sublabels)
+        label_names = label_print_range
     elif output_label == "full":
-        label_print_range = ["%d.%d" % divmod(label, num_sublabels)
-                             for label in xrange(num_labels * 
-                                                 num_sublabels)]
+        label_print_range = xrange(num_labels * num_sublabels)
+        label_names = ("%d.%d" % divmod(label, num_sublabels)
+                             for label in label_print_range)
     else:
         label_print_range = xrange(num_labels)
+        label_names = label_print_range
 
     # Write label-wise posterior bedgraph files
     outfilenames = []
-    for label_index in label_print_range:
+    for label_index in label_names:
         outfilenames.append(outfilename_tmpl % label_index)
 
     # scale, round, and cast to int
