@@ -568,12 +568,15 @@ Posterior task
 The **posterior** inference task of Segway estimates for each position
 of interest the probability that the model has a particular segment
 label given the data. This information is delivered in a series of
-numbered wiggle files, one for each segment label. The individual
-values will vary from 0 to 100, showing the percentage probability at
-each position for the label in that file. In most positions, the value
-will be 0 or 100, and substantially reproduce the Viterbi path
-determined from the **identify** task. The **posterior** task uses the
-same options for specifying a model and parameters as **identify**.
+numbered wiggle files, one for each segment label. In hierarchical 
+segmentation mode, setting the `--output-label` option to *full* or
+*subseg* will cause segway to produce a wiggle file for each sublabel
+instead. The individual values will vary from 0 to 100, showing the 
+percentage probability at each position for the label in that file. 
+In most positions, the value will be 0 or 100, and substantially 
+reproduce the Viterbi path determined from the **identify** task. 
+The **posterior** task uses the same options for specifying a model 
+and parameters as **identify**.
 
 Posterior results can be useful in determining regions of ambiguous
 labeling or in diagnosing new models. The mostly binary nature of the
