@@ -46,6 +46,23 @@ def make_track_indexes(text):
     return array(map(int, text.split(",")))
 
 
+def divide_posterior_array(posterior_code, num_frames, num_sublabels):
+    """
+    takes a one-dimensional array whose values are integers of the form
+    label * num_sublabels + sublabel
+    and creates a two-dimensional array whose columns contain the label
+    and the sublabel in separate values. This is a convenience function to
+    provide the find_segment_starts() function with data in the same format
+    as during the viterbi task.
+    """
+    res = zeros((2, num_frames), DTYPE_IDENTIFY)
+    for frame_index in xrange(num_frames):
+        total_label = posterior_code[frame_index]
+        label, sublabel = divmod(total_label, num_sublabels)
+        res[:, frame_index] = array([label, sublabel])
+    return res
+
+
 def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     """
     returns: numpy.ndarray of size (num_frames,), type DTYPE_IDENTIFY
@@ -263,23 +280,6 @@ def replace_args_filelistname(args, temp_filepaths, ext):
     temp_filepaths.append(filelistpath)
 
     return fd
-
-
-def divide_posterior_array(posterior_code, num_frames, num_sublabels):
-    """
-    takes a one-dimensional array whose values are integers of the form
-    label * num_sublabels + sublabel
-    and creates a two-dimensional array whose columns contain the label
-    and the sublabel in separate values. This is a convenience function to
-    provide the find_segment_starts() function with data in the same format
-    as during the viterbi task.
-    """
-    res = zeros((2, num_frames), DTYPE_IDENTIFY)
-    for frame_index in xrange(num_frames):
-        total_label = posterior_code[frame_index]
-        label, sublabel = divmod(total_label, num_sublabels)
-        res[:, frame_index] = array([label, sublabel])
-    return res
 
 
 def print_to_fd(fd, line):
