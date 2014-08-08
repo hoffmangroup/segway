@@ -92,7 +92,7 @@ def concatenate_window_segmentations(window_filenames, header, outfilename):
         outfile.write(last_line)
 
 class OutputSaver(Copier):
-    copy_attrs = ["tracks", "uuid", "num_worlds", "num_segs"]
+    copy_attrs = ["tracks", "uuid", "num_worlds", "num_segs", "num_subsegs"]
 
     attrs = dict(visibility="dense",
                  viewLimits="0:1",
@@ -149,15 +149,22 @@ class IdentifySaver(OutputSaver):
 
 
 class PosteriorSaver(OutputSaver):
-    copy_attrs = OutputSaver.copy_attrs + ["bedgraph_filename", "bed_filename", "posterior_filenames"]
-
-    bedgraph_header_tmpl = "track type=bedGraph name=posterior.%d \
-        description=\"Segway posterior probability of label %d\" \
-        visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
-        autoScale=off color=200,100,0 altColor=0,100,200"
+    copy_attrs = OutputSaver.copy_attrs + ["bedgraph_filename", "bed_filename",
+                                           "posterior_filenames",
+                                           "output_label"]
 
     def make_bedgraph_header(self, num_seg):
-        return self.bedgraph_header_tmpl % (num_seg, num_seg)
+        if self.output_label == "full":
+            bedgraph_header_tmpl = "track type=bedGraph name=posterior.%s \
+            description=\"Segway posterior probability of label %s\" \
+            visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
+            autoScale=off color=200,100,0 altColor=0,100,200"
+        else:
+            bedgraph_header_tmpl = "track type=bedGraph name=posterior.%d \
+            description=\"Segway posterior probability of label %d\" \
+            visibility=dense  viewLimits=0:100 maxHeightPixels=0:0:10 \
+            autoScale=off color=200,100,0 altColor=0,100,200"
+        return bedgraph_header_tmpl % (num_seg, num_seg)
 
     def __call__(self, world):
         # Save posterior code bed file
@@ -168,7 +175,15 @@ class PosteriorSaver(OutputSaver):
 
         # Save posterior bedgraph files
         posterior_bedgraph_tmpl = self.make_filename(self.bedgraph_filename, world)
-        for num_seg in xrange(self.num_segs):
+        if self.output_label == "subseg":
+            label_print_range = xrange(self.num_segs * self.num_subsegs)
+        elif self.output_label == "full":
+            label_print_range = ("%d.%d" % divmod(label, self.num_subsegs)
+                                 for label in xrange(self.num_segs *
+                                                     self.num_subsegs))
+        else:
+            label_print_range = xrange(self.num_segs)
+        for num_seg in label_print_range:
             posterior_filenames = map(lambda posterior_tmpl: posterior_tmpl % num_seg, self.posterior_filenames)
             header = self.make_bedgraph_header(num_seg)
             concatenate_window_segmentations(posterior_filenames, header, posterior_bedgraph_tmpl % num_seg)

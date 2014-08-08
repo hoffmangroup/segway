@@ -364,7 +364,7 @@ def set_cwd_job_tmpl(job_tmpl):
     job_tmpl.workingDirectory = path.getcwd()
 
 
-def rewrite_cliques(rewriter, frame):
+def rewrite_cliques(rewriter, frame, output_label):
     """
     returns the index of the added clique
     """
@@ -380,7 +380,11 @@ def rewrite_cliques(rewriter, frame):
         rewriter.next()
 
     # new clique
-    rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
+    if output_label != "seg":
+        rewriter.send(NewLine("%d 2 seg %d subseg %d" % 
+                              (orig_num_cliques, frame, frame)))
+    else:
+        rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
 
     # XXX: add subseg as a clique to report it in posterior
 
@@ -977,7 +981,8 @@ class Runner(object):
 
                 components_indexed = enumerate(POSTERIOR_CLIQUE_INDICES)
                 for component_index, component in components_indexed:
-                    clique_index = rewrite_cliques(rewriter, component_index)
+                    clique_index = rewrite_cliques(rewriter, component_index,
+                                                   self.output_label)
                     clique_indices[component] = clique_index
 
                 for line in rewriter:
@@ -2169,9 +2174,9 @@ to find the winning instance anyway.""" % thread.instance_index)
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
-                       self.num_segs, self.output_label, self.genomedataname,
-                       float_filepath, int_filepath, self.distribution,
-                       track_indexes_text]
+                       self.num_segs, self.num_subsegs, self.output_label,
+                       self.genomedataname, float_filepath, int_filepath,
+                       self.distribution, track_indexes_text]
         output_filename = None
 
         num_frames = self.window_lens[window_index]
@@ -2343,8 +2348,6 @@ to find the winning instance anyway.""" % thread.instance_index)
 
                         if (self.posterior and (self.recover_dirname
                                                 or self.num_worlds != 1)):
-                            raise NotImplementedError  # XXX
-                        if (self.posterior and self.output_label != "seg"):
                             raise NotImplementedError  # XXX
 
                         self.run_identify_posterior()
