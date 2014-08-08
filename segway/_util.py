@@ -432,23 +432,6 @@ def read_posterior(infile, num_frames, num_labels,
     return res
 
 
-def divide_posterior_array(posterior_code, num_frames, num_sublabels):
-    """
-    takes a one-dimensional array whose values are integers of the form
-    label * num_sublabels + sublabel
-    and creates a two-dimensional array whose columns contain the label
-    and the sublabel in separate values. This is a convenience function to
-    provide the find_segment_starts() function with data in the same format
-    as during the viterbi task.
-    """
-    res = zeros((2, num_frames), DTYPE_IDENTIFY)
-    for frame_index in xrange(num_frames):
-        total_label = posterior_code[frame_index]
-        label, sublabel = divmod(total_label, num_sublabels)
-        res[:, frame_index] = array([label, sublabel])
-    return res
-
-
 def make_filelistpath(dirpath, ext):
     return dirpath / extjoin(ext, EXT_LIST)
 

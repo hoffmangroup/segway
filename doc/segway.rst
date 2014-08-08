@@ -573,7 +573,7 @@ segmentation mode, setting the `--output-label` option to *full* or
 *subseg* will cause segway to produce a wiggle file for each sublabel
 instead, identified using the label and the sublabel in the file name 
 before the file extension. For example, the bedGraph file for label 0, 
-and sublabel 1 would be called "posterior0.1.bedGraph". The individual 
+and sublabel 1 would be called ``posterior0.1.bedGraph``. The individual 
 values will vary from 0 to 100, showing the percentage probability at 
 each position for the label in that file. In most positions, the value 
 will be 0 or 100, and substantially reproduce the Viterbi path 

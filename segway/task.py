@@ -16,13 +16,13 @@ import sys
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import argmax, array, empty, where, diff, r_
+from numpy import argmax, array, empty, where, diff, r_, zeros
 from path import path
 
 from .observations import _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array, 
-                    find_segment_starts, get_label_color, divide_posterior_array,
+                    find_segment_starts, get_label_color,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
 
@@ -263,6 +263,23 @@ def replace_args_filelistname(args, temp_filepaths, ext):
     temp_filepaths.append(filelistpath)
 
     return fd
+
+
+def divide_posterior_array(posterior_code, num_frames, num_sublabels):
+    """
+    takes a one-dimensional array whose values are integers of the form
+    label * num_sublabels + sublabel
+    and creates a two-dimensional array whose columns contain the label
+    and the sublabel in separate values. This is a convenience function to
+    provide the find_segment_starts() function with data in the same format
+    as during the viterbi task.
+    """
+    res = zeros((2, num_frames), DTYPE_IDENTIFY)
+    for frame_index in xrange(num_frames):
+        total_label = posterior_code[frame_index]
+        label, sublabel = divmod(total_label, num_sublabels)
+        res[:, frame_index] = array([label, sublabel])
+    return res
 
 
 def print_to_fd(fd, line):
