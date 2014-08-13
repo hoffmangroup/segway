@@ -1148,6 +1148,7 @@ class Runner(object):
         if output_params_filename:
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
 
+        # prevent supervised variable from being inherited from train task
         if self.identify:
             directives["CARD_SUPERVISIONLABEL"] = IDENTIFY_SUPERVISION
 
