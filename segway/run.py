@@ -76,6 +76,7 @@ NUM_SUBSEGS = 1
 OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
+CARD_SUPERVISIONLABEL_NONE = -1
 
 ISLAND = True
 
@@ -1149,6 +1150,10 @@ class Runner(object):
 
         if output_params_filename:
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
+
+        # prevent supervised variable from being inherited from train task
+        if self.identify:
+            directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
 
         directives["CARD_SEG"] = self.num_segs
         directives["CARD_SUBSEG"] = self.num_subsegs
