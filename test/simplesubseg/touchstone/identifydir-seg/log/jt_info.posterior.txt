@@ -1,0 +1,184 @@
+===============================
+   P1 partition information: JT_weight = 1.301030
+=== Clique Information ===
+Number of cliques = 2
+== Clique number: 0, root/right-interface clique, root/right-interface clique
+Clique information: 9 packed bits, 1 unsigned words (0 splits), weight = 1.982271, jt_weight = 1.000000
+12 Nodes: seg(1)[2],segCountDown(0)[2],seg(0)[2],subseg(0)[2],presence__testtrack1(0)[2],testtrack1(0),presence__testtrack2(0)[2],testtrack2(0),ruler(1)[2],segCountDown(1)[2],segTransition(1)[3],subseg(1)[2]
+12 Assigned: seg(1),segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),ruler(1),segCountDown(1),segTransition(1),subseg(1)
+11 Assigned Sorted: subseg(0)[2],presence__testtrack1(0)[2],testtrack1(0),presence__testtrack2(0)[2],testtrack2(0),segCountDown(0)[2],ruler(1)[2],segTransition(1)[3],seg(1)[2],segCountDown(1)[2],subseg(1)[2]
+11 Dispositions: 0 0 0 0 0 0 0 0 0 0 0
+11 Assigned Prob: seg(1),segCountDown(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),ruler(1),segCountDown(1),segTransition(1),subseg(1)
+1 Cum Assigned Prob: seg(0)
+1 Union Incomming Seps: seg(0)
+0 Unassigned Iterated: 
+0 Cumulative Unassigned: 
+8 Hidden/Hashable: seg(1)[2],segCountDown(0)[2],seg(0)[2],subseg(0)[2],ruler(1)[2],segCountDown(1)[2],segTransition(1)[3],subseg(1)[2]
+1 Clique Neighbors: 1,
+1 Clique Children: 1,
+1 Receive Seps: 0,
+0 incomming VE Separators
+Send Sep: -1
+  == Clique number: 1, leaf
+  Clique information: 1 packed bits, 1 unsigned words (0 splits), weight = 0.301030, jt_weight = 1.000000
+  1 Nodes: seg(0)[2]
+  1 Assigned: seg(0)
+  1 Assigned Sorted: seg(0)[2]
+  1 Dispositions: 0
+  1 Assigned Prob: seg(0)
+  0 Cum Assigned Prob: 
+  0 Union Incomming Seps: 
+  0 Unassigned Iterated: 
+  0 Cumulative Unassigned: 
+  1 Hidden/Hashable: seg(0)[2]
+  1 Clique Neighbors: 0,
+  0 Clique Children: 
+  0 Receive Seps: 
+  0 incomming VE Separators
+  Send Sep: 0
+
+=== Separator Information ===
+Number of separators = 1
+== Separator number: 0
+Separator information: 0 acc packed bits (0 words, 0 splits), 1 rem packed bits (1 words, 0 splits)
+1 Nodes: seg(0)[2]
+0 Acc Inter: 
+0 Hid Acc Inter: 
+1 remainder: seg(0)
+1 hRemainder: seg(0)
+
+
+===============================
+   Co partition information: JT_weight = 1.301030
+=== Clique Information ===
+Number of cliques = 2
+== Clique number: 0, root/right-interface clique, root/right-interface clique, left-interface clique
+Clique information: 9 packed bits, 1 unsigned words (0 splits), weight = 2.283301, jt_weight = 1.000000
+13 Nodes: seg(1)[2],frameIndex(1)[2000000],segCountDown(1)[2],subseg(1)[2],presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),ruler(2)[2],segCountDown(2)[2],segTransition(2)[3],seg(2)[2],subseg(2)[2]
+10 Assigned: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
+10 Assigned Sorted: presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),frameIndex(1)[2000000],ruler(2)[2],segTransition(2)[3],seg(2)[2],segCountDown(2)[2],subseg(2)[2]
+10 Dispositions: 0 0 0 0 0 0 0 0 0 0
+10 Assigned Prob: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
+12 Cum Assigned Prob: seg(1),segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),ruler(1),segCountDown(1),segTransition(1),subseg(1)
+3 Union Incomming Seps: seg(1),segCountDown(1),subseg(1)
+0 Unassigned Iterated: 
+1 Cumulative Unassigned: seg(1)
+8 Hidden/Hashable: seg(1)[2],segCountDown(1)[2],subseg(1)[2],ruler(2)[2],segCountDown(2)[2],segTransition(2)[3],seg(2)[2],subseg(2)[2]
+1 Clique Neighbors: 1,
+1 Clique Children: 1,
+2 Receive Seps: 0,1,
+0 incomming VE Separators
+Send Sep: -1
+  == Clique number: 1, leaf
+  Clique information: 1 packed bits, 1 unsigned words (0 splits), weight = 0.301030, jt_weight = 1.000000
+  1 Nodes: seg(1)[2]
+  0 Assigned: 
+  0 Assigned Sorted: 
+  0 Dispositions:
+  0 Assigned Prob: 
+  0 Cum Assigned Prob: 
+  0 Union Incomming Seps: 
+  1 Unassigned Iterated: seg(1)
+  0 Cumulative Unassigned: 
+  1 Hidden/Hashable: seg(1)[2]
+  1 Clique Neighbors: 0,
+  0 Clique Children: 
+  0 Receive Seps: 
+  0 incomming VE Separators
+  Send Sep: 0
+
+=== Separator Information ===
+Number of separators = 2
+== Separator number: 0
+Separator information: 0 acc packed bits (0 words, 0 splits), 1 rem packed bits (1 words, 0 splits)
+1 Nodes: seg(1)[2]
+0 Acc Inter: 
+0 Hid Acc Inter: 
+1 remainder: seg(1)
+1 hRemainder: seg(1)
+== Separator number: 1
+Separator information: 1 acc packed bits (1 words, 0 splits), 2 rem packed bits (1 words, 0 splits)
+3 Nodes: seg(1)[2],segCountDown(1)[2],subseg(1)[2]
+1 Acc Inter: seg(1)
+1 Hid Acc Inter: seg(1)
+2 remainder: segCountDown(1),subseg(1)
+2 hRemainder: segCountDown(1),subseg(1)
+
+
+===============================
+   E1 partition information: JT_weight = 1.301030
+=== Clique Information ===
+Number of cliques = 2
+== Clique number: 1, root/right-interface clique, root clique
+Clique information: 1 packed bits, 1 unsigned words (0 splits), weight = 0.301030, jt_weight = 1.000000
+1 Nodes: seg(2)[2]
+0 Assigned: 
+0 Assigned Sorted: 
+0 Dispositions:
+0 Assigned Prob: 
+27 Cum Assigned Prob: seg(1),segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),frameIndex(1),ruler(1),segCountDown(1),segTransition(1),subseg(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),frameIndex(2),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2)
+1 Union Incomming Seps: seg(2)
+0 Unassigned Iterated: 
+0 Cumulative Unassigned: 
+1 Hidden/Hashable: seg(2)[2]
+1 Clique Neighbors: 0,
+1 Clique Children: 0,
+1 Receive Seps: 0,
+0 incomming VE Separators
+Send Sep: -1
+  == Clique number: 0, leaf/left-interface clique
+  Clique information: 3 packed bits, 1 unsigned words (0 splits), weight = 0.903090, jt_weight = 1.000000
+  8 Nodes: frameIndex(2)[2000000],segCountDown(2)[2],seg(2)[2],subseg(2)[2],presence__testtrack1(2)[2],testtrack1(2),presence__testtrack2(2)[2],testtrack2(2)
+  5 Assigned: frameIndex(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2)
+  5 Assigned Sorted: presence__testtrack1(2)[2],testtrack1(2),presence__testtrack2(2)[2],testtrack2(2),frameIndex(2)[2000000]
+  5 Dispositions: 0 0 0 0 0
+  5 Assigned Prob: frameIndex(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2)
+  22 Cum Assigned Prob: seg(1),segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),frameIndex(1),ruler(1),segCountDown(1),segTransition(1),subseg(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
+  3 Union Incomming Seps: segCountDown(2),seg(2),subseg(2)
+  0 Unassigned Iterated: 
+  0 Cumulative Unassigned: 
+  3 Hidden/Hashable: segCountDown(2)[2],seg(2)[2],subseg(2)[2]
+  1 Clique Neighbors: 1,
+  0 Clique Children: 
+  1 Receive Seps: 1,
+  0 incomming VE Separators
+  Send Sep: 0
+
+=== Separator Information ===
+Number of separators = 2
+== Separator number: 0
+Separator information: 0 acc packed bits (0 words, 0 splits), 1 rem packed bits (1 words, 0 splits)
+1 Nodes: seg(2)[2]
+0 Acc Inter: 
+0 Hid Acc Inter: 
+1 remainder: seg(2)
+1 hRemainder: seg(2)
+== Separator number: 1
+Separator information: 0 acc packed bits (0 words, 0 splits), 3 rem packed bits (1 words, 0 splits)
+3 Nodes: segCountDown(2)[2],seg(2)[2],subseg(2)[2]
+0 Acc Inter: 
+0 Hid Acc Inter: 
+3 remainder: segCountDown(2),seg(2),subseg(2)
+3 hRemainder: segCountDown(2),seg(2),subseg(2)
+
+
+===============================
+
+===============================
+   P1 message order
+Number of messages: 1
+  0: 1 --> 0
+
+
+===============================
+   Co message order
+Number of messages: 1
+  0: 1 --> 0
+
+
+===============================
+   E1 message order
+Number of messages: 1
+  0: 0 --> 1
+
+
