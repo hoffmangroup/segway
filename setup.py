@@ -8,7 +8,7 @@ functional genomics data.
 
 __version__ = "1.2.0"
 
-# Copyright 2008-2014 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2014 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 import sys
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
           version=__version__,
           description=short_description,
           author="Michael Hoffman",
-          author_email="mmh1@uw.edu",
+          author_email="mhoffman@uhnresearch.ca",
           url=url,
           download_url=download_url,
           classifiers=classifiers,

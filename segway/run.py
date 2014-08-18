@@ -7,7 +7,7 @@ run: main Segway implementation
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2014 Michael M. Hoffman <mmh1@uw.edu>
+# Copyright 2008-2014 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 from collections import defaultdict, namedtuple
 from copy import copy

@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011, 2012 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 from math import ceil
 import sys

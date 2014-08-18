@@ -7,7 +7,7 @@ layer: convert flattened Viterbi BED files to a layered thick/thin bed file
 
 __version__ = "$Revision$"
 
-# Copyright 2009-2012 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009-2012 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 from collections import defaultdict
 import re

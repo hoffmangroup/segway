@@ -5,7 +5,7 @@ __version__ = "$Revision$"
 
 # common stuff: needs to be in a different file from __init__ because
 # it is imported by lsf.py and sge.py
-# Copyright 2009, 2011, 2012, 2013 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011, 2012, 2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 import sys
 from tempfile import gettempdir

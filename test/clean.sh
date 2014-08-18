@@ -3,7 +3,7 @@
 ## clean.sh: remove test temporary files
 
 ## $Revision$
-## Copyright 2012 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2012 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 set -o nounset -o pipefail -o errexit
 

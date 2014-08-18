@@ -7,7 +7,7 @@ Segway |version| Documentation
 ==============================
 
 :Homepage: http://noble.gs.washington.edu/proj/segway
-:Author: Michael M. Hoffman <mmh1 at uw dot edu>
+:Author: Michael M. Hoffman <mhoffman at uhnresearch dot ca>
 :Organization: University of Washington
 :Address: Department of Genome Sciences, PO Box 355065
           Seattle, WA 98195-5065, United States of America

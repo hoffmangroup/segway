@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2012, 2013 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2012, 2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename

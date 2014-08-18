@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2013 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 from resource import getrusage, RUSAGE_CHILDREN
 from subprocess import Popen

@@ -3,7 +3,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2012 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2008-2012 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 from itertools import chain
 import re

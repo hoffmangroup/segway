@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2012 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2012 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 from ._util import Saver
 

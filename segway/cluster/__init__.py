@@ -3,7 +3,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011-2014 Michael M. Hoffman <mmh1@washington.edu>
+# Copyright 2009, 2011-2014 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 from collections import defaultdict
 from heapq import heappop, heappush

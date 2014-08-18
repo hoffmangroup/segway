@@ -8,7 +8,7 @@ XXX: want to keep track of all files in new directory
 
 __version__ = "$Revision$"
 
-## Copyright 2011-2013 Michael M. Hoffman <mmh1@uw.edu>
+## Copyright 2011-2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
 
 import filecmp
 from os import walk
