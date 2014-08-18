@@ -54,7 +54,7 @@ Running Segway
   dividing segments into smaller pieces.
 
 Results
-======
+=======
 
 8. The ``identifydir/segway.bed.gz`` file has each segment as a
    separate line in the BED file, and can be used for further
