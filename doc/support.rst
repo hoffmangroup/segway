@@ -15,7 +15,7 @@ https://mailman1.u.washington.edu/mailman/listinfo/segway-users
 Specifically, if you want to report a bug or request a feature, please
 do so using the Segway issue tracker at:
 
-http://code.google.com/p/segway-genome/issues/
+https://bitbucket.org/hoffmanlab/segway/issues
 
 If you do not want to read discussions about other people's use of
 Segway, but would like to hear about new releases and other important

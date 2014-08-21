@@ -6,12 +6,11 @@
 Segway |version| Documentation
 ==============================
 
-:Homepage: http://noble.gs.washington.edu/proj/segway
+:Homepage: http://pmgenomics.ca/hoffmanlab/proj/segway
 :Author: Michael M. Hoffman <mhoffman at uhnresearch dot ca>
-:Organization: University of Washington
-:Address: Department of Genome Sciences, PO Box 355065
-          Seattle, WA 98195-5065, United States of America
-:Copyright: 2009-2013 Michael M. Hoffman
+:Organization: Princess Margaret Cancer Centre
+:Address: Toronto Medical Discovery Tower 11-311, 101 College St, M5G 1L7, Toronto, Ontario, Canada
+:Copyright: 2009-2014 Michael M. Hoffman
 :Last updated: |today|
 
 .. currentmodule:: segway
@@ -32,8 +31,6 @@ For a conceptual overview see the paper:
 <http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3340533/>`_ available at
 PubMed Central requires no subscription.
 
-Contents:
-
 .. toctree::
    :maxdepth: 2
 
@@ -44,11 +41,11 @@ Contents:
    troubleshooting
    support
 
+.. Currently all empty
+.. Indices and tables
+.. ==================
 
-Indices and tables
-==================
-
-* :ref:`genindex`
-* :ref:`modindex`
-* :ref:`search`
-
+.. * :ref:`genindex`
+.. * :ref:`modindex`
+.. * :ref:`search`
+..

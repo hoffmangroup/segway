@@ -41,7 +41,7 @@ The **identify** and **posterior** tasks create temporary observation
 files in directories indicated by the Python `tempfile.gettempdir()`
 function, which searches for an appropriate directory as described in
 the documentation for `tempfile.tempdir`
-<http://docs.python.org/library/tempfile.html#tempfile.tempdir>. If
+<https://docs.python.org/2/library/tempfile.html#tempfile.tempdir>. If
 you need to specify that temporary files go into a particular
 directory, set the `TMPDIR` environment variable.
 

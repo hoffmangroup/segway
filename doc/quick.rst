@@ -5,20 +5,16 @@
 Installation and configuration
 ==============================
 
-1. To install Segway in your own user directories, execute this
-   command from :program:`bash`::
+1. To install Segway first install `Genomedata
+   <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>`_
+   and `GMTK
+   <http://pmgenomics.ca/hoffmanlab/proj/segway/gmtk/gmtk-1.0.1.tar.gz>`_
+   , then run the command
+   from :program:`bash`::
 
-     python <(wget -O - http://noble.gs.washington.edu/proj/segway/install.py)
+     pip install segway
 
-2. The installer will ask you some questions where to install things
-   and will install (if necessary) HDF5, NumPy, any other
-   prerequisites, and Segway. It will also tell you about changes it
-   wants to make to your ``~/.bashrc`` to set up your environment
-   properly.
-
-3. Log out and back in to source the new ``~/.bashrc``.
-
-4. If you are using SGE, your system administrator must set up a
+2. If you are using SGE, your system administrator must set up a
    ``mem_requested`` resource for Segway to work. This can be done by
    installing Segway and then running ``python -m
    segway.cluster.sge_setup``.
@@ -27,11 +23,11 @@ Acquiring data
 ==============
 
 5. Observation data is stored with the genomedata system.
-   <http://noble.gs.washington.edu/proj/genomedata/>. There is a small
+   <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>. There is a small
    Genomedata archive for testing that comes with Segway, that is used
    in the below steps. You can get it using::
 
-     wget http://noble.gs.washington.edu/proj/segway/2011/test.genomedata
+     wget http://pmgenomics.ca/hoffmanlab/proj/segway/2011/test.genomedata
 
 Running Segway
 ==============
@@ -67,4 +63,4 @@ Results
 
 10. You can also perform further analysis of the segmentation and
     trained parameters using Segtools
-    <http://noble.gs.washington.edu/proj/segtools/>.
+    <http://pmgenomics.ca/hoffmanlab/proj/segtools/>.

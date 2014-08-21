@@ -213,3 +213,6 @@ man_pages = [
     ('index', 'segway', u'Segway Documentation',
      [u'Michael M. Hoffman'], 1)
 ]
+
+# -- Options for the linkcheck builder ---------------------------------------
+linkcheck_timeout = 15

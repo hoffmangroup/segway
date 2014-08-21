@@ -12,29 +12,19 @@ Segway requires the following prerequisites:
 You need Python 2.6 or 2.7.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
-<http://noble.gs.washington.edu/proj/segway/gmtk/gmtk-20091016.tar.gz>.
-You probably need to install NumPy separately.
+<http://pmgenomics.ca/hoffmanlab/proj/segway/gmtk/gmtk-1.0.1.tar.gz>.
 
-You will need these Python packages, which will probably be installed
-automatically by ``pip install segway`` or ``easy_install segway``:
-``genomedata>0.1.5``, ``textinput``, ``optbuild>0.1.6``,
-``optplus>0.1.0``, ``tables>2.0.4``, ``forked-path``, ``colorbrewer``,
-``segway``
+You need Genomedata 1.3.5 or later. To install Genomedata see the instructions
+at <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>.
 
-If you are installing as an individual user, we have developed an
-``install.py`` script that should make this easy.
-
-If you are installing as a system administrator, we recommend using
-``pip install segway`` or ``easy_install segway`` without configuring
-``~/.pydistutils.cfg`` to install in your home directory. This should
-install many of the prerequisites as well.
+Afterwards Segway can be installed automatically by ``pip install segway`` or
+``easy_install segway``
 
 Standalone configuration
 ------------------------
-Segway 1.2.0 now has experimental support for running without any
-cluster system. This will automatically be used when Segway fails to
-access any cluster system. You can force it by setting the
-`SEGWAY_CLUSTER` environment variable to `local`.
+Segway can be run without any cluster system. This will automatically be
+used when Segway fails to access any cluster system. You can force it by
+setting the `SEGWAY_CLUSTER` environment variable to `local`.
 
 Cluster configuration
 ---------------------
@@ -84,7 +74,7 @@ More specifically, Segway performs the following steps:
      using the generated model and discovered parameters
   7. Convert the GMTK Viterbi results into BED format
      (``segway.bed.gz``) for use in a genome browser, or by
-     Segtools <http://noble.gs.washington.edu/proj/segtools/>, or other tools
+     Segtools <http://pmgenomics.ca/hoffmanlab/proj/segtools/>, or other tools
 
   8. Call GMTK to perform posterior decoding of the observations
      using the generated model and discovered parameters
@@ -98,7 +88,7 @@ More specifically, Segway performs the following steps:
       training (``likelihood.*.tab``)
 
 ..  12. (not implemented) Call Segtools
-..      <http://noble.gs.washington.edu/proj/segtools/> for a more
+..      <http://pmgenomics.ca/hoffmanlab/proj/segtools/> for a more
 ..      comprehensive report and plots on the resulting segmentation.
 
 The **identify** and **posterior** tasks can run simultaneously, as
