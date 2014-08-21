@@ -61,6 +61,12 @@ def calc_version(mgr, options):
     return "%s.dev-rel%s-hg%s" % (__version__, id_num, id_id)
 
 if __name__ == "__main__":
+
+    if "release" in sys.argv:
+        vcs_version_handler = False
+    else:
+        vcs_version_handler = {"version_handler": calc_version}
+
     setup(name=name,
           version=__version__,
           description=short_description,
@@ -77,6 +83,6 @@ if __name__ == "__main__":
           # XXX: this should be based off of __file__ instead
           packages=find_packages("."),
           include_package_data=True,
-          use_vcs_version={"version_handler": calc_version},
+          use_vcs_version=vcs_version_handler,
           entry_points=entry_points
           )
