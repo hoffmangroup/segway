@@ -24,7 +24,7 @@ doclines = __doc__.splitlines()
 name, short_description = doclines[0].split(": ")
 long_description = "\n".join(doclines[2:])
 
-url = "http://noble.gs.washington.edu/proj/%s/" % name.lower()
+url = "http://pmgenomics.ca/hoffmanlab/proj/%s/" % name.lower()
 download_url = "%ssrc/%s-%s.tar.gz" % (url, name, __version__)
 
 classifiers = ["Natural Language :: English",
