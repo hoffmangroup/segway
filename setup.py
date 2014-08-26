@@ -52,13 +52,21 @@ def hg_id(mgr, kind):
     return mgr._invoke("id", "--%s" % kind).strip()
 
 def calc_version(mgr, options):
-    id_num = hg_id(mgr, "num")
-    id_id = hg_id(mgr, "id")
-    id_id = id_id.replace("+", "p")
+    # If the current version is a development version (modified or on an
+    # untagged changeset)
+    current_version = mgr.get_current_version()
+    if current_version.endswith("dev"):
+        # Return a custom version string based on changset id
+        id_num = hg_id(mgr, "num")
+        id_id = hg_id(mgr, "id")
+        id_id = id_id.replace("+", "p")
 
-    # "rel" always comes after r, so new numbering system is preserved
-    # XXX: after 1.2.0 is released, we can change rel back to r
-    return "%s.dev-rel%s-hg%s" % (__version__, id_num, id_id)
+        # "rel" always comes after r, so new numbering system is preserved
+        # XXX: after 1.2.0 is released, we can change rel back to r
+        return "%s.dev-rel%s-hg%s" % (__version__, id_num, id_id)
+    # Otherwise return the current tagged version
+    else:
+        return current_version
 
 if __name__ == "__main__":
     setup(name=name,
