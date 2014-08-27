@@ -22,7 +22,7 @@ Installation and configuration
 Acquiring data
 ==============
 
-5. Observation data is stored with the genomedata system.
+3. Observation data is stored with the genomedata system.
    <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>. There is a small
    Genomedata archive for testing that comes with Segway, that is used
    in the below steps. You can get it using::
@@ -31,13 +31,13 @@ Acquiring data
 
 Running Segway
 ==============
-6. Use the ``segway train`` command to discover patterns in the test
+4. Use the ``segway train`` command to discover patterns in the test
    data. Here, we specify that we want Segway to discover four unique
    patterns::
 
      segway --num-labels=4 train test.genomedata traindir
 
-7. Use the ``segway identify`` command to create the segmentation,
+5. Use the ``segway identify`` command to create the segmentation,
    which partitions the genome into regions labeled with one of the
    four discovered patterns::
 
@@ -52,15 +52,15 @@ Running Segway
 Results
 =======
 
-8. The ``identifydir/segway.bed.gz`` file has each segment as a
+6. The ``identifydir/segway.bed.gz`` file has each segment as a
    separate line in the BED file, and can be used for further
    processing.
 
-9. The ``identifydir/segway.layered.bed.gz`` file is designed for
+7. The ``identifydir/segway.layered.bed.gz`` file is designed for
    easier visualization on a genome browser. It has thick lines where
    a segment is present and thin lines where it is not. This is not as
    easy for a computer to parse, but it is more useful visually.
 
-10. You can also perform further analysis of the segmentation and
+8. You can also perform further analysis of the segmentation and
     trained parameters using Segtools
     <http://pmgenomics.ca/hoffmanlab/proj/segtools/>.
