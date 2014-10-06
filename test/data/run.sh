@@ -36,6 +36,6 @@ segway "$cluster_arg" \
 
 # XXX: Keep as just a smoke test for now until we have a working baseline or
 # reproducible results
-# cd ..
-#
-# ../compare_directory.py ../data/touchstone ../data/${TMPDIR#"./"}
+cd ..
+
+../compare_directory.py ../data/touchstone ../data/${TMPDIR#"./"}
