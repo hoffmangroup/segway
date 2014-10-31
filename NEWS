@@ -1,6 +1,7 @@
 1.2.1:
 
-
+* segway: added new 'data' test baseline with GMTK 1.1.0
+* segway: added new 'simplesubseg' test to test subsegment labels
 
 1.2.0:
 
