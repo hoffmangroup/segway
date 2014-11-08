@@ -16,7 +16,7 @@ cd "$TMPDIR"
 # XXX: this now requires bedToBigBed. could refactor to look for the
 # executable, but this seems odd to do in a test. - JH
 
-segway-layer -b segway.layered.bb -m ../mnemonics < ../segway.bed > segway.layered.bed
+segway-layer -m ../mnemonics < ../segway.bed > segway.layered.bed
 
 cd ..
 
