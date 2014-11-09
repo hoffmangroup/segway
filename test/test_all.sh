@@ -29,6 +29,6 @@ do
     # Save the exit status if any of the tests fail
     ./run.sh || { exit_status=$?; true; }
     cd $TEST_ROOT
-done < <(find -maxdepth 2 -name "run.sh" -type f | sort)
+done < <(find . -maxdepth 2 -name "run.sh" -type f | sort)
 
 exit $exit_status
