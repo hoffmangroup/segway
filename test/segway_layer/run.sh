@@ -13,9 +13,6 @@ TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
 echo >&2 "entering directory $TMPDIR"
 cd "$TMPDIR"
 
-# XXX: this now requires bedToBigBed. could refactor to look for the
-# executable, but this seems odd to do in a test. - JH
-
 segway-layer -m ../mnemonics < ../segway.bed > segway.layered.bed
 
 cd ..

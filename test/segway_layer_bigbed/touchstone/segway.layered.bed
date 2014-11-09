@@ -1,0 +1,6 @@
+track autoScale=off description="segway segmentation of testtrack1A, testtrack1B, testtrack2A, testtrack2B" viewLimits=0:1 visibility=full name=segway.00000000000000000000000000000000 itemRgb=on
+
+chr1	0	8000	D	1000	.	0	8000	27,158,119	3	1,1000,1000	0,3000,7000
+chr1	0	8000	C	1000	.	0	8000	217,95,2	3	1000,1000,1	0,4000,7999
+chr1	0	8000	B	1000	.	0	8000	117,112,179	4	1,1000,1000,1	0,2000,6000,7999
+chr1	0	8000	A	1000	.	0	8000	231,41,138	4	1,1000,1000,1	0,1000,5000,7999
