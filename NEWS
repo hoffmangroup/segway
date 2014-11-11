@@ -2,6 +2,8 @@
 
 * segway: added new 'data' test baseline with GMTK 1.1.0
 * segway: added new 'simplesubseg' test to test subsegment labels
+* segway-layer: fixed bigBed conversion when blocksize==0 and added
+  segway_layer_bigbed test (thanks to Jay Hesselberth)
 
 1.2.0:
 
