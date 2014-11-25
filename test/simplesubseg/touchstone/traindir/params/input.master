@@ -1,0 +1,203 @@
+#include "traindir/auxiliary/segway.inc"
+
+#if CARD_SEG != 2
+#error Specified number of segment labels (CARD_SEG) does not match the number used for this input master file (2)
+#endif
+
+DT_IN_FILE inline
+5
+
+0 map_frameIndex_ruler
+1
+% is the frameIndex divisible by RULER_SCALE
+    -1 { mod(p0, RULER_SCALE) == 0 }
+
+1 map_seg_segCountDown
+1
+% this is only used at the beginning of an observation track
+0 2 0 default
+    -1 1
+    -1 1
+
+2 map_segTransition_ruler_seg_segCountDown_segCountDown
+4
+    0 2 2 default
+      % segTransition(0) == 2 (seg transition):
+      % reinitialize the segCountDown value based on the usual tree
+      % used at the beginning of a segment
+      2 2 0 default
+    -1 1
+    -1 1
+
+      % segTransition(0) in (0, 1) (no transition, subseg transition):
+      1 2 0 default
+            % ruler(0) == 0:
+            -1 { p3 } % not at ruler mark -> copy previous value
+
+            % ruler(0) == 1:
+            -1 { max(p3-1, 0) } % subtract 1 from previous value, or 0
+
+
+3 % XXXopt: good candidate for a linear combination C deterministic mapper
+
+map_seg_subseg_obs
+2       % num parents
+        -1 { p0*CARD_SUBSEG + p1 } 
+
+4 map_supervisionLabel_seg_alwaysTrue
+2              % num parents
+% first parent is the label: 0 = no label; 1+ = (desired-1)
+% second parent is target
+    0 2 0 default
+        % no label
+        -1 1 % does not matter, observed child is always true
+
+        % label set
+        %% if the target == label - 1: then observed child is true
+        %% if the target != label - 1: then observed child is false => impossible
+        -1 { p1 == (p0-SUPERVISION_LABEL_OFFSET) }
+
+
+NAME_COLLECTION_IN_FILE inline
+2
+
+0 collection_seg_testtrack1 4
+mx_seg0_subseg0_testtrack1
+mx_seg0_subseg1_testtrack1
+mx_seg1_subseg0_testtrack1
+mx_seg1_subseg1_testtrack1
+1 collection_seg_testtrack2 4
+mx_seg0_subseg0_testtrack2
+mx_seg0_subseg1_testtrack2
+mx_seg1_subseg0_testtrack2
+mx_seg1_subseg1_testtrack2
+
+
+
+DPMF_IN_FILE inline
+1
+
+0 dpmf_always 1 1.0
+
+DETERMINISTIC_CPT_IN_FILE inline
+#if CARD_SUPERVISIONLABEL == -1
+5
+#else /* CARD_SUPERVISIONLABEL != -1 */
+6
+#endif /* CARD_SUPERVISIONLABEL == -1 */
+
+0 seg_segCountDown
+1
+CARD_SEG CARD_SEGCOUNTDOWN
+map_seg_segCountDown
+
+1 frameIndex_ruler
+1
+CARD_FRAMEINDEX CARD_RULER
+map_frameIndex_ruler
+
+2 segTransition_ruler_seg_segCountDown_segCountDown
+4
+CARD_SEGTRANSITION CARD_RULER CARD_SEG CARD_SEGCOUNTDOWN CARD_SEGCOUNTDOWN
+map_segTransition_ruler_seg_segCountDown_segCountDown
+
+3 seg_seg_copy
+1
+CARD_SEG CARD_SEG
+internal:copyParent
+
+4 subseg_subseg_copy
+1
+CARD_SUBSEG CARD_SUBSEG
+internal:copyParent
+
+#if CARD_SUPERVISIONLABEL != -1
+5 supervisionLabel_seg_alwaysTrue
+2
+CARD_SUPERVISIONLABEL CARD_SEG CARD_BOOLEAN
+map_supervisionLabel_seg_alwaysTrue
+#endif
+
+#ifndef INPUT_PARAMS_FILENAME
+
+DENSE_CPT_IN_FILE inline
+5
+
+0 start_seg 0 2
+0.5 0.5
+
+1 seg_subseg 1 2 2
+0.5 0.5
+0.5 0.5
+
+2 seg_seg 1 2 2
+0.0 1.0
+1.0 0.0
+
+3 seg_subseg_subseg 2 2 2 2
+0.0 1.0
+1.0 0.0
+
+0.0 1.0
+1.0 0.0
+
+4 segCountDown_seg_segTransition 2 2 2 3
+0.99008910901 0.0099008910901 9.99990000095e-06
+0.99008910901 0.0099008910901 9.99990000095e-06
+
+0.990099009901 0.00990099009901 0.0
+0.990099009901 0.00990099009901 0.0
+
+
+MEAN_IN_FILE inline
+8
+
+0 mean_seg0_subseg0_testtrack1 1 0.469289356226
+1 mean_seg0_subseg0_testtrack2 1 0.538177027353
+2 mean_seg0_subseg1_testtrack1 1 0.502183141873
+3 mean_seg0_subseg1_testtrack2 1 0.554624861059
+4 mean_seg1_subseg0_testtrack1 1 0.480832620242
+5 mean_seg1_subseg0_testtrack2 1 0.391549855015
+6 mean_seg1_subseg1_testtrack1 1 0.477163989812
+7 mean_seg1_subseg1_testtrack2 1 0.475488715495
+
+COVAR_IN_FILE inline
+2
+
+0 covar_testtrack1 1 0.247466461547
+1 covar_testtrack2 1 0.247466461547
+
+
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+
+#endif
+
+
+MC_IN_FILE inline
+8
+
+0 1 COMPONENT_TYPE_DIAG_GAUSSIAN mc_asinh_norm_seg0_subseg0_testtrack1 mean_seg0_subseg0_testtrack1 covar_testtrack1
+1 1 COMPONENT_TYPE_DIAG_GAUSSIAN mc_asinh_norm_seg0_subseg0_testtrack2 mean_seg0_subseg0_testtrack2 covar_testtrack2
+2 1 COMPONENT_TYPE_DIAG_GAUSSIAN mc_asinh_norm_seg0_subseg1_testtrack1 mean_seg0_subseg1_testtrack1 covar_testtrack1
+3 1 COMPONENT_TYPE_DIAG_GAUSSIAN mc_asinh_norm_seg0_subseg1_testtrack2 mean_seg0_subseg1_testtrack2 covar_testtrack2
+4 1 COMPONENT_TYPE_DIAG_GAUSSIAN mc_asinh_norm_seg1_subseg0_testtrack1 mean_seg1_subseg0_testtrack1 covar_testtrack1
+5 1 COMPONENT_TYPE_DIAG_GAUSSIAN mc_asinh_norm_seg1_subseg0_testtrack2 mean_seg1_subseg0_testtrack2 covar_testtrack2
+6 1 COMPONENT_TYPE_DIAG_GAUSSIAN mc_asinh_norm_seg1_subseg1_testtrack1 mean_seg1_subseg1_testtrack1 covar_testtrack1
+7 1 COMPONENT_TYPE_DIAG_GAUSSIAN mc_asinh_norm_seg1_subseg1_testtrack2 mean_seg1_subseg1_testtrack2 covar_testtrack2
+
+MX_IN_FILE inline
+8
+
+0 1 mx_seg0_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg0_subseg0_testtrack1
+1 1 mx_seg0_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg0_subseg0_testtrack2
+2 1 mx_seg0_subseg1_testtrack1 1 dpmf_always mc_asinh_norm_seg0_subseg1_testtrack1
+3 1 mx_seg0_subseg1_testtrack2 1 dpmf_always mc_asinh_norm_seg0_subseg1_testtrack2
+4 1 mx_seg1_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg1_subseg0_testtrack1
+5 1 mx_seg1_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg1_subseg0_testtrack2
+6 1 mx_seg1_subseg1_testtrack1 1 dpmf_always mc_asinh_norm_seg1_subseg1_testtrack1
+7 1 mx_seg1_subseg1_testtrack2 1 dpmf_always mc_asinh_norm_seg1_subseg1_testtrack2
+

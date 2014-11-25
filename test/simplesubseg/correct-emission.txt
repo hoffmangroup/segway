@@ -1,0 +1,7 @@
+#label	testtrack1	testtrack2
+0.0	    0	        1
+0.1	    1	        1
+1.0	    1	        0
+1.1	    0	        0
+
+asinh 1 == 0.881373587019543
