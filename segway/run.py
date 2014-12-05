@@ -1469,7 +1469,7 @@ class Runner(object):
 
         self.save_include()
         self.set_params_filename()
-        slf.save_structure()
+        self.save_structure()
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
