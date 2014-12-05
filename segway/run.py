@@ -1469,7 +1469,7 @@ class Runner(object):
 
         self.save_include()
         self.set_params_filename()
-        self.save_structure()
+        slf.save_structure()
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -2518,7 +2518,9 @@ def parse_options(args):
 
     with OptionGroup(parser, "Flags") as group:
         group.add_option("-c", "--clobber", action="store_true",
-                         help="delete any preexisting files")
+                         help="delete any preexisting files and assumes any "
+                         "model files specified in options as output to be "
+                         "overwritten")
         group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
                          " executables")

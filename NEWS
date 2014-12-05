@@ -4,6 +4,8 @@
 * segway: added new 'simplesubseg' test to test subsegment labels
 * segway-layer: fixed bigBed conversion when blocksize==0 and added
   segway_layer_bigbed test (thanks to Jay Hesselberth)
+* segway: updated documentation to clarify --clobber option in relation to
+  model and structure command line options
 
 1.2.0:
 
