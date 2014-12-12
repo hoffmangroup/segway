@@ -2372,6 +2372,14 @@ def parse_options(args):
 
     usage = "%prog [OPTION]... TASK GENOMEDATA TRAINDIR [IDENTIFYDIR]"
     version = "%%prog %s" % __version__
+    citation = \
+    "Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.\n" \
+    "2012. Unsupervised pattern discovery in human chromatin structure\n" \
+    "through genomic segmentation. Nat Methods 9:473-476.\n" \
+    "http://dx.doi.org/10.1038/nmeth.1937"
+
+    usage += "\n" + citation
+
     parser = OptionParser(usage=usage, version=version)
 
     with OptionGroup(parser, "Data selection") as group:
