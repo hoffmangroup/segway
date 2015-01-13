@@ -3,7 +3,7 @@
 # Checks all .py files in segway install using ./flymake-pyflakes script
 # which itself should run pyflakes on all of the python files.
 # $Revision$
-# Copyright 2010, 2011, 2012 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+# Copyright 2010, 2011, 2012 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 set -o nounset -o pipefail -o errexit
 

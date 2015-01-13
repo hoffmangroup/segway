@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2011 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+## Copyright 2011 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from ConfigParser import RawConfigParser
 from cStringIO import StringIO

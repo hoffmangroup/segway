@@ -3,7 +3,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2009, 2011-2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+# Copyright 2008-2009, 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from collections import defaultdict, namedtuple
 from contextlib import closing

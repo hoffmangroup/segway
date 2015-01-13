@@ -7,7 +7,7 @@ sge_setup: setup mem_requested on each node
 
 __version__ = "$Revision$"
 
-# Copyright 2010, 2012, 2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+# Copyright 2010, 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 import sys
 from tempfile import NamedTemporaryFile

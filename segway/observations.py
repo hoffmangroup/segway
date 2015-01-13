@@ -6,7 +6,7 @@ from __future__ import division
 
 __version__ = "$Revision$"
 
-## Copyright 2012, 2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from cStringIO import StringIO
 from collections import deque

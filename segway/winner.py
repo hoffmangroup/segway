@@ -6,7 +6,7 @@ from __future__ import division, with_statement
 
 __version__ = "$Revision$"
 
-## Copyright 2011, 2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+## Copyright 2011, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from operator import itemgetter
 from os import extsep

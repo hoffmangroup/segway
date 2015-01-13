@@ -2,7 +2,7 @@
 
 # flymake-pyflakes: run PyFlakes; set warnings appropriately
 # $Revision$
-# Copyright 2010, 2011 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+# Copyright 2010, 2011 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 # usage: flymake-pyflakes
 

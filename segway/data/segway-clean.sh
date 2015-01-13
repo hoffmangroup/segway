@@ -3,7 +3,7 @@
 ## segway-clean.sh: clean up temporary files on LSF
 
 ## $Revision$
-## Copyright 2011, 2012 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+## Copyright 2011, 2012 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 set -o nounset -o pipefail -o errexit
 

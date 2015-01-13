@@ -7,7 +7,7 @@ task: wraps a GMTK subtask to reduce size of output
 
 __version__ = "$Revision$"
 
-# Copyright 2009-2013 Michael M. Hoffman <mhoffman@uhnresearch.ca>
+# Copyright 2009-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from errno import ENOENT
 from os import extsep, fdopen
