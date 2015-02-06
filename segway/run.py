@@ -2385,8 +2385,8 @@ def parse_options(args):
     with OptionGroup(parser, "Data selection") as group:
         group.add_option("-t", "--track", action="append", default=[],
                          metavar="TRACK",
-                         help="append TRACK to list of tracks to use, using "
-                         " commas to separate tied tracks (default all)")
+                         help="append TRACK to list of tracks to use"
+                         " (default all)")
 
         group.add_option("--tracks-from", action="load", metavar="FILE",
                          dest="track",
