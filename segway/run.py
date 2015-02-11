@@ -2351,9 +2351,19 @@ to find the winning instance anyway.""" % thread.instance_index)
                             # in case you tested multiple num_segs
                             self.save_include()
 
-                        if (self.posterior and (self.recover_dirname
-                                                or self.num_worlds != 1)):
-                            raise NotImplementedError  # XXX
+                        if self.posterior:
+                            if self.recover_dirname:
+                                raise NotImplementedError(
+                                    "Recovery is not yet supported for the " \
+                                    "posterior task"
+                                )
+
+                            if self.num_worlds != 1:
+                                raise NotImplementedError(
+                                    "Tied tracks are not yet supported for " \
+                                    "the posterior task"
+                                )
+                                
 
                         self.run_identify_posterior()
 
