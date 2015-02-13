@@ -1,5 +1,6 @@
 1.2.2:
-
+* segway: added useful error messages for unimplemented features of posterior
+  task
 
 
 1.2.1:
