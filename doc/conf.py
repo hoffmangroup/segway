@@ -40,8 +40,8 @@ def create_command_line_help_file(command):
         os.mkdir(base_dir)
         os.mkdir(command_line_help_directory)
     except:
-        # If we couldn't create the directory, let it fall through raise
-        # an exception. Otherwise we've already created the directory
+        # If we couldn't create the directory, let the error fall through and
+        # raise exception. Otherwise we've already created the directory
         pass 
 
     command_help_filename = os.path.join(command_line_help_directory, command+".help.txt")
@@ -61,10 +61,6 @@ def create_command_line_help_file(command):
 create_command_line_help_file("segway")
 create_command_line_help_file("segway-layer")
 create_command_line_help_file("segway-winner")
-        
-# TODO: Fix this
-#import subprocess
-#subprocess.run("python gethelp"
 
 # -- General configuration -----------------------------------------------------
 
