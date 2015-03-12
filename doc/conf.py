@@ -22,6 +22,50 @@ from setup import __version__ as release
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #sys.path.append(os.path.abspath('.'))
 
+# Custom segway configuration
+# When using 'make' to build, the 'help' text included in the documentation is
+# not generated. This guarentees generation of the command line help files.
+from subprocess import Popen, PIPE
+import os
+
+BUILD_DIR = "_build" # Compatability with preset found in Makefile
+CMD_LINE_HELP_DIR = "cmdline-help"
+
+def create_command_line_help_file(command):
+    # Create the command line help directory to contain helper files
+    base_dir = os.path.dirname(os.path.realpath(__file__))
+    base_dir = os.path.join(base_dir, BUILD_DIR)
+    command_line_help_directory = os.path.join(base_dir, CMD_LINE_HELP_DIR)
+    try:
+        os.mkdir(base_dir)
+        os.mkdir(command_line_help_directory)
+    except:
+        # If we couldn't create the directory, let it fall through raise
+        # an exception. Otherwise we've already created the directory
+        pass 
+
+    command_help_filename = os.path.join(command_line_help_directory, command+".help.txt")
+    # Get the help options from the command and pipe the output to file
+    with open(command_help_filename, 'w') as command_help_file:
+        print "Creating help file: " + command_help_filename
+        get_help_process = Popen(
+                ["python", "gethelp.py", command],
+                stdout=PIPE
+        )
+        sed_filter = Popen(
+                ["sed", "-e", "s/ATTR VALUE/<ATTR VALUE>/g"],
+                stdin=get_help_process.stdout,
+                stdout=command_help_file
+        )
+                                
+create_command_line_help_file("segway")
+create_command_line_help_file("segway-layer")
+create_command_line_help_file("segway-winner")
+        
+# TODO: Fix this
+#import subprocess
+#subprocess.run("python gethelp"
+
 # -- General configuration -----------------------------------------------------
 
 # Add any Sphinx extension module names here, as strings. They can be extensions
