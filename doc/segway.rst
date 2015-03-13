@@ -24,7 +24,10 @@ Standalone configuration
 ------------------------
 Segway can be run without any cluster system. This will automatically be
 used when Segway fails to access any cluster system. You can force it by
-setting the `SEGWAY_CLUSTER` environment variable to `local`.
+setting the `SEGWAY_CLUSTER` environment variable to `local`. For example,
+if you are using bash as your shell, you can run:
+
+    SEGWAY_CLUSTER=local segway
 
 Cluster configuration
 ---------------------
