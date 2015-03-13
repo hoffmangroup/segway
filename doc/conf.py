@@ -36,13 +36,16 @@ def create_command_line_help_file(command):
     base_dir = os.path.dirname(os.path.realpath(__file__))
     base_dir = os.path.join(base_dir, BUILD_DIR)
     command_line_help_directory = os.path.join(base_dir, CMD_LINE_HELP_DIR)
-    try:
-        os.mkdir(base_dir)
-        os.mkdir(command_line_help_directory)
-    except:
-        # If we couldn't create the directory, let the error fall through and
-        # raise exception. Otherwise we've already created the directory
-        pass 
+
+    # If the directory does not yet exist
+    if not os.path.isdir(command_line_help_directory):
+        try:
+            # Try to create it
+            os.makedirs(command_line_help_directory)
+        except:
+            # If we failed, print error message and raise
+            print "Could not create directory: ", command_line_help_directory
+            raise
 
     command_help_filename = os.path.join(command_line_help_directory, command+".help.txt")
     # Get the help options from the command and pipe the output to file
@@ -52,7 +55,7 @@ def create_command_line_help_file(command):
                 ["python", "gethelp.py", command],
                 stdout=PIPE
         )
-        sed_filter = Popen(
+        Popen(
                 ["sed", "-e", "s/ATTR VALUE/<ATTR VALUE>/g"],
                 stdin=get_help_process.stdout,
                 stdout=command_help_file
