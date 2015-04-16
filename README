@@ -3,10 +3,17 @@ Segway
 ======
 by Michael Hoffman <michael.hoffman at utoronto dot ca>
 
-|DroneIOStatus|_
+.. image:: https://drone.io/bitbucket.org/hoffmanlab/segway/status.png
+    :target: https://drone.io/bitbucket.org/hoffmanlab/segway/latest
+    :alt: Build Status
 
-.. |DroneIOStatus| image:: https://drone.io/bitbucket.org/hoffmanlab/segway/status.png
-.. _DroneIOStatus: https://drone.io/bitbucket.org/hoffmanlab/segway/latest
+.. image:: https://pypip.in/version/segway/badge.png
+    :target: https://pypi.python.org/pypi/segway/
+    :alt: Latest Version
+
+.. image:: https://pypip.in/download/segway/badge.png
+    :target: https://pypi.python.org/pypi/segway/
+    :alt: Downloads
 
 Description
 ===========
