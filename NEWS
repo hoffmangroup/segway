@@ -1,4 +1,6 @@
 1.2.2:
+* segway: removed shellshock exported functions from the submitted job
+  environment to avoid importing errors
 * segway: added useful error messages for unimplemented features of posterior
   task
 
