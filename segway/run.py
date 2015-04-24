@@ -1608,7 +1608,14 @@ class Runner(object):
             del environment["PYTHONINSPECT"]
         except KeyError:
             pass
-        job_tmpl.jobEnvironment = environment
+
+        # Remove all post shellshock exported functions from the enviornment
+        # Explicitly not using a dictionary comprehension to support Python
+        # 2.6 (or earlier)
+        job_tmpl.jobEnvironment = dict([
+            (key,value) for key,value in environment.iteritems()
+            if not key.startswith("BASH_FUNC")
+        ])
 
         if output_filename is None:
             output_filename = self.output_dirpath / job_name
