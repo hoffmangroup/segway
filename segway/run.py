@@ -1576,7 +1576,7 @@ class Runner(object):
     def calc_tmp_usage(self, num_frames, prog):
         return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
-    def remove_bash_functions(environment):
+    def remove_bash_functions(self, environment):
         """Removes all bash functions (patched after 'shellshock') from an dictionary
         environment""" 
         # Explicitly not using a dictionary comprehension to support Python
@@ -1622,7 +1622,7 @@ class Runner(object):
 
         # Remove all post shellshock exported bash functions from the
         # environment
-        job_tmpl.jobEnvironment = remove_bash_functions(environment)
+        job_tmpl.jobEnvironment = self.remove_bash_functions(environment)
 
         if output_filename is None:
             output_filename = self.output_dirpath / job_name
