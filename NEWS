@@ -1,4 +1,7 @@
 1.2.2:
+* segway: removed exported bash functions in for job environment submission
+  after the shellshock patch (functions starting with "BASH_FUNC") since it can
+  cause syntax errors when trying to import.
 * segway: added useful error messages for unimplemented features of posterior
   task
 

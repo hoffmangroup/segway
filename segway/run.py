@@ -1576,6 +1576,17 @@ class Runner(object):
     def calc_tmp_usage(self, num_frames, prog):
         return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
+    def remove_bash_functions(environment):
+        """Removes all bash functions (patched after 'shellshock') from an dictionary
+        environment""" 
+        # Explicitly not using a dictionary comprehension to support Python
+        # 2.6 (or earlier)
+        # All bash functions in an exported environment after the shellshock
+        # patch start with "BASH_FUNC"
+        return dict(((key, value)
+                    for key, value in environment.iteritems()
+                    if not key.startswith("BASH_FUNC")))
+
     def queue_gmtk(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
@@ -1608,7 +1619,10 @@ class Runner(object):
             del environment["PYTHONINSPECT"]
         except KeyError:
             pass
-        job_tmpl.jobEnvironment = environment
+
+        # Remove all post shellshock exported bash functions from the
+        # environment
+        job_tmpl.jobEnvironment = remove_bash_functions(environment)
 
         if output_filename is None:
             output_filename = self.output_dirpath / job_name
