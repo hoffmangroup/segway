@@ -28,7 +28,14 @@ url = "http://pmgenomics.ca/hoffmanlab/proj/%s/" % name.lower()
 download_url = "%ssrc/%s-%s.tar.gz" % (url, name, __version__)
 
 classifiers = ["Natural Language :: English",
-               "Programming Language :: Python"]
+               "Development Status :: 5 - Production/Stable",
+               "Intended Audience :: Science/Research",
+               "License :: OSI Approved :: GNU General Public License v2 "
+               "(GPLv2)",
+               "Topic :: Scientific/Engineering :: Bio-Informatics",
+               "Operating System :: Unix",
+               "Programming Language :: Python",
+               "Programming Language :: Python 2"]
 
 entry_points = """
 [console_scripts]
