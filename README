@@ -35,6 +35,12 @@ used Segway for their own projects.
 Please see the following URL (and linked documentation) for information,
 installation, and support: http://pmgenomics.ca/hoffmanlab/proj/segway/
 
+Contributing
+============
+
+Contributions to Segway are always welcome and encouraged. See `CONTRIBUTING
+<CONTRIBUTING.rst>`__ for more information on how to get started.
+
 License
 =======
 Segway is free software: you can redistribute it and/or modify it under the terms of version 2 of the GNU General Public License as published by the Free Software Foundation.
