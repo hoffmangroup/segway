@@ -461,6 +461,17 @@ includes the ``dpmf_always``, ``start_seg``, and all GMTK
 DeterministicCPT parameters. You are unlikely to use this unless you
 are generating your own models manually.
 
+Seeding
+~~~~~~~
+Segway can be forced to run with a specified random number generator seed by
+setting the `SEGWAY_RAND_SEED` environment variable. This can be useful for
+reproducing results in the future. For example, if you are using bash as your
+shell you can run:
+
+    SEGWAY_RAND_SEED=1498730685
+
+To set the random number generator seed to the number 1498730685.
+
 Recovery
 --------
 Since training can take a long time, this increases the probability
