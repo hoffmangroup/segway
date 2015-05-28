@@ -639,6 +639,18 @@ Utilities
 
 .. include:: _build/cmdline-help/segway-winner.help.txt
 
+Running Segway for large jobs
+=============================
+
+It is highly recommended that a terminal mutliplexer, such as `tmux`_ or `GNU
+screen`_, is used to manage your terminal sessions running Segway. Using either
+of these programs allows you to create a session to run longer segway jobs that
+you can safely detatch from without losing your work. For more information, see
+their respective documentation.
+
+.. _tmux: http://tmux.sourceforge.net/
+.. _GNU Screen: http://www.gnu.org/software/screen/
+
 Helpful commands
 ================
 Here are some short bash scripts or one-liners that are useful:
@@ -670,6 +682,4 @@ without completing it (which can be done with
 :option:`--old-directory`. Note that this does not combine adjacent
 lines of same segment. BEDTools might be able to do this for you. You
 will have to create your own header.txt with appropriate track lines::
-
-    cat header.txt <(find viterbi -type f | sort | xargs cat) | gzip -c > segway.bed.gz
 
