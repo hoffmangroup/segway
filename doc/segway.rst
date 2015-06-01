@@ -17,8 +17,9 @@ You need Graphical Models Toolkit (GMTK), which you can get at
 You need Genomedata 1.3.5 or later. To install Genomedata see the instructions
 at <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>.
 
-Afterwards Segway can be installed automatically by ``pip install segway`` or
-``easy_install segway``
+Afterwards Segway can be installed automatically with the command ``pip install
+segway``.
+
 
 Standalone configuration
 ------------------------
