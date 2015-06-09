@@ -1,3 +1,9 @@
+1.2.3:
+* segway: change the location of where likelihood file and likelihood tab file 
+  is stored for the wining method of multiple instances and for singluar instances. 
+  Now it will be at likelihood/likelihood.ll and output/likelihood.tab respectively.
+
+
 1.2.2:
 * segway: removed exported bash functions in for job environment submission
   after the shellshock patch (functions starting with "BASH_FUNC") since it can

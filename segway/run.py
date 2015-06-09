@@ -1291,6 +1291,9 @@ class Runner(object):
                                   subdirname=SUBDIRNAME_LOG)
 
     def set_log_likelihood_filenames(self, instance_index=None, new=False):
+        """
+        None means the final params file, not for any particular thread
+        """
         if new or not self.log_likelihood_filename:
             log_likelihood_filename = \
                 self.make_filename(PREFIX_LIKELIHOOD, instance_index,
