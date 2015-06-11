@@ -1,4 +1,5 @@
 1.2.2:
+* segway: updated test benchmark for better compatability with Torque/PBS
 * segway: removed exported bash functions in for job environment submission
   after the shellshock patch (functions starting with "BASH_FUNC") since it can
   cause syntax errors when trying to import.
