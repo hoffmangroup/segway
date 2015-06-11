@@ -87,14 +87,6 @@ def compare_file(template_filename, query_filename):
                         line_number,
                         template_filename)
 
-    # with maybe_gzip_open(template_filename) as template_file:
-    #     re_template = make_regex(template_file.read())
-
-    # with maybe_gzip_open(query_filename) as query_file:
-    #     match = re_template.match(query_file.read())
-
-    # return bool(match)
-
     return files_are_equivalent
 
 
