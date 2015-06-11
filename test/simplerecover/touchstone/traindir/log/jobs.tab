@@ -1,3 +1,3 @@
 jobid	jobname	prog	num_segs	num_frames	maxvmem	cpu	exit_status
-(%[0-9]+%)	emt0.2.0.traindir.(%[0-9a-f]{32}%)	gmtkEMtrain	4	8000	(%[0-9]+(?:\.[0-9]+)?%)	(%[0-9]+(?:\.[0-9]+)?%)	0
-(%[0-9]+%)	emt0.2.bundle.traindir.(%[0-9a-f]{32}%)	gmtkEMtrain	4	0	(%[0-9]+(?:\.[0-9]+)?%)	(%[0-9]+(?:\.[0-9]+)?%)	0
+(%[0-9]+(?:\.[a-zA-Z0-9-]+)?%)	emt0.2.0.traindir.(%[0-9a-f]{32}%)	gmtkEMtrain	4	8000	(%[0-9]+(?:\.[0-9]+)?%)	(%[0-9]+(?:\.[0-9]+)?%)	0
+(%[0-9]+(?:\.[a-zA-Z0-9-]+)?%)	emt0.2.bundle.traindir.(%[0-9a-f]{32}%)	gmtkEMtrain	4	0	(%[0-9]+(?:\.[0-9]+)?%)	(%[0-9]+(?:\.[0-9]+)?%)	0

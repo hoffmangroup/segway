@@ -30,7 +30,7 @@ Number of separators = 0
 Number of cliques = 1
 == Clique number: 0, root/right-interface clique, root/right-interface clique, leaf/left-interface clique
 Clique information: 9 packed bits, 1 unsigned words (0 splits), weight = 2.283301, jt_weight = 1.000000
-13 Nodes: frameIndex(1)[2000000],segCountDown(1)[2],seg(1)[2],subseg(1)[2],presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),ruler(2)[2],segCountDown(2)[2],segTransition(2)[3],seg(2)[2],subseg(2)[2]
+13 Nodes: frameIndex(1)[2000000],segCountDown(1)[2],seg(1)[2],(%(subseg\(1\)\[2\],)?%)presence__testtrack1(1)[2],(%(subseg\(1\)\[2\],)?%)testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),ruler(2)[2],segCountDown(2)[2],segTransition(2)[3],seg(2)[2],subseg(2)[2]
 10 Assigned: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
 10 Assigned Sorted: presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),frameIndex(1)[2000000],ruler(2)[2],segTransition(2)[3],seg(2)[2],segCountDown(2)[2],subseg(2)[2]
 10 Dispositions: 0 0 0 0 0 0 0 0 0 0
@@ -68,7 +68,7 @@ Clique information: 3 packed bits, 1 unsigned words (0 splits), weight = 0.90309
 5 Assigned Sorted: presence__testtrack1(2)[2],testtrack1(2),presence__testtrack2(2)[2],testtrack2(2),frameIndex(2)[2000000]
 5 Dispositions: 0 0 0 0 0
 5 Assigned Prob: frameIndex(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2)
-22 Cum Assigned Prob: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),frameIndex(1),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
+22 Cum Assigned Prob: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),frameIndex(1),ruler(1),segCountDown(1),segTransition(1),seg(1),(%(subseg\(1\),)?%)presence__testtrack1(1),(%(subseg\(1\),)?%)testtrack1(1),presence__testtrack2(1),testtrack2(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
 3 Union Incomming Seps: segCountDown(2),seg(2),subseg(2)
 0 Unassigned Iterated: 
 0 Cumulative Unassigned: 
