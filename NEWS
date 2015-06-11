@@ -1,4 +1,5 @@
 1.2.2:
+* segway: updated test benchmark for better compatability with Torque/PBS
 * segway: fixed the file are the same error of segway when the 0-index instance
   training run wins. Now it will store the likelihood of winning instance elsewhere  
 * segway: removed exported bash functions in for job environment submission
