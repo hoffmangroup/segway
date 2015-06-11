@@ -71,13 +71,31 @@ def compare_file(template_filename, query_filename):
     if filecmp.cmp(template_filename, query_filename, shallow=False):
         return True  # files are identical, skip slow regex stuff
 
+    # If the files are different find and report the differences based on
+    # embedded regex criteria
+    files_are_equivalent = True
     with maybe_gzip_open(template_filename) as template_file:
-        re_template = make_regex(template_file.read())
+        with maybe_gzip_open(query_filename) as query_file:
+            for line_number, lines in enumerate(
+                    zip(template_file, query_file),
+                    start=1):
+                re_template = make_regex(lines[0])
+                match = re_template.match(lines[1])
+                if not match:
+                    files_are_equivalent = False
+                    print "Line %d differences for %s" % (
+                        line_number,
+                        template_filename)
 
-    with maybe_gzip_open(query_filename) as query_file:
-        match = re_template.match(query_file.read())
+    # with maybe_gzip_open(template_filename) as template_file:
+    #     re_template = make_regex(template_file.read())
 
-    return bool(match)
+    # with maybe_gzip_open(query_filename) as query_file:
+    #     match = re_template.match(query_file.read())
+
+    # return bool(match)
+
+    return files_are_equivalent
 
 
 class TestCounter(object):
