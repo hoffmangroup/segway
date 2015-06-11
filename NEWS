@@ -1,7 +1,8 @@
 1.2.2:
 * segway: updated test benchmark for better compatability with Torque/PBS
-* segway: fixed the file are the same error of segway when the 0-index instance
-  training run wins. Now it will store the likelihood of winning instance elsewhere  
+* segway: fixed a bug when the 0-index training instance wins and fails to 
+  copy the result. Segway will now store the resulting winning likelihood file 
+  and likelihood tab file without the instance index as a suffix.
 * segway: removed exported bash functions in for job environment submission
   after the shellshock patch (functions starting with "BASH_FUNC") since it can
   cause syntax errors when trying to import.
