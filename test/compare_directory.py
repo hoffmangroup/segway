@@ -73,7 +73,7 @@ def compare_file(template_filename, query_filename):
 
     # If the files are different find and report the differences based on
     # embedded regex criteria
-    files_are_equivalent = True
+    res = True
     with maybe_gzip_open(template_filename) as template_file:
         with maybe_gzip_open(query_filename) as query_file:
             for line_number, lines in enumerate(
@@ -82,12 +82,12 @@ def compare_file(template_filename, query_filename):
                 re_template = make_regex(lines[0])
                 match = re_template.match(lines[1])
                 if not match:
-                    files_are_equivalent = False
+                    res = False
                     print "Line %d differences for %s" % (
                         line_number,
                         template_filename)
 
-    return files_are_equivalent
+    return res
 
 
 class TestCounter(object):
