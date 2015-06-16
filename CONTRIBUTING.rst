@@ -54,3 +54,4 @@ Additional Contributions
 - Eric Roberts ( eroberts at uhnresearch.ca )
 - Adam Shaw ( ajshaw at uchicago.edu )
 - Avinash Sahu ( avinash )
+- Xing Zeng ( tamaki.sakura at hotmail.com )
