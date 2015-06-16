@@ -2084,6 +2084,15 @@ to find the winning instance anyway.""" % thread.instance_index)
             path(self.make_log_likelihood_tab_filename(instance_index,
                                                        recover_dirname))
 
+        if not recover_log_likelihood_tab_filepath.isfile():
+            # If the likelihood tab file does not exist in this case, then it
+            # means the recover directory was running a single instance which 
+            # would not generate any tab file with an instance labeled suffix.
+            # Read the tab file that does not have a labeled number suffix.
+            recover_log_likelihood_tab_filepath = \
+                path(self.make_log_likelihood_tab_filename(None,
+                                                           recover_dirname))
+
         with open(recover_log_likelihood_tab_filepath) \
                 as log_likelihood_tab_file:
             log_likelihoods = [float(line.rstrip())
