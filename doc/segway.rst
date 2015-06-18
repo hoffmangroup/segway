@@ -657,30 +657,33 @@ Helpful commands
 Here are some short bash scripts or one-liners that are useful:
 
 There used to be a recipe here to continue Segway from an interrupted
-training run, but this has been replaced by the
-:option:`--old-directory` option.
+training run, but this has been replaced by the `--old-directory` option.
 
 Make a tarball of parameters and models from various directories::
 
     (for DIR in traindir1 traindir2; do
-        echo $DIR/{auxiliary,params/input.master,params/params.params,segway.str,triangulation}
+    echo $DIR/{auxiliary,params/input.master,params/params.params,segway.str,triangulation}
     done) | xargs tar zcvf training.params.tar.gz
 
 .. todo: include rsync-segway script
 
 Rsync parameters from `$REMOTEDIR` on `$REMOTEHOST` to `$LOCALDIR`::
 
-    rsync -rtvz --exclude output --exclude posterior --exclude viterbi --exclude observations --exclude "*.observations" --exclude accumulators $REMOTEHOST:$REMOTEDIR $LOCALDIR
+    rsync -rtvz --exclude output --exclude posterior --exclude viterbi \
+    --exclude observations --exclude "*.observations" --exclude accumulators \
+    $REMOTEHOST:$REMOTEDIR $LOCALDIR
 
 Print all last likelihoods::
 
-    for X in likelihood.*.tab; do dc -e "8 k $(tail -n 2 $X | cut -f 1 | xargs echo | sed -e 's/-//g') sc sl ll lc - ll / p"; done
+    for X in likelihood.*.tab; \
+    do dc -e "8 k $(tail -n 2 $X | cut -f 1 | xargs echo | sed -e 's/-//g') \
+    sc sl ll lc - ll / p"; \
+    done
 
 .. todo: research BEDTools capability here
 
-Recover as much as possible from an incomplete identification run
-without completing it (which can be done with
-:option:`--old-directory`. Note that this does not combine adjacent
-lines of same segment. BEDTools might be able to do this for you. You
-will have to create your own header.txt with appropriate track lines::
-
+Recover as much as possible from an incomplete identification run without
+completing it (which can be done with `--old-directory`. Note that this
+does not combine adjacent lines of same segment. BEDTools might be able to do
+this for you. You will have to create your own header.txt with appropriate
+track lines.

@@ -21,7 +21,7 @@ uses to call GMTK. Try running that to see if it gives you any clues.
 You may want to switch the GMTK option -verbosity 0 to -verbosity 30
 to get more information.
 
-An error like::
+An error like
 
   ERROR: discrete observed random variable 'presence_dnase', frame 0, line 23, specifies a feature element 14:14 that is out of discrete range ([23:45] inclusive) of observation matrix
 
