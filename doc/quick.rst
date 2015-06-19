@@ -8,7 +8,7 @@ Installation and configuration
 1. To install Segway first install `Genomedata
    <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>`_
    and `GMTK
-   <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.0.1.tar.gz>`_, then run this command
+   <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.3.3.tar.gz>`_, then run this command
    from :program:`bash`::
 
      pip install segway
