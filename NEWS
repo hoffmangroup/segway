@@ -1,3 +1,6 @@
+1.2.3:
+
+
 1.2.2:
 * segway: updated test benchmark for better compatability with Torque/PBS
 * segway: fixed a bug when the 0-index training instance wins and fails to 
