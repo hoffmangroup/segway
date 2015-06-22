@@ -1456,8 +1456,8 @@ class Runner(object):
             StructureSaver(self)(self.structure_filename, self.work_dirname,
                                  self.clobber)
 
-    def save_observations_params(self):
-        # XXX: these expect different filepaths
+    def save_gmtk_input(self):
+        # can't run train and identify/posterior in the same run
         assert not ((self.identify or self.posterior) and self.train)
 
         self.load_supervision()
@@ -1471,7 +1471,7 @@ class Runner(object):
             observations.locate_windows(genome)
 
             self.windows = observations.windows
-            ## XXX: does this need to be done before save()?
+            # XXX: does this need to be done before save()?
             self.subset_metadata(genome)
 
             observations.save(genome)
@@ -2354,7 +2354,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         if self.train:
             self.make_subdirs(SUBDIRNAMES_TRAIN)
 
-        self.save_observations_params()
+        self.save_gmtk_input()
 
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:
