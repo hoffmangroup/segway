@@ -29,7 +29,7 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (arcsinh, array, empty, finfo, float32, int64, inf,
+from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
@@ -487,6 +487,8 @@ class Track(object):
         self.is_data = is_data
         self.group = None
         self.index = None
+        # TODO: Change this parameter
+        self.genomedata_archive_name = None
 
     @memoized_property
     def name(self):
@@ -669,14 +671,16 @@ class Runner(object):
 
     @classmethod
     def fromargs(cls, args):
+        """Parses the arguments (not options) that were given to segway"""
         res = cls()
 
         task_str = args[0]
-        genomedataname = args[1]
+        # Multiple genomedata archives can be specified with a comma separator
+        genomedata_names = args[1].split(",")
         traindirname = args[2]
 
         res.set_tasks(task_str)
-        res.genomedataname = genomedataname
+        res.genomedata_names = genomedata_names
 
         if res.train:
             res.work_dirname = traindirname
@@ -1205,31 +1209,71 @@ class Runner(object):
             / kwargs.get("subdirname", "") \
             / filebasename
 
-    def set_tracknames(self, genome):
+    def set_tracknames(self):
         """Set up track groups if not done already.
 
         Add index in Genomedata file for each data track.
         """
+
         tracks = self.tracks
+        # If no tracks were specified on the command line
         if not tracks:
-            ## default: use all tracks in archive
-            for trackname in genome.tracknames_continuous:
-                self.add_track_group([trackname])
+            # Add all tracks from all genomedata archives into individual track
+            # groups
+            for genomedata_name in self.genomedata_names:
+                with Genome(genomedata_name) as genome:
+                    for trackname in genome.tracknames_continuous:
+                        self.add_track_group([trackname])
 
-        # set indexes for each track
-        for track in tracks:
-            if not track.is_data:
-                continue
+            # Raise an error if there are overlapping track names between
+            # genomedata archives
+            if self.check_duplicate_tracknames():
+                raise ValueError(
+                    "Duplicate tracknames found across genomedata archives"
+                )
+        # Otherwise for tracks specified on the command line
+        else:
+            # Check if duplicate tracknames were specified
+            if self.check_duplicate_tracknames():
+                raise ValueError(
+                    "Duplicate tracknames were passed as arguments"
+                )
 
-            track.index = genome.index_continuous(track.name_unquoted)
+        # For every data track in the track list
+        for data_track in (track for track in tracks
+                           if track.is_data):
+            data_track_found = False
+            # For every genomedata archive
+            for genomedata_name in self.genomedata_names:
+                with Genome(genomedata_name) as genome:
+                    # If the data track exists in this genome
+                    if (data_track.name_unquoted in
+                       genome.tracknames_continuous):
+                        data_track_found = True
+                        # Record the index of each data track specified found
+                        # in this genome
+                        data_track.index = genome.index_continuous(
+                            data_track.name_unquoted
+                        )
+                        # TODO: This is repetitive and may need better
+                        # organization
+                        # Needs less coupling with genomedata archive
+                        data_track.genomedata_archive_name = genomedata_name
+                        # Stop looking for this data track
+                        break
 
+            # If the track cannot be found in an archive
+            if not data_track_found:
+                # Raise an error
+                raise ValueError(
+                    "Track: {0} cannot be found in genomedata "
+                    "archive(s)".format(data_track.name_unquoted)
+                )
+
+        # If all tracks are not data
         if not any(track.is_data for track in tracks):
+            # Set the float file list path to None
             self.float_filelistpath = None
-
-        # assert: none of the quoted tracknames are the same
-        if __debug__:
-            tracknames_quoted = [track.name for track in tracks]
-            assert len(tracknames_quoted) == len(frozenset(tracknames_quoted))
 
     def get_last_params_filename(self, params_filename):
         if params_filename is not None and path(params_filename).exists():
@@ -1366,16 +1410,35 @@ class Runner(object):
         """subset a single metadata attribute to only the used tracks,
         grouping things in the same track groups together
         """
+
+        import pdb
+        pdb.set_trace()
+        # Get the genomedata attribute for this genome
         attr = getattr(genome, name)
 
         track_groups = self.track_groups
-
+        # Create an empty list of the same type as the genomedata attribute and
+        # of the the same length of the track groups
         shape = len(track_groups)
         subset_array = empty(shape, attr.dtype)
 
+        # For every track group
         for track_group_index, track_group in enumerate(track_groups):
-            track_indexes = [track.index for track in track_group]
-            subset_array[track_group_index] = reducer(attr[track_indexes])
+            # For every genomedata archive
+            track_group_attributes = empty(0, attr.dtype)
+            for genomedata_name in self.genomedata_names:
+                with Genome(genomedata_name) as genome:
+                    # For each track in the track group that is in this archive
+                    track_indexes = [track.index for track in track_group
+                                     if track.genomedata_archive_name ==
+                                     genomedata_name]
+                    # Add the attribute from the track into a list
+                    genome_attr = getattr(genome, name)
+                    track_group_attributes = append(track_group_attributes,
+                                                    genome_attr[track_indexes])
+
+            # Apply the "reducer" to the attributes list for this track group
+            subset_array[track_group_index] = reducer(track_group_attributes)
 
         setattr(self, name, subset_array)
 
@@ -1456,18 +1519,76 @@ class Runner(object):
             StructureSaver(self)(self.structure_filename, self.work_dirname,
                                  self.clobber)
 
+    def check_genomedata_archives(self):
+        """ Checks that all genomedata archives have matching chromosomes and
+        that each chromosome has matching start and end coordinates
+
+        Returns True if archives are valid, False otherwise"""
+
+        # TODO: Ideally it's only necessary that for chromosomes that do match,
+        # that their start and end coords match. As in, they do not necessarily
+        # have to match on a per-chromosome basis. However when we assume that
+        # they do it makes locating windows trivial and only has to be done on
+        # a single genome
+
+        # If there's more than one genomedata archive
+        if len(self.genomedata_names) > 1:
+            # Open the first genomedata archive as a reference
+            with Genome(self.genomedata_names[0]) as reference_genome:
+                reference_chromosome_info = {}
+                for chromosome in reference_genome:
+                    reference_chromosome_info[chromosome.name] = (
+                        chromosome.start,
+                        chromosome.end
+                    )
+
+                # For every other genomedata archive
+                for genomedata_name in self.genomedata_names[1:]:
+                    with Genome(genomedata_name) as genome:
+                        for chromosome in genome:
+                            # If this chromosome doesn't exist in the reference
+                            # genomedata archive
+                            if chromosome.name not in \
+                               reference_chromosome_info.keys():
+                                # Return false
+                                return False
+                            # If the start and end coords don't match for this
+                            # chromosome
+                            if reference_chromosome_info[chromosome.name] != (
+                                chromosome.start, chromosome.end
+                            ):
+                                # Return false
+                                return False
+                # Otherwise we've completed all checks successfully
+                # Return true
+                return True
+        # Otherwise return true (for a single archive)
+        else:
+            return True
+
+    def check_duplicate_tracknames(self):
+        """ Checks if there exists more than one track with the same name.
+
+        Returns True if duplicates found. False otherwise. """
+        tracks = self.tracks
+        tracknames_quoted = [track.name for track in tracks]
+        return len(tracknames_quoted) != len(frozenset(tracknames_quoted))
+
     def save_gmtk_input(self):
         # can't run train and identify/posterior in the same run
+        # TODO: this should be moved much much earlier
         assert not ((self.identify or self.posterior) and self.train)
 
         self.load_supervision()
 
         # need to open Genomedata archive first in order to finalize
         # tracks and track_groups
-        with Genome(self.genomedataname) as genome:
-            self.set_tracknames(genome)
+        # TODO: Merge all genomedata archives into one dataset for processing
 
-            observations = Observations(self)
+        self.set_tracknames()
+
+        observations = Observations(self)
+        with Genome(self.genomedata_names[0]) as genome:
             observations.locate_windows(genome)
 
             self.windows = observations.windows
@@ -2203,11 +2324,13 @@ to find the winning instance anyway.""" % thread.instance_index)
         track_indexes = self.world_track_indexes[window.world]
         track_indexes_text = ",".join(map(str, track_indexes))
 
+        # TODO: Fix this for multiple genomedata names
+        # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
-                       self.genomedataname, float_filepath, int_filepath,
+                       self.genomedata_names[0], float_filepath, int_filepath,
                        self.distribution, track_indexes_text]
         output_filename = None
 
@@ -2353,6 +2476,13 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         if self.train:
             self.make_subdirs(SUBDIRNAMES_TRAIN)
+
+        # Check if the genomedata archives are compatable with each other
+        if not self.check_genomedata_archives():
+            raise ValueError(
+                "Genomedata archives do not have matching chromosome starts "
+                "and ends"
+            )
 
         self.save_gmtk_input()
 

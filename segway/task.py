@@ -289,7 +289,7 @@ def print_to_fd(fd, line):
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                            num_labels, num_sublabels, output_label, 
-                           genomedataname, float_filename, int_filename,
+                           genomedata_names, float_filename, int_filename,
                            distribution, track_indexes_text, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
@@ -309,7 +309,8 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                                  EXT_FLOAT)
     int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
 
-    with Genome(genomedataname) as genome:
+    # TODO: Fix this for multiple genomedata sets
+    with Genome(genomedata_names) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     try:
@@ -343,7 +344,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                          num_labels, num_sublabels, output_label, 
-                         genomedataname, float_filename, int_filename, 
+                         genomedata_names, float_filename, int_filename, 
                          distribution, track_indexes_text, *args):
     # convert from tuple
     args = list(args)
@@ -364,7 +365,8 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
 
-    with Genome(genomedataname) as genome:
+    # TODO: Fix this for multiple genomedata sets
+    with Genome(genomedata_names) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     try:
