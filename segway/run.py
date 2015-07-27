@@ -1406,15 +1406,14 @@ class Runner(object):
             IncludeSaver(self)(self.gmtk_include_filename, aux_dirpath,
                                self.clobber)
 
-    def subset_metadata_attr(self, genome, name, reducer=sum):
+    def subset_metadata_attr(self, name, reducer=sum):
         """subset a single metadata attribute to only the used tracks,
         grouping things in the same track groups together
         """
 
-        import pdb
-        pdb.set_trace()
-        # Get the genomedata attribute for this genome
-        attr = getattr(genome, name)
+        # Get the data type for this genomedata attribute
+        with Genome(self.genomedata_names[0]) as genome:
+            attr = getattr(genome, name)
 
         track_groups = self.track_groups
         # Create an empty list of the same type as the genomedata attribute and
@@ -1429,10 +1428,10 @@ class Runner(object):
             for genomedata_name in self.genomedata_names:
                 with Genome(genomedata_name) as genome:
                     # For each track in the track group that is in this archive
+                    # Add the attribute from the track into a list
                     track_indexes = [track.index for track in track_group
                                      if track.genomedata_archive_name ==
                                      genomedata_name]
-                    # Add the attribute from the track into a list
                     genome_attr = getattr(genome, name)
                     track_group_attributes = append(track_group_attributes,
                                                     genome_attr[track_indexes])
@@ -1442,14 +1441,14 @@ class Runner(object):
 
         setattr(self, name, subset_array)
 
-    def subset_metadata(self, genome):
+    def subset_metadata(self):
         """limits all the metadata attributes to only tracks that are used
         """
         subset_metadata_attr = self.subset_metadata_attr
-        subset_metadata_attr(genome, "mins", min)
-        subset_metadata_attr(genome, "sums")
-        subset_metadata_attr(genome, "sums_squares")
-        subset_metadata_attr(genome, "num_datapoints")
+        subset_metadata_attr("mins", min)
+        subset_metadata_attr("sums")
+        subset_metadata_attr("sums_squares")
+        subset_metadata_attr("num_datapoints")
 
     def save_input_master(self, instance_index=None, new=False):
         if new:
@@ -1580,22 +1579,16 @@ class Runner(object):
         assert not ((self.identify or self.posterior) and self.train)
 
         self.load_supervision()
-
-        # need to open Genomedata archive first in order to finalize
-        # tracks and track_groups
-        # TODO: Merge all genomedata archives into one dataset for processing
-
         self.set_tracknames()
 
         observations = Observations(self)
         with Genome(self.genomedata_names[0]) as genome:
             observations.locate_windows(genome)
 
-            self.windows = observations.windows
-            # XXX: does this need to be done before save()?
-            self.subset_metadata(genome)
-
-            observations.save(genome)
+        self.windows = observations.windows
+        # XXX: does this need to be done before save()?
+        self.subset_metadata()
+        observations.save(genome)
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
