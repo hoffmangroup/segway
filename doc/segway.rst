@@ -12,7 +12,7 @@ Segway requires the following prerequisites:
 You need Python 2.6 or 2.7.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
-<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.3.3.tar.gz>.
+<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>.
 
 You need Genomedata 1.3.5 or later. To install Genomedata see the instructions
 at <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>.
