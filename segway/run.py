@@ -1109,7 +1109,18 @@ class Runner(object):
         """
         Track indexes for a particular world.
         """
+
         return [[track.index for track in world]
+                for world in zip(*self.track_groups)]
+
+    @memoized_property
+    def world_genomedata_archive_names(self):
+        """
+        Genomedata archive list for a world.
+        Ordered based on track groups
+        """
+
+        return [[track.genomedata_archive_name for track in world]
                 for world in zip(*self.track_groups)]
 
     @memoized_property
@@ -1582,13 +1593,14 @@ class Runner(object):
         self.set_tracknames()
 
         observations = Observations(self)
+        # Use the first genomedata archive for locating windows
         with Genome(self.genomedata_names[0]) as genome:
             observations.locate_windows(genome)
 
         self.windows = observations.windows
         # XXX: does this need to be done before save()?
         self.subset_metadata()
-        observations.save(genome)
+        observations.save()
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
