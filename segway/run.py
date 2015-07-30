@@ -2328,14 +2328,14 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         track_indexes = self.world_track_indexes[window.world]
         track_indexes_text = ",".join(map(str, track_indexes))
+        genomedata_archives_text = ",".join(self.genomedata_names)
 
-        # TODO: Fix this for multiple genomedata names
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
-                       self.genomedata_names[0], float_filepath, int_filepath,
+                       genomedata_archives_text, float_filepath, int_filepath,
                        self.distribution, track_indexes_text]
         output_filename = None
 

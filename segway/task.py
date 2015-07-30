@@ -16,7 +16,7 @@ import sys
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import argmax, array, empty, where, diff, r_, zeros
+from numpy import argmax, append, array, copy, empty, where, diff, r_, zeros
 from path import path
 
 from .observations import _save_window
@@ -365,9 +365,30 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
 
-    # TODO: Fix this for multiple genomedata sets
-    with Genome(genomedata_names) as genome:
-        continuous_cells = genome[chrom][start:end, track_indexes]
+    # TODO: This may be incorrect. What if all track indexes refer to the same
+    # archive?
+    # XXX: This is code duplication in observations.py which gets the
+    # continuous cells as well
+    genomedata_archive_names = genomedata_names.split(",")
+    continuous_cells = None
+    track_dimension = 1
+
+    # For every track in each genomedata archive
+    for track_index, genomedata_archive_name in zip(
+            track_indexes, genomedata_archive_names):
+        with Genome(genomedata_archive_name) as genome:
+            chromosome = genome[chrom]
+            # If we haven't started creating the continous cells
+            if continuous_cells is None:
+                # Copy the first track into our continous cells
+                continuous_cells = copy(chromosome[start:end,
+                                        [track_index]])
+            else:
+                # Otherwise append the track to our continuous cells
+                continuous_cells = append(continuous_cells,
+                                          chromosome[start:end,
+                                                     [track_index]],
+                                          track_dimension)
 
     try:
         print_to_fd(float_filelistfd, float_filename)
