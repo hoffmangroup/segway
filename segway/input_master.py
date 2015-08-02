@@ -555,7 +555,6 @@ class MeanParamSpec(ParamSpec):
                 data = supervision_means.get(track_i)
                 for label_i in data.keys():
                     means_tiled[label_i, 0, track_i] = data.get(label_i)
-            print means_tiled
             return means_tiled + (stds_tiled * noise)            
             
 

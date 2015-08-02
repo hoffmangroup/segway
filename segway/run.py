@@ -30,7 +30,7 @@ from warnings import warn
 
 from genomedata import Genome
 from numpy import (arcsinh, array, empty, finfo, float32, int64, inf,
-                   append, mean, square, vstack, zeros)
+                   append, nanmean, square, vstack, zeros)
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -613,6 +613,7 @@ class Runner(object):
         self.posterior = False
         self.identify = False  # viterbi
         self.dry_run = False
+        self.set_supervision_means = False
         self.verbosity = VERBOSITY
 
         self.__dict__.update(kwargs)
@@ -651,6 +652,7 @@ class Runner(object):
                         ("split_sequences", "max_frames"),
                         ("clobber",),
                         ("dry_run",),
+                        ("set_supervision_means",),
                         ("input_master", "input_master_filename"),
                         ("structure", "structure_filename"),
                         ("dont_train", "dont_train_filename"),
@@ -1451,8 +1453,7 @@ class Runner(object):
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
         
-        # XXX: Done by an external parameter or environmental variable
-        set_supervision_means = True
+        set_supervision_means = self.set_supervision_means 
         
         if set_supervision_means:
             return self.load_supervision_means(genome) 
@@ -1493,7 +1494,7 @@ class Runner(object):
                         dict_label_values[current_label] = data
 
             for label in dict_label_values.keys():
-                dict_label_means[label] = mean(dict_label_values[label])
+                dict_label_means[label] = nanmean(dict_label_values[label])
 
             supervision_means[track_index] = dict_label_means
         
@@ -2619,6 +2620,9 @@ def parse_options(args):
         group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
                          " executables")
+        group.add_option("--set-supervision-means", action="store_true",
+                         help="Change the gaussian to have its mean generate "
+                         "from supervision label regions")
 
     options, args = parser.parse_args(args)
 
