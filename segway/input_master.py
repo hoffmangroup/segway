@@ -527,7 +527,7 @@ class MeanParamSpec(ParamSpec):
     object_tmpl = "mean_${seg}_${subseg}_${track} 1 ${datum}"
     jitter_std_bound = 0.2
 
-    copy_attrs = ParamSpec.copy_attrs + ["means", "vars"]
+    copy_attrs = ParamSpec.copy_attrs + ["means", "vars", "supervision_means"]
 
     def make_data(self):
         num_segs = self.num_segs
@@ -544,9 +544,20 @@ class MeanParamSpec(ParamSpec):
         jitter_std_bound = self.jitter_std_bound
         noise = uniform(-jitter_std_bound, jitter_std_bound,
                         stds_tiled.shape)
-
-        return means_tiled + (stds_tiled * noise)
-
+        
+        supervision_means = self.supervision_means
+        if (supervision_means is None):
+            return means_tiled + (stds_tiled * noise)
+        else:
+            # XXX: Currently does not support subseg
+        
+            for track_i in supervision_means.keys():
+                data = supervision_means.get(track_i)
+                for label_i in data.keys():
+                    means_tiled[label_i, 0, track_i] = data.get(label_i)
+            print means_tiled
+            return means_tiled + (stds_tiled * noise)            
+            
 
 class CovarParamSpec(ParamSpec):
     type_name = "COVAR"
@@ -644,7 +655,8 @@ class InputMasterSaver(Saver):
                   "num_track_groups", "card_seg_countdown",
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "supervision_type",
-                  "use_dinucleotide", "mins", "means", "vars",
+                  "use_dinucleotide", 
+                  "mins", "means", "vars", "supervision_means",
                   "gmtk_include_filename_relative", "track_groups"]
 
     def make_mapping(self):

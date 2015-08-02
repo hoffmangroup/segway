@@ -30,7 +30,7 @@ from warnings import warn
 
 from genomedata import Genome
 from numpy import (arcsinh, array, empty, finfo, float32, int64, inf,
-                   square, vstack, zeros)
+                   append, mean, square, vstack, zeros)
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -1398,7 +1398,7 @@ class Runner(object):
             InputMasterSaver(self)(input_master_filename, self.params_dirpath,
                                    self.clobber, instance_index)
 
-    def load_supervision(self):
+    def load_supervision(self, genome):
         # The semi-supervised mode changes the DBN structure so there is an
         # additional "supervisionLabel" observed variable at every frame. This
         # can then be used to deterministically force the hidden state to have
@@ -1414,7 +1414,7 @@ class Runner(object):
 
         supervision_type = self.supervision_type
         if supervision_type == SUPERVISION_UNSUPERVISED:
-            return
+            return None
 
         assert supervision_type == SUPERVISION_SEMISUPERVISED
 
@@ -1450,6 +1450,55 @@ class Runner(object):
         self.tracks.append(TRACK_SUPERVISIONLABEL)
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
+        
+        # XXX: Done by an external parameter or environmental variable
+        set_supervision_means = True
+        
+        if set_supervision_means:
+            return self.load_supervision_means(genome) 
+        else:
+            return None
+
+    def load_supervision_means(self, genome): 
+        # dict of dict of float
+        # key: input data track index
+        # value: dict of key being supevision index and float showing the mean of the track in supervision region 
+        supervision_means = {}
+
+        # XXX: Currently does not support Track Group
+
+        for track in self.tracks:
+            if not track.is_data:
+                continue
+        
+            dict_label_values = {}
+            dict_label_means = {}
+            track_index = genome.index_continuous(track.name_unquoted)
+
+            for chrom in self.supervision_coords.keys():
+
+                labels = self.supervision_labels.get(chrom)
+                regions = self.supervision_coords.get(chrom)
+                chromosome = genome[chrom]
+
+                for i in range(len(regions)):
+                    begin, end = regions[i]
+                    current_label = labels[i]
+                    data = chromosome[begin:end, track_index]
+
+                    if (dict_label_values.get(current_label)):
+                        dict_label_values[current_label] = \
+                            append(data, dict_label_values[current_label])
+                    else:
+                        dict_label_values[current_label] = data
+
+            for label in dict_label_values.keys():
+                dict_label_means[label] = mean(dict_label_values[label])
+
+            supervision_means[track_index] = dict_label_means
+        
+        print supervision_means
+        return supervision_means
 
     def save_structure(self):
         self.structure_filename, _ = \
@@ -1460,12 +1509,12 @@ class Runner(object):
         # XXX: these expect different filepaths
         assert not ((self.identify or self.posterior) and self.train)
 
-        self.load_supervision()
-
         # need to open Genomedata archive first in order to finalize
         # tracks and track_groups
-        with Genome(self.genomedataname) as genome:
+        with Genome(self.genomedataname) as genome: 
             self.set_tracknames(genome)
+            
+            self.supervision_means = self.load_supervision(genome)
 
             observations = Observations(self)
             observations.locate_windows(genome)
@@ -1977,6 +2026,7 @@ class Runner(object):
         self.gmtk_include_filename_relative
         self.means
         self.vars
+        self.supervision_means
         self.dont_train_filename
         self.output_master_filename
         self.params_dirpath
