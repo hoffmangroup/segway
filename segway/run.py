@@ -1487,7 +1487,7 @@ class Runner(object):
                     current_label = labels[i]
                     data = chromosome[begin:end, track_index]
 
-                    if (dict_label_values.get(current_label)):
+                    if (not dict_label_values.get(current_label) is None):
                         dict_label_values[current_label] = \
                             append(data, dict_label_values[current_label])
                     else:
@@ -1498,7 +1498,6 @@ class Runner(object):
 
             supervision_means[track_index] = dict_label_means
         
-        print supervision_means
         return supervision_means
 
     def save_structure(self):
