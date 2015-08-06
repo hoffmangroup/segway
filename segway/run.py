@@ -605,6 +605,7 @@ class Runner(object):
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
+        self.supervisionLabel_extension = 1
 
         # flags
         self.clobber = False
@@ -1438,7 +1439,15 @@ class Runner(object):
                                                      supervision_coords)
 
                 supervision_coords[chrom].append((start, end))
-                supervision_labels[chrom].append(int(datum.name))
+                
+                comma_pos = datum.name.find(":")
+                if comma_pos == -1:
+                    supervision_labels[chrom].append(int(datum.name))
+                else: 
+                    start_label = int(datum.name[:comma_pos])
+                    end_label = int(datum.name[comma_pos + 1:])
+                    supervision_labels[chrom].append(start_label)
+                    self.supervisionLabel_extension = end_label - start_label
 
         max_supervision_label = max(max(labels)
                                     for labels
@@ -1984,6 +1993,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
+        self.supervisionLabel_extension 
 
         threads = []
         with Session() as session:
