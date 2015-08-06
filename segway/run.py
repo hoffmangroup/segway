@@ -1467,7 +1467,8 @@ class Runner(object):
         supervision_means = {}
 
         # XXX: Currently does not support Track Group
-
+        
+        track_index_segway = 0
         for track in self.tracks:
             if not track.is_data:
                 continue
@@ -1496,8 +1497,9 @@ class Runner(object):
             for label in dict_label_values.keys():
                 dict_label_means[label] = nanmean(dict_label_values[label])
 
-            supervision_means[track_index] = dict_label_means
-        
+            supervision_means[track_index_segway] = dict_label_means
+            track_index_segway += 1
+
         return supervision_means
 
     def save_structure(self):
