@@ -605,7 +605,7 @@ class Runner(object):
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
-        self.supervisionLabel_extension = 1
+        self.supervision_label_extension = 0
 
         # flags
         self.clobber = False
@@ -1443,11 +1443,12 @@ class Runner(object):
                 comma_pos = datum.name.find(":")
                 if comma_pos == -1:
                     supervision_labels[chrom].append(int(datum.name))
+                    self.modify_supervision_label_extension(1)
                 else: 
                     start_label = int(datum.name[:comma_pos])
                     end_label = int(datum.name[comma_pos + 1:])
                     supervision_labels[chrom].append(start_label)
-                    self.supervisionLabel_extension = end_label - start_label
+                    self.modify_supervision_label_extension(end_label - start_label)
 
         max_supervision_label = max(max(labels)
                                     for labels
@@ -1459,6 +1460,16 @@ class Runner(object):
         self.tracks.append(TRACK_SUPERVISIONLABEL)
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
+
+    def modify_supervision_label_extension(self, new_extension):
+        current_extension = self.supervision_label_extension
+        if (current_extension != 0) and (current_extension != new_extension):
+            raise NotImplementedError(
+                "Currently does not support different width in " \
+                "semisupervised soft label assignment"
+            )
+        else:
+            self.supervision_label_extension = new_extension
 
     def save_structure(self):
         self.structure_filename, _ = \
@@ -1993,7 +2004,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
-        self.supervisionLabel_extension 
+        self.supervision_label_extension 
 
         threads = []
         with Session() as session:
