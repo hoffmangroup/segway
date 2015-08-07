@@ -1,5 +1,6 @@
 1.2.3:
-
+* segway: semi-supervsied mode support soft assignment now. See documentation
+  for more detail. 
 
 1.2.2:
 * segway: updated test benchmark for better compatability with Torque/PBS

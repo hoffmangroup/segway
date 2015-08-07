@@ -54,6 +54,11 @@
 #define CARD_SUPERVISIONLABEL 3
 #endif
 
+% supervision label extension
+#ifndef SUPERVISIONLABEL_EXTENSION
+#define SUPERVISIONLABEL_EXTENSION 1
+#endif
+
 % AA .. TT
 #define CARD_DINUCLEOTIDE 16
 
