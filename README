@@ -32,8 +32,16 @@ documentation and was designed from the outset with external users in mind.
 Researchers at other universities and institutes have already installed and
 used Segway for their own projects.
 
-Please see the following URL (and linked documentation) for information,
+Please see the following URL for information,
 installation, and support: http://pmgenomics.ca/hoffmanlab/proj/segway/
+
+Documentation
+=============
+
+Live documentation based on this repository can be found on `Read the Docs`_.
+
+.. _Read the Docs: http://segway.readthedocs.org/en/latest/
+
 
 Contributing
 ============
