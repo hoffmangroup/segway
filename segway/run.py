@@ -70,6 +70,7 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
+MIX_COMPONENTS = 1
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -77,6 +78,7 @@ OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
+VAR_FLOOR = -1
 
 ISLAND = True
 
@@ -221,7 +223,7 @@ TRAIN_OPTION_TYPES = \
          distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
          num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
-         reverse_worlds=[int])
+         reverse_worlds=[int],mix_components=int)
 
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
@@ -605,6 +607,8 @@ class Runner(object):
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
+        self.mix_components = MIX_COMPONENTS
+        self.var_floor = VAR_FLOOR
 
         # flags
         self.clobber = False
@@ -613,6 +617,7 @@ class Runner(object):
         self.posterior = False
         self.identify = False  # viterbi
         self.dry_run = False
+        self.zscore = False
         self.verbosity = VERBOSITY
 
         self.__dict__.update(kwargs)
@@ -651,6 +656,7 @@ class Runner(object):
                         ("split_sequences", "max_frames"),
                         ("clobber",),
                         ("dry_run",),
+                        ("zscore",),
                         ("input_master", "input_master_filename"),
                         ("structure", "structure_filename"),
                         ("dont_train", "dont_train_filename"),
@@ -660,13 +666,14 @@ class Runner(object):
                         ("segtransition_weight_scale",),
                         ("ruler_scale",),
                         ("resolution",),
+                        ("var_floor",),
+                        ("mixture_components","mix_components",),
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
                         ("output_label", "output_label"),
                         ("max_train_rounds", "max_em_iters"),
                         ("reverse_world", "reverse_worlds"),
                         ("track", "track_specs")]
-
     @classmethod
     def fromargs(cls, args):
         res = cls()
@@ -1081,6 +1088,7 @@ class Runner(object):
     def card_seg_countdown(self):
         return self.seg_countdowns_initial.max() + 1
 
+
     @memoized_property
     def num_track_groups(self):
         return len(self.track_groups)
@@ -1364,7 +1372,8 @@ class Runner(object):
         grouping things in the same track groups together
         """
         attr = getattr(genome, name)
-
+        print "attr,genome,name"
+        print attr,genome,name
         track_groups = self.track_groups
 
         shape = len(track_groups)
@@ -1384,6 +1393,7 @@ class Runner(object):
         subset_metadata_attr(genome, "sums")
         subset_metadata_attr(genome, "sums_squares")
         subset_metadata_attr(genome, "num_datapoints")
+        #subset_metadata_attr(genome, "num_tracks_continuous")
 
     def save_input_master(self, instance_index=None, new=False):
         if new:
@@ -1818,12 +1828,15 @@ class Runner(object):
         if round_index == 0:
             # if round > 0, this is set by self.recover_train_instance()
             self.save_input_master(instance_index, new)
-
+        
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
                       lldp=LOG_LIKELIHOOD_DIFF_FRAC * 100.0,
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
+        
+        if self.var_floor != -1: # means it was defined
+            kwargs["varFloor"] = self.var_floor
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
@@ -2196,7 +2209,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
                        self.genomedataname, float_filepath, int_filepath,
-                       self.distribution, track_indexes_text]
+                       self.distribution, track_indexes_text, self.mix_components]
         output_filename = None
 
         num_frames = self.window_lens[window_index]
@@ -2485,6 +2498,11 @@ def parse_options(args):
                          help="use DIST distribution"
                          " (default %s)" % DISTRIBUTION_DEFAULT)
 
+        group.add_option("--mixture-components", type=int,
+                         default=MIX_COMPONENTS,
+                         help="Number of component for the mixture"
+                         " of Gaussians (default %d)" % MIX_COMPONENTS)
+
         group.add_option("--num-instances", type=int,
                          default=NUM_INSTANCES, metavar="NUM",
                          help="run NUM training instances, randomizing start"
@@ -2527,6 +2545,14 @@ def parse_options(args):
                          help="reverse sequences in concatenated world WORLD"
                          " (0-based)")
 
+        group.add_option("--var-floor", type=float,
+                         help="Controls the variance floor, meaning that if any" 
+                         "of the diagonal variances of a Gaussian falls below" 
+                         "this value, then the variance is “floored” (prohibited" 
+                         "from falling below the floor value). The variance, in" 
+                         "this case, is set to the corresponding variance from" 
+                         "the previous EM iteration.")
+
     with OptionGroup(parser, "Technical variables") as group:
         group.add_option("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
                          metavar="PROGRESSION",
@@ -2557,6 +2583,8 @@ def parse_options(args):
         group.add_option("-n", "--dry-run", action="store_true",
                          help="write all files, but do not run any"
                          " executables")
+        group.add_option("--zscore", action="store_true",
+                         help="zscore normalize the genomedata tracks")
 
     options, args = parser.parse_args(args)
 
