@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python
 
 """segway: a way to segment the genome
