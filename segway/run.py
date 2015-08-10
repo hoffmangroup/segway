@@ -1440,15 +1440,26 @@ class Runner(object):
 
                 supervision_coords[chrom].append((start, end))
                 
-                comma_pos = datum.name.find(":")
-                if comma_pos == -1:
+                colon_pos = datum.name.find(":")
+                if colon_pos == -1:
+                    # Supervision label specified without the colon
+                    # This means it's not a soft assignment e.g "0" which
+                    # means 0 is supervision label and extension is 1
+                    # since we only need to keep 1 label.
                     supervision_labels[chrom].append(int(datum.name))
                     self.modify_supervision_label_extension(1)
-                else: 
-                    start_label = int(datum.name[:comma_pos])
-                    end_label = int(datum.name[comma_pos + 1:])
+                else:
+                    # Supervision label specified with a colon
+                    # This means it's a soft assignment e.g. "0:5" which 
+                    # allow supervision label to be in [0,5). Here we should
+                    # use 0 as supervison label and extension=5-0=5 meaning
+                    # we keep 5 kind of label (0,1,2,3,4).
+                    start_label = int(datum.name[:colon_pos])
+                    end_label = int(datum.name[colon_pos + 1:])
                     supervision_labels[chrom].append(start_label)
-                    self.modify_supervision_label_extension(end_label - start_label)
+                    assert end_label > start_label
+                    self.modify_supervision_label_extension(end_label - 
+                                                            start_label)
 
         max_supervision_label = max(max(labels)
                                     for labels
@@ -1462,6 +1473,14 @@ class Runner(object):
                                        SUPERVISION_LABEL_OFFSET)
 
     def modify_supervision_label_extension(self, new_extension):
+        """This function takes a new label extension new_extension,
+        and add it into the supervision_label_extension set.
+
+        Currently supervision_label_extension only support one value,
+        thsu an assignment is used to represend add funcitonality.
+        If the original value is set and different, however, 
+        Error will be raised.
+        """
         current_extension = self.supervision_label_extension
         if (current_extension != 0) and (current_extension != new_extension):
             raise NotImplementedError(
