@@ -10,9 +10,18 @@ __version__ = "$Revision$"
 
 from resource import getrusage, RUSAGE_CHILDREN
 from subprocess import Popen
+from threading import Event, Lock, Thread
 
 from .common import _JobTemplateFactory, make_native_spec
 
+try:
+    num_local_jobs_text = environ["SEGWAY_NUM_LOCAL_JOBS"]
+    try:
+        MAX_PARALLEL_JOBS = int(num_local_jobs_text)
+    except ValueError:
+        MAX_PARALLEL_JOBS = 32
+except KeyError:
+    MAX_PARALLEL_JOBS = 32
 
 class JobTemplate(object):
     """mimics a DRMAA job template object
@@ -105,6 +114,14 @@ class Session(object):
         self.drmsInfo = "local"
         self.next_jobid = 1
         self.jobs = {}
+        self.running_jobs = set() # set(jobid)
+
+        # This lock controls access to the jobs and running_jobs objects.
+        # These objects are modified in the runJob() and wait() functions.
+        # runJob() holds the lock for its full extent, so that the first thread
+        # to take the lock is the next to queue a job.  wait() holds the
+        # lock only when it finds a finished job.
+        self.lock = Lock()
 
     def __enter__(self):
         return self
@@ -114,9 +131,23 @@ class Session(object):
             job.kill()
 
     def runJob(self, job_tmpl):  # noqa
+        # Wait until there are fewer than MAX_PARALLEL_JOBS running
+        self.lock.acquire()
+        while len(self.running_jobs) >= MAX_PARALLEL_JOBS:
+            found_finished_job = False
+            for jobid in self.running_jobs:
+                if not (self.jobs[jobid].poll() is None):
+                    self.running_jobs.remove(jobid)
+                    found_finished_job = True
+                    break
+            if not found_finished_job:
+                sleep(JOB_WAIT_SLEEP_TIME)
+
         jobid = str(self.next_jobid)
         self.next_jobid += 1
         self.jobs[jobid] = Job(job_tmpl)
+        self.running_jobs.add(jobid)
+        self.lock.release()
 
         return jobid
 
@@ -126,7 +157,11 @@ class Session(object):
             retcode = job.poll()
 
             if not retcode is None:
-                del self.jobs[jobid]
+                self.lock.acquire()
+                if jobid in self.jobs:
+                    del self.jobs[jobid]
+                self.running_jobs.discard(jobid)
+                self.lock.release()
                 return JobInfo(retcode)
             else:
                 raise ExitTimeoutException()
