@@ -11,17 +11,19 @@ __version__ = "$Revision$"
 from resource import getrusage, RUSAGE_CHILDREN
 from subprocess import Popen
 from threading import Event, Lock, Thread
+from os import environ
 
 from .common import _JobTemplateFactory, make_native_spec
 
 try:
-    num_local_jobs_text = environ["SEGWAY_NUM_LOCAL_JOBS"]
+    num_local_jobs_text = environ.get("SEGWAY_NUM_LOCAL_JOBS")
     try:
         MAX_PARALLEL_JOBS = int(num_local_jobs_text)
-    except ValueError:
+    except (ValueError, TypeError):
         MAX_PARALLEL_JOBS = 32
 except KeyError:
     MAX_PARALLEL_JOBS = 32
+print "MAX_PARALLEL_JOBS:", MAX_PARALLEL_JOBS # XXX
 
 class JobTemplate(object):
     """mimics a DRMAA job template object
