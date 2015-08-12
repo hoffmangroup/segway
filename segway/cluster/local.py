@@ -76,7 +76,7 @@ class JobInfo(object):
 
     def __init__(self, retcode):
         self.resourceUsage = self._get_resource_usage()
-        if not retcode is None:
+        if retcode is not None:
             self.hasExited = True
             self.exitStatus = retcode
             self.hasSignal = (retcode < 0)
@@ -137,22 +137,19 @@ class Session(object):
 
     def runJob(self, job_tmpl):  # noqa
         # Wait until there are fewer than MAX_PARALLEL_JOBS running
-        self.lock.acquire()
-        while len(self.running_jobs) >= MAX_PARALLEL_JOBS:
-            found_finished_job = False
-            for jobid in self.running_jobs:
-                if not (self.jobs[jobid].poll() is None):
-                    self.running_jobs.remove(jobid)
-                    found_finished_job = True
-                    break
-            if not found_finished_job:
-                sleep(JOB_WAIT_SLEEP_TIME)
+        with self.lock:
+            while len(self.running_jobs) >= MAX_PARALLEL_JOBS:
+                for jobid in self.running_jobs:
+                    if self.jobs[jobid].poll() is not None:
+                        self.running_jobs.remove(jobid)
+                        break
+                else:
+                    sleep(JOB_WAIT_SLEEP_TIME)
 
-        jobid = str(self.next_jobid)
-        self.next_jobid += 1
-        self.jobs[jobid] = Job(job_tmpl)
-        self.running_jobs.add(jobid)
-        self.lock.release()
+            jobid = str(self.next_jobid)
+            self.next_jobid += 1
+            self.jobs[jobid] = Job(job_tmpl)
+            self.running_jobs.add(jobid)
 
         return jobid
 
@@ -161,12 +158,12 @@ class Session(object):
             job = self.jobs[jobid]
             retcode = job.poll()
 
-            if not retcode is None:
+            if retcode is not None:
                 self.lock.acquire()
-                if jobid in self.jobs:
-                    del self.jobs[jobid]
-                self.running_jobs.discard(jobid)
-                self.lock.release()
+                with self.lock:
+                    if jobid in self.jobs:
+                        del self.jobs[jobid]
+                    self.running_jobs.discard(jobid)
                 return JobInfo(retcode)
             else:
                 raise ExitTimeoutException()
