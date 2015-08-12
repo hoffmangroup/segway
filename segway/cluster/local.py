@@ -8,6 +8,7 @@ __version__ = "$Revision$"
 
 ## Copyright 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
+from time import sleep
 from resource import getrusage, RUSAGE_CHILDREN
 from subprocess import Popen
 from threading import Event, Lock, Thread
@@ -24,6 +25,8 @@ try:
 except KeyError:
     MAX_PARALLEL_JOBS = 32
 print "MAX_PARALLEL_JOBS:", MAX_PARALLEL_JOBS # XXX
+
+JOB_WAIT_SLEEP_TIME = 3.0
 
 class JobTemplate(object):
     """mimics a DRMAA job template object
