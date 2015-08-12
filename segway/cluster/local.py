@@ -24,7 +24,6 @@ try:
         MAX_PARALLEL_JOBS = 32
 except KeyError:
     MAX_PARALLEL_JOBS = 32
-print "MAX_PARALLEL_JOBS:", MAX_PARALLEL_JOBS # XXX
 
 JOB_WAIT_SLEEP_TIME = 3.0
 
@@ -159,7 +158,6 @@ class Session(object):
             retcode = job.poll()
 
             if retcode is not None:
-                self.lock.acquire()
                 with self.lock:
                     if jobid in self.jobs:
                         del self.jobs[jobid]
