@@ -25,7 +25,6 @@ fi
 set -x
 
 # TODO: Change include-coords to use multiple bed files
-#SEGWAY_RAND_SEED=1498730685 python ../../../segway-run-local.py "$cluster_arg" \
 SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \

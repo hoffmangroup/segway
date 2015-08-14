@@ -309,7 +309,6 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                                  EXT_FLOAT)
     int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
 
-    # TODO: Fix this for multiple genomedata sets
     with Genome(genomedata_names) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
@@ -353,7 +352,11 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
     (chrom, start, end) = coord
 
-    track_indexes = make_track_indexes(track_indexes_text)
+    # Create a list of a list of tracks ordered based on genomedata archive
+    # specified order (delimiated with a ';')
+    track_indexes = [make_track_indexes(genomedata_track_indexes_text) for
+                     genomedata_track_indexes_text in track_indexes_text.
+                     split(';')]
 
     float_filepath = TEMP_DIRPATH / float_filename
     int_filepath = TEMP_DIRPATH / int_filename
@@ -365,30 +368,34 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
 
-    # TODO: This may be incorrect. What if all track indexes refer to the same
-    # archive?
     # XXX: This is code duplication in observations.py which gets the
     # continuous cells as well
     genomedata_archive_names = genomedata_names.split(",")
     continuous_cells = None
     track_dimension = 1
 
-    # For every track in each genomedata archive
-    for track_index, genomedata_archive_name in zip(
+    # For every track list for each genomedata archive
+    for track_index_list, genomedata_archive_name in zip(
             track_indexes, genomedata_archive_names):
+
+        # Open the geneomedata archive
         with Genome(genomedata_archive_name) as genome:
+            # Open the chromsome
             chromosome = genome[chrom]
-            # If we haven't started creating the continous cells
-            if continuous_cells is None:
-                # Copy the first track into our continous cells
-                continuous_cells = copy(chromosome[start:end,
-                                        [track_index]])
-            else:
-                # Otherwise append the track to our continuous cells
-                continuous_cells = append(continuous_cells,
-                                          chromosome[start:end,
-                                                     [track_index]],
-                                          track_dimension)
+
+            # For each track in this genomedata's track list
+            for track_index in track_index_list:
+                # If we haven't started creating the continous cells
+                if continuous_cells is None:
+                    # Copy the first track into our continous cells
+                    continuous_cells = copy(chromosome[start:end,
+                                            [track_index]])
+                else:
+                    # Otherwise append the track to our continuous cells
+                    continuous_cells = append(continuous_cells,
+                                              chromosome[start:end,
+                                                         [track_index]],
+                                              track_dimension)
 
     try:
         print_to_fd(float_filelistfd, float_filename)

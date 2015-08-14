@@ -1586,7 +1586,6 @@ class Runner(object):
 
     def save_gmtk_input(self):
         # can't run train and identify/posterior in the same run
-        # TODO: this should be moved much much earlier
         assert not ((self.identify or self.posterior) and self.train)
 
         self.load_supervision()
@@ -2326,9 +2325,24 @@ to find the winning instance anyway.""" % thread.instance_index)
         float_filepath = self.float_filepaths[window_index]
         int_filepath = self.int_filepaths[window_index]
 
-        track_indexes = self.world_track_indexes[window.world]
-        track_indexes_text = ",".join(map(str, track_indexes))
-        genomedata_archives_text = ",".join(self.genomedata_names)
+        # The track indexes should be semi-colon separated for each genomedata
+        # archive
+        track_string_list = []
+        world_genomedata_archive_names = \
+            set(self.world_genomedata_archive_names[window.world])
+        # For each unique genomedata archive in this world
+        for genomedata_name in world_genomedata_archive_names:
+            # For every track in this world
+            tracks_from_world = zip(*self.track_groups)[window.world]
+            track_list = [track.index for track in tracks_from_world
+                          if track.genomedata_archive_name == genomedata_name]
+            # Build a comma seperated string
+            track_string = ",".join(map(str, track_list))
+            track_string_list.append(track_string)
+        # Build a semi-colon separated string
+        track_indexes_text = ";".join(track_string_list)
+
+        genomedata_archives_text = ",".join(world_genomedata_archive_names)
 
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
