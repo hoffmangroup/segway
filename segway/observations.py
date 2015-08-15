@@ -586,7 +586,7 @@ class Observations(object):
 
                 # data is transformed as part of _save_window()
                 save_window(float_filepath, int_filepath, continuous_cells,
-                            seq_cells, supervision_cells, tracks_means, tracks_vars)
+                            tracks_means, tracks_vars,seq_cells, supervision_cells)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
