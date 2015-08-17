@@ -8,11 +8,11 @@ __version__ = "$Revision$"
 
 ## Copyright 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from time import sleep
+from os import environ
 from resource import getrusage, RUSAGE_CHILDREN
 from subprocess import Popen
 from threading import Lock
-from os import environ
+from time import sleep
 
 from .common import _JobTemplateFactory, make_native_spec
 
