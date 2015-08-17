@@ -259,7 +259,7 @@ def zscore_norm(float_data, tracks_means, tracks_vars):
         float_data[:,track] = (float_data[:,track] - tracks_means[track])/sqrt(tracks_vars[track])
     return float_data
 
-def _save_window(float_filename, int_filename, float_data, tracks_means,tracks_vars, resolution, distribution,zscore,seq_data=None, supervision_data=None):
+def _save_window(float_filename, int_filename, float_data, resolution, distribution,zscore=False,tracks_means=None,tracks_vars=None,seq_data=None, supervision_data=None):
     # called by task.py as well as observation.py
 
     # input function in GMTK_ObservationMatrix.cc:
@@ -445,9 +445,7 @@ class Observations(object):
 
     def save_window(self, float_filename, int_filename, float_data,tracks_means,
                     tracks_vars,seq_data=None, supervision_data=None):
-        return _save_window(float_filename, int_filename, float_data,tracks_means,
-                            tracks_vars,self.resolution, self.distribution, self.zscore,seq_data,
-                            supervision_data)
+        return _save_window(float_filename, int_filename, float_data,self.resolution, self.distribution, self.zscore,tracks_means,tracks_vars,seq_data,supervision_data)
 
     @staticmethod
     def make_filepath(dirpath, prefix, suffix):
