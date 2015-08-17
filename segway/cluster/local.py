@@ -11,20 +11,13 @@ __version__ = "$Revision$"
 from time import sleep
 from resource import getrusage, RUSAGE_CHILDREN
 from subprocess import Popen
-from threading import Event, Lock, Thread
+from threading import Lock
 from os import environ
 
 from .common import _JobTemplateFactory, make_native_spec
 
-try:
-    num_local_jobs_text = environ.get("SEGWAY_NUM_LOCAL_JOBS")
-    try:
-        MAX_PARALLEL_JOBS = int(num_local_jobs_text)
-    except (ValueError, TypeError):
-        MAX_PARALLEL_JOBS = 32
-except KeyError:
-    MAX_PARALLEL_JOBS = 32
-
+# Allow this to throw an error if the environment variable is not an integer
+MAX_PARALLEL_JOBS = int(environ.get("SEGWAY_NUM_LOCAL_JOBS", 32))
 JOB_WAIT_SLEEP_TIME = 3.0
 
 class JobTemplate(object):
