@@ -30,6 +30,10 @@ if you are using bash as your shell, you can run:
 
     SEGWAY_CLUSTER=local segway
 
+By default, Segway will use up to 32 concurrent processes when running in 
+standalone mode. To change this, set the `SEGWAY_NUM_LOCAL_JOBS` environment
+variable to the appropriate number.
+
 Cluster configuration
 ---------------------
 If you want to use Segway with your cluster, you will need the
