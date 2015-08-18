@@ -1457,7 +1457,9 @@ class Runner(object):
                     start_label = int(datum.name[:colon_pos])
                     end_label = int(datum.name[colon_pos + 1:])
                     supervision_labels[chrom].append(start_label)
-                    assert end_label > start_label
+                    assert end_label > start_label, "In Soft Assignment the
+                                                     end label should be greater
+                                                     than the start label."
                     self.modify_supervision_label_extension(end_label - 
                                                             start_label)
 
@@ -1478,8 +1480,8 @@ class Runner(object):
 
         Currently supervision_label_extension only support one value,
         thsu an assignment is used to represend add funcitonality.
-        If the original value is set and different, however, 
-        Error will be raised.
+        If a new value tries to override an existing value (that is being
+        set and doesn't match), an error will be thrown.
         """
         current_extension = self.supervision_label_extension
         if (current_extension != 0) and (current_extension != new_extension):
