@@ -8,11 +8,17 @@ __version__ = "$Revision$"
 
 ## Copyright 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
+from os import environ
 from resource import getrusage, RUSAGE_CHILDREN
 from subprocess import Popen
+from threading import Lock
+from time import sleep
 
 from .common import _JobTemplateFactory, make_native_spec
 
+# Allow this to throw an error if the environment variable is not an integer
+MAX_PARALLEL_JOBS = int(environ.get("SEGWAY_NUM_LOCAL_JOBS", 32))
+JOB_WAIT_SLEEP_TIME = 3.0
 
 class JobTemplate(object):
     """mimics a DRMAA job template object
@@ -62,7 +68,7 @@ class JobInfo(object):
 
     def __init__(self, retcode):
         self.resourceUsage = self._get_resource_usage()
-        if not retcode is None:
+        if retcode is not None:
             self.hasExited = True
             self.exitStatus = retcode
             self.hasSignal = (retcode < 0)
@@ -105,6 +111,14 @@ class Session(object):
         self.drmsInfo = "local"
         self.next_jobid = 1
         self.jobs = {}
+        self.running_jobs = set() # set(jobid)
+
+        # This lock controls access to the jobs and running_jobs objects.
+        # These objects are modified in the runJob() and wait() functions.
+        # runJob() holds the lock for its full extent, so that the first thread
+        # to take the lock is the next to queue a job.  wait() holds the
+        # lock only when it finds a finished job.
+        self.lock = Lock()
 
     def __enter__(self):
         return self
@@ -114,9 +128,20 @@ class Session(object):
             job.kill()
 
     def runJob(self, job_tmpl):  # noqa
-        jobid = str(self.next_jobid)
-        self.next_jobid += 1
-        self.jobs[jobid] = Job(job_tmpl)
+        # Wait until there are fewer than MAX_PARALLEL_JOBS running
+        with self.lock:
+            while len(self.running_jobs) >= MAX_PARALLEL_JOBS:
+                for jobid in self.running_jobs:
+                    if self.jobs[jobid].poll() is not None:
+                        self.running_jobs.remove(jobid)
+                        break
+                else:
+                    sleep(JOB_WAIT_SLEEP_TIME)
+
+            jobid = str(self.next_jobid)
+            self.next_jobid += 1
+            self.jobs[jobid] = Job(job_tmpl)
+            self.running_jobs.add(jobid)
 
         return jobid
 
@@ -125,8 +150,11 @@ class Session(object):
             job = self.jobs[jobid]
             retcode = job.poll()
 
-            if not retcode is None:
-                del self.jobs[jobid]
+            if retcode is not None:
+                with self.lock:
+                    if jobid in self.jobs:
+                        del self.jobs[jobid]
+                    self.running_jobs.discard(jobid)
                 return JobInfo(retcode)
             else:
                 raise ExitTimeoutException()
