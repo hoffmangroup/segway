@@ -19,7 +19,7 @@ from genomedata import Genome
 from numpy import argmax, append, array, copy, empty, where, diff, r_, zeros
 from path import path
 
-from .observations import _save_window
+from .observations import make_continuous_cells, _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array, 
                     find_segment_starts, get_label_color,
@@ -40,6 +40,7 @@ EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
 USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
+
 
 
 def make_track_indexes(text):
@@ -352,12 +353,6 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
     (chrom, start, end) = coord
 
-    # Create a list of a list of tracks ordered based on genomedata archive
-    # specified order (delimiated with a ';')
-    track_indexes = [make_track_indexes(genomedata_track_indexes_text) for
-                     genomedata_track_indexes_text in track_indexes_text.
-                     split(';')]
-
     float_filepath = TEMP_DIRPATH / float_filename
     int_filepath = TEMP_DIRPATH / int_filename
 
@@ -368,34 +363,15 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
 
-    # XXX: This is code duplication in observations.py which gets the
-    # continuous cells as well
-    genomedata_archive_names = genomedata_names.split(",")
-    continuous_cells = None
-    track_dimension = 1
+    # Create a list of a list of tracks ordered based on genomedata archive
+    # specified order (delimited with a ';')
+    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
+                     for genomedata_track_indexes_text
+                     in track_indexes_text.split(';')]
+    genomedata_names = genomedata_names.split(",")
 
-    # For every track list for each genomedata archive
-    for track_index_list, genomedata_archive_name in zip(
-            track_indexes, genomedata_archive_names):
-
-        # Open the geneomedata archive
-        with Genome(genomedata_archive_name) as genome:
-            # Open the chromsome
-            chromosome = genome[chrom]
-
-            # For each track in this genomedata's track list
-            for track_index in track_index_list:
-                # If we haven't started creating the continous cells
-                if continuous_cells is None:
-                    # Copy the first track into our continous cells
-                    continuous_cells = copy(chromosome[start:end,
-                                            [track_index]])
-                else:
-                    # Otherwise append the track to our continuous cells
-                    continuous_cells = append(continuous_cells,
-                                              chromosome[start:end,
-                                                         [track_index]],
-                                              track_dimension)
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
 
     try:
         print_to_fd(float_filelistfd, float_filename)

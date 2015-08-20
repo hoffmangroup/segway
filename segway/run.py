@@ -487,8 +487,7 @@ class Track(object):
         self.is_data = is_data
         self.group = None
         self.index = None
-        # TODO: Change this parameter
-        self.genomedata_archive_name = None
+        self.genomedata_name = None
 
     @memoized_property
     def name(self):
@@ -1114,13 +1113,13 @@ class Runner(object):
                 for world in zip(*self.track_groups)]
 
     @memoized_property
-    def world_genomedata_archive_names(self):
+    def world_genomedata_names(self):
         """
         Genomedata archive list for a world.
         Ordered based on track groups
         """
 
-        return [[track.genomedata_archive_name for track in world]
+        return [[track.genomedata_name for track in world]
                 for world in zip(*self.track_groups)]
 
     @memoized_property
@@ -1238,43 +1237,36 @@ class Runner(object):
 
             # Raise an error if there are overlapping track names between
             # genomedata archives
-            if self.check_duplicate_tracknames():
+            if self.is_tracknames_unique():
                 raise ValueError(
                     "Duplicate tracknames found across genomedata archives"
                 )
         # Otherwise for tracks specified on the command line
-        else:
-            # Check if duplicate tracknames were specified
-            if self.check_duplicate_tracknames():
-                raise ValueError(
-                    "Duplicate tracknames were passed as arguments"
-                )
+        # Check if duplicate tracknames were specified
+        elif self.is_tracknames_unique():
+            raise ValueError(
+                "Arguments have duplicate tracknames"
+            )
 
         # For every data track in the track list
         for data_track in (track for track in tracks
                            if track.is_data):
-            data_track_found = False
             # For every genomedata archive
             for genomedata_name in self.genomedata_names:
                 with Genome(genomedata_name) as genome:
                     # If the data track exists in this genome
                     if (data_track.name_unquoted in
-                       genome.tracknames_continuous):
-                        data_track_found = True
+                        genome.tracknames_continuous):
                         # Record the index of each data track specified found
                         # in this genome
                         data_track.index = genome.index_continuous(
                             data_track.name_unquoted
                         )
-                        # TODO: This is repetitive and may need better
-                        # organization
-                        # Needs less coupling with genomedata archive
-                        data_track.genomedata_archive_name = genomedata_name
+                        data_track.genomedata_name = genomedata_name
                         # Stop looking for this data track
                         break
-
             # If the track cannot be found in an archive
-            if not data_track_found:
+            else:
                 # Raise an error
                 raise ValueError(
                     "Track: {0} cannot be found in genomedata "
@@ -1441,7 +1433,7 @@ class Runner(object):
                     # For each track in the track group that is in this archive
                     # Add the attribute from the track into a list
                     track_indexes = [track.index for track in track_group
-                                     if track.genomedata_archive_name ==
+                                     if track.genomedata_name ==
                                      genomedata_name]
                     genome_attr = getattr(genome, name)
                     track_group_attributes = append(track_group_attributes,
@@ -1543,14 +1535,13 @@ class Runner(object):
 
         # If there's more than one genomedata archive
         if len(self.genomedata_names) > 1:
+
             # Open the first genomedata archive as a reference
-            with Genome(self.genomedata_names[0]) as reference_genome:
-                reference_chromosome_info = {}
-                for chromosome in reference_genome:
-                    reference_chromosome_info[chromosome.name] = (
-                        chromosome.start,
-                        chromosome.end
-                    )
+            with Genome(self.genomedata_names[0]) as sbjct:
+                sbjct_coords = {}
+                for chromosome in sbjct:
+                    coord = (chromosome.start, chromosome.end)
+                    sbjct_coords[chromosome.name] = coord
 
                 # For every other genomedata archive
                 for genomedata_name in self.genomedata_names[1:]:
@@ -1559,24 +1550,26 @@ class Runner(object):
                             # If this chromosome doesn't exist in the reference
                             # genomedata archive
                             if chromosome.name not in \
-                               reference_chromosome_info.keys():
+                               sbjct_coords.keys():
                                 # Return false
                                 return False
                             # If the start and end coords don't match for this
                             # chromosome
-                            if reference_chromosome_info[chromosome.name] != (
+                            if sbjct_coords[chromosome.name] != (
                                 chromosome.start, chromosome.end
                             ):
                                 # Return false
                                 return False
+
                 # Otherwise we've completed all checks successfully
                 # Return true
                 return True
+
         # Otherwise return true (for a single archive)
         else:
             return True
 
-    def check_duplicate_tracknames(self):
+    def is_tracknames_unique(self):
         """ Checks if there exists more than one track with the same name.
 
         Returns True if duplicates found. False otherwise. """
@@ -1592,6 +1585,7 @@ class Runner(object):
         self.set_tracknames()
 
         observations = Observations(self)
+
         # Use the first genomedata archive for locating windows
         with Genome(self.genomedata_names[0]) as genome:
             observations.locate_windows(genome)
@@ -2328,21 +2322,21 @@ to find the winning instance anyway.""" % thread.instance_index)
         # The track indexes should be semi-colon separated for each genomedata
         # archive
         track_string_list = []
-        world_genomedata_archive_names = \
-            set(self.world_genomedata_archive_names[window.world])
+        world_genomedata_names = \
+            set(self.world_genomedata_names[window.world])
         # For each unique genomedata archive in this world
-        for genomedata_name in world_genomedata_archive_names:
+        for genomedata_name in world_genomedata_names:
             # For every track in this world
             tracks_from_world = zip(*self.track_groups)[window.world]
             track_list = [track.index for track in tracks_from_world
-                          if track.genomedata_archive_name == genomedata_name]
+                          if track.genomedata_name == genomedata_name]
             # Build a comma seperated string
             track_string = ",".join(map(str, track_list))
             track_string_list.append(track_string)
         # Build a semi-colon separated string
         track_indexes_text = ";".join(track_string_list)
 
-        genomedata_archives_text = ",".join(world_genomedata_archive_names)
+        genomedata_archives_text = ",".join(world_genomedata_names)
 
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
