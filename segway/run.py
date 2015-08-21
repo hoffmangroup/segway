@@ -1457,8 +1457,8 @@ class Runner(object):
                     start_label = int(datum.name[:colon_pos])
                     end_label = int(datum.name[colon_pos + 1:])
                     supervision_labels[chrom].append(start_label)
-                    assert end_label > start_label, "In Soft Assignment the
-                                                     end label should be greater
+                    assert end_label > start_label, "In Soft Assignment the \
+                                                     end label should be greater \
                                                      than the start label."
                     self.modify_supervision_label_extension(end_label - 
                                                             start_label)
@@ -1486,8 +1486,8 @@ class Runner(object):
         current_extension = self.supervision_label_extension
         if (current_extension != 0) and (current_extension != new_extension):
             raise NotImplementedError(
-                "Currently does not support different width in " \
-                "semisupervised soft label assignment"
+                "Currently does not support different size of range " \
+                "of semisupervised soft label assignment"
             )
         else:
             self.supervision_label_extension = new_extension

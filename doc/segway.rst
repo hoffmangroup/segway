@@ -460,9 +460,9 @@ For example, with the line::
 one can enforce that those position will have label in the range of
 [0,5) i.e. one of {0,1,2,3,4}. You may want to do this if you know the
 apparence of the patterns in the regions but you believe they might
-belong to more than 1 label. For soft assignment currently we only 
-support fix width e.g. you may specify both 0:5 and 3:8 in the *name*
-of a BED file but both 0:5 and 6:8 are not allowed.    
+belong to more than 1 label. For soft assignment currently we only support 
+fixed size of the range of labels e.g. you may specify both 0:5 and 
+3:8 in the *name* of a BED file but both 0:5 and 6:8 are not allowed.    
 
 To simulate fully supervised training, simply supply supervision
 labels for the entire training region.
