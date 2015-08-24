@@ -16,7 +16,7 @@ import sys
 from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
-from numpy import argmax, append, array, copy, empty, where, diff, r_, zeros
+from numpy import argmax, array, empty, where, diff, r_, zeros
 from path import path
 
 from .observations import make_continuous_cells, _save_window

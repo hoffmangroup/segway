@@ -674,27 +674,30 @@ class Runner(object):
         res = cls()
 
         task_str = args[0]
-        # Multiple genomedata archives can be specified with a comma separator
-        genomedata_names = args[1].split(",")
-        traindirname = args[2]
-
         res.set_tasks(task_str)
-        res.genomedata_names = genomedata_names
 
+        # If we're running the training task
         if res.train:
-            res.work_dirname = traindirname
-            assert len(args) == 3
-            return res
+            # The genomedata archives are all arguments execept the final
+            # train directory
+            res.genomedata_names = args[1:-1]
+            res.work_dirname = args[-1]
+            # Check that there is at least 3 arguments
+            assert len(args) >= 3
+        # Otherwise
+        else:
+            # The genomedata archives except the final train directory and
+            # posterior/identify working directory
+            res.genomedata_names = args[1:-2]
+            train_dir_name = args[-2]
+            res.work_dirname = args[-1]
 
-        # identify or posterior
-        res.work_dirname = args[3]
-
-        try:
-            res.load_train_options(traindirname)
-        except IOError, err:
-            # train.tab use is optional
-            if err.errno != ENOENT:
-                raise
+            try:
+                res.load_train_options(train_dir_name)
+            except IOError, err:
+                # train.tab use is optional
+                if err.errno != ENOENT:
+                    raise
 
         return res
 
@@ -2715,14 +2718,12 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
-    if len(args) < 3:
-        parser.error("Expected at least 3 arguments.")
     if args[0] == "train":
-        if len(args) != 3:
-            parser.error("Expected 3 arguments for the train task.")
+        if len(args) < 3:
+            parser.error("Expected at least 3 arguments for the train task.")
     else:
-        if len(args) != 4:
-            parser.error("Expected 4 arguments for the identify task.")
+        if len(args) < 4:
+            parser.error("Expected at least 4 arguments for the identify task.")
 
     return options, args
 
