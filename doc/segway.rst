@@ -12,7 +12,7 @@ Segway requires the following prerequisites:
 You need Python 2.6 or 2.7.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
-<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.3.3.tar.gz>.
+<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>.
 
 You need Genomedata 1.3.5 or later. To install Genomedata see the instructions
 at <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>.
@@ -29,6 +29,10 @@ setting the `SEGWAY_CLUSTER` environment variable to `local`. For example,
 if you are using bash as your shell, you can run:
 
     SEGWAY_CLUSTER=local segway
+
+By default, Segway will use up to 32 concurrent processes when running in 
+standalone mode. To change this, set the `SEGWAY_NUM_LOCAL_JOBS` environment
+variable to the appropriate number.
 
 Cluster configuration
 ---------------------
