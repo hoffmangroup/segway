@@ -1,5 +1,5 @@
 1.2.3:
-
+* segway: added the ability to use multiple genomedata archives
 
 1.2.2:
 * segway: updated test benchmark for better compatability with Torque/PBS

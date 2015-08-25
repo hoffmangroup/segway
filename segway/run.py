@@ -2553,7 +2553,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(args):
     from optplus import OptionParser, OptionGroup
 
-    usage = "%prog [OPTION]... TASK GENOMEDATA TRAINDIR [IDENTIFYDIR]"
+    usage = "%prog [OPTION]... TASK GENOMEDATA [GENOMEDATA ...] TRAINDIR " \
+    "[IDENTIFYDIR]"
+
     version = "%%prog %s" % __version__
     citation = \
     "Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.\n" \
