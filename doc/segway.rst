@@ -439,13 +439,13 @@ regions should be tied together.
 Semisupervised training
 -----------------------
 Using the :option:`--semisupervised`\=\ *file* option, one can specify
-a BED file as a list of regions used supervision labels. The *name*
+a BED file as a list of regions used as supervision labels. The *name*
 field of the BED File specifies a label to be enforced during
 training. For example, with the line::
 
     chr3    400    800   2
 
-one can enforce that those positions will have label 2. You might do
+one can enforce that these positions will have label 2. You might do
 this if you had specific reason to believe that these regions were
 enhancers and wanted to find similar patterns in your data tracks.
 Using smaller labels first (such as 0) is probably better. Supervision
@@ -457,12 +457,12 @@ For example, with the line::
 
     chr3    400    800   0:5
 
-one can enforce that those position will have label in the range of
+one can enforce that these positions will have label in the range of
 [0,5) i.e. one of {0,1,2,3,4}. You may want to do this if you know the
 apparence of the patterns in the regions but you believe they might
 belong to more than 1 label. For soft assignment currently we only support 
-fixed size of the range of labels e.g. you may specify both 0:5 and 
-3:8 in the *name* of a BED file but both 0:5 and 6:8 are not allowed.    
+fixed size of the range of labels (e.g. you may specify both 0:5 and 
+3:8 in the *name* of a BED file but both 0:5 and 6:8 are not allowed).    
 
 To simulate fully supervised training, simply supply supervision
 labels for the entire training region.

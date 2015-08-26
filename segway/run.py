@@ -1453,13 +1453,15 @@ class Runner(object):
                     # This means it's a soft assignment e.g. "0:5" which 
                     # allow supervision label to be in [0,5). Here we should
                     # use 0 as supervison label and extension=5-0=5 meaning
-                    # we keep 5 kind of label (0,1,2,3,4).
+                    # we keep 5 kind of labels (0,1,2,3,4).
                     start_label = int(datum.name[:colon_pos])
                     end_label = int(datum.name[colon_pos + 1:])
                     supervision_labels[chrom].append(start_label)
-                    assert end_label > start_label, "In Soft Assignment the \
-                                                     end label should be greater \
-                                                     than the start label."
+                    if end_label <= start_label:
+                        raise ValueError( 
+                            "In Soft Assignment the end label " \
+                            "should be greater than the start label."
+                        )
                     self.modify_supervision_label_extension(end_label - 
                                                             start_label)
 
@@ -1479,15 +1481,15 @@ class Runner(object):
         and add it into the supervision_label_extension set.
 
         Currently supervision_label_extension only support one value,
-        thsu an assignment is used to represend add funcitonality.
+        thus assignment is used to represent add functionality.
         If a new value tries to override an existing value (that is being
         set and doesn't match), an error will be thrown.
         """
         current_extension = self.supervision_label_extension
         if (current_extension != 0) and (current_extension != new_extension):
             raise NotImplementedError(
-                "Currently does not support different size of range " \
-                "of semisupervised soft label assignment"
+                "Currently does not support different sizes of ranges " \
+                "for semisupervised soft label assignment"
             )
         else:
             self.supervision_label_extension = new_extension
