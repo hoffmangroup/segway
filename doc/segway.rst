@@ -14,8 +14,31 @@ You need Python 2.6 or 2.7.
 You need Graphical Models Toolkit (GMTK), which you can get at
 <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>.
 
-You need Genomedata 1.3.5 or later. To install Genomedata see the instructions
-at <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>.
+You need the HDF5 serial library and tools. The following packages are
+necessary for the OS you are running:
+
+Ubuntu/Debian::
+
+    sudo apt-get install libhdf5-serial-dev hdf5-tools
+
+CentOS/RHEL/Fedora::
+
+    sudo yum -y install hdf5 hdf5-devel
+
+OpenSUSE::
+
+    sudo zypper in hdf5 hdf5-devel libhdf5
+
+You need numpy <http://www.numpy.org/> installed. To install the latest version of numpy use ``pip
+install numpy``.
+
+.. note::
+    The latest version of numpy will not install with older versions of pip (< 6.0). To
+    upgrade your pip version run `pip install pip --upgrade`.
+
+    Numpy needs to be installed separately because some of Segway's dependencies
+    will fail to install otherwise.
+
 
 Afterwards Segway can be installed automatically with the command ``pip install
 segway``.
