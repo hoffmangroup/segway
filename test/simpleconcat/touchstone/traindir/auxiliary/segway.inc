@@ -55,8 +55,8 @@
 #endif
 
 % supervision label extension
-#ifndef SUPERVISIONLABEL_EXTENSION
-#define SUPERVISIONLABEL_EXTENSION 0
+#ifndef SUPERVISIONLABEL_RANGE_SIZE
+#define SUPERVISIONLABEL_RANGE_SIZE 0
 #endif
 
 % AA .. TT
