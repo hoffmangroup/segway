@@ -1,4 +1,5 @@
 1.2.3:
+* segway: added the ability to use multiple genomedata archives
 * segway: Added support for the SEGWAY_NUM_LOCAL_JOBS environment variable,
   which controls the number of concurrent processes used when 
   SEGWAY_CLUSTER=local is set (default: 32). (thanks to Max Libbrecht)

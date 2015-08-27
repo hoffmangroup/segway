@@ -17,8 +17,9 @@ from os import extsep
 import sys
 from tempfile import gettempdir
 
-from numpy import (add, append, arange, arcsinh, array, column_stack, empty,
-                   invert, isnan, maximum, zeros)
+from genomedata import Genome
+from numpy import (add, append, arange, arcsinh, array, column_stack, copy,
+                   empty, invert, isnan, maximum, zeros)
 from path import path
 from tabdelim import ListWriter
 
@@ -43,6 +44,8 @@ ORD_a = ord("a")
 ORD_c = ord("c")
 ORD_g = ord("g")
 ORD_t = ord("t")
+
+DIM_TRACK = 1  # Dimension in numpy array for track data
 
 
 class NoData(object):
@@ -252,6 +255,38 @@ def make_dinucleotide_int_data(seq):
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
 
 
+def make_continuous_cells(track_indexes, genomedata_names,
+                          chromosome_name, start, end):
+    """
+    returns 2-dimensional numpy.ndarray of continuous observation
+    data for specified interval. This data is untransformed
+
+    dim 0: position
+    dim 1: track
+    """
+
+    continuous_cells = None
+
+    # For every track in each genomedata archive
+    zipper = zip(track_indexes, genomedata_names)
+    for track_index, genomedata_name in zipper:
+        with Genome(genomedata_name) as genome:
+            chromosome = genome[chromosome_name]
+            # If we haven't started creating the continous cells
+            if continuous_cells is None:
+                # Copy the first track into our continous cells
+                continuous_cells = copy(chromosome[start:end,
+                                        [track_index]])
+            else:
+                # Otherwise append the track to our continuous cells
+                continuous_cells = append(continuous_cells,
+                                          chromosome[start:end,
+                                                     [track_index]],
+                                          DIM_TRACK)
+
+    return continuous_cells
+
+
 def _save_window(float_filename, int_filename, float_data, resolution,
                  distribution, seq_data=None, supervision_data=None):
     # called by task.py as well as observation.py
@@ -325,7 +360,8 @@ class Observations(object):
                   "float_tabfilepath", "obs_dirpath", "uuid", "resolution",
                   "distribution", "train", "identify", "supervision_type",
                   "supervision_coords", "supervision_labels",
-                  "use_dinucleotide", "world_track_indexes", "clobber",
+                  "use_dinucleotide", "world_track_indexes",
+                  "world_genomedata_names", "clobber",
                   "num_worlds"]
 
     def __init__(self, runner):
@@ -473,16 +509,6 @@ class Observations(object):
         if self.use_dinucleotide:
             return chromosome.seq[start:end]
 
-    def make_continuous_cells(self, world, chromosome, start, end):
-        """
-        returns 2-dimensional numpy.ndarray of continuous observation
-        data for specified interval. This data is untransformed
-
-        dim 0: position
-        dim 1: track
-        """
-        track_indexes = self.world_track_indexes[world]
-        return chromosome[start:end, track_indexes]
 
     def make_supervision_cells(self, chrom, start, end):
         """
@@ -518,7 +544,7 @@ class Observations(object):
 
         return res
 
-    def write(self, genome, float_filelist, int_filelist, float_tabfile):
+    def write(self, float_filelist, int_filelist, float_tabfile):
         print_filepaths_custom = partial(self.print_filepaths,
                                          float_filelist, int_filelist,
                                          temp=self.identify)
@@ -539,8 +565,12 @@ class Observations(object):
 
             # if they don't both exist
             if not (float_filepath.exists() and int_filepath.exists()):
-                chromosome = genome[chrom]
-                seq_cells = self.make_seq_cells(chromosome, start, end)
+                # Get the first genome from this world to use for generating
+                # sequence cells
+                genomedata_name = self.world_genomedata_names[world][0]
+                with Genome(genomedata_name) as genome:
+                    chromosome = genome[chrom]
+                    seq_cells = self.make_seq_cells(chromosome, start, end)
 
                 supervision_cells = \
                     self.make_supervision_cells(chrom, start, end)
@@ -553,8 +583,11 @@ class Observations(object):
                     # don't actually write data--it is done by task.py instead
                     continue
 
+                track_indexes = self.world_track_indexes[world]
+                genomedata_names = self.world_genomedata_names[world]
                 continuous_cells = \
-                    self.make_continuous_cells(world, chromosome, start, end)
+                    make_continuous_cells(track_indexes, genomedata_names,
+                                          chrom, start, end)
 
                 # data is transformed as part of _save_window()
                 save_window(float_filepath, int_filepath, continuous_cells,
@@ -566,11 +599,10 @@ class Observations(object):
         else:
             return open(filepath, "w")
 
-    def save(self, genome):
+    def save(self):
         open_writable = self.open_writable_or_dummy
 
         with open_writable(self.float_filelistpath) as float_filelist:
             with open_writable(self.int_filelistpath) as int_filelist:
                 with open_writable(self.float_tabfilepath) as float_tabfile:
-                    self.write(genome, float_filelist, int_filelist,
-                               float_tabfile)
+                    self.write(float_filelist, int_filelist, float_tabfile)

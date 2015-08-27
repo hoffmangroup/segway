@@ -1,0 +1,2 @@
+filename	window_index	chrom	start	end
+(%.*%)/chr1.0000.(%[0-9a-f]{32}%).float32	0	chr1	0	8000
