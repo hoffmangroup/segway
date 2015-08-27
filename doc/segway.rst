@@ -109,7 +109,7 @@ package includes utilities to convert from BED, wiggle, and bedGraph
 formats. By default, Segway uses all the continuous data tracks in a
 Genomedata archive. Multiple Genomedata archives can be specified to be used in
 data selection as long as each archive refers to the same sequence and do not
-overlapping track names.
+have overlapping track names.
 
 Tracks
 ------
