@@ -61,5 +61,4 @@ Results
    easy for a computer to parse, but it is more useful visually.
 
 8. You can also perform further analysis of the segmentation and
-    trained parameters using Segtools
-    <http://pmgenomics.ca/hoffmanlab/proj/segtools/>.
+   trained parameters using Segtools <http://pmgenomics.ca/hoffmanlab/proj/segtools/>.
