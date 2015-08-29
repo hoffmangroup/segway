@@ -2,8 +2,8 @@
 Frequently Asked Questions
 ============================================
 
-What do these memory progression errors mean?
----------------------------------------------
+How do I troubleshoot errors that occur in the training or identification process?
+----------------------------------------------------------------------------------
 
 See :doc:`troubleshooting` and :ref:`task-output`.
 
