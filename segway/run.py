@@ -606,6 +606,7 @@ class Runner(object):
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
+        self.supervision_label_range_size = 0
 
         # flags
         self.clobber = False
@@ -1506,7 +1507,32 @@ class Runner(object):
                                                      supervision_coords)
 
                 supervision_coords[chrom].append((start, end))
-                supervision_labels[chrom].append(int(datum.name))
+                
+                name = datum.name
+                start_label, breaks, end_label = name.partition(":")
+                if end_label == "":
+                    # Supervision label specified without the colon
+                    # This means it's not a soft assignment e.g "0" which
+                    # means 0 is supervision label and extension is 1
+                    # since we only need to keep 1 label.
+                    supervision_labels[chrom].append(int(start_label))
+                    self.set_supervision_label_range_size(1)
+                else:
+                    # Supervision label specified with a colon
+                    # This means it's a soft assignment e.g. "0:5" which 
+                    # allow supervision label to be in [0,5). Here we should
+                    # use 0 as supervison label and extension=5-0=5 meaning
+                    # we keep 5 kind of labels (0,1,2,3,4).
+                    start_label = int(start_label)
+                    end_label = int(end_label)
+                    supervision_labels[chrom].append(start_label)
+                    if end_label <= start_label:
+                        raise ValueError( 
+                            "Supervision label end label must be greater " \
+                            "than start label."
+                        )
+                    self.set_supervision_label_range_size(end_label - 
+                                                            start_label)
 
         max_supervision_label = max(max(labels)
                                     for labels
@@ -1518,6 +1544,24 @@ class Runner(object):
         self.tracks.append(TRACK_SUPERVISIONLABEL)
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
+
+    def set_supervision_label_range_size(self, new_extension):
+        """This function takes a new label extension new_extension,
+        and add it into the supervision_label_range_size set.
+
+        Currently supervision_label_range_size only support one value,
+        thus assignment is used to represent add functionality.
+        If a new value tries to override an existing value (that is being
+        set and doesn't match), an error will be thrown.
+        """
+        current_extension = self.supervision_label_range_size
+        if current_extension != 0 and current_extension != new_extension:
+            raise NotImplementedError(
+                "Semisupervised soft label assignment currently does " \
+                "not support different range sizes. "
+            )
+        else:
+            self.supervision_label_range_size = new_extension
 
     def save_structure(self):
         self.structure_filename, _ = \
@@ -2106,6 +2150,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
+        self.supervision_label_range_size 
 
         threads = []
         with Session() as session:
