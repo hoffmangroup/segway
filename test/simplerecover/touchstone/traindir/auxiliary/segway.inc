@@ -54,6 +54,11 @@
 #define CARD_SUPERVISIONLABEL -1
 #endif
 
+% supervision label extension
+#ifndef SUPERVISIONLABEL_RANGE_SIZE
+#define SUPERVISIONLABEL_RANGE_SIZE 0
+#endif
+
 % AA .. TT
 #define CARD_DINUCLEOTIDE 16
 

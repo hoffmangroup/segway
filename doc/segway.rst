@@ -12,10 +12,33 @@ Segway requires the following prerequisites:
 You need Python 2.6 or 2.7.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
-<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.3.3.tar.gz>.
+<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>.
 
-You need Genomedata 1.3.5 or later. To install Genomedata see the instructions
-at <http://pmgenomics.ca/hoffmanlab/proj/genomedata/>.
+You need the HDF5 serial library and tools. The following packages are
+necessary for the OS you are running:
+
+Ubuntu/Debian::
+
+    sudo apt-get install libhdf5-serial-dev hdf5-tools
+
+CentOS/RHEL/Fedora::
+
+    sudo yum -y install hdf5 hdf5-devel
+
+OpenSUSE::
+
+    sudo zypper in hdf5 hdf5-devel libhdf5
+
+You need numpy <http://www.numpy.org/> installed. To install the latest version of numpy use ``pip
+install numpy``.
+
+.. note::
+    The latest version of numpy will not install with older versions of pip (< 6.0). To
+    upgrade your pip version run `pip install pip --upgrade`.
+
+    Numpy needs to be installed separately because some of Segway's dependencies
+    will fail to install otherwise.
+
 
 Afterwards Segway can be installed automatically with the command ``pip install
 segway``.
@@ -29,6 +52,10 @@ setting the `SEGWAY_CLUSTER` environment variable to `local`. For example,
 if you are using bash as your shell, you can run:
 
     SEGWAY_CLUSTER=local segway
+
+By default, Segway will use up to 32 concurrent processes when running in 
+standalone mode. To change this, set the `SEGWAY_NUM_LOCAL_JOBS` environment
+variable to the appropriate number.
 
 Cluster configuration
 ---------------------
@@ -103,7 +130,9 @@ Data selection
 Segway accepts data only in the Genomedata format. The Genomedata
 package includes utilities to convert from BED, wiggle, and bedGraph
 formats. By default, Segway uses all the continuous data tracks in a
-Genomedata archive.
+Genomedata archive. Multiple Genomedata archives can be specified to be used in
+data selection as long as each archive refers to the same sequence and do not
+have overlapping track names.
 
 Tracks
 ------
@@ -435,18 +464,31 @@ regions should be tied together.
 Semisupervised training
 -----------------------
 Using the :option:`--semisupervised`\=\ *file* option, one can specify
-a BED file as a list of regions used s supervision labels. The *name*
+a BED file as a list of regions used as supervision labels. The *name*
 field of the BED File specifies a label to be enforced during
 training. For example, with the line::
 
     chr3    400    800   2
 
-one can enforce that those positions will have label 2. You might do
+one can enforce that these positions will have label 2. You might do
 this if you had specific reason to believe that these regions were
 enhancers and wanted to find similar patterns in your data tracks.
 Using smaller labels first (such as 0) is probably better. Supervision
 labels are not enforced during the identify task, and therefore cannot
 be specified during identify.
+
+You can also choose to specify a soft assignment for the supervision label.
+For example, with the line::
+
+    chr3    400    800   0:5
+
+one can enforce that these positions will have a label in the range of
+[0,5). In other words, the label will be restricted to one of {0, 1, 2, 3, 4}.
+You may want to do this if you know the apparence of the patterns in the regions
+but you believe they might belong to more than one label. For soft assignment
+currently we only support a fixed size of the range of labels. For example, you may specify 
+`0:5` and `3:8` in a single supervision label BED file, but you can't specify
+`0:5` (range size 5) and `6:8` (range size 2).
 
 To simulate fully supervised training, simply supply supervision
 labels for the entire training region.

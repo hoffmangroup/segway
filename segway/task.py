@@ -19,7 +19,7 @@ from genomedata import Genome
 from numpy import argmax, array, empty, where, diff, r_, zeros
 from path import path
 
-from .observations import _save_window
+from .observations import make_continuous_cells, _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array, 
                     find_segment_starts, get_label_color,
@@ -40,6 +40,7 @@ EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
 USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
+
 
 
 def make_track_indexes(text):
@@ -289,7 +290,7 @@ def print_to_fd(fd, line):
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                            num_labels, num_sublabels, output_label, 
-                           genomedataname, float_filename, int_filename,
+                           genomedata_names, float_filename, int_filename,
                            distribution, track_indexes_text, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
@@ -309,7 +310,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                                  EXT_FLOAT)
     int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
 
-    with Genome(genomedataname) as genome:
+    with Genome(genomedata_names) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     try:
@@ -343,7 +344,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                          num_labels, num_sublabels, output_label, 
-                         genomedataname, float_filename, int_filename, 
+                         genomedata_names, float_filename, int_filename, 
                          distribution, track_indexes_text, *args):
     # convert from tuple
     args = list(args)
@@ -351,8 +352,6 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     # read the whole thing into memory
 
     (chrom, start, end) = coord
-
-    track_indexes = make_track_indexes(track_indexes_text)
 
     float_filepath = TEMP_DIRPATH / float_filename
     int_filepath = TEMP_DIRPATH / int_filename
@@ -364,8 +363,15 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
 
-    with Genome(genomedataname) as genome:
-        continuous_cells = genome[chrom][start:end, track_indexes]
+    # Create a list of a list of tracks ordered based on genomedata archive
+    # specified order (delimited with a ';')
+    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
+                     for genomedata_track_indexes_text
+                     in track_indexes_text.split(';')]
+    genomedata_names = genomedata_names.split(",")
+
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
 
     try:
         print_to_fd(float_filelistfd, float_filename)

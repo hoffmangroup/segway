@@ -29,7 +29,7 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (arcsinh, array, empty, finfo, float32, int64, inf,
+from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
@@ -487,6 +487,7 @@ class Track(object):
         self.is_data = is_data
         self.group = None
         self.index = None
+        self.genomedata_name = None
 
     @memoized_property
     def name(self):
@@ -605,6 +606,7 @@ class Runner(object):
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
+        self.supervision_label_range_size = 0
 
         # flags
         self.clobber = False
@@ -669,29 +671,34 @@ class Runner(object):
 
     @classmethod
     def fromargs(cls, args):
+        """Parses the arguments (not options) that were given to segway"""
         res = cls()
 
         task_str = args[0]
-        genomedataname = args[1]
-        traindirname = args[2]
-
         res.set_tasks(task_str)
-        res.genomedataname = genomedataname
 
+        # If we're running the training task
         if res.train:
-            res.work_dirname = traindirname
-            assert len(args) == 3
-            return res
+            # The genomedata archives are all arguments execept the final
+            # train directory
+            res.genomedata_names = args[1:-1]
+            res.work_dirname = args[-1]
+            # Check that there is at least 3 arguments
+            assert len(args) >= 3
+        # Otherwise
+        else:
+            # The genomedata archives except the final train directory and
+            # posterior/identify working directory
+            res.genomedata_names = args[1:-2]
+            train_dir_name = args[-2]
+            res.work_dirname = args[-1]
 
-        # identify or posterior
-        res.work_dirname = args[3]
-
-        try:
-            res.load_train_options(traindirname)
-        except IOError, err:
-            # train.tab use is optional
-            if err.errno != ENOENT:
-                raise
+            try:
+                res.load_train_options(train_dir_name)
+            except IOError, err:
+                # train.tab use is optional
+                if err.errno != ENOENT:
+                    raise
 
         return res
 
@@ -1105,7 +1112,18 @@ class Runner(object):
         """
         Track indexes for a particular world.
         """
+
         return [[track.index for track in world]
+                for world in zip(*self.track_groups)]
+
+    @memoized_property
+    def world_genomedata_names(self):
+        """
+        Genomedata archive list for a world.
+        Ordered based on track groups
+        """
+
+        return [[track.genomedata_name for track in world]
                 for world in zip(*self.track_groups)]
 
     @memoized_property
@@ -1205,31 +1223,64 @@ class Runner(object):
             / kwargs.get("subdirname", "") \
             / filebasename
 
-    def set_tracknames(self, genome):
+    def set_tracknames(self):
         """Set up track groups if not done already.
 
         Add index in Genomedata file for each data track.
         """
+
         tracks = self.tracks
+        # If no tracks were specified on the command line
         if not tracks:
-            ## default: use all tracks in archive
-            for trackname in genome.tracknames_continuous:
-                self.add_track_group([trackname])
+            # Add all tracks from all genomedata archives into individual track
+            # groups
+            for genomedata_name in self.genomedata_names:
+                with Genome(genomedata_name) as genome:
+                    for trackname in genome.tracknames_continuous:
+                        self.add_track_group([trackname])
 
-        # set indexes for each track
-        for track in tracks:
-            if not track.is_data:
-                continue
+            # Raise an error if there are overlapping track names between
+            # genomedata archives
+            if self.is_tracknames_unique():
+                raise ValueError(
+                    "Duplicate tracknames found across genomedata archives"
+                )
+        # Otherwise for tracks specified on the command line
+        # Check if duplicate tracknames were specified
+        elif self.is_tracknames_unique():
+            raise ValueError(
+                "Arguments have duplicate tracknames"
+            )
 
-            track.index = genome.index_continuous(track.name_unquoted)
+        # For every data track in the track list
+        for data_track in (track for track in tracks
+                           if track.is_data):
+            # For every genomedata archive
+            for genomedata_name in self.genomedata_names:
+                with Genome(genomedata_name) as genome:
+                    # If the data track exists in this genome
+                    if (data_track.name_unquoted in
+                        genome.tracknames_continuous):
+                        # Record the index of each data track specified found
+                        # in this genome
+                        data_track.index = genome.index_continuous(
+                            data_track.name_unquoted
+                        )
+                        data_track.genomedata_name = genomedata_name
+                        # Stop looking for this data track
+                        break
+            # If the track cannot be found in an archive
+            else:
+                # Raise an error
+                raise ValueError(
+                    "Track: {0} cannot be found in genomedata "
+                    "archive(s)".format(data_track.name_unquoted)
+                )
 
+        # If all tracks are not data
         if not any(track.is_data for track in tracks):
+            # Set the float file list path to None
             self.float_filelistpath = None
-
-        # assert: none of the quoted tracknames are the same
-        if __debug__:
-            tracknames_quoted = [track.name for track in tracks]
-            assert len(tracknames_quoted) == len(frozenset(tracknames_quoted))
 
     def get_last_params_filename(self, params_filename):
         if params_filename is not None and path(params_filename).exists():
@@ -1362,31 +1413,49 @@ class Runner(object):
             IncludeSaver(self)(self.gmtk_include_filename, aux_dirpath,
                                self.clobber)
 
-    def subset_metadata_attr(self, genome, name, reducer=sum):
+    def subset_metadata_attr(self, name, reducer=sum):
         """subset a single metadata attribute to only the used tracks,
         grouping things in the same track groups together
         """
-        attr = getattr(genome, name)
+
+        # Get the data type for this genomedata attribute
+        with Genome(self.genomedata_names[0]) as genome:
+            attr = getattr(genome, name)
 
         track_groups = self.track_groups
-
+        # Create an empty list of the same type as the genomedata attribute and
+        # of the the same length of the track groups
         shape = len(track_groups)
         subset_array = empty(shape, attr.dtype)
 
+        # For every track group
         for track_group_index, track_group in enumerate(track_groups):
-            track_indexes = [track.index for track in track_group]
-            subset_array[track_group_index] = reducer(attr[track_indexes])
+            # For every genomedata archive
+            track_group_attributes = empty(0, attr.dtype)
+            for genomedata_name in self.genomedata_names:
+                with Genome(genomedata_name) as genome:
+                    # For each track in the track group that is in this archive
+                    # Add the attribute from the track into a list
+                    track_indexes = [track.index for track in track_group
+                                     if track.genomedata_name ==
+                                     genomedata_name]
+                    genome_attr = getattr(genome, name)
+                    track_group_attributes = append(track_group_attributes,
+                                                    genome_attr[track_indexes])
+
+            # Apply the "reducer" to the attributes list for this track group
+            subset_array[track_group_index] = reducer(track_group_attributes)
 
         setattr(self, name, subset_array)
 
-    def subset_metadata(self, genome):
+    def subset_metadata(self):
         """limits all the metadata attributes to only tracks that are used
         """
         subset_metadata_attr = self.subset_metadata_attr
-        subset_metadata_attr(genome, "mins", min)
-        subset_metadata_attr(genome, "sums")
-        subset_metadata_attr(genome, "sums_squares")
-        subset_metadata_attr(genome, "num_datapoints")
+        subset_metadata_attr("mins", min)
+        subset_metadata_attr("sums")
+        subset_metadata_attr("sums_squares")
+        subset_metadata_attr("num_datapoints")
 
     def save_input_master(self, instance_index=None, new=False):
         if new:
@@ -1438,7 +1507,32 @@ class Runner(object):
                                                      supervision_coords)
 
                 supervision_coords[chrom].append((start, end))
-                supervision_labels[chrom].append(int(datum.name))
+                
+                name = datum.name
+                start_label, breaks, end_label = name.partition(":")
+                if end_label == "":
+                    # Supervision label specified without the colon
+                    # This means it's not a soft assignment e.g "0" which
+                    # means 0 is supervision label and extension is 1
+                    # since we only need to keep 1 label.
+                    supervision_labels[chrom].append(int(start_label))
+                    self.set_supervision_label_range_size(1)
+                else:
+                    # Supervision label specified with a colon
+                    # This means it's a soft assignment e.g. "0:5" which 
+                    # allow supervision label to be in [0,5). Here we should
+                    # use 0 as supervison label and extension=5-0=5 meaning
+                    # we keep 5 kind of labels (0,1,2,3,4).
+                    start_label = int(start_label)
+                    end_label = int(end_label)
+                    supervision_labels[chrom].append(start_label)
+                    if end_label <= start_label:
+                        raise ValueError( 
+                            "Supervision label end label must be greater " \
+                            "than start label."
+                        )
+                    self.set_supervision_label_range_size(end_label - 
+                                                            start_label)
 
         max_supervision_label = max(max(labels)
                                     for labels
@@ -1451,30 +1545,102 @@ class Runner(object):
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
 
+    def set_supervision_label_range_size(self, new_extension):
+        """This function takes a new label extension new_extension,
+        and add it into the supervision_label_range_size set.
+
+        Currently supervision_label_range_size only support one value,
+        thus assignment is used to represent add functionality.
+        If a new value tries to override an existing value (that is being
+        set and doesn't match), an error will be thrown.
+        """
+        current_extension = self.supervision_label_range_size
+        if current_extension != 0 and current_extension != new_extension:
+            raise NotImplementedError(
+                "Semisupervised soft label assignment currently does " \
+                "not support different range sizes. "
+            )
+        else:
+            self.supervision_label_range_size = new_extension
+
     def save_structure(self):
         self.structure_filename, _ = \
             StructureSaver(self)(self.structure_filename, self.work_dirname,
                                  self.clobber)
 
-    def save_observations_params(self):
-        # XXX: these expect different filepaths
+    def check_genomedata_archives(self):
+        """ Checks that all genomedata archives have matching chromosomes and
+        that each chromosome has matching start and end coordinates
+
+        Returns True if archives are valid, False otherwise"""
+
+        # TODO: Ideally it's only necessary that for chromosomes that do match,
+        # that their start and end coords match. As in, they do not necessarily
+        # have to match on a per-chromosome basis. However when we assume that
+        # they do it makes locating windows trivial and only has to be done on
+        # a single genome
+
+        # If there's more than one genomedata archive
+        if len(self.genomedata_names) > 1:
+
+            # Open the first genomedata archive as a reference
+            with Genome(self.genomedata_names[0]) as sbjct:
+                sbjct_coords = {}
+                for chromosome in sbjct:
+                    coord = (chromosome.start, chromosome.end)
+                    sbjct_coords[chromosome.name] = coord
+
+                # For every other genomedata archive
+                for genomedata_name in self.genomedata_names[1:]:
+                    with Genome(genomedata_name) as genome:
+                        for chromosome in genome:
+                            # If this chromosome doesn't exist in the reference
+                            # genomedata archive
+                            if chromosome.name not in \
+                               sbjct_coords.keys():
+                                # Return false
+                                return False
+                            # If the start and end coords don't match for this
+                            # chromosome
+                            if sbjct_coords[chromosome.name] != (
+                                chromosome.start, chromosome.end
+                            ):
+                                # Return false
+                                return False
+
+                # Otherwise we've completed all checks successfully
+                # Return true
+                return True
+
+        # Otherwise return true (for a single archive)
+        else:
+            return True
+
+    def is_tracknames_unique(self):
+        """ Checks if there exists more than one track with the same name.
+
+        Returns True if duplicates found. False otherwise. """
+        tracks = self.tracks
+        tracknames_quoted = [track.name for track in tracks]
+        return len(tracknames_quoted) != len(frozenset(tracknames_quoted))
+
+    def save_gmtk_input(self):
+        # can't run train and identify/posterior in the same run
         assert not ((self.identify or self.posterior) and self.train)
 
         self.load_supervision()
+        self.set_tracknames()
 
-        # need to open Genomedata archive first in order to finalize
-        # tracks and track_groups
-        with Genome(self.genomedataname) as genome:
-            self.set_tracknames(genome)
+        observations = Observations(self)
 
-            observations = Observations(self)
+        # Use the first genomedata archive for locating windows
+        with Genome(self.genomedata_names[0]) as genome:
             observations.locate_windows(genome)
 
-            self.windows = observations.windows
-            ## XXX: does this need to be done before save()?
-            self.subset_metadata(genome)
-
-            observations.save(genome)
+        self.windows = observations.windows
+        # XXX: does this need to be done before save()?
+        self.subset_metadata()
+        observations.save()
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
@@ -1984,6 +2150,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
+        self.supervision_label_range_size 
 
         threads = []
         with Session() as session:
@@ -2200,14 +2367,31 @@ to find the winning instance anyway.""" % thread.instance_index)
         float_filepath = self.float_filepaths[window_index]
         int_filepath = self.int_filepaths[window_index]
 
-        track_indexes = self.world_track_indexes[window.world]
-        track_indexes_text = ",".join(map(str, track_indexes))
+        # The track indexes should be semi-colon separated for each genomedata
+        # archive
+        track_string_list = []
+        world_genomedata_names = \
+            set(self.world_genomedata_names[window.world])
+        # For each unique genomedata archive in this world
+        for genomedata_name in world_genomedata_names:
+            # For every track in this world
+            tracks_from_world = zip(*self.track_groups)[window.world]
+            track_list = [track.index for track in tracks_from_world
+                          if track.genomedata_name == genomedata_name]
+            # Build a comma seperated string
+            track_string = ",".join(map(str, track_list))
+            track_string_list.append(track_string)
+        # Build a semi-colon separated string
+        track_indexes_text = ";".join(track_string_list)
 
+        genomedata_archives_text = ",".join(world_genomedata_names)
+
+        # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
-                       self.genomedataname, float_filepath, int_filepath,
+                       genomedata_archives_text, float_filepath, int_filepath,
                        self.distribution, track_indexes_text]
         output_filename = None
 
@@ -2354,7 +2538,14 @@ to find the winning instance anyway.""" % thread.instance_index)
         if self.train:
             self.make_subdirs(SUBDIRNAMES_TRAIN)
 
-        self.save_observations_params()
+        # Check if the genomedata archives are compatable with each other
+        if not self.check_genomedata_archives():
+            raise ValueError(
+                "Genomedata archives do not have matching chromosome starts "
+                "and ends"
+            )
+
+        self.save_gmtk_input()
 
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:
@@ -2407,7 +2598,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(args):
     from optplus import OptionParser, OptionGroup
 
-    usage = "%prog [OPTION]... TASK GENOMEDATA TRAINDIR [IDENTIFYDIR]"
+    usage = "%prog [OPTION]... TASK GENOMEDATA [GENOMEDATA ...] TRAINDIR " \
+    "[IDENTIFYDIR]"
+
     version = "%%prog %s" % __version__
     citation = \
     "Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.\n" \
@@ -2572,14 +2765,12 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
-    if len(args) < 3:
-        parser.error("Expected at least 3 arguments.")
     if args[0] == "train":
-        if len(args) != 3:
-            parser.error("Expected 3 arguments for the train task.")
+        if len(args) < 3:
+            parser.error("Expected at least 3 arguments for the train task.")
     else:
-        if len(args) != 4:
-            parser.error("Expected 4 arguments for the identify task.")
+        if len(args) < 4:
+            parser.error("Expected at least 4 arguments for the identify task.")
 
     return options, args
 
