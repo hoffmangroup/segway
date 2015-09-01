@@ -51,7 +51,7 @@
 
 % supervision label
 #ifndef CARD_SUPERVISIONLABEL
-#define CARD_SUPERVISIONLABEL 3
+#define CARD_SUPERVISIONLABEL 2
 #endif
 
 % AA .. TT
