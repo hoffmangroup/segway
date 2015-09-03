@@ -2325,10 +2325,17 @@ to find the winning instance anyway.""" % thread.instance_index)
         # The track indexes should be semi-colon separated for each genomedata
         # archive
         track_string_list = []
-        world_genomedata_names = \
-            set(self.world_genomedata_names[window.world])
-        # For each unique genomedata archive in this world
+
+        # The genomedata names for the worlds needs to be ordered and unique
+        # from the world it comes from
+        world_genomedata_names = self.world_genomedata_names[window.world]
+        ordered_unique_world_genomedata_names = []
         for genomedata_name in world_genomedata_names:
+            if genomedata_name not in ordered_unique_world_genomedata_names:
+                ordered_unique_world_genomedata_names.append(genomedata_name)
+
+        # For each unique genomedata archive in this world
+        for genomedata_name in ordered_unique_world_genomedata_names:
             # For every track in this world
             tracks_from_world = zip(*self.track_groups)[window.world]
             track_list = [track.index for track in tracks_from_world
@@ -2339,7 +2346,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         # Build a semi-colon separated string
         track_indexes_text = ";".join(track_string_list)
 
-        genomedata_archives_text = ",".join(world_genomedata_names)
+        genomedata_archives_text = ",".join(
+            ordered_unique_world_genomedata_names)
 
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
