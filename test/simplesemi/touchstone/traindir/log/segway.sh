@@ -1,4 +1,4 @@
-## segway 1.2.3.dev0 run 17cacea42d7d11e5ae77989096b2d04e at 2015-07-18 14:44:59.829212
+## segway (%[^ ]+%) run (%[0-9a-f]{32}%) at (%\d{4}%)-(%\d{2}%)-(%\d{2}%) (%\d{2}%):(%\d{2}%):(%\d{2}%).(%\d{1,}%)
 
-cd "/scratch/xzeng/segway/test/simplesemi/test-20150718.QARU2q"
-"/users/xzeng/.local/bin/segway" "--cluster-opt=" "--semisupervised=../semi-label.bed" "--include-coords=../include-coords.bed" "--tracks-from=../tracks.txt" "--num-labels=4" "train" "../simplesemi.genomedata" "traindir"
+cd "(%[^"]+%)/test-(%\d{8}%).(%[0-9a-zA-Z]{6}%)"
+"(%[^"]+%)/segway" "--cluster-opt=(%[^\"]*%)" "--semisupervised=../semi-label.bed" "--include-coords=../include-coords.bed" "--tracks-from=../tracks.txt" "--num-labels=4" "train" "../simplesemi.genomedata" "traindir"

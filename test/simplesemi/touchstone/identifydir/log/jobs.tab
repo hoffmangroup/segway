@@ -1,2 +1,2 @@
 jobid	jobname	prog	num_segs	num_frames	maxvmem	cpu	exit_status
-1	vit0.identifydir.265c6c982d7d11e5b118989096b2d04e	gmtkViterbi	4	8000	0	0.470928	0
+(%[0-9]+(?:\.[a-zA-Z0-9-]+)?%)	vit0.identifydir.(%[0-9a-f]{32}%)	gmtkViterbi	4	8000	(%[0-9]+(?:\.[0-9]+)?%)	(%[0-9]+(?:\.[0-9]+)?%)	0

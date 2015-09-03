@@ -19,7 +19,7 @@
 @@@!!!TRIFILE_END_OF_ID_STRING!!!@@@
 
 % ---
-% GMTK Triangulation File Created: Saturday July 18 2015, 14:45:24 EDT
+% GMTK Triangulation File Created: (%[^\n]*%)
 % Options-: triangulationHeuristic: completed, jtWeight: T, jtwUB: F, jtwPUI: 0.000000, jtwMC: F, jtwSNSC: 1.000000, jtwDNSC: 1.000000, pfCobWeight: 0.000000, findBestBoundary: T, traverseFraction: 1.000000, noBoundaryMemoize: F, forceLeftRight: , boundaryHeuristic: S,
 % ---
 

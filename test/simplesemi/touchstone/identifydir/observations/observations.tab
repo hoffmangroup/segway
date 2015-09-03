@@ -1,2 +1,2 @@
 filename	window_index	chrom	start	end
-/tmp/chr1.0000.265c6c982d7d11e5b118989096b2d04e.float32	0	chr1	0	8000
+(%.*%)/chr1.0000.(%[0-9a-f]{32}%).float32	0	chr1	0	8000
