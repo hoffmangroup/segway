@@ -24,16 +24,13 @@ fi
 
 set -x
 
-# TODO: Change include-coords to use multiple bed files
-SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
+SEGWAY_RAND_SEED=4014068903 segway "$cluster_arg" \
     --include-coords="../include-coords.bed" \
-    --tracks-from="../tracks.txt" --num-labels=4 \
-    train ../track*.genomedata traindir
+    --track=testtrack1A,testtrack1B --track=testtrack2A,testtrack2B \
+    --num-labels=4 train ../track*.genomedata traindir
 
 segway "$cluster_arg" --include-coords="../include-coords.bed" \
     identify ../track*.genomedata traindir identifydir
-    # identify "../simpleseg.genomedata" traindir identifydir
-#segway "$cluster_arg" identify traindir identifydir
 
 cd ..
 
