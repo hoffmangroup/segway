@@ -5,8 +5,6 @@ from __future__ import division, with_statement
 run: main Segway implementation
 """
 
-__version__ = "$Revision$"
-
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from collections import defaultdict, namedtuple
@@ -60,6 +58,7 @@ from ._util import (data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
                     VITERBI_PROG)
+from .version import __version__
 
 # set once per file run
 UUID = uuid1().hex
