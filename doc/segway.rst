@@ -48,13 +48,13 @@ Standalone configuration
 ------------------------
 Segway can be run without any cluster system. This will automatically be
 used when Segway fails to access any cluster system. You can force it by
-setting the `SEGWAY_CLUSTER` environment variable to `local`. For example,
+setting the :envvar:`SEGWAY_CLUSTER` environment variable to `local`. For example,
 if you are using bash as your shell, you can run:
 
     SEGWAY_CLUSTER=local segway
 
 By default, Segway will use up to 32 concurrent processes when running in 
-standalone mode. To change this, set the `SEGWAY_NUM_LOCAL_JOBS` environment
+standalone mode. To change this, set the :envvar:`SEGWAY_NUM_LOCAL_JOBS` environment
 variable to the appropriate number.
 
 Cluster configuration
@@ -507,9 +507,9 @@ are generating your own models manually.
 Seeding
 ~~~~~~~
 Segway can be forced to run with a specified random number generator seed by
-setting the `SEGWAY_RAND_SEED` environment variable. This can be useful for
+setting the :envvar:`SEGWAY_RAND_SEED` environment variable. This can be useful for
 reproducing results in the future. For example, if you are using bash as your
-shell you can run:
+shell you can run::
 
     SEGWAY_RAND_SEED=1498730685
 
@@ -681,6 +681,23 @@ Utilities
 .. include:: _build/cmdline-help/segway-layer.help.txt
 
 .. include:: _build/cmdline-help/segway-winner.help.txt
+
+Environment Variables
+=====================
+.. envvar:: SEGWAY_CLUSTER
+
+    Forces segway to use a specific cluster environment. Setting this to
+    'local' forces segway to use run locally and use no cluster environment.
+
+.. envvar:: SEGWAY_NUM_LOCAL_JOBS
+
+    Sets the maximum number of jobs when running locally.
+
+.. envvar:: SEGWAY_RAND_SEED
+    
+    Sets the seed for the random number generator. This is useful for
+    reproducing results.
+
 
 Running Segway for large jobs
 =============================
