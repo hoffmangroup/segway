@@ -1100,8 +1100,8 @@ class Runner(object):
         # greater than starts
 
         # starts and ends must all be divisible by steps
-        if (starts % steps).any() or \
-           (ends % steps).any():
+        if ((starts % steps).any() or
+           (ends % steps).any()):
             raise ValueError("A segment table start or end boundary is not"
                              " divisible by the ruler (%d)" % steps[0])
 
