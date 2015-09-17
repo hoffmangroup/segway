@@ -330,18 +330,19 @@ for a label, as in the last row above, means all labels 4 or higher.
 The second column specifies three colon-separate values: the minimum
 segment length, maximum segment length, and the ruler.  In the example
 above, for labels 1, 2 and 3, segment lengths between 200 and 2200 are
-allowed, with a 200 bp ruler. If either the minimum or maximum lengths
-are left unspecified, then no corresponding constraint is applied.
+allowed, with a 50 bp ruler. If either the minimum or maximum lengths
+are left unspecified, then no corresponding constraint is applied. If 
+the ruler is left unspecified the default or set value from the
+:option:`--ruler` option is used.
 
 The ruler is an efficient heuristic that decreases the memory used
 during inference at the cost of also decreasing the precision with
 which the segment duration model acts.  Essentially, it allows the
 duration model to switch the behavior of the rest of the model only
-after a multiple of *scale* bp has passed.  Note that the ruler for
-every label must be explicitly specified and must match all other
-ruler entries in this file, as well as the option set with
-:option:`--ruler-scale`\=\ *scale*. (This may become more free in the
-future.)
+after a multiple of *scale* bp has passed.  Note that the ruler must 
+match all other ruler entries in this file, as well as the option set
+with :option:`--ruler-scale`\=\ *scale*. (This may become more free 
+in the future.)
 
 Due to the lack of an epilogue in the model, it is possible to get one
 segment per sequence that actually does not meet the minimum segment

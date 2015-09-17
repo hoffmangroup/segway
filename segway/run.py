@@ -752,6 +752,19 @@ class Runner(object):
         # 64-bit compute nodes
         res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
 
+        # If the resolution is set to a non-default value
+        # And the ruler has not been set from the options
+        if res.resolution is not RESOLUTION and \
+           res.ruler_scale is RULER_SCALE:
+            # Set the ruler scale to 10x the non-default value
+            res.ruler_scale = res.resolution * 10
+        # Else if the ruler is not divisible by the resolution
+        elif res.ruler_scale % res.resolution != 0:
+            # Report the value error
+            raise ValueError("The ruler (%d) is not divisible by the"
+                             " resolution (%d)" %
+                             (res.ruler_scale, res.resolution))
+
         # don't change from None if this is false
         params_filenames = options.trainable_params
         if params_filenames:
@@ -818,11 +831,15 @@ class Runner(object):
         num_segs = slice2range(self.num_segs)[-1]
 
         res = zeros((num_segs, SEG_TABLE_WIDTH), dtype=int)
+
         ruler_scale = self.ruler_scale
         res[:, OFFSET_STEP] = ruler_scale
 
         with open(filename) as infile:
             reader = DictReader(infile)
+
+            # Ensure that all ruler lengths are equal
+            first_ruler_length = None
 
             # overwriting is allowed
             for row in reader:
@@ -840,11 +857,25 @@ class Runner(object):
                 # get slice
                 len_slice = str2slice_or_int(row["len"])
 
-                # XXX: eventually, should read ruler scale from file
-                # instead of using as a command-line option
-                assert len_slice.step == ruler_scale
+                # When no step is specified, use the set ruler
+                # NB: The default segment table does not have a step specified.
+                segment_length_step = len_slice.step
+                if segment_length_step is None:
+                    segment_length_step = ruler_scale
 
-                len_tuple = (len_slice.start, len_slice.stop, len_slice.step)
+                # If this is the first row, get the first ruler length
+                if first_ruler_length is None:
+                    first_ruler_length = segment_length_step
+                # Else if the first ruler length does not match this row's
+                # length
+                elif first_ruler_length is not segment_length_step:
+                    # Raise a value error
+                    raise ValueError("Segment table rulers are not equal."
+                                     " Found ruler lengths %d and %d" %
+                                     (first_ruler_length, segment_length_step))
+
+                len_tuple = (len_slice.start, len_slice.stop,
+                             segment_length_step)
                 len_row = zeros((SEG_TABLE_WIDTH))
 
                 for item_index, item in enumerate(len_tuple):
@@ -1069,8 +1100,10 @@ class Runner(object):
         # greater than starts
 
         # starts and ends must all be divisible by steps
-        assert not (starts % steps).any()
-        assert not (ends % steps).any()
+        if (starts % steps).any() or \
+           (ends % steps).any():
+            raise ValueError("A segment table start or end boundary is not"
+                             " divisible by the ruler (%d)" % steps[0])
 
         # // = floor division
         seg_countdowns_start = starts // steps
@@ -2721,8 +2754,8 @@ def parse_options(args):
                          " rounds (default %d)" % MAX_EM_ITERS)
 
         group.add_option("--ruler-scale", type=int, metavar="SCALE",
-                         help="ruler marking every SCALE bp (default %d)" %
-                         RULER_SCALE)
+                         help="ruler marking every SCALE bp (default %d or 10x"
+                         " resolution if set)" % RULER_SCALE)
 
         group.add_option("--prior-strength", type=float, metavar="RATIO",
                          help="use RATIO times the number of data counts as"
