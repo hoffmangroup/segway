@@ -754,8 +754,8 @@ class Runner(object):
 
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
-        if res.resolution is not RESOLUTION and \
-           res.ruler_scale is RULER_SCALE:
+        if res.resolution != RESOLUTION and \
+           res.ruler_scale == RULER_SCALE:
             # Set the ruler scale to 10x the non-default value
             res.ruler_scale = res.resolution * 10
         # Else if the ruler is not divisible by the resolution
@@ -2754,8 +2754,8 @@ def parse_options(args):
                          " rounds (default %d)" % MAX_EM_ITERS)
 
         group.add_option("--ruler-scale", type=int, metavar="SCALE",
-                         help="ruler marking every SCALE bp (default %d or 10x"
-                         " resolution if set)" % RULER_SCALE)
+                         help="ruler marking every SCALE bp (default the"
+                         " resolution multiplied by 10)")
 
         group.add_option("--prior-strength", type=float, metavar="RATIO",
                          help="use RATIO times the number of data counts as"
