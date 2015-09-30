@@ -5,8 +5,6 @@ from __future__ import division, with_statement
 layer: convert flattened Viterbi BED files to a layered thick/thin bed file
 """
 
-__version__ = "$Revision$"
-
 # Copyright 2009-2012 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from collections import defaultdict
@@ -20,8 +18,10 @@ from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native
 from ._util import (BED_SCORE, BED_STRAND, get_label_color,
-                    maybe_gzip_open, memoized_property, PassThroughDict, SUFFIX_BED,
-                    SUFFIX_TAB)
+                    maybe_gzip_open, memoized_property, PassThroughDict,
+                    SUFFIX_BED, SUFFIX_TAB)
+
+from version import __version__
 
 BED_START = "0"
 ACCEPTABLE_STRANDS = set(".+")
