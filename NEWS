@@ -1,4 +1,6 @@
 1.3.1:
+* segway: fixed case where a track was specified that existed in more than 1
+  genomedata
 * segway: ruler default is now 10x resolution. Default resolution is still 1,
   so default ruler is 10
 * segway: helpful error messages when segment table boundaries or the resolution

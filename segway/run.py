@@ -1263,15 +1263,37 @@ class Runner(object):
 
         tracks = self.tracks
         is_tracks_from_archive = False
+
+        # Create a list of all tracks from all archives specified
+        all_genomedata_tracks = []
+        for genomedata_name in self.genomedata_names:
+            with Genome(genomedata_name) as genome:
+                all_genomedata_tracks.extend(genome.tracknames_continuous)
+
         # If no tracks were specified on the command line
         if not tracks:
             # Add all tracks from all genomedata archives into individual track
             # groups
             is_tracks_from_archive = True
-            for genomedata_name in self.genomedata_names:
-                with Genome(genomedata_name) as genome:
-                    for trackname in genome.tracknames_continuous:
-                        self.add_track_group([trackname]) # Adds to self.tracks
+            for trackname in all_genomedata_tracks:
+                self.add_track_group([trackname])  # Adds to self.tracks
+        # Otherwise check that all tracks specified appear only once across all
+        # archives
+        else:
+            exclude_trackname_list = [
+                TRACK_DINUCLEOTIDE.name_unquoted,
+                TRACK_SUPERVISIONLABEL.name_unquoted
+            ]
+
+            for trackname in (track.name_unquoted for track in tracks
+                              if track.name_unquoted not in
+                              exclude_trackname_list):
+                track_count = all_genomedata_tracks.count(trackname)
+                if track_count != 1:
+                    raise ValueError(
+                        "Track: {0} was found {1} times across all"
+                        " archives".format(trackname, track_count)
+                    )
 
         # Raise an error if there are overlapping track names
         if self.is_tracknames_unique():
@@ -1301,13 +1323,6 @@ class Runner(object):
                         data_track.genomedata_name = genomedata_name
                         # Stop looking for this data track
                         break
-            # If the track cannot be found in an archive
-            else:
-                # Raise an error
-                raise ValueError(
-                    "Track: {} cannot be found in genomedata "
-                    "archive(s)".format(data_track.name_unquoted)
-                )
 
         # If all tracks are not data
         if not any(track.is_data for track in tracks):
