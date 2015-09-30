@@ -1262,27 +1262,27 @@ class Runner(object):
         """
 
         tracks = self.tracks
+        is_tracks_from_archive = False
         # If no tracks were specified on the command line
         if not tracks:
             # Add all tracks from all genomedata archives into individual track
             # groups
+            is_tracks_from_archive = True
             for genomedata_name in self.genomedata_names:
                 with Genome(genomedata_name) as genome:
                     for trackname in genome.tracknames_continuous:
-                        self.add_track_group([trackname])
+                        self.add_track_group([trackname]) # Adds to self.tracks
 
-            # Raise an error if there are overlapping track names between
-            # genomedata archives
-            if self.is_tracknames_unique():
-                raise ValueError(
-                    "Duplicate tracknames found across genomedata archives"
-                )
-        # Otherwise for tracks specified on the command line
-        # Check if duplicate tracknames were specified
-        elif self.is_tracknames_unique():
-            raise ValueError(
-                "Arguments have duplicate tracknames"
-            )
+        # Raise an error if there are overlapping track names
+        if self.is_tracknames_unique():
+            error_msg = ""
+            if is_tracks_from_archive:
+                error_msg = "Duplicate tracknames found across genomedata"
+                " archives"
+            else:
+                error_msg = "Arguments have duplicate tracknames"
+
+            raise ValueError(error_msg)
 
         # For every data track in the track list
         for data_track in (track for track in tracks
@@ -1305,7 +1305,7 @@ class Runner(object):
             else:
                 # Raise an error
                 raise ValueError(
-                    "Track: {0} cannot be found in genomedata "
+                    "Track: {} cannot be found in genomedata "
                     "archive(s)".format(data_track.name_unquoted)
                 )
 
