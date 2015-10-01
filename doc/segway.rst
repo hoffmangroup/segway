@@ -134,6 +134,13 @@ Genomedata archive. Multiple Genomedata archives can be specified to be used in
 data selection as long as each archive refers to the same sequence and do not
 have overlapping track names.
 
+.. note::
+    Segway does not allow mulitple genomedata archives to contain equivalent
+    tracks names. However if your archives have tracks with matching track
+    names, you may explictly specify to Segway the track names that do not
+    overlap in other genomedata archives and Segway will run as normal.
+
+
 Tracks
 ------
 

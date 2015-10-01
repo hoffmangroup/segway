@@ -495,6 +495,10 @@ class Track(object):
 TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
 TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
 
+EXCLUDE_TRACKNAME_LIST = [
+    TRACK_DINUCLEOTIDE.name_unquoted,
+    TRACK_SUPERVISIONLABEL.name_unquoted
+]
 
 class TrackGroup(list):
     def _set_group(self, item):
@@ -1270,30 +1274,26 @@ class Runner(object):
             with Genome(genomedata_name) as genome:
                 all_genomedata_tracks.extend(genome.tracknames_continuous)
 
-        # If no tracks were specified on the command line
-        if not tracks:
-            # Add all tracks from all genomedata archives into individual track
-            # groups
-            is_tracks_from_archive = True
-            for trackname in all_genomedata_tracks:
-                self.add_track_group([trackname])  # Adds to self.tracks
-        # Otherwise check that all tracks specified appear only once across all
-        # archives
-        else:
-            exclude_trackname_list = [
-                TRACK_DINUCLEOTIDE.name_unquoted,
-                TRACK_SUPERVISIONLABEL.name_unquoted
-            ]
-
+        # If tracks were specified on the command line or from file
+        if tracks:
+            # Check that all tracks specified appear only once across all
+            # archives
             for trackname in (track.name_unquoted for track in tracks
                               if track.name_unquoted not in
-                              exclude_trackname_list):
+                              EXCLUDE_TRACKNAME_LIST):
                 track_count = all_genomedata_tracks.count(trackname)
                 if track_count != 1:
                     raise ValueError(
                         "Track: {0} was found {1} times across all"
                         " archives".format(trackname, track_count)
                     )
+        # Otherwise by default add all tracks from all archives
+        else:
+            # Add all tracks into individual track groups
+            is_tracks_from_archive = True
+            for trackname in all_genomedata_tracks:
+                self.add_track_group([trackname])  # Adds to self.tracks
+
 
         # Raise an error if there are overlapping track names
         if self.is_tracknames_unique():
