@@ -9,7 +9,7 @@ Installation
 
 Segway requires the following prerequisites:
 
-You need Python 2.6 or 2.7.
+You need Python 2.7.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
 <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>.
