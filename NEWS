@@ -1,4 +1,6 @@
 1.3.1:
+* segway: fix numpy array casting bug in posterior with newer versions of
+  numpy (>= 1.10)
 * segway: fixed case where a track was specified that existed in more than 1
   genomedata
 * segway: ruler default is now 10x resolution. Default resolution is still 1,
