@@ -6,19 +6,18 @@ from __future__ import division
 XXX: want to keep track of all files in new directory
 """
 
-__version__ = "$Revision$"
-
 ## Copyright 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 import filecmp
 from os import walk
 from re import compile as re_compile, escape
 import sys
+import tarfile
 
 from path import path
 
 from segway._util import maybe_gzip_open
-
+from segway.version import __version__
 
 def get_dir_filenames(dirname):
     if (not path(dirname).exists()):
@@ -107,6 +106,8 @@ def compare_directory(template_dirname, query_dirname):
     counter = TestCounter()
     query_filenames = dict(get_dir_filenames(query_dirname))
 
+    different_files_list = []
+
     template_filenames = get_dir_filenames(template_dirname)
     for template_filename_relative, template_filename in template_filenames:
         re_template_filename_relative = make_regex(template_filename_relative)
@@ -120,6 +121,8 @@ def compare_directory(template_dirname, query_dirname):
                 else:
                     counter.error("diff '%s' '%s'" % (template_filename,
                                                       query_filename))
+                    different_files_list.append((template_filename,
+                                                 query_filename))
 
                 break
         else:
@@ -139,6 +142,18 @@ def compare_directory(template_dirname, query_dirname):
         msg = "FAIL: %s and %s: %d files match;" \
               " %d files mismatch" % (template_dirname, query_dirname,
                                       counter.num_success, counter.num_error)
+
+        base_directory_name = (path(template_dirname)
+                               .abspath().dirname().basename())
+        tar_filename = base_directory_name + "-changes.tar.gz"
+
+        with tarfile.open(tar_filename, "w:gz") as tar:
+            print "Archiving in {}:".format(tar_filename)
+            for template_filename, query_filename in different_files_list:
+                tar.add(template_filename)
+                tar.add(query_filename)
+                print template_filename, query_filename
+
         print >>sys.stderr, msg
         return 1
 
