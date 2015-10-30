@@ -35,4 +35,4 @@ segway "$cluster_arg" --include-coords="../include-coords.bed" \
 
 cd ..
 
-../compare_directory.py ../simplesemi/touchstone ../simplesemi/${TMPDIR#"./"}
+../compare_directory.py ../simplesemisupervised/touchstone ../simplesemisupervised/${TMPDIR#"./"}
