@@ -25,7 +25,7 @@ The best way to submit contributions to Segway is through the pull request featu
 Coding Style
 ------------
 
-We ask that all code submissions follow the `PEP 8`_ python coding guidelines.
+We ask that all code submissions follow the `PEP 8`_ python coding guidelines and to only support Python 2.7 (and above if possible). Python 3 migration is a long term goal of Segway and by simply only supporting Python 2.7 the process should be far easier in the future.
 
 .. _issue tracker: https://bitbucket.org/hoffmanlab/segway/issues/
 .. _pull requests: https://bitbucket.org/hoffmanlab/segway/pull-requests

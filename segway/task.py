@@ -190,7 +190,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     num_frames = ceildiv(end - start, resolution)
     probs = read_posterior(infile, num_frames, num_labels,
                            num_sublabels, output_label)
-    probs_rounded = empty(probs.shape, int)
+    probs_rounded = empty(probs.shape, float) # casted to int after rounding
 
     # Write posterior code file
     posterior_code = argmax(probs, axis=1)
@@ -218,6 +218,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
 
     # scale, round, and cast to int
     (probs * POSTERIOR_SCALE_FACTOR).round(out=probs_rounded)
+    probs_rounded = probs_rounded.astype(int)
 
     # print array columns as text to each outfile
     zipper = zip(outfilenames, probs_rounded.T, label_print_range)

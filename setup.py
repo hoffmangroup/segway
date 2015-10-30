@@ -6,7 +6,7 @@ Segway is a tool for easy pattern discovery and identification in
 functional genomics data.
 """
 
-__version__ = "1.2.3"
+from segway import __version__
 
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
@@ -35,7 +35,6 @@ classifiers = ["Natural Language :: English",
                "Topic :: Scientific/Engineering :: Bio-Informatics",
                "Operating System :: Unix",
                "Programming Language :: Python",
-               "Programming Language :: Python :: 2.6",
                "Programming Language :: Python :: 2.7"]
 
 entry_points = """

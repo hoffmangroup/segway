@@ -9,7 +9,7 @@ Installation
 
 Segway requires the following prerequisites:
 
-You need Python 2.6 or 2.7.
+You need Python 2.7.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
 <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>.
@@ -48,13 +48,13 @@ Standalone configuration
 ------------------------
 Segway can be run without any cluster system. This will automatically be
 used when Segway fails to access any cluster system. You can force it by
-setting the `SEGWAY_CLUSTER` environment variable to `local`. For example,
+setting the :envvar:`SEGWAY_CLUSTER` environment variable to `local`. For example,
 if you are using bash as your shell, you can run:
 
     SEGWAY_CLUSTER=local segway
 
 By default, Segway will use up to 32 concurrent processes when running in 
-standalone mode. To change this, set the `SEGWAY_NUM_LOCAL_JOBS` environment
+standalone mode. To change this, set the :envvar:`SEGWAY_NUM_LOCAL_JOBS` environment
 variable to the appropriate number.
 
 Cluster configuration
@@ -133,6 +133,13 @@ formats. By default, Segway uses all the continuous data tracks in a
 Genomedata archive. Multiple Genomedata archives can be specified to be used in
 data selection as long as each archive refers to the same sequence and do not
 have overlapping track names.
+
+.. note::
+    Segway does not allow mulitple genomedata archives to contain equivalent
+    tracks names. However if your archives have tracks with matching track
+    names, you may explictly specify to Segway the track names that do not
+    overlap in other genomedata archives and Segway will run as normal.
+
 
 Tracks
 ------
@@ -330,18 +337,19 @@ for a label, as in the last row above, means all labels 4 or higher.
 The second column specifies three colon-separate values: the minimum
 segment length, maximum segment length, and the ruler.  In the example
 above, for labels 1, 2 and 3, segment lengths between 200 and 2200 are
-allowed, with a 200 bp ruler. If either the minimum or maximum lengths
-are left unspecified, then no corresponding constraint is applied.
+allowed, with a 50 bp ruler. If either the minimum or maximum lengths
+are left unspecified, then no corresponding constraint is applied. If 
+the ruler is left unspecified the default or set value from the
+:option:`--ruler` option is used.
 
 The ruler is an efficient heuristic that decreases the memory used
 during inference at the cost of also decreasing the precision with
 which the segment duration model acts.  Essentially, it allows the
 duration model to switch the behavior of the rest of the model only
-after a multiple of *scale* bp has passed.  Note that the ruler for
-every label must be explicitly specified and must match all other
-ruler entries in this file, as well as the option set with
-:option:`--ruler-scale`\=\ *scale*. (This may become more free in the
-future.)
+after a multiple of *scale* bp has passed.  Note that the ruler must 
+match all other ruler entries in this file, as well as the option set
+with :option:`--ruler-scale`\=\ *scale*. (This may become more free 
+in the future.)
 
 Due to the lack of an epilogue in the model, it is possible to get one
 segment per sequence that actually does not meet the minimum segment
@@ -507,9 +515,9 @@ are generating your own models manually.
 Seeding
 ~~~~~~~
 Segway can be forced to run with a specified random number generator seed by
-setting the `SEGWAY_RAND_SEED` environment variable. This can be useful for
+setting the :envvar:`SEGWAY_RAND_SEED` environment variable. This can be useful for
 reproducing results in the future. For example, if you are using bash as your
-shell you can run:
+shell you can run::
 
     SEGWAY_RAND_SEED=1498730685
 
@@ -681,6 +689,23 @@ Utilities
 .. include:: _build/cmdline-help/segway-layer.help.txt
 
 .. include:: _build/cmdline-help/segway-winner.help.txt
+
+Environment Variables
+=====================
+.. envvar:: SEGWAY_CLUSTER
+
+    Forces segway to use a specific cluster environment. Setting this to
+    'local' forces segway to use run locally and use no cluster environment.
+
+.. envvar:: SEGWAY_NUM_LOCAL_JOBS
+
+    Sets the maximum number of jobs when running locally.
+
+.. envvar:: SEGWAY_RAND_SEED
+    
+    Sets the seed for the random number generator. This is useful for
+    reproducing results.
+
 
 Running Segway for large jobs
 =============================

@@ -19,6 +19,9 @@ fi
 
 TEST_ROOT="$(pwd)"
 
+# Clear existing archives created by previous failures
+rm */*-changes.tar.gz || true
+
 exit_status=0
 # Avoid creating a new subshell to get an error exit status by putting the
 # search commands for "run.sh" in a process substitution (file descriptor)
@@ -30,5 +33,10 @@ do
     ./run.sh || { exit_status=$?; true; }
     cd $TEST_ROOT
 done < <(find . -maxdepth 2 -name "run.sh" -type f | sort)
+
+mkdir all-test-changes || true
+cp */*-changes.tar.gz all-test-changes || true
+tar -cf all-test-changes.tar all-test-changes || true
+rm -rf all-test-changes || true
 
 exit $exit_status

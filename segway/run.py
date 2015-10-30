@@ -5,8 +5,6 @@ from __future__ import division, with_statement
 run: main Segway implementation
 """
 
-__version__ = "$Revision$"
-
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from collections import defaultdict, namedtuple
@@ -60,6 +58,7 @@ from ._util import (data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
                     VITERBI_PROG)
+from .version import __version__
 
 # set once per file run
 UUID = uuid1().hex
@@ -496,6 +495,10 @@ class Track(object):
 TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
 TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
 
+EXCLUDE_TRACKNAME_LIST = [
+    TRACK_DINUCLEOTIDE.name_unquoted,
+    TRACK_SUPERVISIONLABEL.name_unquoted
+]
 
 class TrackGroup(list):
     def _set_group(self, item):
@@ -753,6 +756,19 @@ class Runner(object):
         # 64-bit compute nodes
         res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
 
+        # If the resolution is set to a non-default value
+        # And the ruler has not been set from the options
+        if (res.resolution != RESOLUTION and
+           res.ruler_scale == RULER_SCALE):
+            # Set the ruler scale to 10x the non-default value
+            res.ruler_scale = res.resolution * 10
+        # Else if the ruler is not divisible by the resolution
+        elif res.ruler_scale % res.resolution != 0:
+            # Report the value error
+            raise ValueError("The ruler (%d) is not divisible by the"
+                             " resolution (%d)" %
+                             (res.ruler_scale, res.resolution))
+
         # don't change from None if this is false
         params_filenames = options.trainable_params
         if params_filenames:
@@ -819,11 +835,15 @@ class Runner(object):
         num_segs = slice2range(self.num_segs)[-1]
 
         res = zeros((num_segs, SEG_TABLE_WIDTH), dtype=int)
+
         ruler_scale = self.ruler_scale
         res[:, OFFSET_STEP] = ruler_scale
 
         with open(filename) as infile:
             reader = DictReader(infile)
+
+            # Ensure that all ruler lengths are equal
+            first_ruler_length = None
 
             # overwriting is allowed
             for row in reader:
@@ -841,11 +861,25 @@ class Runner(object):
                 # get slice
                 len_slice = str2slice_or_int(row["len"])
 
-                # XXX: eventually, should read ruler scale from file
-                # instead of using as a command-line option
-                assert len_slice.step == ruler_scale
+                # When no step is specified, use the set ruler
+                # NB: The default segment table does not have a step specified.
+                segment_length_step = len_slice.step
+                if segment_length_step is None:
+                    segment_length_step = ruler_scale
 
-                len_tuple = (len_slice.start, len_slice.stop, len_slice.step)
+                # If this is the first row, get the first ruler length
+                if first_ruler_length is None:
+                    first_ruler_length = segment_length_step
+                # Else if the first ruler length does not match this row's
+                # length
+                elif first_ruler_length is not segment_length_step:
+                    # Raise a value error
+                    raise ValueError("Segment table rulers are not equal."
+                                     " Found ruler lengths %d and %d" %
+                                     (first_ruler_length, segment_length_step))
+
+                len_tuple = (len_slice.start, len_slice.stop,
+                             segment_length_step)
                 len_row = zeros((SEG_TABLE_WIDTH))
 
                 for item_index, item in enumerate(len_tuple):
@@ -1070,8 +1104,10 @@ class Runner(object):
         # greater than starts
 
         # starts and ends must all be divisible by steps
-        assert not (starts % steps).any()
-        assert not (ends % steps).any()
+        if ((starts % steps).any() or
+           (ends % steps).any()):
+            raise ValueError("A segment table start or end boundary is not"
+                             " divisible by the ruler (%d)" % steps[0])
 
         # // = floor division
         seg_countdowns_start = starts // steps
@@ -1230,27 +1266,45 @@ class Runner(object):
         """
 
         tracks = self.tracks
-        # If no tracks were specified on the command line
-        if not tracks:
-            # Add all tracks from all genomedata archives into individual track
-            # groups
-            for genomedata_name in self.genomedata_names:
-                with Genome(genomedata_name) as genome:
-                    for trackname in genome.tracknames_continuous:
-                        self.add_track_group([trackname])
+        is_tracks_from_archive = False
 
-            # Raise an error if there are overlapping track names between
-            # genomedata archives
-            if self.is_tracknames_unique():
-                raise ValueError(
-                    "Duplicate tracknames found across genomedata archives"
-                )
-        # Otherwise for tracks specified on the command line
-        # Check if duplicate tracknames were specified
-        elif self.is_tracknames_unique():
-            raise ValueError(
-                "Arguments have duplicate tracknames"
-            )
+        # Create a list of all tracks from all archives specified
+        all_genomedata_tracks = []
+        for genomedata_name in self.genomedata_names:
+            with Genome(genomedata_name) as genome:
+                all_genomedata_tracks.extend(genome.tracknames_continuous)
+
+        # If tracks were specified on the command line or from file
+        if tracks:
+            # Check that all tracks specified appear only once across all
+            # archives
+            for trackname in (track.name_unquoted for track in tracks
+                              if track.name_unquoted not in
+                              EXCLUDE_TRACKNAME_LIST):
+                track_count = all_genomedata_tracks.count(trackname)
+                if track_count != 1:
+                    raise ValueError(
+                        "Track: {0} was found {1} times across all"
+                        " archives".format(trackname, track_count)
+                    )
+        # Otherwise by default add all tracks from all archives
+        else:
+            # Add all tracks into individual track groups
+            is_tracks_from_archive = True
+            for trackname in all_genomedata_tracks:
+                self.add_track_group([trackname])  # Adds to self.tracks
+
+
+        # Raise an error if there are overlapping track names
+        if self.is_tracknames_unique():
+            error_msg = ""
+            if is_tracks_from_archive:
+                error_msg = "Duplicate tracknames found across genomedata"
+                " archives"
+            else:
+                error_msg = "Arguments have duplicate tracknames"
+
+            raise ValueError(error_msg)
 
         # For every data track in the track list
         for data_track in (track for track in tracks
@@ -1269,13 +1323,6 @@ class Runner(object):
                         data_track.genomedata_name = genomedata_name
                         # Stop looking for this data track
                         break
-            # If the track cannot be found in an archive
-            else:
-                # Raise an error
-                raise ValueError(
-                    "Track: {0} cannot be found in genomedata "
-                    "archive(s)".format(data_track.name_unquoted)
-                )
 
         # If all tracks are not data
         if not any(track.is_data for track in tracks):
@@ -2370,10 +2417,17 @@ to find the winning instance anyway.""" % thread.instance_index)
         # The track indexes should be semi-colon separated for each genomedata
         # archive
         track_string_list = []
-        world_genomedata_names = \
-            set(self.world_genomedata_names[window.world])
-        # For each unique genomedata archive in this world
+
+        # The genomedata names for the worlds needs to be ordered and unique
+        # from the world it comes from
+        world_genomedata_names = self.world_genomedata_names[window.world]
+        ordered_unique_world_genomedata_names = []
         for genomedata_name in world_genomedata_names:
+            if genomedata_name not in ordered_unique_world_genomedata_names:
+                ordered_unique_world_genomedata_names.append(genomedata_name)
+
+        # For each unique genomedata archive in this world
+        for genomedata_name in ordered_unique_world_genomedata_names:
             # For every track in this world
             tracks_from_world = zip(*self.track_groups)[window.world]
             track_list = [track.index for track in tracks_from_world
@@ -2384,7 +2438,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         # Build a semi-colon separated string
         track_indexes_text = ";".join(track_string_list)
 
-        genomedata_archives_text = ",".join(world_genomedata_names)
+        genomedata_archives_text = ",".join(
+            ordered_unique_world_genomedata_names)
 
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
@@ -2714,8 +2769,8 @@ def parse_options(args):
                          " rounds (default %d)" % MAX_EM_ITERS)
 
         group.add_option("--ruler-scale", type=int, metavar="SCALE",
-                         help="ruler marking every SCALE bp (default %d)" %
-                         RULER_SCALE)
+                         help="ruler marking every SCALE bp (default the"
+                         " resolution multiplied by 10)")
 
         group.add_option("--prior-strength", type=float, metavar="RATIO",
                          help="use RATIO times the number of data counts as"
