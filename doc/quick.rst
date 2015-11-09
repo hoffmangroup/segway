@@ -7,9 +7,8 @@ Installation and configuration
 
 1. To install Segway first install `GMTK
    <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>`_,
-   install `HDF5 <http://www.hdfgroup.org/downloads/index.html>`_, 
-   and install `numpy <http://www.numpy.org>`_. Then run this command
-   from :program:`bash`::
+   and install `HDF5 <http://www.hdfgroup.org/downloads/index.html>`_,.
+   Then run this command from :program:`bash`::
 
      pip install segway
 
