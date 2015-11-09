@@ -29,19 +29,13 @@ OpenSUSE::
 
     sudo zypper in hdf5 hdf5-devel libhdf5
 
-You need numpy <http://www.numpy.org/> installed. To install the latest version of numpy use ``pip
-install numpy``.
-
-.. note::
-    The latest version of numpy will not install with older versions of pip (< 6.0). To
-    upgrade your pip version run `pip install pip --upgrade`.
-
-    Numpy needs to be installed separately because some of Segway's dependencies
-    will fail to install otherwise.
-
-
 Afterwards Segway can be installed automatically with the command ``pip install
 segway``.
+
+.. note::
+    Segway may not install with older versions of pip (< 6.0) due to some of its dependencies
+    requiring the newer version. To upgrade your pip version run `pip install pip --upgrade`.
+
 
 
 Standalone configuration
