@@ -2820,6 +2820,9 @@ def parse_options(args):
 
     options, args = parser.parse_args(args)
 
+    if len(args) < 3:
+        parser.error("Expected at least 3 arguments.")
+
     if args[0] == "train":
         if len(args) < 3:
             parser.error("Expected at least 3 arguments for the train task.")
