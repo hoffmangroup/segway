@@ -210,7 +210,7 @@ Resolution
 
 .. important::
 
-  The resolution feature is not implemented in the current Segway
+  The resolution feature is not implemented for posterior use in the Segway
   |version| release.
 
 In order to speed up the inference process, you may downsample the
