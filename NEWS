@@ -1,4 +1,10 @@
 1.3.2:
+* segway: clarify documentation on resolution support
+* segway: simplify installation instructions
+* segway: fix help not printing when no arguments are given
+* segway: add resolution test case
+* segway: clarify and add GPLV2 license
+* segway: add better test result capturing
 
 
 1.3.1:
