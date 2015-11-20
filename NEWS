@@ -1,4 +1,5 @@
 1.3.2:
+* segway: add a new simple semisupervision test case
 * segway: clarify documentation on resolution support
 * segway: simplify installation instructions
 * segway: fix help not printing when no arguments are given
