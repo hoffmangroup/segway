@@ -51,7 +51,7 @@
 
 % supervision label
 #ifndef CARD_SUPERVISIONLABEL
-#define CARD_SUPERVISIONLABEL 2
+#define CARD_SUPERVISIONLABEL 5
 #endif
 
 % supervision label extension

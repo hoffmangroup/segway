@@ -11,6 +11,8 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
+
+
 TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
 
 echo >&2 "entering directory $TMPDIR"
@@ -24,7 +26,7 @@ fi
 
 set -x
 
-SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
+SEGWAY_RAND_SEED=7908 segway "$cluster_arg" \
     --semisupervised="../semi-label.bed" \
     --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \

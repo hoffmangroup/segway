@@ -6,7 +6,7 @@
 4 presence__testtrack2 0 2 D 0 1 0 
 5 testtrack2 0 0 C 1 presence__testtrack2 0 2 0 1 seg 0 
 6 alwaysTrue 0 2 D 0 1 2 supervisionLabel 0 seg 0 
-7 supervisionLabel 0 2 D 0 1 0 
+7 supervisionLabel 0 5 D 0 1 0 
 8 frameIndex 1 2000000 D 0 1 0 
 9 ruler 1 2 D 0 1 1 frameIndex 0 
 10 segCountDown 1 2 D 0 1 4 segTransition 0 ruler 0 seg 0 segCountDown -1 
@@ -17,7 +17,7 @@
 15 presence__testtrack2 1 2 D 0 1 0 
 16 testtrack2 1 0 C 1 presence__testtrack2 0 2 0 1 seg 0 
 17 alwaysTrue 1 2 D 0 1 2 supervisionLabel 0 seg 0 
-18 supervisionLabel 1 2 D 0 1 0 
+18 supervisionLabel 1 5 D 0 1 0 
 1 1 
 @@@!!!TRIFILE_END_OF_ID_STRING!!!@@@ 
 
