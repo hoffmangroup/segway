@@ -2,14 +2,15 @@
 Troubleshooting
 ===============
 
-When Segway reports "end of memory progression reached without
-success", this usually means that dispatched GMTK tasks failed
-repeatedly. Look in ``log/jobs.tab`` to see all the jobs and whether
-they reported an error in the form of nonzero exit status. The job
-causing your Segway run to fail will probably be near the end of this
-list and have a nonzero exit status in the last column. Look in
-``output/e/``\ *instance*\ ``/``\ *jobname* to find the cause of the
-underlying error. See :ref:`task-output` for more output information.
+When Segway reports an error, it usually means that dispatched GMTK tasks
+failed somehow. Look in ``log/jobs.tab`` to see all the jobs and whether
+they reported an error in the form of nonzero exit status in the last column.
+If the job had a "75" error status (or an "EX_TEMPFAIL") the job simply ran out
+of memory. If this was the last job with this error, increase the allowed
+memory in your ``-mem-usage`` option. Otherwise if the job had a non-zero and
+wasn't due to out of memory issues, look in ``output/e/``\ *instance*\ ``/``\
+*jobname* to find the cause of the underlying error. See :ref:`task-output` for
+more output information.
 
 Are your bundle jobs failing? This might be because an accumulator
 file (written by individual job) is corrupted or truncated. This can

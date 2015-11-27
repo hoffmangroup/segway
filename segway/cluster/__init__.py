@@ -7,7 +7,7 @@ __version__ = "$Revision$"
 
 from collections import defaultdict
 from heapq import heappop, heappush
-from os import environ
+from os import environ, EX_TEMPFAIL
 import sys
 from time import sleep
 
@@ -23,6 +23,11 @@ else:
         from .local import ExitTimeoutException, JobState, Session
 
 from .._util import constant
+
+MSG_JOB_ERROR = """
+Submitted Job (%s) failed. Failed Job: %s.
+For details, check error messages in %s.
+See the Troubleshooting section of the Segway documentation."""
 
 FAILED = JobState.FAILED
 DONE = JobState.DONE
@@ -212,10 +217,19 @@ class RestartableJobDict(dict):
     def process_job(self, jobid, job_info):
         exit_status = self.get_job_info_exit_status(job_info)
 
+        # Only resubmit job if out-of-memory is reported (EX_TEMPFAIL)
         # if the job queue is already full, this will probably
         # result in the job going to unqueued jobs for now
-        if exit_status != 0:
+        if exit_status == EX_TEMPFAIL:
             self.queue(self[jobid])
+        # Else if the job had an error that wasn't due to memory
+        elif exit_status != 0:
+            # Raise a runtime error regarding the job
+            job_template_factory = self[jobid].job_tmpl_factory
+            job_name = job_template_factory.template.jobName
+            error_filename = job_template_factory.error_filename
+            raise RuntimeError(MSG_JOB_ERROR % 
+                               (jobid, job_name, error_filename))
 
         restartable_job = self[jobid]
         jobname = restartable_job.job_tmpl_factory.template.jobName

@@ -25,7 +25,7 @@ RES_WRAPPER = "segway-wrapper.sh"
 
 MSG_EDGE = """
 Ran through entire memory usage progression without success.
-This is probably not related to memory usage, however. Check for errors in %s.
+For details, check error messages in %s.
 See the Troubleshooting section of the Segway documentation."""
 
 NULL_FILENAME = "/dev/null"
