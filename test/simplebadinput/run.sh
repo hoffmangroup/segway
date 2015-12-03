@@ -24,16 +24,9 @@ fi
 
 set -x
 
+# Exit true if the first was false
 SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \
     --input-master="../input.master" \
-    train "../simplebadinput.genomedata" traindir || { exit_status=$?; true; }
-
-# Exit with success if an error was produced
-if [ $exit_status -ne 0 ]; then
-    exit 0
-# Otherwise this test failed and exit with failure
-else
-    exit 1
-fi
+    train "../simplebadinput.genomedata" traindir || { exit 0; }

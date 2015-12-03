@@ -52,6 +52,7 @@ except KeyError:
 
 NOMINAL_MIN_JOB_WAIT_SLEEP_TIME = MIN_JOB_WAIT_SLEEP_TIME + 3
 MAX_JOB_WAIT_SLEEP_TIME = 10  # max time to wait between checking job status
+MAX_JOB_ATTEMPTS = 3
 
 # these settings limit job queueing to 360 at once
 
@@ -95,6 +96,10 @@ class RestartableJob(object):
 
         # last trial index tried
         self.trial_index = -1
+        # Count of the number of attempts for this job
+        # Will always be submitted once before resubmission
+        # Does not count for out of memory errors
+        self.num_job_attempts = 1
 
         self.global_mem_usage = global_mem_usage
         self.mem_usage_key = mem_usage_key
@@ -216,22 +221,31 @@ class RestartableJobDict(dict):
 
     def process_job(self, jobid, job_info):
         exit_status = self.get_job_info_exit_status(job_info)
+        restartable_job = self[jobid]
 
         # Only resubmit job if out-of-memory is reported (EX_TEMPFAIL)
         # if the job queue is already full, this will probably
         # result in the job going to unqueued jobs for now
         if exit_status == EX_TEMPFAIL:
-            self.queue(self[jobid])
+            self.queue(restartable_job)
         # Else if the job had an error that wasn't due to memory
         elif exit_status != 0:
-            # Raise a runtime error regarding the job
-            job_template_factory = self[jobid].job_tmpl_factory
-            job_name = job_template_factory.template.jobName
-            error_filename = job_template_factory.error_filename
-            raise RuntimeError(MSG_JOB_ERROR % 
-                               (jobid, job_name, error_filename))
+            # If the job has been submitted more than or equal to the max
+            # amount of attempts allowed
+            if restartable_job.num_job_attempts >= MAX_JOB_ATTEMPTS:
+                # Raise a runtime error regarding the job
+                job_template_factory = restartable_job.job_tmpl_factory
+                job_name = job_template_factory.template.jobName
+                error_filename = job_template_factory.error_filename
+                raise RuntimeError(MSG_JOB_ERROR %
+                                   (jobid, job_name, error_filename))
+            # Otherwise
+            else:
+                # Increment the job attempt count
+                restartable_job.num_job_attempts += 1
+                # Resubmit
+                self.queue(restartable_job)
 
-        restartable_job = self[jobid]
         jobname = restartable_job.job_tmpl_factory.template.jobName
 
         prog, num_segs, num_frames = restartable_job.mem_usage_key
