@@ -1,5 +1,5 @@
 1.3.2:
-* segway: add GMTK minimum version checking (1.4.3) to support better GMTK job
+* segway: add GMTK minimum version checking (1.4.2) to support better GMTK job
   handling
 * segway: add a job resubmission test due to out of memory issues
 * segway: add a smarter job resubmission due to out of memory issues

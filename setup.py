@@ -21,7 +21,7 @@ use_setuptools()
 
 from setuptools import find_packages, setup
 
-MINIMUM_GMTK_VERSION = (1, 4, 3)
+MINIMUM_GMTK_VERSION = (1, 4, 2)
 GMTK_VERSION_ERROR_MSG = """
 GMTK version %s was detected.
 Segway requires GMTK version %s or later to be installed.
