@@ -1,4 +1,13 @@
 1.3.2:
+* segway: add GMTK minimum version checking (1.4.3) to support better GMTK job
+  handling
+* segway: add a job resubmission test due to out of memory issues
+* segway: add a smarter job resubmission due to out of memory issues
+* segway: add a better error message for out of memory issues vs actual process
+  issues
+* segway: update documentation on debugging GMTK job issues
+* segway: add a minimum job attempt of 2 before stopping all jobs
+* segway: add a new bad input testcase for proper job termination
 * segway: add a new simple semisupervision test case
 * segway: clarify documentation on resolution support
 * segway: simplify installation instructions
