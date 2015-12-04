@@ -11,6 +11,7 @@ from segway import __version__
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 import sys
+import subprocess
 
 # required for OrderedDict
 assert (2, 6) <= sys.version_info <= (3, 0)
@@ -19,6 +20,12 @@ from ez_setup import use_setuptools
 use_setuptools()
 
 from setuptools import find_packages, setup
+
+MINIMUM_GMTK_VERSION = (1, 4, 3)
+GMTK_VERSION_ERROR_MSG = """
+GMTK version %s was detected.
+Segway requires GMTK version %s or later to be installed.
+Please update your GMTK version."""
 
 doclines = __doc__.splitlines()
 name, short_description = doclines[0].split(": ")
@@ -55,8 +62,10 @@ install_requires = ["genomedata>1.3.1", "textinput", "optbuild>0.1.10",
                     "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
                     "colorbrewer", "drmaa>=0.4a3"]
 
+
 def hg_id(mgr, kind):
     return mgr._invoke("id", "--%s" % kind).strip()
+
 
 def calc_version(mgr, options):
     # If the current version is a development version (modified or on an
@@ -75,7 +84,61 @@ def calc_version(mgr, options):
     else:
         return current_version
 
+
+def check_gmtk_version():
+    """ Checks if the supported minimum GMTK version is installed """
+    # Typical expected output from "gmtkPrint -version":
+    # gmtkPrint (GMTK) 1.4.3
+    # Mercurial id: 8995e40101d2 tip
+    # checkin date: Fri Oct 30 10:51:44 2015 -0700
+
+    # Older versions:
+    # GMTK 1.4.0 (Mercurial id: bdf2718cc6ce tip checkin date: Thu Jun 25 12:31:56 2015 -0700)
+
+    line_output = ""
+    # Try to open gmtkPrint to get the version
+    try:
+        # blocks until finished
+        line_output = subprocess.check_output(["gmtkPrint", "-version"])
+    # If GMTK was not found
+    except:
+        # Raise a runtime error stating that GMTK was not found on the path
+        raise RuntimeError("GMTK cannot be found on your PATH.\nPlease "
+                           "install GMTK from "
+                           "http://melodi.ee.washington.edu/gmtk/ "
+                           "before installing Segway.")
+
+    minimum_version_string = ".".join([str(x) for x in MINIMUM_GMTK_VERSION])
+
+    output_lines = line_output.split("\n")
+    # Get the first line of output
+    first_output_line = output_lines[0]
+    # Check if there's only one line of output (for older versions)
+    if len(output_lines) == 2:  # there will be an empty string after the split
+        # Get the version string from 2nd word on the line
+        current_version_string = first_output_line.split()[1]
+        raise RuntimeError(GMTK_VERSION_ERROR_MSG %
+                           (current_version_string,
+                            minimum_version_string))
+    else:
+        # Get the version string as the last word on the first line
+        current_version_string = first_output_line.split()[-1]
+
+        # Get the version number to compare with the minimum version
+        current_version = map(int, current_version_string.split("."))
+        version_zip = zip(current_version, MINIMUM_GMTK_VERSION)
+        for current_version_number, minimum_version_number in version_zip:
+            # If the version number (from most to least significant digit) is
+            # ever less than the minimum
+            if current_version_number < minimum_version_number:
+                # Raise a runtime error stating the version found and the
+                # minimum required
+                raise RuntimeError(GMTK_VERSION_ERROR_MSG %
+                                   (current_version_string,
+                                    minimum_version_string))
+
 if __name__ == "__main__":
+    check_gmtk_version()
     setup(name=name,
           version=__version__,
           description=short_description,

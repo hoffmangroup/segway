@@ -52,7 +52,7 @@ except KeyError:
 
 NOMINAL_MIN_JOB_WAIT_SLEEP_TIME = MIN_JOB_WAIT_SLEEP_TIME + 3
 MAX_JOB_WAIT_SLEEP_TIME = 10  # max time to wait between checking job status
-MAX_JOB_ATTEMPTS = 3
+MAX_JOB_ATTEMPTS = 2
 
 # these settings limit job queueing to 360 at once
 
