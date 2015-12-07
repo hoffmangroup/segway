@@ -85,6 +85,7 @@ def compare_file(template_filename, query_filename):
                     print "Line %d differences for %s" % (
                         line_number,
                         template_filename)
+                    print "Different line:\n%s" % (lines[1])
 
     return res
 
