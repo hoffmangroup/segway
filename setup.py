@@ -108,7 +108,7 @@ def check_gmtk_version():
                            "http://melodi.ee.washington.edu/gmtk/ "
                            "before installing Segway.")
 
-    minimum_version_string = ".".join([str(x) for x in MINIMUM_GMTK_VERSION])
+    minimum_version_string = ".".join(map(str, MINIMUM_GMTK_VERSION))
 
     output_lines = line_output.split("\n")
     # Get the first line of output
@@ -137,7 +137,8 @@ def check_gmtk_version():
                                    (current_version_string,
                                     minimum_version_string))
 
-if __name__ == "__main__":
+
+def main():
     check_gmtk_version()
     setup(name=name,
           version=__version__,
@@ -158,3 +159,6 @@ if __name__ == "__main__":
           use_vcs_version={"version_handler": calc_version},
           entry_points=entry_points
           )
+
+if __name__ == "__main__":
+    main()
