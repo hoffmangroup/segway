@@ -24,11 +24,11 @@ fi
 
 set -x
 
-# Set mem-usage to 25000KB in fraction of a GB
+# Set mem-usage to 30000KB in fraction of a GB
 SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \
-    --mem-usage="0.025,0.026,1" \
+    --mem-usage="0.030,0.031,1" \
     train "../simpleresubmit.genomedata" traindir
 
 # TODO: Remove identify
