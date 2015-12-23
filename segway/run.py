@@ -16,7 +16,6 @@ from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
 from os import environ, extsep
-from random import sample
 import re
 from shutil import copy2
 from string import letters
@@ -382,7 +381,7 @@ def rewrite_cliques(rewriter, frame, output_label):
 
     # new clique
     if output_label != "seg":
-        rewriter.send(NewLine("%d 2 seg %d subseg %d" %
+        rewriter.send(NewLine("%d 2 seg %d subseg %d" % 
                               (orig_num_cliques, frame, frame)))
     else:
         rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
@@ -471,7 +470,7 @@ def check_overlapping_supervision_labels(start, end, chrom, coords):
 
 def remove_bash_functions(environment):
     """Removes all bash functions (patched after 'shellshock') from an dictionary
-    environment"""
+    environment""" 
     # Explicitly not using a dictionary comprehension to support Python
     # 2.6 (or earlier)
     # All bash functions in an exported environment after the shellshock
@@ -570,8 +569,6 @@ class Runner(object):
         self.include_coords_filename = None
         self.exclude_coords_filename = None
 
-        self.minibatch_num_windows = -1
-
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
         self.triangulation_filename_is_new = None
@@ -654,7 +651,6 @@ class Runner(object):
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
-                        ("minibatch_num_windows",),
                         ("num_instances",),
                         ("verbosity",),
                         ("split_sequences", "max_frames"),
@@ -1558,7 +1554,7 @@ class Runner(object):
                                                      supervision_coords)
 
                 supervision_coords[chrom].append((start, end))
-
+                
                 name = datum.name
                 start_label, breaks, end_label = name.partition(":")
                 if end_label == "":
@@ -1570,7 +1566,7 @@ class Runner(object):
                     self.set_supervision_label_range_size(1)
                 else:
                     # Supervision label specified with a colon
-                    # This means it's a soft assignment e.g. "0:5" which
+                    # This means it's a soft assignment e.g. "0:5" which 
                     # allow supervision label to be in [0,5). Here we should
                     # use 0 as supervison label and extension=5-0=5 meaning
                     # we keep 5 kind of labels (0,1,2,3,4).
@@ -1578,11 +1574,11 @@ class Runner(object):
                     end_label = int(end_label)
                     supervision_labels[chrom].append(start_label)
                     if end_label <= start_label:
-                        raise ValueError(
+                        raise ValueError( 
                             "Supervision label end label must be greater " \
                             "than start label."
                         )
-                    self.set_supervision_label_range_size(end_label -
+                    self.set_supervision_label_range_size(end_label - 
                                                             start_label)
 
         max_supervision_label = max(max(labels)
@@ -1890,7 +1886,7 @@ class Runner(object):
         return self.queue_gmtk(self.train_prog, kwargs, name, num_frames)
 
     def queue_train_parallel(self, input_params_filename, instance_index,
-                             round_index, train_windows, **kwargs):
+                             round_index, **kwargs):
         kwargs["cppCommandOptions"] = \
             self.make_cpp_options(input_params_filename)
 
@@ -1899,7 +1895,7 @@ class Runner(object):
         make_acc_filename_custom = partial(self.make_acc_filename,
                                            instance_index)
 
-        for window_index, window_len in train_windows:
+        for window_index, window_len in self.window_lens_sorted():
             acc_filename = make_acc_filename_custom(window_index)
             kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
                                  **kwargs)
@@ -1920,7 +1916,7 @@ class Runner(object):
         return res
 
     def queue_train_bundle(self, input_params_filename, output_params_filename,
-                           instance_index, round_index, train_windows, **kwargs):
+                           instance_index, round_index, **kwargs):
         """bundle step: take parallel accumulators and combine them
         """
         acc_filename = self.make_acc_filename(instance_index,
@@ -1931,12 +1927,10 @@ class Runner(object):
 
         last_window = self.num_windows - 1
 
-        loadAccRange=",".join(map(lambda x: str(x[0]), train_windows))
-
         kwargs = dict(outputMasterFile=self.output_master_filename,
                       cppCommandOptions=cpp_options,
                       trrng="nil",
-                      loadAccRange=loadAccRange,
+                      loadAccRange="0:%s" % last_window,
                       loadAccFile=acc_filename,
                       **kwargs)
 
@@ -2009,22 +2003,14 @@ class Runner(object):
         last_params_filename = self.last_params_filename
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
-        if self.minibatch_num_windows == -1:
-            train_windows = list(self.window_lens_sorted())
-        else:
-            train_windows_all = list(self.window_lens_sorted())
-            train_windows = [train_windows_all[i] for i in
-                             sorted(sample(xrange(len(train_windows_all)),
-                                           self.minibatch_num_windows))]
-
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
-                                      round_index, train_windows, **kwargs)
+                                      round_index, **kwargs)
         restartable_jobs.wait()
 
         restartable_jobs = \
             self.queue_train_bundle(last_params_filename, curr_params_filename,
-                                    instance_index, round_index, train_windows,
+                                    instance_index, round_index,
                                     llStoreFile=self.log_likelihood_filename,
                                     **kwargs)
         restartable_jobs.wait()
@@ -2066,8 +2052,7 @@ class Runner(object):
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
                                 round_index, kwargs):
         while (round_index < self.max_em_iters and
-               ((self.minibatch_num_windows != -1) or
-                is_training_progressing(last_log_likelihood, log_likelihood))):
+               is_training_progressing(last_log_likelihood, log_likelihood)):
             self.run_train_round(self.instance_index, round_index, **kwargs)
 
             last_log_likelihood = log_likelihood
@@ -2197,7 +2182,6 @@ class Runner(object):
         self.jt_info_filename
         self.include_coords
         self.exclude_coords
-        self.minibatch_num_windows
         self.card_seg_countdown
         self.obs_dirpath
         self.float_filelistpath
@@ -2213,7 +2197,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
-        self.supervision_label_range_size
+        self.supervision_label_range_size 
 
         threads = []
         with Session() as session:
@@ -2316,7 +2300,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         if not recover_log_likelihood_tab_filepath.isfile():
             # If the likelihood tab file does not exist in this case, then it
-            # means the recover directory was running a single instance which
+            # means the recover directory was running a single instance which 
             # would not generate any tab file with an instance labeled suffix.
             # Read the tab file that does not have a labeled number suffix.
             recover_log_likelihood_tab_filepath = \
@@ -2514,7 +2498,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         filenames = dict(identify=self.viterbi_filenames,
                          posterior=self.posterior_filenames)
-
+        
         # if output_label == "subseg" or "full", need to catch
         # superlabel and sublabel output from gmtk
         if self.output_label != "seg":
@@ -2652,7 +2636,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                     "Tied tracks are not yet supported for " \
                                     "the posterior task"
                                 )
-
+                                
 
                         self.run_identify_posterior()
 
@@ -2708,12 +2692,6 @@ def parse_options(args):
         group.add_option("--resolution", type=int, metavar="RES",
                          help="downsample to every RES bp (default %d)" %
                          RESOLUTION)
-
-        group.add_option("--minibatch-num-windows", type=int, metavar="NUM", default=-1,
-                         help="Use just a random NUM windows for each EM iteration. "
-                         " Removes the normal stopping criterion, so will always "
-                         " run to max-train-rounds.")
-
 
     with OptionGroup(parser, "Model files") as group:
         group.add_option("-i", "--input-master", metavar="FILE",
