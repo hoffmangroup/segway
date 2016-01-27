@@ -314,7 +314,8 @@ Hard length constraints
 
 The :option:`--seg-table`\=\ *file* option allows specification of a
 *segment table* that specifies minimum and maximum segment lengths for
-various labels. Here is an example of a segment table::
+various labels. By default, the segment table is setup for a minimum
+length of 10 bp for all labels. Here is an example of a segment table::
 
   label	len
   1:4	200:2200:50
