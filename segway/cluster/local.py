@@ -54,9 +54,12 @@ class Job(object):
         return retcode
 
     def kill(self):
-        self.proc.terminate()
-        self.proc.wait()
-        self._close()
+        try:
+            self.proc.terminate()
+            self.proc.wait()
+            self._close()
+        except OSError: # Ignore exception if process is no longer running
+            pass
 
     def _close(self):
         self.outfile.close()
