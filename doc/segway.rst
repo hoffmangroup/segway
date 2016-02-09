@@ -205,6 +205,16 @@ as *windows*, and are supplied to GMTK for inference. There is no
 direction connection between the data in different windows during any
 inference process--the windows are treated independently.
 
+An alternative way to speed up training is to use the 
+*--num-minibatch-windows=NUM* option, which will cause Segway to use a random 
+NUM windows at each training iteration.  This will allow training to utilize 
+the whole genome for training while maintaining fast iterations.  Note that 
+using this option will select on the basis of windows, so it is best to 
+combine --num-minibatch-windows with --split-sequences
+The likelihood-based training stopping criterion is no longer valid with 
+minibatch training, so training will always run to --max-train-rounds 
+(100, by default) if --minibatch-num-windows is set.
+
 Resolution
 ----------
 
