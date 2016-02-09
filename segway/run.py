@@ -77,6 +77,7 @@ OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
+MINIBATCH_DEFAULT = -1
 
 ISLAND = True
 
@@ -570,7 +571,7 @@ class Runner(object):
         self.include_coords_filename = None
         self.exclude_coords_filename = None
 
-        self.minibatch_num_windows = -1
+        self.minibatch_num_windows = MINIBATCH_DEFAULT
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
@@ -2009,13 +2010,14 @@ class Runner(object):
         last_params_filename = self.last_params_filename
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
-        if self.minibatch_num_windows == -1:
+        if self.minibatch_num_windows == MINIBATCH_DEFAULT:
             train_windows = list(self.window_lens_sorted())
         else:
             train_windows_all = list(self.window_lens_sorted())
+            minibatch_num_samples = min(len(train_windows_all), self.minibatch_num_windows)
             train_windows = [train_windows_all[i] for i in
                              sorted(sample(xrange(len(train_windows_all)),
-                                           self.minibatch_num_windows))]
+                                           minibatch_num_samples))]
 
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
@@ -2066,7 +2068,7 @@ class Runner(object):
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
                                 round_index, kwargs):
         while (round_index < self.max_em_iters and
-               ((self.minibatch_num_windows != -1) or
+               ((self.minibatch_num_windows != MINIBATCH_DEFAULT) or
                 is_training_progressing(last_log_likelihood, log_likelihood))):
             self.run_train_round(self.instance_index, round_index, **kwargs)
 
@@ -2709,9 +2711,9 @@ def parse_options(args):
                          help="downsample to every RES bp (default %d)" %
                          RESOLUTION)
 
-        group.add_option("--minibatch-num-windows", type=int, metavar="NUM", default=-1,
-                         help="Use just a random NUM windows for each EM iteration. "
-                         " Removes the normal stopping criterion, so will always "
+        group.add_option("--minibatch-num-windows", type=int, metavar="NUM", default=MINIBATCH_DEFAULT,
+                         help="Use a random NUM windows for each EM iteration."
+                         " Removes the normal stopping criterion, so will always"
                          " run to max-train-rounds.")
 
 
