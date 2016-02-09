@@ -571,7 +571,7 @@ class Runner(object):
         self.include_coords_filename = None
         self.exclude_coords_filename = None
 
-        self.minibatch_num_windows = MINIBATCH_DEFAULT
+        self.num_minibatch_windows = MINIBATCH_DEFAULT
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
@@ -655,7 +655,7 @@ class Runner(object):
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
-                        ("minibatch_num_windows",),
+                        ("num_minibatch_windows",),
                         ("num_instances",),
                         ("verbosity",),
                         ("split_sequences", "max_frames"),
@@ -2010,11 +2010,11 @@ class Runner(object):
         last_params_filename = self.last_params_filename
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
-        if self.minibatch_num_windows == MINIBATCH_DEFAULT:
+        if self.num_minibatch_windows == MINIBATCH_DEFAULT:
             train_windows = list(self.window_lens_sorted())
         else:
             train_windows_all = list(self.window_lens_sorted())
-            minibatch_num_samples = min(len(train_windows_all), self.minibatch_num_windows)
+            minibatch_num_samples = min(len(train_windows_all), self.num_minibatch_windows)
             train_windows = [train_windows_all[i] for i in
                              sorted(sample(xrange(len(train_windows_all)),
                                            minibatch_num_samples))]
@@ -2068,7 +2068,7 @@ class Runner(object):
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
                                 round_index, kwargs):
         while (round_index < self.max_em_iters and
-               ((self.minibatch_num_windows != MINIBATCH_DEFAULT) or
+               ((self.num_minibatch_windows != MINIBATCH_DEFAULT) or
                 is_training_progressing(last_log_likelihood, log_likelihood))):
             self.run_train_round(self.instance_index, round_index, **kwargs)
 
@@ -2199,7 +2199,7 @@ class Runner(object):
         self.jt_info_filename
         self.include_coords
         self.exclude_coords
-        self.minibatch_num_windows
+        self.num_minibatch_windows
         self.card_seg_countdown
         self.obs_dirpath
         self.float_filelistpath
@@ -2711,7 +2711,7 @@ def parse_options(args):
                          help="downsample to every RES bp (default %d)" %
                          RESOLUTION)
 
-        group.add_option("--minibatch-num-windows", type=int, metavar="NUM", default=MINIBATCH_DEFAULT,
+        group.add_option("--num-minibatch-windows", type=int, metavar="NUM", default=MINIBATCH_DEFAULT,
                          help="Use a random NUM windows for each EM iteration."
                          " Removes the normal stopping criterion, so will always"
                          " run to max-train-rounds.")
