@@ -335,7 +335,7 @@ above, for labels 1, 2 and 3, segment lengths between 200 and 2200 are
 allowed, with a 50 bp ruler. If either the minimum or maximum lengths
 are left unspecified, then no corresponding constraint is applied. If 
 the ruler is left unspecified the default or set value from the
-:option:`--ruler` option is used.
+:option:`--ruler-scale` option is used.
 
 The ruler is an efficient heuristic that decreases the memory used
 during inference at the cost of also decreasing the precision with
