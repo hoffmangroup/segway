@@ -758,7 +758,8 @@ class Runner(object):
 
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
-        if res.resolution != RESOLUTION and options.ruler_scale:
+        if (res.resolution != RESOLUTION and
+            not options.ruler_scale):
             # Set the ruler scale to 10x the non-default value
             res.ruler_scale = res.resolution * 10
         # Else if the ruler is not divisible by the resolution
