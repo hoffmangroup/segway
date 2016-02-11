@@ -1,6 +1,6 @@
 1.4.0:
 * segway: add drmaa handling for "IBM Platform LSF"
-* segway: fix force using user specified ruler_scale when set to 10
+* segway: fix not using user specified ruler_scale when set to 10
 
 1.3.2:
 * segway: add GMTK minimum version checking (1.4.2) to support better GMTK job
