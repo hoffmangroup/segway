@@ -314,7 +314,8 @@ Hard length constraints
 
 The :option:`--seg-table`\=\ *file* option allows specification of a
 *segment table* that specifies minimum and maximum segment lengths for
-various labels. Here is an example of a segment table::
+various labels. By default, the segment table is setup for a minimum
+length of 10 bp for all labels. Here is an example of a segment table::
 
   label	len
   1:4	200:2200:50
@@ -334,7 +335,7 @@ above, for labels 1, 2 and 3, segment lengths between 200 and 2200 are
 allowed, with a 50 bp ruler. If either the minimum or maximum lengths
 are left unspecified, then no corresponding constraint is applied. If 
 the ruler is left unspecified the default or set value from the
-:option:`--ruler` option is used.
+:option:`--ruler-scale` option is used.
 
 The ruler is an efficient heuristic that decreases the memory used
 during inference at the cost of also decreasing the precision with

@@ -67,7 +67,7 @@ def get_driver_name(session):
     if (drms_info.startswith("GE") or drms_info.startswith("SGE")
             or drms_info.startswith("UGE") or drms_info.startswith("OGS/GE")):
         return "sge" # XXX: should probably change to GE
-    elif drms_info.startswith("Platform LSF"):
+    elif "Platform LSF" in drms_info:  # includes "IBM Platform LSF"
         return "lsf"
     elif drms_info.startswith("SLURM"):
         return "slurm"
