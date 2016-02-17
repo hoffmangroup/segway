@@ -1,4 +1,5 @@
 1.4.0:
+* segway: remove optparse in favour of using argparse instead
 * segway: add drmaa handling for "IBM Platform LSF"
 * segway: fix not using user specified ruler_scale when set to 10
 
