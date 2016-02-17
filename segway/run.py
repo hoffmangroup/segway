@@ -2450,7 +2450,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             tracks_from_world = zip(*self.track_groups)[window.world]
             track_list = [track.index for track in tracks_from_world
                           if track.genomedata_name == genomedata_name]
-            # Build a comma seperated string
+            # Build a comma separated string
             track_string = ",".join(map(str, track_list))
             track_string_list.append(track_string)
         # Build a semi-colon separated string
@@ -2846,7 +2846,7 @@ def parse_options(args):
 
     args = parser.parse_args(args)
 
-    # Seperate options from arguments
+    # Separate options from arguments
     save_args = args.args # args is a non-iterable Namespace object
     del args.args
     options = args
