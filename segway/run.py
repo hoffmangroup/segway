@@ -735,6 +735,24 @@ class Runner(object):
         """
         res = cls.fromargs(args)
 
+        # Preprocess options
+        # Convert any track files into a list of tracks
+        track_specs = []
+        for track_object in options.track:
+            # Try to read file object
+            try:
+                track_specs.extend([line.rstrip() for line in
+                                    track_object.readlines()])
+            # Otherwise assume string
+            except:
+                track_specs.append(track_object)
+        options.track = track_specs
+
+        # Convert labels string into potential slice or an int
+        # If num labels was specified
+        if options.num_labels:
+            options.num_labels = str2slice_or_int(options.num_labels)
+
         # bulk copy options that need no further processing
         for option_to_attr in cls.options_to_attrs:
             try:
@@ -2651,174 +2669,188 @@ to find the winning instance anyway.""" % thread.instance_index)
 
 
 def parse_options(args):
-    from optplus import OptionParser, OptionGroup
+    from argparse import ArgumentParser, FileType
 
-    usage = "%prog [OPTION]... TASK GENOMEDATA [GENOMEDATA ...] TRAINDIR " \
-    "[IDENTIFYDIR]"
+    usage = "%(prog)s [OPTION]... TASK GENOMEDATA [GENOMEDATA ...] TRAINDIR " \
+            "[IDENTIFYDIR]"
 
-    version = "%%prog %s" % __version__
-    citation = \
-    "Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.\n" \
-    "2012. Unsupervised pattern discovery in human chromatin structure\n" \
-    "through genomic segmentation. Nat Methods 9:473-476.\n" \
-    "http://dx.doi.org/10.1038/nmeth.1937"
+    version = "%(prog)s {}".format(__version__)
+    description = "Semi-automatically annotate a genome"
 
-    usage += "\n" + citation
+    citation = """
+    Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.  2012.
+    Unsupervised pattern discovery in human chromatin structure through genomic
+    segmentation. Nat Methods 9:473-476.
+    http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = OptionParser(usage=usage, version=version)
+    parser = ArgumentParser(description=description, usage=usage,
+                            epilog=citation)
 
-    with OptionGroup(parser, "Data selection") as group:
-        group.add_option("-t", "--track", action="append", default=[],
-                         metavar="TRACK",
-                         help="append TRACK to list of tracks to use"
-                         " (default all)")
+    parser.add_argument("--version", action="version", version=version)
 
-        group.add_option("--tracks-from", action="load", metavar="FILE",
-                         dest="track",
-                         help="append tracks from newline-delimited FILE to"
-                         " list of tracks to use")
+    # with OptionGroup(parser, "Data selection") as group:
+    group = parser.add_argument_group("Data selection")
+    group.add_argument("-t", "--track", action="append", default=[],
+                       metavar="TRACK", help="append TRACK to list of tracks"
+                       " to use (default all)")
 
-        # This is a 0-based file.
-        # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
-        group.add_option("--include-coords", metavar="FILE",
-                         help="limit to genomic coordinates in FILE"
-                         " (default all)")
+    # TODO: Fix action "load" and use FileType instead
+    group.add_argument("--tracks-from", type=FileType("r"), metavar="FILE",
+                       dest="track", nargs=1, help="append tracks from"
+                       " newline-delimited FILE to list of tracks"
+                       " to use")
 
-        # exclude goes after all includes
-        group.add_option("--exclude-coords", metavar="FILE",
-                         help="filter out genomic coordinates in FILE"
-                         " (default none)")
+    # NB: This does not use the "load" action
+    # This is a 0-based file.
+    # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
+    group.add_argument("--include-coords", metavar="FILE",
+                       help="limit to genomic coordinates in FILE"
+                       " (default all)")
 
-        group.add_option("--resolution", type=int, metavar="RES",
-                         help="downsample to every RES bp (default %d)" %
-                         RESOLUTION)
+    # exclude goes after all includes
+    group.add_argument("--exclude-coords", metavar="FILE",
+                       help="filter out genomic coordinates in FILE"
+                       " (default none)")
 
-    with OptionGroup(parser, "Model files") as group:
-        group.add_option("-i", "--input-master", metavar="FILE",
-                         help="use or create input master in FILE"
-                         " (default %s)" %
-                         make_default_filename(InputMasterSaver.resource_name,
-                                               DIRPATH_PARAMS))
+    group.add_argument("--resolution", type=int, metavar="RES",
+                       help="downsample to every RES bp (default %d)" %
+                       RESOLUTION)
 
-        group.add_option("-s", "--structure", metavar="FILE",
-                         help="use or create structure in FILE (default %s)" %
-                         make_default_filename(StructureSaver.resource_name))
+    group = parser.add_argument_group("Model files")
+    group.add_argument("-i", "--input-master", metavar="FILE",
+                       help="use or create input master in FILE"
+                       " (default %s)" %
+                       make_default_filename(InputMasterSaver.resource_name,
+                                             DIRPATH_PARAMS))
 
-        group.add_option("-p", "--trainable-params", action="append",
-                         default=[], metavar="FILE",
-                         help="use or create trainable parameters in FILE"
-                         " (default WORKDIR/params/params.params)")
+    group.add_argument("-s", "--structure", metavar="FILE",
+                       help="use or create structure in FILE (default %s)" %
+                       make_default_filename(StructureSaver.resource_name))
 
-        group.add_option("--dont-train", metavar="FILE",
-                         help="use FILE as list of parameters not to train"
-                         " (default %s)" %
-                         make_default_filename(RES_DONT_TRAIN, DIRPATH_AUX))
+    group.add_argument("-p", "--trainable-params", action="append",
+                       default=[], metavar="FILE",
+                       help="use or create trainable parameters in FILE"
+                       " (default WORKDIR/params/params.params)")
 
-        group.add_option("--seg-table", metavar="FILE",
-                         help="load segment hyperparameters from FILE"
-                         " (default none)")
+    group.add_argument("--dont-train", metavar="FILE",
+                       help="use FILE as list of parameters not to train"
+                       " (default %s)" %
+                       make_default_filename(RES_DONT_TRAIN, DIRPATH_AUX))
 
-        group.add_option("--semisupervised", metavar="FILE",
-                         help="semisupervised segmentation with labels in "
-                         "FILE (default none)")
+    group.add_argument("--seg-table", metavar="FILE",
+                       help="load segment hyperparameters from FILE"
+                       " (default none)")
 
-    with OptionGroup(parser, "Intermediate files") as group:
-        group.add_option("-o", "--observations", metavar="DIR",
-                         help="use or create observations in DIR"
-                         " (default %s)" %
-                         (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
+    group.add_argument("--semisupervised", metavar="FILE",
+                       help="semisupervised segmentation with labels in "
+                       "FILE (default none)")
 
-        group.add_option("-r", "--recover", metavar="DIR",
-                         help="continue from interrupted run in DIR")
+    group = parser.add_argument_group("Intermediate files")
+    group.add_argument("-o", "--observations", metavar="DIR",
+                       help="use or create observations in DIR"
+                       " (default %s)" %
+                       (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
 
-    with OptionGroup(parser, "Output files") as group:
-        group.add_option("-b", "--bed", metavar="FILE",
-                         help="create identification BED track in FILE"
-                         " (default WORKDIR/%s)" % BED_FILEBASENAME)
+    group.add_argument("-r", "--recover", metavar="DIR",
+                       help="continue from interrupted run in DIR")
 
-        group.add_option("--bigBed", metavar="FILE",
-                         help="specify layered bigBed filename")
+    group = parser.add_argument_group("Output files")
+    group.add_argument("-b", "--bed", metavar="FILE",
+                       help="create identification BED track in FILE"
+                       " (default WORKDIR/%s)" % BED_FILEBASENAME)
 
-    with OptionGroup(parser, "Modeling variables") as group:
-        group.add_option("-D", "--distribution", choices=DISTRIBUTIONS,
-                         metavar="DIST",
-                         help="use DIST distribution"
-                         " (default %s)" % DISTRIBUTION_DEFAULT)
+    group.add_argument("--bigBed", metavar="FILE",
+                       help="specify layered bigBed filename")
 
-        group.add_option("--num-instances", type=int,
-                         default=NUM_INSTANCES, metavar="NUM",
-                         help="run NUM training instances, randomizing start"
-                         " parameters NUM times (default %d)" % NUM_INSTANCES)
+    group = parser.add_argument_group("Modeling variables")
+    group.add_argument("-D", "--distribution", choices=DISTRIBUTIONS,
+                       metavar="DIST",
+                       help="use DIST distribution"
+                       " (default %s)" % DISTRIBUTION_DEFAULT)
 
-        group.add_option("-N", "--num-labels", type=slice, metavar="SLICE",
-                         help="make SLICE segment labels"
-                         " (default %d)" % NUM_SEGS)
+    group.add_argument("--num-instances", type=int,
+                       default=NUM_INSTANCES, metavar="NUM",
+                       help="run NUM training instances, randomizing start"
+                       " parameters NUM times (default %d)" % NUM_INSTANCES)
 
-        group.add_option("--num-sublabels", type=int, metavar="NUM",
-                         help="make NUM segment sublabels"
-                         " (default %d)" % NUM_SUBSEGS)
+    group.add_argument("-N", "--num-labels", type=str, metavar="SLICE",
+                       help="make SLICE segment labels"
+                       " (default %d)" % NUM_SEGS) # will use str2slice_or_int
 
-        group.add_option("--output-label", type=str,
-                         help="in the segmentation file, for each coordinate "
-                         "print only its superlabel (\"seg\"), only its "
-                         "sublabel (\"subseg\"), or both (\"full\")"
-                         "  (default %s)" % OUTPUT_LABEL)
+    group.add_argument("--num-sublabels", type=int, metavar="NUM",
+                       help="make NUM segment sublabels"
+                       " (default %d)" % NUM_SUBSEGS)
 
-        group.add_option("--max-train-rounds", type=int, metavar="NUM",
-                         help="each training instance runs a maximum of NUM"
-                         " rounds (default %d)" % MAX_EM_ITERS)
+    group.add_argument("--output-label", type=str,
+                       help="in the segmentation file, for each coordinate "
+                       "print only its superlabel (\"seg\"), only its "
+                       "sublabel (\"subseg\"), or both (\"full\")"
+                       "  (default %s)" % OUTPUT_LABEL)
 
-        group.add_option("--ruler-scale", type=int, metavar="SCALE",
-                         help="ruler marking every SCALE bp (default the"
-                         " resolution multiplied by 10)")
+    group.add_argument("--max-train-rounds", type=int, metavar="NUM",
+                       help="each training instance runs a maximum of NUM"
+                       " rounds (default %d)" % MAX_EM_ITERS)
 
-        group.add_option("--prior-strength", type=float, metavar="RATIO",
-                         help="use RATIO times the number of data counts as"
-                         " the number of pseudocounts for the segment length"
-                         " prior (default %f)" % PRIOR_STRENGTH)
+    group.add_argument("--ruler-scale", type=int, metavar="SCALE",
+                       help="ruler marking every SCALE bp (default the"
+                       " resolution multiplied by 10)")
 
-        group.add_option("--segtransition-weight-scale", type=float,
-                         metavar="SCALE",
-                         help="exponent for segment transition probability "
-                         " (default %f)" % SEGTRANSITION_WEIGHT_SCALE)
+    group.add_argument("--prior-strength", type=float, metavar="RATIO",
+                       help="use RATIO times the number of data counts as"
+                       " the number of pseudocounts for the segment length"
+                       " prior (default %f)" % PRIOR_STRENGTH)
 
-        group.add_option("--reverse-world", action="append", type=int,
-                         default=[], metavar="WORLD",
-                         help="reverse sequences in concatenated world WORLD"
-                         " (0-based)")
+    group.add_argument("--segtransition-weight-scale", type=float,
+                       metavar="SCALE",
+                       help="exponent for segment transition probability "
+                       " (default %f)" % SEGTRANSITION_WEIGHT_SCALE)
 
-    with OptionGroup(parser, "Technical variables") as group:
-        group.add_option("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
-                         metavar="PROGRESSION",
-                         help="try each float in PROGRESSION as the number "
-                         "of gibibytes of memory to allocate in turn "
-                         "(default %s)" % MEM_USAGE_PROGRESSION)
+    group.add_argument("--reverse-world", action="append", type=int,
+                       default=[], metavar="WORLD",
+                       help="reverse sequences in concatenated world WORLD"
+                       " (0-based)")
 
-        group.add_option("-S", "--split-sequences", metavar="SIZE",
-                         default=MAX_FRAMES, type=int,
-                         help="split up sequences that are larger than SIZE "
-                         "bp (default %s)" % MAX_FRAMES)
+    group = parser.add_argument_group("Technical variables")
+    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
+                       metavar="PROGRESSION",
+                       help="try each float in PROGRESSION as the number "
+                       "of gibibytes of memory to allocate in turn "
+                       "(default %s)" % MEM_USAGE_PROGRESSION)
 
-        group.add_option("-v", "--verbosity", type=int, default=VERBOSITY,
-                         metavar="NUM",
-                         help="show messages with verbosity NUM"
-                         " (default %d)" % VERBOSITY)
+    group.add_argument("-S", "--split-sequences", metavar="SIZE",
+                       default=MAX_FRAMES, type=int,
+                       help="split up sequences that are larger than SIZE "
+                       "bp (default %s)" % MAX_FRAMES)
 
-        group.add_option("--cluster-opt", action="append", default=[],
-                         metavar="OPT",
-                         help="specify an option to be passed to the "
-                         "cluster manager")
+    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
+                       metavar="NUM",
+                       help="show messages with verbosity NUM"
+                       " (default %d)" % VERBOSITY)
 
-    with OptionGroup(parser, "Flags") as group:
-        group.add_option("-c", "--clobber", action="store_true",
-                         help="delete any preexisting files and assumes any "
-                         "model files specified in options as output to be "
-                         "overwritten")
-        group.add_option("-n", "--dry-run", action="store_true",
-                         help="write all files, but do not run any"
-                         " executables")
+    group.add_argument("--cluster-opt", action="append", default=[],
+                       metavar="OPT",
+                       help="specify an option to be passed to the "
+                       "cluster manager")
 
-    options, args = parser.parse_args(args)
+    group = parser.add_argument_group("Flags")
+    group.add_argument("-c", "--clobber", action="store_true",
+                       help="delete any preexisting files and assumes any "
+                       "model files specified in options as output to be "
+                       "overwritten")
+    group.add_argument("-n", "--dry-run", action="store_true",
+                       help="write all files, but do not run any"
+                       " executables")
+
+    # Positional arguments
+    parser.add_argument("args", nargs="+") # "+" for at least 1 arg
+
+    args = parser.parse_args(args)
+
+    # Seperate options from arguments
+    save_args = args.args # args is a non-iterable Namespace object
+    del args.args
+    options = args
+    args = save_args
 
     if len(args) < 3:
         parser.error("Expected at least 3 arguments.")
