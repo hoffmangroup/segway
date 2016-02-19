@@ -10,7 +10,7 @@ __version__ = "$Revision$"
 # Copyright 2009-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from errno import ENOENT
-from os import extsep, fdopen
+from os import extsep, fdopen, EX_TEMPFAIL
 import re
 import sys
 from tempfile import gettempdir, mkstemp
@@ -423,7 +423,16 @@ def main(args=sys.argv[1:]):
         print >>sys.stderr, USAGE
         sys.exit(2)
 
-    return task(*args)
+    # Try running the task
+    try:
+        result = task(*args)
+    # If the there is an explicit out of memory
+    except MemoryError:
+        # return EX_TEMPFAIL
+        result = EX_TEMPFAIL
+
+    return result
+
 
 if __name__ == "__main__":
     sys.exit(main())
