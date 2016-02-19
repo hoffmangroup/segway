@@ -353,6 +353,19 @@ def slice2range(s):
     return xrange(start, stop, step)
 
 
+def file_or_string_to_string_list(file_or_string):
+    """Returns the lines of a file in an list or a singular string in a
+    list otherwise """
+    # Try to read all the lines from a file object
+    try:
+        result = [line.rstrip() for line in file_or_string.readlines()]
+    # If the object isn't a file, return it's own type (presumed string)
+    except AttributeError:
+        result = [file_or_string]
+
+    return result
+
+
 def is_training_progressing(last_ll, curr_ll,
                             min_ll_diff_frac=LOG_LIKELIHOOD_DIFF_FRAC):
     # using x !< y instead of x >= y to give the right default answer
@@ -727,6 +740,7 @@ class Runner(object):
 
         self.track_groups.append(track_group)
 
+
     @classmethod
     def fromoptions(cls, args, options):
         """This is the usual way a Runner is created.
@@ -738,14 +752,9 @@ class Runner(object):
         # Preprocess options
         # Convert any track files into a list of tracks
         track_specs = []
-        for track_object in options.track:
-            # Try to read file object
-            try:
-                track_specs.extend([line.rstrip() for line in
-                                    track_object.readlines()])
-            # Otherwise assume string
-            except:
-                track_specs.append(track_object)
+        for file_or_string in options.track:
+            track_specs.extend(file_or_string_to_string_list(file_or_string))
+
         options.track = track_specs
 
         # Convert labels string into potential slice or an int
@@ -2675,7 +2684,7 @@ def parse_options(args):
             "[IDENTIFYDIR]"
 
     version = "%(prog)s {}".format(__version__)
-    description = "Semi-automatically annotate a genome"
+    description = "Semi-automated genome annotation"
 
     citation = """
     Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.  2012.
@@ -2700,9 +2709,6 @@ def parse_options(args):
                        " newline-delimited FILE to list of tracks"
                        " to use")
 
-    # NB: This does not use the "load" action
-    # This is a 0-based file.
-    # I know because ENm008 starts at position 0 in encodeRegions.txt.gz
     group.add_argument("--include-coords", metavar="FILE",
                        help="limit to genomic coordinates in FILE"
                        " (default all)")
@@ -2783,7 +2789,7 @@ def parse_options(args):
 
     group.add_argument("--output-label", type=str,
                        help="in the segmentation file, for each coordinate "
-                       "print only its superlabel (\"seg\"), only its "
+                       'print only its superlabel ("seg"), only its '
                        "sublabel (\"subseg\"), or both (\"full\")"
                        "  (default %s)" % OUTPUT_LABEL)
 
@@ -2844,12 +2850,13 @@ def parse_options(args):
     # Positional arguments
     parser.add_argument("args", nargs="+") # "+" for at least 1 arg
 
-    args = parser.parse_args(args)
+    options_and_args = parser.parse_args(args)
 
     # Separate options from arguments
-    save_args = args.args # args is a non-iterable Namespace object
-    del args.args
-    options = args
+    save_args = options_and_args.args # args is a non-iterable Namespace object
+
+    del options_and_args.args
+    options = options_and_args
     args = save_args
 
     if len(args) < 3:
