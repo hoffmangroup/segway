@@ -425,13 +425,12 @@ def main(args=sys.argv[1:]):
 
     # Try running the task
     try:
-        result = task(*args)
-    # If the there is an explicit out of memory
+        return task(*args)
+    # If the there is an explicit out of memory exception
     except MemoryError:
-        # return EX_TEMPFAIL
-        result = EX_TEMPFAIL
+        # return EX_TEMPFAIL error code
+        return EX_TEMPFAIL
 
-    return result
 
 
 if __name__ == "__main__":
