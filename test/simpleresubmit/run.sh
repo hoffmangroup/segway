@@ -31,8 +31,8 @@ SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --mem-usage="0.030,0.031,1" \
     train "../simpleresubmit.genomedata" traindir
 
-# TODO: Remove identify
 segway "$cluster_arg" --include-coords="../include-coords.bed" \
+    --mem-usage="0.346,1" \
     identify "../simpleresubmit.genomedata" traindir identifydir
 
 cd ..
