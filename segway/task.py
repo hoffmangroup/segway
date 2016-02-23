@@ -432,6 +432,5 @@ def main(args=sys.argv[1:]):
         return EX_TEMPFAIL
 
 
-
 if __name__ == "__main__":
     sys.exit(main())
