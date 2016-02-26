@@ -1,4 +1,5 @@
 1.4.0:
+* segway: set minimum segment length default to ruler length
 * segway: add and fix better job handling for segway-task (identify)
 * segway: add drmaa handling for "IBM Platform LSF"
 * segway: fix not using user specified ruler_scale when set to 10
