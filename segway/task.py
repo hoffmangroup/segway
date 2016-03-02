@@ -17,6 +17,7 @@ from tempfile import gettempdir, mkstemp
 
 from genomedata import Genome
 from numpy import argmax, array, empty, where, diff, r_, zeros
+import optbuild
 from path import path
 
 from .observations import make_continuous_cells, _save_window
@@ -430,6 +431,10 @@ def main(args=sys.argv[1:]):
     except MemoryError:
         # return EX_TEMPFAIL error code
         return EX_TEMPFAIL
+    # If the viterbi prog returns a non zero exit status
+    except optbuild.ReturncodeError as return_code_exception:
+        # return the non zero exit status
+        return return_code_exception.returncode
 
 
 if __name__ == "__main__":

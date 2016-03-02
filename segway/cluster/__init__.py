@@ -226,13 +226,11 @@ class RestartableJobDict(dict):
 
         # Only resubmit job if out-of-memory is reported:
         # Check for EX_TEMPFAIL and also treat SIGKILL as out of memory
-        # For SIGKILL assume with or with out the high bit set which
-        # indicates abnormal termination
 
         # If the job queue is already full, this will probably
         # result in the job going to unqueued jobs for now
         if (exit_status == EX_TEMPFAIL or
-           exit_status % 128 == SIGKILL):
+           exit_status == "SIGKILL"):
             self.queue(restartable_job)
         # Else if the job had an error that wasn't due to memory
         elif exit_status != 0:
