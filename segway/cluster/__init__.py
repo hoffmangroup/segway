@@ -8,7 +8,6 @@ __version__ = "$Revision$"
 from collections import defaultdict
 from heapq import heappop, heappush
 from os import environ, EX_TEMPFAIL
-from signal import SIGKILL
 import sys
 from time import sleep
 
