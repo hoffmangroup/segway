@@ -1,4 +1,4 @@
-1.4.0:
+1.3.3:
 * segway: set minimum segment length default to ruler length
 * segway: remove simpleresubmit test from being tested with all tests by
   default due to memory requirement differences between platforms
