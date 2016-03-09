@@ -33,5 +33,4 @@ How can I make Segway go faster?
   :option:`--include-coords` option and supply a BED file.
 - Splitting up into smaller subsequences by reducing --split-sequences
   can also help.
-- Decrease Resolution (Not currently implemented segway)
 

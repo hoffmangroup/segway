@@ -67,7 +67,7 @@ def get_driver_name(session):
     if (drms_info.startswith("GE") or drms_info.startswith("SGE")
             or drms_info.startswith("UGE") or drms_info.startswith("OGS/GE")):
         return "sge" # XXX: should probably change to GE
-    elif drms_info.startswith("Platform LSF"):
+    elif "Platform LSF" in drms_info:  # includes "IBM Platform LSF"
         return "lsf"
     elif drms_info.startswith("SLURM"):
         return "slurm"
@@ -223,10 +223,13 @@ class RestartableJobDict(dict):
         exit_status = self.get_job_info_exit_status(job_info)
         restartable_job = self[jobid]
 
-        # Only resubmit job if out-of-memory is reported (EX_TEMPFAIL)
-        # if the job queue is already full, this will probably
+        # Only resubmit job if out-of-memory is reported:
+        # Check for EX_TEMPFAIL and also treat SIGKILL as out of memory
+
+        # If the job queue is already full, this will probably
         # result in the job going to unqueued jobs for now
-        if exit_status == EX_TEMPFAIL:
+        if (exit_status == EX_TEMPFAIL or
+           exit_status == "SIGKILL"):
             self.queue(restartable_job)
         # Else if the job had an error that wasn't due to memory
         elif exit_status != 0:

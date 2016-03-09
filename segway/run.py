@@ -764,7 +764,7 @@ class Runner(object):
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
         if (res.resolution != RESOLUTION and
-           res.ruler_scale == RULER_SCALE):
+            not options.ruler_scale):
             # Set the ruler scale to 10x the non-default value
             res.ruler_scale = res.resolution * 10
         # Else if the ruler is not divisible by the resolution
@@ -872,6 +872,11 @@ class Runner(object):
                 if segment_length_step is None:
                     segment_length_step = ruler_scale
 
+                # When no minimum length is set, use the set ruler
+                minimum_segment_length = len_slice.start
+                if minimum_segment_length is None:
+                    minimum_segment_length = ruler_scale
+
                 # If this is the first row, get the first ruler length
                 if first_ruler_length is None:
                     first_ruler_length = segment_length_step
@@ -883,7 +888,7 @@ class Runner(object):
                                      " Found ruler lengths %d and %d" %
                                      (first_ruler_length, segment_length_step))
 
-                len_tuple = (len_slice.start, len_slice.stop,
+                len_tuple = (minimum_segment_length, len_slice.stop,
                              segment_length_step)
                 len_row = zeros((SEG_TABLE_WIDTH))
 
