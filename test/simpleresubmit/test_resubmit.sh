@@ -11,10 +11,10 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
+testdir="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
 
-echo >&2 "entering directory $TMPDIR"
-cd "$TMPDIR"
+echo >&2 "entering directory $testdir"
+cd "$testdir"
 
 if [ "${SEGWAY_TEST_CLUSTER_OPT:-}" ]; then
     cluster_arg="--cluster-opt=$SEGWAY_TEST_CLUSTER_OPT"
@@ -31,10 +31,10 @@ SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --mem-usage="0.030,0.031,1" \
     train "../simpleresubmit.genomedata" traindir
 
-# TODO: Remove identify
 segway "$cluster_arg" --include-coords="../include-coords.bed" \
+    --mem-usage="0.346,1" \
     identify "../simpleresubmit.genomedata" traindir identifydir
 
 cd ..
 
-../compare_directory.py ../simpleresubmit/touchstone ../simpleresubmit/${TMPDIR#"./"}
+../compare_directory.py ../simpleresubmit/touchstone ../simpleresubmit/${testdir#"./"}

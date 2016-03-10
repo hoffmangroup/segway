@@ -13,10 +13,10 @@ fi
 
 datadir="$(dirname $0)"
 
-TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
+testdir="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
 
-echo >&2 "entering directory $TMPDIR"
-cd "$TMPDIR"
+echo >&2 "entering directory $testdir"
+cd "$testdir"
 
 if [ "${SEGWAY_TEST_CLUSTER_OPT:-}" ]; then
     cluster_arg="--cluster-opt=$SEGWAY_TEST_CLUSTER_OPT"
@@ -37,4 +37,4 @@ segway "$cluster_arg" --include-coords="../include-coords.bed" \
 
 cd ..
 
-../compare_directory.py ../simpleconcat/touchstone ../simpleconcat/${TMPDIR#"./"}
+../compare_directory.py ../simpleconcat/touchstone ../simpleconcat/${testdir#"./"}
