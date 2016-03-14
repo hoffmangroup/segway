@@ -354,16 +354,15 @@ def slice2range(s):
 
 
 def file_or_string_to_string_list(file_or_string):
-    """Returns the lines of a file in an list or a singular string in a
-    list otherwise """
+    """Returns a list that will either contain each line from a file object or
+    the single string given."""
+
     # Try to read all the lines from a file object
     try:
-        result = [line.rstrip() for line in file_or_string.readlines()]
-    # If the object isn't a file, return it's own type (presumed string)
+        return [line.rstrip() for line in file_or_string.readlines()]
+    # If the object isn't a file, return its own type (presumed string)
     except AttributeError:
-        result = [file_or_string]
-
-    return result
+        return [file_or_string]
 
 
 def is_training_progressing(last_ll, curr_ll,
@@ -2682,7 +2681,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         self.run(*args, **kwargs)
 
 
-def parse_options(args):
+def parse_options(argv):
     from argparse import ArgumentParser, FileType
 
     usage = "%(prog)s [OPTION]... TASK GENOMEDATA [GENOMEDATA ...] TRAINDIR " \
@@ -2853,16 +2852,12 @@ def parse_options(args):
                        " executables")
 
     # Positional arguments
-    parser.add_argument("args", nargs="+") # "+" for at least 1 arg
+    parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
 
-    options_and_args = parser.parse_args(args)
+    options = parser.parse_args(argv)
 
-    # Separate options from arguments
-    save_args = options_and_args.args # args is a non-iterable Namespace object
-
-    del options_and_args.args
-    options = options_and_args
-    args = save_args
+    # Separate arguments from options
+    args = options.args  # is a non-iterable Namespace object
 
     if len(args) < 3:
         parser.error("Expected at least 3 arguments.")
@@ -2872,13 +2867,14 @@ def parse_options(args):
             parser.error("Expected at least 3 arguments for the train task.")
     else:
         if len(args) < 4:
-            parser.error("Expected at least 4 arguments for the identify task.")
+            parser.error("Expected at least 4 arguments for the identify "
+                         "task.")
 
     return options, args
 
 
-def main(args=sys.argv[1:]):
-    options, args = parse_options(args)
+def main(argv=sys.argv[1:]):
+    options, args = parse_options(argv)
 
     runner = Runner.fromoptions(args, options)
 
