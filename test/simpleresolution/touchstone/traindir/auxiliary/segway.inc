@@ -29,7 +29,7 @@
 
 % maximum number of frames
 #ifndef CARD_FRAMEINDEX
-#define CARD_FRAMEINDEX 2000000
+#define CARD_FRAMEINDEX 1000000
 #endif
 
 % allow transition or not?
