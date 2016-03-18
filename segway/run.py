@@ -43,7 +43,7 @@ from .input_master import InputMasterSaver
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
-from ._util import (data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
+from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     DISTRIBUTION_GAMMA, DISTRIBUTION_ASINH_NORMAL,
                     EXT_BED, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS,
                     EXT_TAB, extjoin, extjoin_not_none, GB,
@@ -125,7 +125,8 @@ LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
 NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
-MAX_FRAMES = 2000000  # 2 million
+MAX_SPLIT_SEQUENCE_LENGTH = 2000000  # 2 million
+MAX_FRAMES = MAX_SPLIT_SEQUENCE_LENGTH
 MEM_USAGE_BUNDLE = 100 * MB  # XXX: should start using this again
 MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
 
@@ -616,6 +617,7 @@ class Runner(object):
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
+        self.max_split_sequence_length = MAX_SPLIT_SEQUENCE_LENGTH
         self.max_frames = MAX_FRAMES
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
         self.ruler_scale = RULER_SCALE
@@ -665,7 +667,7 @@ class Runner(object):
                         ("exclude_coords", "exclude_coords_filename"),
                         ("num_instances",),
                         ("verbosity",),
-                        ("split_sequences", "max_frames"),
+                        ("split_sequences", "max_split_sequence_length"),
                         ("clobber",),
                         ("dry_run",),
                         ("input_master", "input_master_filename"),
@@ -794,6 +796,8 @@ class Runner(object):
             raise ValueError("The ruler (%d) is not divisible by the"
                              " resolution (%d)" %
                              (res.ruler_scale, res.resolution))
+
+        res.max_frames = ceildiv(res.max_split_sequence_length, res.resolution)
 
         # don't change from None if this is false
         params_filenames = options.trainable_params
@@ -2828,9 +2832,9 @@ def parse_options(argv):
                        "(default %s)" % MEM_USAGE_PROGRESSION)
 
     group.add_argument("-S", "--split-sequences", metavar="SIZE",
-                       default=MAX_FRAMES, type=int,
+                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
                        help="split up sequences that are larger than SIZE "
-                       "bp (default %s)" % MAX_FRAMES)
+                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
 
     group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
                        metavar="NUM",
