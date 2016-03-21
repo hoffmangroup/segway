@@ -9,12 +9,12 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
-echo >&2 "entering directory $TMPDIR"
-cd "$TMPDIR"
+testdir="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
+echo >&2 "entering directory $testdir"
+cd "$testdir"
 
 segway-layer -m ../mnemonics < ../segway.bed > segway.layered.bed
 
 cd ..
 
-../compare_directory.py ../segway_layer/touchstone ../segway_layer/${TMPDIR#"./"}
+../compare_directory.py ../segway_layer/touchstone ../segway_layer/${testdir#"./"}

@@ -9,9 +9,9 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-TMPDIR="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
-echo >&2 "entering directory $TMPDIR"
-cd "$TMPDIR"
+testdir="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
+echo >&2 "entering directory $testdir"
+cd "$testdir"
 
 if type -P bedToBigBed >/dev/null; then
 
@@ -20,7 +20,7 @@ if type -P bedToBigBed >/dev/null; then
     cd ..
 
     ../compare_directory.py ../segway_layer_bigbed/touchstone \
-        ../segway_layer_bigbed/${TMPDIR#"./"}
+        ../segway_layer_bigbed/${testdir#"./"}
 
 else
     echo bedToBigBed not found in PATH. test skipped. >&2
