@@ -102,7 +102,7 @@ JOIN_TIMEOUT = finfo(float).max
 
 SWAP_ENDIAN = False
 
-## option defaults
+# option defaults
 VERBOSITY = 0
 PRIOR_STRENGTH = 0
 
@@ -134,7 +134,7 @@ TMP_USAGE_BASE = 10 * MB  # just a guess
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
-## defaults
+# defaults
 NUM_INSTANCES = 1
 
 CPP_DIRECTIVE_FMT = "-D%s=%s"
@@ -183,16 +183,16 @@ PREFIX_JOB_NAMES = dict(identify=PREFIX_JOB_NAME_VITERBI,
 SUFFIX_OUT = extsep + EXT_OUT
 SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 
-## "segway.bed.gz"
+# "segway.bed.gz"
 BED_FILEBASENAME = extjoin(__package__, EXT_BED, EXT_GZ)
 
-## "segway.%d.bed.gz"
+# "segway.%d.bed.gz"
 BED_FILEBASEFMT = extjoin(__package__, "%d", EXT_BED, EXT_GZ)
 
-## "posterior%s.bed.gz"
+# "posterior%s.bed.gz"
 BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
 
-## "posterior%s.%%d.bed.gz"
+# "posterior%s.%%d.bed.gz"
 BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ)
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
@@ -257,7 +257,7 @@ OFFSET_FILENAMES = 2  # where the filenames begin in Results
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 
 
-## functions
+# functions
 def quote_trackname(text):
     # legal characters are ident in GMTK_FileTokenizer.ll:
     # {alpha})({alpha}|{dig}|\_|\-)* (alpha is [A-za-z], dig is [0-9])
@@ -271,7 +271,7 @@ def quote_trackname(text):
 
     # add stub to deal with non-alphabetic first characters
     if res[0] not in letters:
-         # __ should never appear in strings quoted as before
+        # __ should never appear in strings quoted as before
         res = "x__" + res
 
     return res
@@ -394,7 +394,7 @@ def rewrite_cliques(rewriter, frame, output_label):
 
     # new clique
     if output_label != "seg":
-        rewriter.send(NewLine("%d 2 seg %d subseg %d" % 
+        rewriter.send(NewLine("%d 2 seg %d subseg %d" %
                               (orig_num_cliques, frame, frame)))
     else:
         rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
@@ -483,7 +483,7 @@ def check_overlapping_supervision_labels(start, end, chrom, coords):
 
 def remove_bash_functions(environment):
     """Removes all bash functions (patched after 'shellshock') from an dictionary
-    environment""" 
+    environment"""
     # Explicitly not using a dictionary comprehension to support Python
     # 2.6 (or earlier)
     # All bash functions in an exported environment after the shellshock
@@ -512,6 +512,7 @@ EXCLUDE_TRACKNAME_LIST = [
     TRACK_DINUCLEOTIDE.name_unquoted,
     TRACK_SUPERVISIONLABEL.name_unquoted
 ]
+
 
 class TrackGroup(list):
     def _set_group(self, item):
@@ -627,7 +628,7 @@ class Runner(object):
 
         # flags
         self.clobber = False
-        ## XXX: this should become an int for num_starts
+        # XXX: this should become an int for num_starts
         self.train = False  # EM train
         self.posterior = False
         self.identify = False  # viterbi
@@ -741,7 +742,6 @@ class Runner(object):
 
         self.track_groups.append(track_group)
 
-
     @classmethod
     def fromoptions(cls, args, options):
         """This is the usual way a Runner is created.
@@ -787,7 +787,7 @@ class Runner(object):
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
         if (res.resolution != RESOLUTION and
-            not options.ruler_scale):
+           not options.ruler_scale):
             # Set the ruler scale to 10x the non-default value
             res.ruler_scale = res.resolution * 10
         # Else if the ruler is not divisible by the resolution
@@ -804,7 +804,7 @@ class Runner(object):
         if params_filenames:
             res.params_filenames = params_filenames
 
-        ## track option processing
+        # track option processing
         for track_spec in res.track_specs:
             # local to each value of track_spec
             res.add_track_group(track_spec.split(","))
@@ -967,7 +967,7 @@ class Runner(object):
         #     include_filename.partition(dirpath_trailing_slash)[2]
         # assert include_filename_relative
 
-        #self.gmtk_include_filename_relative = include_filename_relative
+        # self.gmtk_include_filename_relative = include_filename_relative
 
     @memoized_property
     def _means_untransformed(self):
@@ -986,8 +986,8 @@ class Runner(object):
         # (see Wikipedia)
 
         sums_squares_normalized = self.sums_squares / self.num_datapoints
-        return self.transform(sums_squares_normalized
-                              - square(self._means_untransformed))
+        return self.transform(sums_squares_normalized -
+                              square(self._means_untransformed))
 
     @memoized_property
     def dont_train_filename(self):
@@ -1004,8 +1004,10 @@ class Runner(object):
         viterbi_dirpath = dirpath / SUBDIRNAME_VITERBI
         num_windows = self.num_windows
 
-        viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_windows)
-                                + EXT_BED)
+        viterbi_filename_fmt = (PREFIX_VITERBI +
+                                make_prefix_fmt(num_windows) +
+                                EXT_BED)
+
         return [viterbi_dirpath / viterbi_filename_fmt % index
                 for index in xrange(num_windows)]
 
@@ -1050,8 +1052,8 @@ class Runner(object):
         infilename = self.triangulation_filename
 
         # either strip ".trifile" off end, or just use the whole filename
-        infilename_stem = (infilename.rpartition(SUFFIX_TRIFILE)[0]
-                           or infilename)
+        infilename_stem = (infilename.rpartition(SUFFIX_TRIFILE)[0] or
+                           infilename)
 
         res = extjoin(infilename_stem, EXT_POSTERIOR, EXT_TRIFILE)
 
@@ -1329,7 +1331,6 @@ class Runner(object):
             for trackname in all_genomedata_tracks:
                 self.add_track_group([trackname])  # Adds to self.tracks
 
-
         # Raise an error if there are overlapping track names
         if self.is_tracknames_unique():
             error_msg = ""
@@ -1349,7 +1350,7 @@ class Runner(object):
                 with Genome(genomedata_name) as genome:
                     # If the data track exists in this genome
                     if (data_track.name_unquoted in
-                        genome.tracknames_continuous):
+                       genome.tracknames_continuous):
                         # Record the index of each data track specified found
                         # in this genome
                         data_track.index = genome.index_continuous(
@@ -1392,8 +1393,8 @@ class Runner(object):
             # special case if there is only one param filename set
             # otherwise generate "params.params" anew
             params_filename = params_filenames[0]
-        elif (instance_index is not None
-              and num_params_filenames > instance_index):
+        elif (instance_index is not None and
+              num_params_filenames > instance_index):
             params_filename = params_filenames[instance_index]
         else:
             params_filename = None
@@ -1402,8 +1403,8 @@ class Runner(object):
 
         # make new filenames when new is set, or params_filename is
         # not set, or the file already exists and we are training
-        if (new or not params_filename
-                or (self.train and path(params_filename).exists())):
+        if (new or not params_filename or
+           (self.train and path(params_filename).exists())):
             params_filename = self.make_params_filename(instance_index)
 
         return params_filename, last_params_filename
@@ -1589,7 +1590,7 @@ class Runner(object):
                                                      supervision_coords)
 
                 supervision_coords[chrom].append((start, end))
-                
+
                 name = datum.name
                 start_label, breaks, end_label = name.partition(":")
                 if end_label == "":
@@ -1601,7 +1602,7 @@ class Runner(object):
                     self.set_supervision_label_range_size(1)
                 else:
                     # Supervision label specified with a colon
-                    # This means it's a soft assignment e.g. "0:5" which 
+                    # This means it's a soft assignment e.g. "0:5" which
                     # allow supervision label to be in [0,5). Here we should
                     # use 0 as supervison label and extension=5-0=5 meaning
                     # we keep 5 kind of labels (0,1,2,3,4).
@@ -1609,12 +1610,12 @@ class Runner(object):
                     end_label = int(end_label)
                     supervision_labels[chrom].append(start_label)
                     if end_label <= start_label:
-                        raise ValueError( 
-                            "Supervision label end label must be greater " \
+                        raise ValueError(
+                            "Supervision label end label must be greater "
                             "than start label."
                         )
-                    self.set_supervision_label_range_size(end_label - 
-                                                            start_label)
+                    self.set_supervision_label_range_size(end_label -
+                                                          start_label)
 
         max_supervision_label = max(max(labels)
                                     for labels
@@ -1639,7 +1640,7 @@ class Runner(object):
         current_extension = self.supervision_label_range_size
         if current_extension != 0 and current_extension != new_extension:
             raise NotImplementedError(
-                "Semisupervised soft label assignment currently does " \
+                "Semisupervised soft label assignment currently does "
                 "not support different range sizes. "
             )
         else:
@@ -1788,8 +1789,8 @@ class Runner(object):
             res["hashLoadFactor"] = HASH_LOAD_FACTOR
 
         # XXX: dinucleotide-only won't work, because it has no float data
-        assert (self.float_filelistpath
-                and any(track.is_data for track in self.tracks))
+        assert (self.float_filelistpath and
+                any(track.is_data for track in self.tracks))
 
         if self.float_filelistpath:
             res.update(of1=self.float_filelistpath,
@@ -1993,8 +1994,8 @@ class Runner(object):
         if num_subsegs is None:
             num_subsegs = self.num_subsegs
 
-        if (self.triangulation_filename_is_new
-                or not self.triangulation_filename):
+        if (self.triangulation_filename_is_new or
+           not self.triangulation_filename):
             self.triangulation_filename_is_new = True
 
             structure_filebasename = path(self.structure_filename).name
@@ -2002,8 +2003,8 @@ class Runner(object):
                 extjoin(structure_filebasename, str(num_segs),
                         str(num_subsegs), EXT_TRIFILE)
 
-            self.triangulation_filename = (self.triangulation_dirpath
-                                           / triangulation_filebasename)
+            self.triangulation_filename = (self.triangulation_dirpath /
+                                           triangulation_filebasename)
 
         # print >>sys.stderr, ("setting triangulation_filename = %s"
         #                     % self.triangulation_filename)
@@ -2159,7 +2160,7 @@ class Runner(object):
         if not self.instance_make_new_params:
             self.save_input_master()
 
-        ## save file locations to tab-delimited file
+        # save file locations to tab-delimited file
         self.save_train_options()
 
         if not input_master_filename_is_new:
@@ -2192,7 +2193,7 @@ class Runner(object):
 
         run_train_func = self.get_thread_run_func()
 
-        ## this is where the actual training takes place
+        # this is where the actual training takes place
         instance_params = run_train_func(self.num_segs_range)
 
         self.finish_train(instance_params, dst_filenames)
@@ -2232,7 +2233,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
-        self.supervision_label_range_size 
+        self.supervision_label_range_size
 
         threads = []
         with Session() as session:
@@ -2308,8 +2309,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         # only want "input.master" not "input.0.master" if there is
         # only one instance
-        if (not self.instance_make_new_params
-                and resource == InputMasterSaver.resource_name):
+        if (not self.instance_make_new_params and
+           resource == InputMasterSaver.resource_name):
             instance_index = None
 
         old_filename = make_default_filename(resource,
@@ -2335,7 +2336,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         if not recover_log_likelihood_tab_filepath.isfile():
             # If the likelihood tab file does not exist in this case, then it
-            # means the recover directory was running a single instance which 
+            # means the recover directory was running a single instance which
             # would not generate any tab file with an instance labeled suffix.
             # Read the tab file that does not have a labeled number suffix.
             recover_log_likelihood_tab_filepath = \
@@ -2377,7 +2378,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         -inf, -inf, 0 if there is no recovery--this is also used to set initial
         values
         """
-        ## initial values:
+        # initial values:
         last_log_likelihood = -inf
         log_likelihood = -inf
         final_round_index = 0
@@ -2515,7 +2516,7 @@ to find the winning instance anyway.""" % thread.instance_index)
     def setup_identify_posterior(self):
         self.instance_index = "identify"
 
-        ## setup files
+        # setup files
         if not self.input_master_filename:
             warn("Input master not specified. Generating.")
             self.save_input_master()
@@ -2533,7 +2534,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         filenames = dict(identify=self.viterbi_filenames,
                          posterior=self.posterior_filenames)
-        
+
         # if output_label == "subseg" or "full", need to catch
         # superlabel and sublabel output from gmtk
         if self.output_label != "seg":
@@ -2566,8 +2567,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             for window_index, window_len in self.window_lens_sorted():
                 for task in tasks:
-                    if (task == "identify"
-                            and self.recover_viterbi_window(window_index)):
+                    if (task == "identify" and
+                       self.recover_viterbi_window(window_index)):
                         # XXX: should be able to recover posterior also
                         continue
 
@@ -2613,7 +2614,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         self.interrupt_event = Event()
 
-        ## start log files
+        # start log files
         self.make_subdir(SUBDIRNAME_LOG)
         run_msg = self.make_run_msg()
 
@@ -2662,16 +2663,15 @@ to find the winning instance anyway.""" % thread.instance_index)
                         if self.posterior:
                             if self.recover_dirname:
                                 raise NotImplementedError(
-                                    "Recovery is not yet supported for the " \
+                                    "Recovery is not yet supported for the "
                                     "posterior task"
                                 )
 
                             if self.num_worlds != 1:
                                 raise NotImplementedError(
-                                    "Tied tracks are not yet supported for " \
+                                    "Tied tracks are not yet supported for "
                                     "the posterior task"
                                 )
-                                
 
                         self.run_identify_posterior()
 
@@ -2789,7 +2789,7 @@ def parse_options(argv):
 
     group.add_argument("-N", "--num-labels", type=str, metavar="SLICE",
                        help="make SLICE segment labels"
-                       " (default %d)" % NUM_SEGS) # will use str2slice_or_int
+                       " (default %d)" % NUM_SEGS)  # will use str2slice_or_int
 
     group.add_argument("--num-sublabels", type=int, metavar="NUM",
                        help="make NUM segment sublabels"
