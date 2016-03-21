@@ -1,4 +1,5 @@
 1.4.0:
+* segway: remove optparse in favour of using argparse instead
 * segway: fix --split-sequences specifying where to split GMTK frames instead
   of by base pair length
 
