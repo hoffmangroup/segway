@@ -2056,9 +2056,7 @@ class Runner(object):
                 [train_window[1] for train_window in train_windows_all]
             )
 
-            for _, train_window_index in enumerate(
-                train_window_indices_shuffled
-            ):
+            for train_window_index in train_window_indices_shuffled:
                 if (float(cur_bases) / total_bases) < self.minibatch_fraction:
                     train_windows.append(train_windows_all[train_window_index])
                     cur_bases += train_windows_all[train_window_index][1]
