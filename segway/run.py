@@ -1965,12 +1965,12 @@ class Runner(object):
         cpp_options = self.make_cpp_options(input_params_filename,
                                             output_params_filename)
 
-        loadAccRange = ",".join(map(lambda x: str(x[0]), train_windows))
+        acc_range = ",".join(str(train_window[0]) for train_window in train_windows)
 
         kwargs = dict(outputMasterFile=self.output_master_filename,
                       cppCommandOptions=cpp_options,
                       trrng="nil",
-                      loadAccRange=loadAccRange,
+                      loadAccRange=acc_range,
                       loadAccFile=acc_filename,
                       **kwargs)
 
@@ -2053,7 +2053,7 @@ class Runner(object):
             train_windows = []
             cur_bases = 0
             total_bases = sum(
-                [train_window[1] for train_window in train_windows_all]
+                train_window[1] for train_window in train_windows_all
             )
 
             for train_window_index in train_window_indices_shuffled:
@@ -2759,8 +2759,9 @@ def parse_options(argv):
     group.add_argument("--minibatch-fraction", type=float, metavar="FRAC",
                        default=MINIBATCH_DEFAULT,
                        help="Use a random fraction FRAC positions for each EM"
-                       " iteration. Removes the normal stopping criterion, so"
-                       " will always run to max-train-rounds.")
+                       " iteration. Removes the likelihood stopping criterion,"
+                       " so training always runs to the number of rounds"
+                       " specified by --max-train-rounds")
 
     group = parser.add_argument_group("Model files")
     group.add_argument("-i", "--input-master", metavar="FILE",
