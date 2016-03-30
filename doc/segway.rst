@@ -205,6 +205,21 @@ as *windows*, and are supplied to GMTK for inference. There is no
 direction connection between the data in different windows during any
 inference process--the windows are treated independently.
 
+An alternative way to speed up training is to use the 
+:option:`--minibatch-fraction`\=\*frac* option, which will cause Segway to 
+use a fraction *frac* or more of genomic positions, chosen randomly at each 
+training iteration.  For example, using ``--minibatch-fraction=0.01`` will 
+use a different random one percent of the genome for each training round.  
+This will allow training to have access to the whole genome for training 
+while maintaining fast iterations.  Using this option will select on the 
+basis of windows, so the fraction of the genome chosen will be closer to 
+the specified fraction if the windows are small (but the chosen fraction will 
+always be at least as large as specified).  Therefore, it is best to combine 
+--minibatch-fraction with --split-sequences.  The likelihood-based training 
+stopping criterion is no longer valid with minibatch training, so training 
+will always run to --max-train-rounds (100, by default) if 
+--minibatch-fraction is set.
+
 Resolution
 ----------
 

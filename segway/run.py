@@ -16,6 +16,7 @@ from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
 from os import environ, extsep
+from random import sample
 import re
 from shutil import copy2
 from string import letters
@@ -76,6 +77,7 @@ OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
+MINIBATCH_DEFAULT = -1
 
 ISLAND = True
 
@@ -583,6 +585,8 @@ class Runner(object):
         self.include_coords_filename = None
         self.exclude_coords_filename = None
 
+        self.minibatch_fraction = MINIBATCH_DEFAULT
+
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
         self.triangulation_filename_is_new = None
@@ -666,6 +670,7 @@ class Runner(object):
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
+                        ("minibatch_fraction",),
                         ("num_instances",),
                         ("verbosity",),
                         ("split_sequences", "max_split_sequence_length"),
@@ -1004,10 +1009,8 @@ class Runner(object):
         viterbi_dirpath = dirpath / SUBDIRNAME_VITERBI
         num_windows = self.num_windows
 
-        viterbi_filename_fmt = (PREFIX_VITERBI +
-                                make_prefix_fmt(num_windows) +
+        viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_windows) +
                                 EXT_BED)
-
         return [viterbi_dirpath / viterbi_filename_fmt % index
                 for index in xrange(num_windows)]
 
@@ -1922,7 +1925,7 @@ class Runner(object):
         return self.queue_gmtk(self.train_prog, kwargs, name, num_frames)
 
     def queue_train_parallel(self, input_params_filename, instance_index,
-                             round_index, **kwargs):
+                             round_index, train_windows, **kwargs):
         kwargs["cppCommandOptions"] = \
             self.make_cpp_options(input_params_filename)
 
@@ -1931,7 +1934,7 @@ class Runner(object):
         make_acc_filename_custom = partial(self.make_acc_filename,
                                            instance_index)
 
-        for window_index, window_len in self.window_lens_sorted():
+        for window_index, window_len in train_windows:
             acc_filename = make_acc_filename_custom(window_index)
             kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
                                  **kwargs)
@@ -1952,7 +1955,8 @@ class Runner(object):
         return res
 
     def queue_train_bundle(self, input_params_filename, output_params_filename,
-                           instance_index, round_index, **kwargs):
+                           instance_index, round_index, train_windows, **kwargs
+                           ):
         """bundle step: take parallel accumulators and combine them
         """
         acc_filename = self.make_acc_filename(instance_index,
@@ -1961,12 +1965,12 @@ class Runner(object):
         cpp_options = self.make_cpp_options(input_params_filename,
                                             output_params_filename)
 
-        last_window = self.num_windows - 1
+        acc_range = ",".join(str(train_window[0]) for train_window in train_windows)
 
         kwargs = dict(outputMasterFile=self.output_master_filename,
                       cppCommandOptions=cpp_options,
                       trrng="nil",
-                      loadAccRange="0:%s" % last_window,
+                      loadAccRange=acc_range,
                       loadAccFile=acc_filename,
                       **kwargs)
 
@@ -2039,14 +2043,34 @@ class Runner(object):
         last_params_filename = self.last_params_filename
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
+        if self.minibatch_fraction == MINIBATCH_DEFAULT:
+            train_windows = list(self.window_lens_sorted())
+        else:
+            train_windows_all = list(self.window_lens_sorted())
+            num_train_windows = len(train_windows_all)
+            train_window_indices_shuffled = sample(range(num_train_windows),
+                                                   num_train_windows)
+            train_windows = []
+            cur_bases = 0
+            total_bases = sum(
+                train_window[1] for train_window in train_windows_all
+            )
+
+            for train_window_index in train_window_indices_shuffled:
+                if (float(cur_bases) / total_bases) < self.minibatch_fraction:
+                    train_windows.append(train_windows_all[train_window_index])
+                    cur_bases += train_windows_all[train_window_index][1]
+                else:
+                    break
+
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
-                                      round_index, **kwargs)
+                                      round_index, train_windows, **kwargs)
         restartable_jobs.wait()
 
         restartable_jobs = \
             self.queue_train_bundle(last_params_filename, curr_params_filename,
-                                    instance_index, round_index,
+                                    instance_index, round_index, train_windows,
                                     llStoreFile=self.log_likelihood_filename,
                                     **kwargs)
         restartable_jobs.wait()
@@ -2088,7 +2112,8 @@ class Runner(object):
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
                                 round_index, kwargs):
         while (round_index < self.max_em_iters and
-               is_training_progressing(last_log_likelihood, log_likelihood)):
+               ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
+                is_training_progressing(last_log_likelihood, log_likelihood))):
             self.run_train_round(self.instance_index, round_index, **kwargs)
 
             last_log_likelihood = log_likelihood
@@ -2218,6 +2243,7 @@ class Runner(object):
         self.jt_info_filename
         self.include_coords
         self.exclude_coords
+        self.minibatch_fraction
         self.card_seg_countdown
         self.obs_dirpath
         self.float_filelistpath
@@ -2729,6 +2755,13 @@ def parse_options(argv):
     group.add_argument("--resolution", type=int, metavar="RES",
                        help="downsample to every RES bp (default %d)" %
                        RESOLUTION)
+
+    group.add_argument("--minibatch-fraction", type=float, metavar="FRAC",
+                       default=MINIBATCH_DEFAULT,
+                       help="Use a random fraction FRAC positions for each EM"
+                       " iteration. Removes the likelihood stopping criterion,"
+                       " so training always runs to the number of rounds"
+                       " specified by --max-train-rounds")
 
     group = parser.add_argument_group("Model files")
     group.add_argument("-i", "--input-master", metavar="FILE",

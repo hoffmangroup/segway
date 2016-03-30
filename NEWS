@@ -1,4 +1,8 @@
 1.4.0:
+* segway: added support for --num-minibatch-windows, which causes Segway
+  to train on random subset of windows at each iteration in order to
+  enable training to touch every genomic position while maintaining fast
+  iterations. (thanks to Max Libbrecht)
 * segway: remove optparse in favour of using argparse instead
 * segway: fix --split-sequences specifying where to split GMTK frames instead
   of by base pair length
