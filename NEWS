@@ -1,3 +1,5 @@
+1.4.1:
+
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
   to train on random subset of windows at each iteration in order to
