@@ -5,8 +5,6 @@ from __future__ import division, with_statement
 task: wraps a GMTK subtask to reduce size of output
 """
 
-__version__ = "$Revision$"
-
 # Copyright 2009-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from errno import ENOENT
@@ -22,7 +20,7 @@ from path import path
 
 from .observations import make_continuous_cells, _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
-                    EXT_INT, EXT_LIST, extract_superlabel, fill_array, 
+                    EXT_INT, EXT_LIST, extract_superlabel, fill_array,
                     find_segment_starts, get_label_color,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
@@ -41,7 +39,6 @@ EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
 USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
-
 
 
 def make_track_indexes(text):
@@ -153,7 +150,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
     start_pos[-1] = region_end
 
     # score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
-    label_colors = [get_label_color(extract_superlabel(seg_label)) for 
+    label_colors = [get_label_color(extract_superlabel(seg_label)) for
                     seg_label in labels]
 
     zipper = zip(start_pos[:-1], start_pos[1:], labels, label_colors)
@@ -182,7 +179,7 @@ def save_bed(outfilename, *args, **kwargs):
 
 
 def read_posterior_save_bed(coord, resolution, do_reverse,
-                            outfilename_tmpl, num_labels, infile, 
+                            outfilename_tmpl, num_labels, infile,
                             num_sublabels, output_label):
     if do_reverse:
         raise NotImplementedError
@@ -191,23 +188,24 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     num_frames = ceildiv(end - start, resolution)
     probs = read_posterior(infile, num_frames, num_labels,
                            num_sublabels, output_label)
-    probs_rounded = empty(probs.shape, float) # casted to int after rounding
+    probs_rounded = empty(probs.shape, float)  # casted to int after rounding
 
     # Write posterior code file
     posterior_code = argmax(probs, axis=1)
     if output_label != "seg":
         posterior_code = divide_posterior_array(posterior_code, num_frames,
-                                         num_sublabels)
+                                                num_sublabels)
     start_pos, labels = find_segment_starts(posterior_code, output_label)
     bed_filename = outfilename_tmpl % "_code"
-    save_bed(bed_filename, start_pos, labels, coord, resolution, int(num_labels))
+    save_bed(bed_filename, start_pos, labels, coord, resolution,
+             int(num_labels))
     if output_label == "subseg":
         label_print_range = xrange(num_labels * num_sublabels)
         label_names = label_print_range
     elif output_label == "full":
         label_print_range = xrange(num_labels * num_sublabels)
         label_names = ("%d.%d" % divmod(label, num_sublabels)
-                             for label in label_print_range)
+                       for label in label_print_range)
     else:
         label_print_range = xrange(num_labels)
         label_names = label_print_range
@@ -249,7 +247,8 @@ def load_posterior_save_bed(coord, resolution, do_reverse,
 
 
 def parse_viterbi_save_bed(coord, resolution, do_reverse,
-                           viterbi_lines, bed_filename, num_labels, output_label):
+                           viterbi_lines, bed_filename, num_labels,
+                           output_label):
     data = parse_viterbi(viterbi_lines, do_reverse, output_label)
 
     start_pos, labels = find_segment_starts(data, output_label)
@@ -291,7 +290,7 @@ def print_to_fd(fd, line):
 
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
-                           num_labels, num_sublabels, output_label, 
+                           num_labels, num_sublabels, output_label,
                            genomedata_names, float_filename, int_filename,
                            distribution, track_indexes_text, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
@@ -345,8 +344,8 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
-                         num_labels, num_sublabels, output_label, 
-                         genomedata_names, float_filename, int_filename, 
+                         num_labels, num_sublabels, output_label,
+                         genomedata_names, float_filename, int_filename,
                          distribution, track_indexes_text, *args):
     # convert from tuple
     args = list(args)
