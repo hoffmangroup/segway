@@ -14,8 +14,7 @@ There are several ways to do this:
 
 - Soft weight constraints:
 
-  - :option:`--segtransition-weight-scale` will increase the strength
-    of the soft length prior for longer segments
+  - :option:`--segtransition-weight-scale` will increase the strength of the soft length prior for longer segments. :option:`--prior-strength` also does this but empirically seems to have less of an effect than :option:`--segtransition-weight-scale`
 
 - Hard weight constraints
 
