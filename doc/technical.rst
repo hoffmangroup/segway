@@ -16,7 +16,7 @@ The observation files can be quite large, taking up 8 bytes per track
 per position and cannot be compressed. Since they are needed multiple
 times during training, they are generated in the working directory. As
 an exception, if you turn off training and specify only the identify
-task, the files will be generated independently on temproary space on
+task, the files will be generated independently on temporary space on
 each machine. This is because otherwise they could take terabytes for
 identifying on the whole human genome with dozens of tracks.
 
@@ -49,13 +49,13 @@ Distributed computing
 =====================
 Segway can currently perform the training, identification, and
 posterior tasks only using a cluster controllable with the DRMAA
-interface. I have only tested it against Sun Grid Engine and Platform
+interface. We have only tested it against Sun Grid Engine and Platform
 LSF, but it should be possible to work with other DRMAA-compatible
 distributed computing systems, such as PBS Pro, PBS/TORQUE, Condor, or
 GridWay. If you are interested in using one of these systems, please
-contact Michael so he correct all the fine details. A standalone
-version is planned, but for now you must have a clustering system. Try
-installing the free SGE on your workstation if you want to run Segway
+open an issue on Bitbucket <https://bitbucket.org/hoffmanlab/segway/issues?status=new&status=open> to correct all the fine details. A standalone
+option exists when you set the `SEGWAY_CLUSTER` environment variable to `local`. Try
+installing the free Open Grid Scheduler on your workstation if you want to run Segway
 without a full clustering system.
 
 The :option:`--cluster-opt` option allows the specification of native
