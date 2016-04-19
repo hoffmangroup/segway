@@ -654,7 +654,8 @@ class InputMasterSaver(Saver):
     copy_attrs = ["num_bases", "num_segs", "num_subsegs",
                   "num_track_groups", "card_seg_countdown",
                   "seg_countdowns_initial", "seg_table", "distribution",
-                  "len_seg_strength", "resolution", "supervision_type",
+                  "len_seg_strength", "transition_seg_strength",
+                  "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
                   "gmtk_include_filename_relative", "track_groups"]
 
