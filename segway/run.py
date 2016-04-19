@@ -106,7 +106,8 @@ SWAP_ENDIAN = False
 
 # option defaults
 VERBOSITY = 0
-PRIOR_STRENGTH = 0
+LEN_PRIOR_STRENGTH = 0
+TRANSITION_PRIOR_STRENGTH = 0
 
 FINFO_FLOAT32 = finfo(float32)
 MACHEP_FLOAT32 = FINFO_FLOAT32.machep
@@ -220,7 +221,7 @@ TRAIN_FIELDNAMES = ["name", "value"]
 TRAIN_OPTION_TYPES = \
     dict(input_master_filename=str, structure_filename=str,
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
-         distribution=str, len_seg_strength=float,
+         distribution=str, len_seg_strength=float, transition_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
          num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
          reverse_worlds=[int])
@@ -619,7 +620,8 @@ class Runner(object):
         self.num_subsegs = NUM_SUBSEGS
         self.output_label = OUTPUT_LABEL
         self.num_instances = NUM_INSTANCES
-        self.len_seg_strength = PRIOR_STRENGTH
+        self.len_seg_strength = LEN_PRIOR_STRENGTH
+        self.transition_seg_strength = TRANSITION_PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
         self.max_split_sequence_length = MAX_SPLIT_SEQUENCE_LENGTH
@@ -681,7 +683,8 @@ class Runner(object):
                         ("dont_train", "dont_train_filename"),
                         ("seg_table", "seg_table_filename"),
                         ("distribution",),
-                        ("prior_strength", "len_seg_strength"),
+                        ("len_prior_strength", "len_seg_strength"),
+                        ("transition_prior_strength", "transition_seg_strength"),
                         ("segtransition_weight_scale",),
                         ("ruler_scale",),
                         ("resolution",),
@@ -2842,10 +2845,14 @@ def parse_options(argv):
                        help="ruler marking every SCALE bp (default the"
                        " resolution multiplied by 10)")
 
-    group.add_argument("--prior-strength", type=float, metavar="RATIO",
+    group.add_argument("--len-prior-strength", type=float, metavar="RATIO",
                        help="use RATIO times the number of data counts as"
                        " the number of pseudocounts for the segment length"
-                       " prior (default %f)" % PRIOR_STRENGTH)
+                       " prior (default %f)" % LEN_PRIOR_STRENGTH)
+
+    group.add_argument("--transition-prior-strength", type=float, metavar="RATIO",
+                         help="use NUM pseudocounts for determining label-label"
+                         " transition probabilites.")
 
     group.add_argument("--segtransition-weight-scale", type=float,
                        metavar="SCALE",
