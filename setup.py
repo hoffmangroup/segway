@@ -95,47 +95,45 @@ def check_gmtk_version():
     # Older versions:
     # GMTK 1.4.0 (Mercurial id: bdf2718cc6ce tip checkin date: Thu Jun 25 12:31:56 2015 -0700)
 
-    line_output = ""
     # Try to open gmtkPrint to get the version
     try:
         # blocks until finished
-        line_output = subprocess.check_output(["gmtkPrint", "-version"])
+        output_string = subprocess.check_output(["gmtkPrint", "-version"])
     # If GMTK was not found
-    except:
+    except OSError:
         # Raise a runtime error stating that GMTK was not found on the path
         raise RuntimeError("GMTK cannot be found on your PATH.\nPlease "
                            "install GMTK from "
                            "http://melodi.ee.washington.edu/gmtk/ "
                            "before installing Segway.")
 
-    minimum_version_string = ".".join(map(str, MINIMUM_GMTK_VERSION))
+    output_lines = output_string.splitlines()
 
-    output_lines = line_output.split("\n")
+    # Check if there's only one line of output (for older versions)
+    if len(output_lines) == 1:
+        version_word_index = 1
+    else:
+        version_word_index = -1
+
     # Get the first line of output
     first_output_line = output_lines[0]
-    # Check if there's only one line of output (for older versions)
-    if len(output_lines) == 2:  # there will be an empty string after the split
-        # Get the version string from 2nd word on the line
-        current_version_string = first_output_line.split()[1]
-        raise RuntimeError(GMTK_VERSION_ERROR_MSG %
-                           (current_version_string,
-                            minimum_version_string))
-    else:
-        # Get the version string as the last word on the first line
-        current_version_string = first_output_line.split()[-1]
 
-        # Get the version number to compare with the minimum version
-        current_version = map(int, current_version_string.split("."))
-        version_zip = zip(current_version, MINIMUM_GMTK_VERSION)
-        for current_version_number, minimum_version_number in version_zip:
-            # If the version number (from most to least significant digit) is
-            # ever less than the minimum
-            if current_version_number < minimum_version_number:
-                # Raise a runtime error stating the version found and the
-                # minimum required
-                raise RuntimeError(GMTK_VERSION_ERROR_MSG %
-                                   (current_version_string,
-                                    minimum_version_string))
+    # Get the version string from the proper word on the line
+    current_version_string = first_output_line.split()[version_word_index]
+
+    # Get the version number to compare with the minimum version
+    current_version = map(int, current_version_string.split("."))
+    version_zip = zip(current_version, MINIMUM_GMTK_VERSION)
+    for current_version_number, minimum_version_number in version_zip:
+        # If the version number (from most to least significant digit) is
+        # ever less than the minimum
+        if current_version_number < minimum_version_number:
+            # Raise a runtime error stating the version found and the
+            # minimum required
+            minimum_version_string = ".".join(map(str, MINIMUM_GMTK_VERSION))
+            raise RuntimeError(GMTK_VERSION_ERROR_MSG %
+                               (current_version_string,
+                                minimum_version_string))
 
 
 def main():
