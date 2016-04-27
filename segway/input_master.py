@@ -276,13 +276,20 @@ class DTParamSpec(ParamSpec):
         if supervision_type == SUPERVISION_SEMISUPERVISED:
             yield data_string("map_supervisionLabel_seg_alwaysTrue_semisupervised.dt.txt")  # noqa
         elif supervision_type == SUPERVISION_SUPERVISED:
-             # XXX: does not exist yet
+            # XXX: does not exist yet
             yield data_string("map_supervisionLabel_seg_alwaysTrue_supervised.dt.txt")  # noqa
         else:
             assert supervision_type == SUPERVISION_UNSUPERVISED
 
 
 class TableParamSpec(ParamSpec):
+    copy_attrs = ParamSpec.copy_attrs \
+        + ["resolution", "card_seg_countdown", "seg_table",
+           "seg_countdowns_initial"]
+
+    # see Segway paper
+    probs_force_transition = array([0.0, 0.0, 1.0])
+
     def make_table_spec(self, name, table, ndim, extra_rows=[]):
         header_rows = [name, ndim]
         header_rows.extend(table.shape)
@@ -292,84 +299,6 @@ class TableParamSpec(ParamSpec):
         rows.extend([array2text(table), ""])
 
         return "\n".join(rows)
-
-    @staticmethod
-    def make_dirichlet_name(name):
-        return "dirichlet_%s" % name
-
-
-class DenseCPTParamSpec(TableParamSpec):
-    type_name = "DENSE_CPT"
-    copy_attrs = TableParamSpec.copy_attrs \
-        + ["resolution", "card_seg_countdown", "seg_table",
-           "seg_countdowns_initial", "len_seg_strength", "use_dinucleotide"]
-
-    # see Segway paper
-    probs_force_transition = array([0.0, 0.0, 1.0])
-
-    def make_table_spec(self, name, table, dirichlet=False):
-        """
-        if dirichlet is True, this table has a corresponding DirichletTable
-        automatically generated name
-        """
-        ndim = table.ndim - 1  # don't include output dim
-
-        if dirichlet:
-            extra_rows = ["DirichletTable %s" % self.make_dirichlet_name(name)]
-        else:
-            extra_rows = []
-
-        return TableParamSpec.make_table_spec(self, name, table, ndim,
-                                              extra_rows)
-
-    def make_empty_cpt(self):
-        num_segs = self.num_segs
-
-        return zeros((num_segs, num_segs))
-
-    def make_dense_cpt_start_seg_spec(self):
-        num_segs = self.num_segs
-        cpt = fill_array(1.0 / num_segs, num_segs)
-
-        return self.make_table_spec("start_seg", cpt)
-
-    def make_dense_cpt_seg_subseg_spec(self):
-        num_subsegs = self.num_subsegs
-        cpt = fill_array(1.0 / num_subsegs, (self.num_segs, num_subsegs))
-
-        return self.make_table_spec("seg_subseg", cpt)
-
-    def make_dense_cpt_seg_seg_spec(self):
-        cpt = make_zero_diagonal_table(self.num_segs)
-
-        return self.make_table_spec("seg_seg", cpt)
-
-    def make_dense_cpt_seg_subseg_subseg_spec(self):
-        cpt_seg = make_zero_diagonal_table(self.num_subsegs)
-        cpt = vstack_tile(cpt_seg, self.num_segs, 1)
-
-        return self.make_table_spec("seg_subseg_subseg", cpt)
-
-    def make_dinucleotide_table_row(self):
-        # simple one-parameter model
-        gc = uniform()
-        at = 1 - gc
-
-        a = at / 2
-        c = gc / 2
-        g = gc - c
-        t = 1 - a - c - g
-
-        acgt = array([a, c, g, t])
-
-        # shape: (16,)
-        return outer(acgt, acgt).ravel()
-
-    def make_dense_cpt_seg_dinucleotide_spec(self):
-        table = [self.make_dinucleotide_table_row()
-                 for seg_index in xrange(self.num_segs)]
-
-        return self.make_table_spec("seg_dinucleotide", table)
 
     def calc_prob_transition(self, length):
         """Calculate probability transition from scaled expected length.
@@ -435,6 +364,81 @@ class DenseCPTParamSpec(TableParamSpec):
 
         return res
 
+
+    @staticmethod
+    def make_dirichlet_name(name):
+        return "dirichlet_%s" % name
+
+
+class DenseCPTParamSpec(TableParamSpec):
+    type_name = "DENSE_CPT"
+    copy_attrs = TableParamSpec.copy_attrs \
+        + ["len_seg_strength", "use_dinucleotide"]
+
+    def make_table_spec(self, name, table, dirichlet=False):
+        """
+        if dirichlet is True, this table has a corresponding DirichletTable
+        automatically generated name
+        """
+        ndim = table.ndim - 1  # don't include output dim
+
+        if dirichlet:
+            extra_rows = ["DirichletTable %s" % self.make_dirichlet_name(name)]
+        else:
+            extra_rows = []
+
+        return TableParamSpec.make_table_spec(self, name, table, ndim,
+                                              extra_rows)
+
+    def make_empty_cpt(self):
+        num_segs = self.num_segs
+
+        return zeros((num_segs, num_segs))
+
+    def make_dense_cpt_start_seg_spec(self):
+        num_segs = self.num_segs
+        cpt = fill_array(1.0 / num_segs, num_segs)
+
+        return self.make_table_spec("start_seg", cpt)
+
+    def make_dense_cpt_seg_subseg_spec(self):
+        num_subsegs = self.num_subsegs
+        cpt = fill_array(1.0 / num_subsegs, (self.num_segs, num_subsegs))
+
+        return self.make_table_spec("seg_subseg", cpt)
+
+    def make_dense_cpt_seg_seg_spec(self):
+        cpt = make_zero_diagonal_table(self.num_segs)
+
+        return self.make_table_spec("seg_seg", cpt)
+
+    def make_dense_cpt_seg_subseg_subseg_spec(self):
+        cpt_seg = make_zero_diagonal_table(self.num_subsegs)
+        cpt = vstack_tile(cpt_seg, self.num_segs, 1)
+
+        return self.make_table_spec("seg_subseg_subseg", cpt)
+
+    def make_dinucleotide_table_row(self):
+        # simple one-parameter model
+        gc = uniform()
+        at = 1 - gc
+
+        a = at / 2
+        c = gc / 2
+        g = gc - c
+        t = 1 - a - c - g
+
+        acgt = array([a, c, g, t])
+
+        # shape: (16,)
+        return outer(acgt, acgt).ravel()
+
+    def make_dense_cpt_seg_dinucleotide_spec(self):
+        table = [self.make_dinucleotide_table_row()
+                 for seg_index in xrange(self.num_segs)]
+
+        return self.make_table_spec("seg_dinucleotide", table)
+
     def make_dense_cpt_segCountDown_seg_segTransition_spec(self):  # noqa
         cpt = self.make_dense_cpt_segCountDown_seg_segTransition()
 
@@ -455,7 +459,7 @@ class DenseCPTParamSpec(TableParamSpec):
 class DirichletTabParamSpec(TableParamSpec):
     type_name = "DIRICHLET_TAB"
     copy_attrs = TableParamSpec.copy_attrs \
-        + ["len_seg_strength", "num_bases", "card_seg_countdown"]
+        + ["len_seg_strength", "num_bases"]
 
     def make_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
