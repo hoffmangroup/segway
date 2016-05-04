@@ -17,8 +17,11 @@ from os import extsep
 import sys
 from tempfile import gettempdir
 
-from numpy import (add, append, arange, arcsinh, array, column_stack, empty,
-                   invert, isnan, maximum, zeros)
+from numpy import sum as npsum
+from numpy import square as npsquare
+from numpy import (absolute, add, append, any, arange, arcsinh, array, column_stack, empty, sign,sqrt,
+                   invert, isnan, maximum, power as to_power, transpose, where, zeros, nansum,nan_to_num,fromfile,float32)
+
 from path import path
 from tabdelim import ListWriter
 
@@ -533,7 +536,7 @@ class Observations(object):
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
         
-        if self.zscore and distribution == DISTRIBUTION_ASINH_NORMAL:
+        if self.zscore and self.distribution == DISTRIBUTION_ASINH_NORMAL:
             tracks_sums = [0]*genome.num_tracks_continuous
             tracks_num_datapoints = [0]*genome.num_tracks_continuous
             tracks_sums_squared = [0]*genome.num_tracks_continuous
