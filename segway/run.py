@@ -1968,7 +1968,8 @@ class Runner(object):
         cpp_options = self.make_cpp_options(input_params_filename,
                                             output_params_filename)
 
-        acc_range = ",".join(str(train_window[0]) for train_window in train_windows)
+        acc_range = ",".join(str(train_window[0]) for train_window in
+                             train_windows)
 
         kwargs = dict(outputMasterFile=self.output_master_filename,
                       cppCommandOptions=cpp_options,

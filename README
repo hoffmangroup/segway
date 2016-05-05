@@ -40,7 +40,7 @@ Documentation
 
 Live documentation based on this repository can be found on `Read the Docs`_.
 
-.. _Read the Docs: http://segway.readthedocs.org/en/latest/
+.. _Read the Docs: http://segway.readthedocs.io/en/latest/
 
 
 Contributing
@@ -59,6 +59,4 @@ FITNESS FOR A PARTICULAR PURPOSE.
 
 Contact
 =======
-Please let me <michael.hoffman at utoronto dot ca> know if you have any
-comments on the installation or use of Segway. I would love to know
-if you get it working on a system not listed above.
+Please let us <segway-users at uw dot edu> know if you have any comments on the installation or use of Segway, or file an issue on Bitbucket <https://bitbucket.org/hoffmanlab/segway/issues>.

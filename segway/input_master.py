@@ -276,13 +276,20 @@ class DTParamSpec(ParamSpec):
         if supervision_type == SUPERVISION_SEMISUPERVISED:
             yield data_string("map_supervisionLabel_seg_alwaysTrue_semisupervised.dt.txt")  # noqa
         elif supervision_type == SUPERVISION_SUPERVISED:
-             # XXX: does not exist yet
+            # XXX: does not exist yet
             yield data_string("map_supervisionLabel_seg_alwaysTrue_supervised.dt.txt")  # noqa
         else:
             assert supervision_type == SUPERVISION_UNSUPERVISED
 
 
 class TableParamSpec(ParamSpec):
+    copy_attrs = ParamSpec.copy_attrs \
+        + ["resolution", "card_seg_countdown", "seg_table",
+           "seg_countdowns_initial"]
+
+    # see Segway paper
+    probs_force_transition = array([0.0, 0.0, 1.0])
+
     def make_table_spec(self, name, table, ndim, extra_rows=[]):
         header_rows = [name, ndim]
         header_rows.extend(table.shape)
@@ -292,6 +299,71 @@ class TableParamSpec(ParamSpec):
         rows.extend([array2text(table), ""])
 
         return "\n".join(rows)
+
+    def calc_prob_transition(self, length):
+        """Calculate probability transition from scaled expected length.
+        """
+        length_scaled = length // self.resolution
+
+        prob_self_self = prob_transition_from_expected_len(length_scaled)
+        prob_self_other = 1.0 - prob_self_self
+
+        return prob_self_self, prob_self_other
+
+    def make_dense_cpt_segCountDown_seg_segTransition(self):  # noqa
+        # first values are the ones where segCountDown = 0 therefore
+        # the transitions to segTransition = 2 occur early on
+        card_seg_countdown = self.card_seg_countdown
+
+        # by default, when segCountDown is high, never transition
+        res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
+
+        prob_seg_self_self, prob_seg_self_other = \
+            self.calc_prob_transition(LEN_SEG_EXPECTED)
+
+        prob_subseg_self_self, prob_subseg_self_other = \
+            self.calc_prob_transition(LEN_SUBSEG_EXPECTED)
+
+        # 0: no transition
+        # 1: subseg transition (no transition when CARD_SUBSEG == 1)
+        # 2: seg transition
+        probs_allow_transition = \
+            array([prob_seg_self_self * prob_subseg_self_self,
+                   prob_seg_self_self * prob_subseg_self_other,
+                   prob_seg_self_other])
+
+        probs_prevent_transition = array([prob_subseg_self_self,
+                                          prob_subseg_self_other,
+                                          0.0])
+
+        # find the labels with maximum segment lengths and those without
+        table = self.seg_table
+        ends = table[:, OFFSET_END]
+        bitmap_without_maximum = ends == 0
+
+        # where() returns a tuple; this unpacks it
+        labels_with_maximum, = where(~bitmap_without_maximum)
+        labels_without_maximum, = where(bitmap_without_maximum)
+
+        # labels without a maximum
+        res[0, labels_without_maximum] = probs_allow_transition
+        res[1:, labels_without_maximum] = probs_prevent_transition
+
+        # labels with a maximum
+        seg_countdowns_initial = self.seg_countdowns_initial
+
+        res[0, labels_with_maximum] = self.probs_force_transition
+        for label in labels_with_maximum:
+            seg_countdown_initial = seg_countdowns_initial[label]
+            minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
+
+            seg_countdown_allow = seg_countdown_initial - minimum + 1
+
+            res[1:seg_countdown_allow, label] = probs_allow_transition
+            res[seg_countdown_allow:, label] = probs_prevent_transition
+
+        return res
+
 
     @staticmethod
     def make_dirichlet_name(name):
@@ -370,70 +442,6 @@ class DenseCPTParamSpec(TableParamSpec):
                  for seg_index in xrange(self.num_segs)]
 
         return self.make_table_spec("seg_dinucleotide", table)
-
-    def calc_prob_transition(self, length):
-        """Calculate probability transition from scaled expected length.
-        """
-        length_scaled = length // self.resolution
-
-        prob_self_self = prob_transition_from_expected_len(length_scaled)
-        prob_self_other = 1.0 - prob_self_self
-
-        return prob_self_self, prob_self_other
-
-    def make_dense_cpt_segCountDown_seg_segTransition(self):  # noqa
-        # first values are the ones where segCountDown = 0 therefore
-        # the transitions to segTransition = 2 occur early on
-        card_seg_countdown = self.card_seg_countdown
-
-        # by default, when segCountDown is high, never transition
-        res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
-
-        prob_seg_self_self, prob_seg_self_other = \
-            self.calc_prob_transition(LEN_SEG_EXPECTED)
-
-        prob_subseg_self_self, prob_subseg_self_other = \
-            self.calc_prob_transition(LEN_SUBSEG_EXPECTED)
-
-        # 0: no transition
-        # 1: subseg transition (no transition when CARD_SUBSEG == 1)
-        # 2: seg transition
-        probs_allow_transition = \
-            array([prob_seg_self_self * prob_subseg_self_self,
-                   prob_seg_self_self * prob_subseg_self_other,
-                   prob_seg_self_other])
-
-        probs_prevent_transition = array([prob_subseg_self_self,
-                                          prob_subseg_self_other,
-                                          0.0])
-
-        # find the labels with maximum segment lengths and those without
-        table = self.seg_table
-        ends = table[:, OFFSET_END]
-        bitmap_without_maximum = ends == 0
-
-        # where() returns a tuple; this unpacks it
-        labels_with_maximum, = where(~bitmap_without_maximum)
-        labels_without_maximum, = where(bitmap_without_maximum)
-
-        # labels without a maximum
-        res[0, labels_without_maximum] = probs_allow_transition
-        res[1:, labels_without_maximum] = probs_prevent_transition
-
-        # labels with a maximum
-        seg_countdowns_initial = self.seg_countdowns_initial
-
-        res[0, labels_with_maximum] = self.probs_force_transition
-        for label in labels_with_maximum:
-            seg_countdown_initial = seg_countdowns_initial[label]
-            minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
-
-            seg_countdown_allow = seg_countdown_initial - minimum + 1
-
-            res[1:seg_countdown_allow, label] = probs_allow_transition
-            res[seg_countdown_allow:, label] = probs_prevent_transition
-
-        return res
 
     def make_dense_cpt_segCountDown_seg_segTransition_spec(self):  # noqa
         cpt = self.make_dense_cpt_segCountDown_seg_segTransition()

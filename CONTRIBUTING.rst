@@ -26,11 +26,14 @@ Coding Style
 ------------
 
 We ask that all code submissions follow the `PEP 8`_ python coding guidelines and to only support Python 2.7 (and above if possible). Python 3 migration is a long term goal of Segway and by simply only supporting Python 2.7 the process should be far easier in the future.
+In addition we recommend that you use the `flake8`_ tool to check your
+contributions with the added option of "--max-complexity=10".
 
 .. _issue tracker: https://bitbucket.org/hoffmanlab/segway/issues/
 .. _pull requests: https://bitbucket.org/hoffmanlab/segway/pull-requests
 .. _PEP 8: https://www.python.org/dev/peps/pep-0008/
 .. _A Note About Commit Messages: http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
+.. _flake8: https://pypi.python.org/pypi/flake8
 
 
 ============

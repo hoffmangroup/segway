@@ -1,4 +1,5 @@
 1.4.1:
+* segway: fix --prior-strength option
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway

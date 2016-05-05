@@ -12,7 +12,7 @@ Segway requires the following prerequisites:
 You need Python 2.7.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
-<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>.
+<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.4.tar.gz>.
 
 You need the HDF5 serial library and tools. The following packages are
 necessary for the OS you are running:
