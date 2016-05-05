@@ -301,9 +301,10 @@ class TableParamSpec(ParamSpec):
 class DenseCPTParamSpec(TableParamSpec):
     type_name = "DENSE_CPT"
     copy_attrs = TableParamSpec.copy_attrs \
-        + ["resolution", "card_seg_countdown", "seg_table",
-           "seg_countdowns_initial", "len_seg_strength",
-           "transition_seg_strength", "use_dinucleotide"]
+        + ["len_seg_strength", "use_dinucleotide",
+           "transition_seg_strength", "resolution",
+	   "card_seg_countdown", "seg_table",
+           "seg_countdowns_initial"]
 
     # see Segway paper
     probs_force_transition = array([0.0, 0.0, 1.0])
@@ -457,8 +458,8 @@ class DenseCPTParamSpec(TableParamSpec):
 class DirichletTabParamSpec(DenseCPTParamSpec):
     type_name = "DIRICHLET_TAB"
     copy_attrs = DenseCPTParamSpec.copy_attrs \
-        + ["len_seg_strength", "transition_seg_strength",
-           "num_bases", "card_seg_countdown"]
+        + ["len_seg_strength", "num_bases",
+	"transition_seg_strength", "card_seg_countdown"]
 
     def make_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
