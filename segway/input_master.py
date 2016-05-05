@@ -306,9 +306,6 @@ class DenseCPTParamSpec(TableParamSpec):
 	   "card_seg_countdown", "seg_table",
            "seg_countdowns_initial"]
 
-    # see Segway paper
-    probs_force_transition = array([0.0, 0.0, 1.0])
-
     def make_table_spec(self, name, table, dirichlet=False):
         """
         if dirichlet is True, this table has a corresponding DirichletTable
@@ -457,7 +454,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
 class DirichletTabParamSpec(DenseCPTParamSpec):
     type_name = "DIRICHLET_TAB"
-    copy_attrs = DenseCPTParamSpec.copy_attrs \
+    copy_attrs = TableParamSpec.copy_attrs \
         + ["len_seg_strength", "num_bases",
 	"transition_seg_strength", "card_seg_countdown"]
 
