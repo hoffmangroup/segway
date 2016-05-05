@@ -1,4 +1,4 @@
-#!/usr/bin/env bash`
+#!/usr/bin/env bash
 
 ## memory limit in kibibytes
 mem_limit_kb="$1"
