@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-source ~/.bashrc
-
 ## memory limit in kibibytes
 mem_limit_kb="$1"
 
