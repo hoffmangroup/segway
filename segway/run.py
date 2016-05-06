@@ -106,7 +106,7 @@ SWAP_ENDIAN = False
 
 # option defaults
 VERBOSITY = 0
-LEN_PRIOR_STRENGTH = 0
+PRIOR_STRENGTH = 0
 TRANSITION_PRIOR_STRENGTH = 0
 
 FINFO_FLOAT32 = finfo(float32)
@@ -620,7 +620,7 @@ class Runner(object):
         self.num_subsegs = NUM_SUBSEGS
         self.output_label = OUTPUT_LABEL
         self.num_instances = NUM_INSTANCES
-        self.len_seg_strength = LEN_PRIOR_STRENGTH
+        self.len_seg_strength = PRIOR_STRENGTH
         self.transition_seg_strength = TRANSITION_PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
@@ -683,7 +683,7 @@ class Runner(object):
                         ("dont_train", "dont_train_filename"),
                         ("seg_table", "seg_table_filename"),
                         ("distribution",),
-                        ("len_prior_strength", "len_seg_strength"),
+                        ("prior_strength", "len_seg_strength"),
                         ("transition_prior_strength", "transition_seg_strength"),
                         ("segtransition_weight_scale",),
                         ("ruler_scale",),
@@ -2846,10 +2846,10 @@ def parse_options(argv):
                        help="ruler marking every SCALE bp (default the"
                        " resolution multiplied by 10)")
 
-    group.add_argument("--len-prior-strength", type=float, metavar="RATIO",
+    group.add_argument("--prior-strength", type=float, metavar="RATIO",
                        help="use RATIO times the number of data counts as"
                        " the number of pseudocounts for the segment length"
-                       " prior (default %f)" % LEN_PRIOR_STRENGTH)
+                       " prior (default %f)" % PRIOR_STRENGTH)
 
     group.add_argument("--transition-prior-strength", type=float, metavar="RATIO",
                          help="use NUM pseudocounts for determining label-label"

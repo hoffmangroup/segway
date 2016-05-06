@@ -394,8 +394,8 @@ default expected segment length of 100000 can't be changed at the
 moment but will in a future version.
 
 You can control the strength of the prior relative to observed
-transitions with the :option:`--len-prior-strength`\=\ *strength* option.
-Setting ``--len-prior-strength=1`` means there are as many pseudocounts
+transitions with the :option:`--prior-strength`\=\ *strength* option.
+Setting ``--prior-strength=1`` means there are as many pseudocounts
 due to the prior as the number of nucleotides in the training regions.
 
 The :option:`--segtransition-weight-scale`\=\ *scale* option controls

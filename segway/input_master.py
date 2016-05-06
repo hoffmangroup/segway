@@ -462,7 +462,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
 class DirichletTabParamSpec(DenseCPTParamSpec):
     type_name = "DIRICHLET_TAB"
-    copy_attrs = TableParamSpec.copy_attrs \
+    copy_attrs = DenseCPTParamSpec.copy_attrs \
         + ["len_seg_strength", "num_bases",
 	"transition_seg_strength", "card_seg_countdown"]
 
