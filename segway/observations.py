@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 from __future__ import division
+import fractions
 
 """observations.py: prepare and save GMTK observations
 """
@@ -19,7 +20,7 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, array, column_stack, copy,
-                   empty, invert, isnan, maximum, zeros)
+                   empty, int32, invert, isnan, maximum, zeros)
 from path import path
 from tabdelim import ListWriter
 
@@ -313,6 +314,7 @@ def _save_window(float_filename, int_filename, float_data, resolution,
             num_datapoints = downsample_add(presence_data, resolution)
 
             # this is the presence observation
+
             int_blocks.append(num_datapoints)
 
             # so that there is no divide by zero
@@ -331,8 +333,17 @@ def _save_window(float_filename, int_filename, float_data, resolution,
         assert resolution == 1  # not implemented yet
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
-    if supervision_data is not None:
-        assert resolution == 1  # not implemented yet
+    if (supervision_data is not None) and \
+       (resolution > 1):
+ 
+        supervision_data = downsample_add(supervision_data, resolution)
+        supervision_data = supervision_data / resolution
+        supervision_data = supervision_data.astype(int32)
+
+        int_blocks.append(supervision_data)
+
+    elif (supervision_data is not None) and \
+         (resolution == 1):
         int_blocks.append(supervision_data)
 
     if int_blocks:
