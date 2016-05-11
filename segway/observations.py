@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from __future__ import division
-import fractions
 
 """observations.py: prepare and save GMTK observations
 """
