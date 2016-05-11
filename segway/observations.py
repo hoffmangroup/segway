@@ -216,6 +216,33 @@ def downsample_add(inarray, resolution):
 
     return res
 
+def downsample_mode(inarray, resolution):
+     """"
+     Downsample a matrix by rows to a desired resolution, by taking the mode of each resolution-sized frame
+     [1 2 2 3 4 4] downsampled to resolution 3 is:
+     [2 4]
+
+     # we take the modulus of inarrays's number of rows with the resolution. If remainder==0, then the number of rows is fully divisible by the resolution, and we will not have any subarrays of size less than resolution. Else, we will have a 'remainder' subarray, which we'll choose to ignore.
+     This is the same as downsample_add, but with mode instead.
+     We discard the remainder (for inarray % resolution != 0) but it's worth considering, for the last segment, taking the mode of (resolution+remainder) instead.
+     """
+     if resolution == 1:
+	return inarray
+     
+     full_num_rows=inarray.shape[0]
+     res = zeros(calc_downsampled_shape(inarray, resolution), inarray.dtype)
+
+     remainder = full_num_rows % resolution # we take the modulus of inarrays's number of rows with the resolution. If remainder==0, then the number of rows is fully divisible by the resolution, and we will not have any subarrays of size less than resolution. Else, we will have a 'remainder' subarray, which we'll choose to ignore.
+     inarray = [inarray[i:i+resolution] for i in range(0, len(inarray), resolution)] # split inarray into subarrays of length resolution. For example, if inarray=[1 1 3 4 5 6] then if resolution=3, then inarray now looks like [[1 1 3], [4 5 6]].
+     num_subarrays_to_consider = len(inarray)
+
+     if remainder != 0: # if the modulus is not 0
+	num_subarrays_to_consider -= 1 # then we will have a 'remainder subarray', which we will not consider. so the list of subarrays to consider is 1:len-1
+
+     for i in xrange(num_subarrays_to_consider): # now we iterate through the subarrays
+	res[i] = max(set(inarray[i]), key=inarray[i].tolist().count) # take the ith inarray subarray and find the most common value in it. set(inarray[i]) removes duplicates, key= sorts each item by its occurence. max returns the value with the highest count in the subarray by the keys. In order to use .count, convert inarray[i] from numpy.ndarray to list (ie: a = np.array([1,2], [3,4]) gives a=[[1,2], [3,4]] under a.tolist().)
+     return res
+ 
 
 def make_dinucleotide_int_data(seq):
     """
@@ -313,7 +340,6 @@ def _save_window(float_filename, int_filename, float_data, resolution,
             num_datapoints = downsample_add(presence_data, resolution)
 
             # this is the presence observation
-
             int_blocks.append(num_datapoints)
 
             # so that there is no divide by zero
@@ -332,18 +358,12 @@ def _save_window(float_filename, int_filename, float_data, resolution,
         assert resolution == 1  # not implemented yet
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
-    if (supervision_data is not None) and \
-       (resolution > 1):
- 
-        supervision_data = downsample_add(supervision_data, resolution)
-        supervision_data = supervision_data / resolution
-        supervision_data = supervision_data.astype(int32)
-
-        int_blocks.append(supervision_data)
-
-    elif (supervision_data is not None) and \
-         (resolution == 1):
-        int_blocks.append(supervision_data)
+    if supervision_data is not None:
+	if resolution > 1:
+		supervision_data = downsample_mode(supervision_data, resolution) # we downsample the supervision data according to mode
+		int_blocks.append(supervision_data)
+	else:
+		int_blocks.append(supervision_data)
 
     if int_blocks:
         int_data = column_stack(int_blocks)
@@ -351,7 +371,6 @@ def _save_window(float_filename, int_filename, float_data, resolution,
         int_data = array([], dtype=DTYPE_OBS_INT)
 
     int_data.tofile(int_filename)
-
 
 def process_new_windows(new_windows, starts, ends):
     if not new_windows:  # nothing left
