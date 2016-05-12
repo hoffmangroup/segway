@@ -237,8 +237,8 @@ def downsample_array_by_mode(input_array, resolution):
 
     len_input_array = input_array.shape[0]
 
-    # we take the modulus of input_array's number of rows with the resolution.
-    # If len_remainder_segment==0, then the number of rows is fully divisible
+    # we take the modulus of input_array's size with the resolution.
+    # If len_remainder_segment==0, then the size is fully divisible
     # by the resolution, and we will not have a remainder subarray.
     # Else, we will have a 'remainder' subarray, which we'll
     # choose to ignore.
