@@ -217,67 +217,6 @@ def downsample_add(inarray, resolution):
     return res
 
 
-def downsample_mode(input_array, resolution):
-    """
-    Downsample a matrix by rows to a desired resolution, by taking
-    the mode of each resolution-sized frame [1 2 2 3 4 4] downsampled
-    to resolution 3 is: [2 4]
-
-    we take the modulus of input_arrays's number of rows with the resolution.
-    If remainder==0, then the number of rows is fully divisible by the
-    resolution, and we will not have a 'remainder' subarray (a 'leftover'
-    subarray of size less than resolution. Else, we will have a 'remainder'
-    subarray, which we'll choose to ignore.
-
-    This is the same as downsample_add, but with mode instead.
-
-    We discard the remainder (for input_array_num_rows % resolution != 0)
-    but it's worth considering, for the last segment, taking the mode of
-    (resolution+remainder) instead. Or only considering the mode of the
-    remainder segment of its size is greater than half the resolution.
-
-    """
-    if resolution == 1:
-        return input_array
-
-    input_array_num_rows = input_array.shape[0]
-
-    # we take the modulus of input_array's number of rows with the resolution.
-    # If len_remainder_segment==0, then the number of rows is fully divisible
-    # by the resolution, and we will not have a remainder subarray.
-    # Else, we will have a 'remainder' subarray, which we'll
-    # choose to ignore.
-    len_remainder_segment = input_array_num_rows % resolution
-
-    # split input_array into subarrays of length resolution. For example, if
-    # input_array=[1 1 3 4 5 6] then if resolution=3, then input_array now
-    # looks like [[1 1 3], [4 5 6]], a matrix.
-    resolution_partitioned_input_matrix = [input_array[i:i+resolution] for i in
-                                           range(0, len(input_array), resolution)]
-
-    num_subarrays_to_consider = len(resolution_partitioned_input_matrix)
-    if len_remainder_segment != 0:
-        # if len_remainder_segment!=0, then we will have a
-        # 'remainder subarray', which we will not consider.
-        # so the list of subarrays to consider is 0:len-2
-        num_subarrays_to_consider -= 1
-
-    downsampled_input_array = zeros(calc_downsampled_shape(input_array,
-                                    resolution), input_array.dtype)
-    for i in xrange(num_subarrays_to_consider):
-        # take the ith resolution_partitioned_input_matrix subarray and
-        # find the most common value in it. set(resolution_partitioned_
-        # input_matrix[i]) removes duplicates, key= sorts each item by its
-        # occurence. max returns the value with the highest count in the
-        # subarray by the keys. In order to use .count, convert
-        # resolution_partitioned_input_matrix[i] from type numpy.ndarray to
-        # list. (ie: a = np.array([1,2], [3,4]) gives
-        # a=[[1,2], [3,4]] under a.tolist().)
-        downsampled_input_array[i] = max(set(resolution_partitioned_input_matrix[i]), key=resolution_partitioned_input_matrix[i].tolist().count)
-
-    return downsampled_input_array
-
-
 def make_dinucleotide_int_data(seq):
     """
     makes an array with two columns, one with 0..15=AA..TT and the other
@@ -393,12 +332,8 @@ def _save_window(float_filename, int_filename, float_data, resolution,
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
     if supervision_data is not None:
-        if resolution > 1:
-            # we downsample the supervision data according to mode
-            supervision_data = downsample_mode(supervision_data, resolution)
-            int_blocks.append(supervision_data)
-        else:
-            int_blocks.append(supervision_data)
+        assert resolution == 1  # not implemented yet
+        int_blocks.append(supervision_data)
 
     if int_blocks:
         int_data = column_stack(int_blocks)
