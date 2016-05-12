@@ -28,9 +28,11 @@ set -x
 
 SEGWAY_RAND_SEED=7908 segway "$cluster_arg" \
     --semisupervised="../semi-label.bed" \
+    --resolution=10 \
     --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \
     train "../simplesemi.genomedata" traindir
+
 
 segway "$cluster_arg" --include-coords="../include-coords.bed" \
     identify "../simplesemi.genomedata" traindir identifydir
