@@ -9,7 +9,7 @@ __version__ = "$Revision$"
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from cStringIO import StringIO
-from collections import (deque, Counter)
+from collections import deque, Counter
 from contextlib import closing
 from functools import partial
 from itertools import izip, repeat
@@ -399,12 +399,8 @@ def _save_window(float_filename, int_filename, float_data, resolution,
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
     if supervision_data is not None:
-        if resolution > 1:
-            # we downsample the supervision data according to mode
-            supervision_data = downsample_mode(supervision_data, resolution)
-            int_blocks.append(supervision_data)
-        else:
-            int_blocks.append(supervision_data)
+        supervision_data = downsample_mode(supervision_data, resolution)
+        int_blocks.append(supervision_data)
 
     if int_blocks:
         int_data = column_stack(int_blocks)
