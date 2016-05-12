@@ -9,7 +9,7 @@ __version__ = "$Revision$"
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from cStringIO import StringIO
-from collections import deque
+from collections import (deque, Counter)
 from contextlib import closing
 from functools import partial
 from itertools import izip, repeat
@@ -265,15 +265,21 @@ def downsample_mode(input_array, resolution):
     downsampled_input_array = zeros(calc_downsampled_shape(input_array,
                                     resolution), input_array.dtype)
     for i in xrange(num_subarrays_to_consider):
-        # take the ith resolution_partitioned_input_matrix subarray and
-        # find the most common value in it. set(resolution_partitioned_
-        # input_matrix[i]) removes duplicates, key= sorts each item by its
-        # occurence. max returns the value with the highest count in the
-        # subarray by the keys. In order to use .count, convert
-        # resolution_partitioned_input_matrix[i] from type numpy.ndarray to
-        # list. (ie: a = np.array([1,2], [3,4]) gives
-        # a=[[1,2], [3,4]] under a.tolist().)
-        downsampled_input_array[i] = max(set(resolution_partitioned_input_matrix[i]), key=resolution_partitioned_input_matrix[i].tolist().count)
+        # we take the ith resolution_partitioned_input_matrix subarray
+        # and find the most common value in it.
+        # to do this, we convert the subarray to list in order
+        # to take its Counter object, subarray_Counter.
+        #
+        # most_common(n) returns the n most common
+        # items, formatted as (n, times occurred).
+        # for example, [(0, 10), (2, 5), (4, 10)].
+        # elements with equal counts are ordered arbitrarily.
+        #
+        # so subarray_Counter.most_common(1)[0][0] returns the most
+        # common value as a sequence. We index it as 0 and take its
+        # 0th value (the most common value). this is our mode.
+        subarray_Counter = Counter(resolution_partitioned_input_matrix[i].tolist())
+        downsampled_input_array[i] = subarray_Counter.most_common(1)[0][0]
 
     return downsampled_input_array
 
