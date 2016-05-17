@@ -137,7 +137,7 @@ class ParamSpec(object):
     type_name = None
     object_tmpl = None
     copy_attrs = ["distribution", "mins", "num_segs", "num_subsegs",
-                  "num_track_groups", "track_groups"]
+                  "num_track_groups", "track_groups", "mix_components"]
 
     def __init__(self, saver):
         # copy all variables from saver that it copied from Runner
@@ -459,7 +459,8 @@ class DenseCPTParamSpec(TableParamSpec):
 class DirichletTabParamSpec(TableParamSpec):
     type_name = "DIRICHLET_TAB"
     copy_attrs = TableParamSpec.copy_attrs \
-        + ["len_seg_strength", "num_bases"]
+        + ["len_seg_strength", "num_bases", "card_seg_countdown","mix_components",
+           "len_seg_strength"]
 
     def make_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
@@ -481,14 +482,18 @@ class DirichletTabParamSpec(TableParamSpec):
         pseudocounts = (probs * pseudocounts_per_row).astype(int)
 
         return pseudocounts
+    
+    def make_components_table(self):
+        return array([100]*self.mix_components)
 
     def generate_objects(self):
         # XXX: these called functions have confusing/duplicative names
-        dirichlet_table = self.make_dirichlet_table()
-
-        yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
+        if (self.len_seg_strength > 0):
+            dirichlet_table = self.make_dirichlet_table()
+            yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
                                    dirichlet_table)
-
+        dirichlet_table = self.make_components_table()
+        yield self.make_table_spec("mix_components", dirichlet_table)
 
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
@@ -528,10 +533,10 @@ class NameCollectionParamSpec(ParamSpec):
 
 class MeanParamSpec(ParamSpec):
     type_name = "MEAN"
-    object_tmpl = "mean_${seg}_${subseg}_${track} 1 ${datum}"
+    object_tmpl = "mean_${seg}_${subseg}_${track}_component${component} 1 ${datum}"
     jitter_std_bound = 0.2
 
-    copy_attrs = ParamSpec.copy_attrs + ["means", "vars"]
+    copy_attrs = ParamSpec.copy_attrs + ["means", "vars", "mix_components"]
 
     def make_data(self):
         num_segs = self.num_segs
@@ -551,19 +556,62 @@ class MeanParamSpec(ParamSpec):
 
         return means_tiled + (stds_tiled * noise)
 
+    def generate_objects(self):
+        """
+        returns: iterable of strs containing gmtk parameter objects starting
+        with names
+        """
+        substitute = Template(self.object_tmpl).substitute
+
+        for component in range(self.mix_components):
+            data = self.make_data()
+            for mapping in self.generate_tmpl_mappings():
+                track_index = mapping["track_index"]
+                if self.distribution == DISTRIBUTION_GAMMA:
+                    mapping["min_track"] = self.get_track_lt_min(track_index)
+                if data is not None:
+                    seg_index = mapping["seg_index"]
+                    subseg_index = mapping["subseg_index"]
+                    mapping["datum"] = data[seg_index, subseg_index, track_index]
+                    mapping["track"] = mapping["track"]
+                    mapping["component"] = component
+                    mapping["datum"] = mapping["datum"]
+                    yield substitute(mapping)
+
 
 class CovarParamSpec(ParamSpec):
     type_name = "COVAR"
-    object_tmpl = "covar_${seg}_${subseg}_${track} 1 ${datum}"
+    object_tmpl = "covar_${seg}_${subseg}_${track}_component${component} 1 ${datum}"
 
-    copy_attrs = ParamSpec.copy_attrs + ["vars"]
+    copy_attrs = ParamSpec.copy_attrs + ["vars","mix_components"]
 
     def make_data(self):
         return vstack_tile(self.vars, self.num_segs, self.num_subsegs)
-
+    
+    def generate_objects(self):
+        """
+        returns: iterable of strs containing gmtk parameter objects starting
+        with names
+        """
+        substitute = Template(self.object_tmpl).substitute
+        for component in range(self.mix_components):
+            data = self.make_data()
+            for mapping in self.generate_tmpl_mappings():
+                track_index = mapping["track_index"]
+                if self.distribution == DISTRIBUTION_GAMMA:
+                    mapping["min_track"] = self.get_track_lt_min(track_index)
+                if data is not None:
+                    seg_index = mapping["seg_index"]
+                    subseg_index = mapping["subseg_index"]
+                    mapping["datum"] = data[seg_index, subseg_index, track_index]
+                    mapping["track"] = mapping["track"]
+                    mapping["component"] = component
+                    mapping["datum"] = mapping["datum"]
+                    yield substitute(mapping)
+    
 
 class TiedCovarParamSpec(CovarParamSpec):
-    object_tmpl = "covar_${track} 1 ${datum}"
+    object_tmpl = "covar_${track}_component${component} 1 ${datum}"
 
     def make_segnames(self):
         return ["any"]
@@ -617,6 +665,8 @@ class MCParamSpec(ParamSpec):
 
 
 class NormMCParamSpec(MCParamSpec):
+    copy_attrs = ParamSpec.copy_attrs + ["mix_components"]
+
     if USE_MFSDG:
         # dimensionality component_type name mean covar weights
         object_tmpl = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
@@ -626,8 +676,23 @@ class NormMCParamSpec(MCParamSpec):
     else:
         # dimensionality component_type name mean covar
         object_tmpl = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-            " mc_${distribution}_${seg}_${subseg}_${track}" \
-            " mean_${seg}_${subseg}_${track} covar_${track}"
+            " mc_${distribution}_${seg}_${subseg}_${track}_component${component}" \
+            " mean_${seg}_${subseg}_${track}_component${component} covar_${track}_component${component}"
+
+    def generate_objects(self):
+        """
+        returns: iterable of strs containing gmtk parameter objects starting
+        with names
+        """
+        substitute = Template(self.object_tmpl).substitute
+        for component in xrange(self.mix_components):
+            for mapping in self.generate_tmpl_mappings():
+                track_index = mapping["track_index"]
+                if self.distribution == DISTRIBUTION_GAMMA:
+                    mapping["min_track"] = self.get_track_lt_min(track_index)
+                mapping["track"] = mapping["track"]
+                mapping["component"] = component
+                yield substitute(mapping)
 
 
 class GammaMCParamSpec(MCParamSpec):
@@ -638,9 +703,57 @@ class GammaMCParamSpec(MCParamSpec):
 
 class MXParamSpec(ParamSpec):
     type_name = "MX"
-    object_tmpl = "1 mx_${seg}_${subseg}_${track} 1 dpmf_always" \
-        " mc_${distribution}_${seg}_${subseg}_${track}"
 
+    def generate_objects(self):
+        """
+        returns: iterable of strs containing gmtk parameter objects starting
+        with names
+        """
+        object_tmpl = "1 mx_${seg}_${subseg}_${track} ${mix_components} dpmf_${seg}_${subseg}_${track}"
+        for component in xrange(self.mix_components):
+            add = " mc_${distribution}_${seg}_${subseg}_${track}_component%s" % component
+            object_tmpl += add
+        substitute = Template(object_tmpl).substitute
+
+        data = self.make_data()
+        for mapping in self.generate_tmpl_mappings():
+            track_index = mapping["track_index"]
+            mapping["mix_components"] = self.mix_components
+            if self.distribution == DISTRIBUTION_GAMMA:
+                mapping["min_track"] = self.get_track_lt_min(track_index)
+            if data is not None:
+                seg_index = mapping["seg_index"]
+                subseg_index = mapping["subseg_index"]
+                mapping["datum"] = data[seg_index, subseg_index, track_index]
+            yield substitute(mapping)
+
+class DPMFParamSpec(DenseCPTParamSpec):
+    type_name = "DPMF"
+    copy_attrs = ParamSpec.copy_attrs + ["mix_components"]
+
+    def generate_objects(self):
+        """
+        returns: iterable of strs containing gmtk parameter objects starsting
+        with names
+        """
+
+        object_tmpl = "dpmf_${seg}_${subseg}_${track} ${mix_components} "\
+                      "DirichletTable dirichlet_mix_components ${weights}"
+        weights = (" " + str(1.0 / self.mix_components))*self.mix_components
+        substitute = Template(object_tmpl).substitute
+        data = self.make_data()
+        for mapping in self.generate_tmpl_mappings():
+            mapping["weights"] = weights
+            track_index = mapping["track_index"]
+            mapping["mix_components"] = self.mix_components
+            if self.distribution == DISTRIBUTION_GAMMA:
+                mapping["min_track"] = self.get_track_lt_min(track_index)
+
+            if data is not None:
+                seg_index = mapping["seg_index"]
+                subseg_index = mapping["subseg_index"]
+                mapping["datum"] = data[seg_index, subseg_index, track_index]
+            yield substitute(mapping)
 
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
@@ -649,7 +762,7 @@ class InputMasterSaver(Saver):
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
-                  "gmtk_include_filename_relative", "track_groups"]
+                  "gmtk_include_filename_relative", "track_groups","mix_components"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
@@ -666,10 +779,8 @@ class InputMasterSaver(Saver):
 
         dt_spec = DTParamSpec(self)
 
-        if self.len_seg_strength > 0:
-            dirichlet_spec = DirichletTabParamSpec(self)
-        else:
-            dirichlet_spec = ""
+        dirichlet_spec = DirichletTabParamSpec(self)
+        
 
         dense_cpt_spec = DenseCPTParamSpec(self)
 
@@ -683,6 +794,8 @@ class InputMasterSaver(Saver):
         if distribution in DISTRIBUTIONS_LIKE_NORM:
             mean_spec = MeanParamSpec(self)
             if COVAR_TIED:
+                print "tied"
+                print COVAR_TIED
                 covar_spec = TiedCovarParamSpec(self)
             else:
                 covar_spec = CovarParamSpec(self)
@@ -715,5 +828,6 @@ class InputMasterSaver(Saver):
         mx_spec = MXParamSpec(self)
         name_collection_spec = NameCollectionParamSpec(self)
         card_seg = num_segs
+        dpmf_spec = DPMFParamSpec(self)
 
         return locals()  # dict of vars set in this function

@@ -18,8 +18,12 @@ import sys
 from tempfile import gettempdir
 
 from genomedata import Genome
-from numpy import (add, append, arange, arcsinh, array, column_stack, copy,
-                   empty, invert, isnan, maximum, zeros)
+
+from numpy import sum as npsum
+from numpy import square as npsquare
+from numpy import (absolute, add, append, any, arange, arcsinh, array, column_stack, empty, sign,sqrt,
+                   invert, isnan, maximum, power as to_power, transpose, where, zeros, nansum,nan_to_num,fromfile,float32)
+
 from path import path
 from tabdelim import ListWriter
 
@@ -254,6 +258,13 @@ def make_dinucleotide_int_data(seq):
     # column_stacking at the end
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
 
+def zscore_norm(float_data, tracks_means, tracks_vars):
+    assert float_data.shape[1] == tracks_means.shape[0]
+    assert tracks_means.shape[0] == tracks_vars.shape[0]
+    num_tracks = tracks_means.shape[0]
+    for track in xrange(num_tracks):
+        float_data[:,track] = (float_data[:,track] - tracks_means[track])/sqrt(tracks_vars[track])
+    return float_data
 
 def make_continuous_cells(track_indexes, genomedata_names,
                           chromosome_name, start, end):
@@ -286,9 +297,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
 
     return continuous_cells
 
-
-def _save_window(float_filename, int_filename, float_data, resolution,
-                 distribution, seq_data=None, supervision_data=None):
+def _save_window(float_filename, int_filename, float_data, resolution, distribution,zscore=False,tracks_means=None,tracks_vars=None,seq_data=None, supervision_data=None):
     # called by task.py as well as observation.py
 
     # input function in GMTK_ObservationMatrix.cc:
@@ -301,6 +310,8 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     if float_data is not None:
         if distribution == DISTRIBUTION_ASINH_NORMAL:
             float_data = arcsinh(float_data)
+        if zscore:
+            float_data = zscore_norm(float_data, tracks_means, tracks_vars)
 
         if (not USE_MFSDG) or resolution > 1:
             mask_missing = isnan(float_data)
@@ -362,7 +373,7 @@ class Observations(object):
                   "supervision_coords", "supervision_labels",
                   "use_dinucleotide", "world_track_indexes",
                   "world_genomedata_names", "clobber",
-                  "num_worlds"]
+                  "num_worlds","zscore"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)
@@ -471,11 +482,9 @@ class Observations(object):
 
         self.windows = windows
 
-    def save_window(self, float_filename, int_filename, float_data,
-                    seq_data=None, supervision_data=None):
-        return _save_window(float_filename, int_filename, float_data,
-                            self.resolution, self.distribution, seq_data,
-                            supervision_data)
+    def save_window(self, float_filename, int_filename, float_data,tracks_means,
+                    tracks_vars,seq_data=None, supervision_data=None):
+        return _save_window(float_filename, int_filename, float_data,self.resolution, self.distribution, self.zscore,tracks_means,tracks_vars,seq_data,supervision_data)
 
     @staticmethod
     def make_filepath(dirpath, prefix, suffix):
@@ -552,6 +561,26 @@ class Observations(object):
 
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
+        
+        if self.zscore and self.distribution == DISTRIBUTION_ASINH_NORMAL:
+            tracks_sums = [0]*genome.num_tracks_continuous
+            tracks_num_datapoints = [0]*genome.num_tracks_continuous
+            tracks_sums_squared = [0]*genome.num_tracks_continuous
+            for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                chromosome = genome[chrom]
+                continuous_cells = \
+                                   self.make_continuous_cells(world, chromosome, start, end)
+                tracks_sums += npsum(nan_to_num(arcsinh(continuous_cells)),axis=0)
+                tracks_num_datapoints += npsum(~isnan(continuous_cells),axis=0)
+                tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
+            tracks_means = tracks_sums / tracks_num_datapoints
+            tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
+        elif self.zscore:
+            tracks_means = genome.means
+            tracks_vars = genome.vars
+        else:
+            tracks_means = None
+            tracks_vars = None
 
         for window_index, window in enumerate(self.windows):
             world, chrom, start, end = window
@@ -591,7 +620,7 @@ class Observations(object):
 
                 # data is transformed as part of _save_window()
                 save_window(float_filepath, int_filepath, continuous_cells,
-                            seq_cells, supervision_cells)
+                            tracks_means, tracks_vars,seq_cells, supervision_cells)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
