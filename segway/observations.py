@@ -553,7 +553,7 @@ class Observations(object):
 
         return res
 
-    def write(self, float_filelist, int_filelist, float_tabfile):
+    def write(self, genome, float_filelist, int_filelist, float_tabfile):
         print_filepaths_custom = partial(self.print_filepaths,
                                          float_filelist, int_filelist,
                                          temp=self.identify)
@@ -561,7 +561,7 @@ class Observations(object):
 
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
-        
+ 
         if self.zscore and self.distribution == DISTRIBUTION_ASINH_NORMAL:
             tracks_sums = [0]*genome.num_tracks_continuous
             tracks_num_datapoints = [0]*genome.num_tracks_continuous
@@ -597,8 +597,8 @@ class Observations(object):
                 # Get the first genome from this world to use for generating
                 # sequence cells
                 genomedata_name = self.world_genomedata_names[world][0]
-                with Genome(genomedata_name) as genome:
-                    chromosome = genome[chrom]
+                with Genome(genomedata_name) as genome_data:
+                    chromosome = genome_data[chrom]
                     seq_cells = self.make_seq_cells(chromosome, start, end)
 
                 supervision_cells = \
@@ -628,10 +628,10 @@ class Observations(object):
         else:
             return open(filepath, "w")
 
-    def save(self):
+    def save(self, genome):
         open_writable = self.open_writable_or_dummy
 
         with open_writable(self.float_filelistpath) as float_filelist:
             with open_writable(self.int_filelistpath) as int_filelist:
                 with open_writable(self.float_tabfilepath) as float_tabfile:
-                    self.write(float_filelist, int_filelist, float_tabfile)
+                    self.write(float_filelist, genome, int_filelist, float_tabfile)

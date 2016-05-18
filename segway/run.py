@@ -1549,10 +1549,10 @@ class Runner(object):
         """limits all the metadata attributes to only tracks that are used
         """
         subset_metadata_attr = self.subset_metadata_attr
-        subset_metadata_attr(genome, "mins", min)
-        subset_metadata_attr(genome, "sums")
-        subset_metadata_attr(genome, "sums_squares")
-        subset_metadata_attr(genome, "num_datapoints")
+        subset_metadata_attr("mins", min)
+        subset_metadata_attr("sums")
+        subset_metadata_attr("sums_squares")
+        subset_metadata_attr("num_datapoints")
         #subset_metadata_attr(genome, "num_tracks_continuous")
 
     def save_input_master(self, instance_index=None, new=False):
@@ -1735,10 +1735,11 @@ class Runner(object):
         with Genome(self.genomedata_names[0]) as genome:
             observations.locate_windows(genome)
 
-        self.windows = observations.windows
-        # XXX: does this need to be done before save()?
-        self.subset_metadata()
-        observations.save()
+            self.windows = observations.windows
+            # XXX: does this need to be done before save()?
+            self.subset_metadata()
+            
+            observations.save(genome)
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
