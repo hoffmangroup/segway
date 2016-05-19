@@ -18,8 +18,8 @@ import sys
 from tempfile import gettempdir
 
 from genomedata import Genome
-from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip, column_stack, copy,
-                   empty, invert, isnan, maximum, zeros)
+from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
+                   column_stack, copy, empty, invert, isnan, maximum, zeros)
 from path import path
 from tabdelim import ListWriter
 
@@ -170,7 +170,7 @@ def find_overlaps_exclude(start, end, exclude_coords):
 
         include_coords = new_include_coords
 
-        return include_coords
+    return include_coords
 
 
 def calc_downsampled_shape(inarray, resolution):
@@ -217,29 +217,28 @@ def downsample_add(inarray, resolution):
     return res
 
 
-def downsample_array_by_mode(input_array, resolution):
+def get_downsampled_mode_and_presence(input_array, resolution):
     """
     Downsample a 1-dimensional numpy array to a desired resolution
     by taking the mode of each resolution-sized frame.
     For example, [1 2 2 3 4 4] downsampled to resolution 3 is: [2 4]
 
+    This function returns a tuple (where each element is an array) of
+    the form: [downsampled input array], [presence of downsampled
+    input array] where 'presence' is the count of each mode in its
+
     This is similar to downsample_add, but downsamples by mode, instead.
-    Also only downsamples 1D numpy arrays.
+    Only downsamples 1D numpy arrays.
 
-    For example, for [1,1,2,3,4,...,99] our mode will be 1.
-
-    For input_array.shape[0] % resolution != 0, there will be a 'remainder'
-    subarray. We choose to include this subarray's mode.
+    There is the possibility that there will be a 'remainder'
+    subarray. For that case, we choose to take its mode and append
+    it to the end of our array of modes.
 
     As a rule, we will never choose 0 (no label) unless all elements
     of the subarray are 0.
 
-    For example, for [1, 0, 0,...,0] our mode will be 1.
+    For example, for [1, 0, 0,...,0] our 'mode' will be 1.
     But [0,0,0,0...,0] has a mode of 0.
-
-    This function returns two arrays of the form:
-    [downsampled input array], [presence of downsampled input array]
-    where 'presence' is the frequency of each mode in its 'window'.
 
     """
     if resolution == 1:
@@ -249,88 +248,41 @@ def downsample_array_by_mode(input_array, resolution):
         return input_array, presence_array
 
     # split input_array into subarrays of length resolution. For example, if
-    # input_array=[1 1 3 4 5 6] then if resolution=3, then input_array now
-    # looks like [[1 1 3], [4 5 6]], a list of lists.
-    resolution_partitioned_input_array = [input_array[i:i+resolution] for i in
-                                          range(0, len(input_array), resolution)]
-
-    num_subarrays_to_consider = len(resolution_partitioned_input_array)
+    # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
+    resolution_partitioned_input_array = (input_array[i:i+resolution] for i in
+                                          xrange(0, len(input_array), resolution))
 
     downsampled_input_array = zeros(calc_downsampled_shape(input_array,
                                     resolution), input_array.dtype)
     presence_downsampled_input_array = zeros(calc_downsampled_shape(input_array,
                                              resolution), input_array.dtype)
-    for i in xrange(num_subarrays_to_consider):
-        # we take the ith resolution_partitioned_input_array subarray
-        # and find the most common value in it (the mode).
-        #
-        # to do this, we use bincount (which takes a numpy array).
-        # bincount(a) returns an array where the elements are the number
-        # of times each index occurs in a.
-        # for example, bincount([1,1,2,3]) = [0,2,1,1]. So index 1 occurs
-        # the largest number of times (2 times) and is the mode.
-        #
-        # our mode 'algorithm' is as follows:
-        #   a = array
-        #   b = bincount(a)
-        #   b[0] = 0
-        #   mode = argmax(b)
-        #
-        # in the case of ties for the max count, argmax takes the
-        # smallest numbered index. ex: a = [1,1,2,2], b = bincount(a),
-        # b = [0,2,2], b[0] = 0, b = [0,2,2], mode = argmax(b) = 1
-        # as we expect.
-        #
-        # rules:
-        #   1) in general, we wish to take the highest-count label
-        #   not zero.
-        #   2) in the case of ties for the mode, we wish to take the
-        #   lowest-numbered label not zero, if possible
-        #   3) our mode is 0 iff all subarray elements are 0
-        #
-        # proof that the algorithm works as expected to these rules:
-        # we can have the following 3 cases:
-        #
+    # For each input partition find it's mode
+    for i, input_partition in enumerate(resolution_partitioned_input_array):
+        # Get the number of times each index occurs in the input partition
+        resolution_sized_subarray_bincount = bincount(input_partition)
+
+        # by setting the 0th value of bincount to 0, we take care
+        # of two possible special cases:
         # 1) number of 0s is the same as the count of the nonzero mode:
         #   >we want to have the nonzero mode, not 0.
         #   setting count of 0 to 0 will force argmax to default to
         #   the nonzero mode.
         #
-        #   ex: for the case of a = [0,0,1,1], b = bincount(a) = [2,2].
-        #   b[0] = 0, so b = [0,2]. so mode = argmax(b) = 1.
-        #
         # 2) the case of all 0's (no nonzero mode):
         #   >we want the mode to be 0.
         #   setting count of 0 to 0 will return an argmax of 0 since
         #   there are no other numbers to choose.
-        #
-        #   ex: for the case of a = [0,0,...,0,0], length n,
-        #   b = bincount(a) = [n]. b[0] = 0, so b = [0].
-        #   so mode = argmax(b) = 0.
-        #
-        # 3) the case where the number of zeros is greater than or equal
-        #   to 0, but less than the count of the nonzero mode:
-        #   >we want the nonzero mode.
-        #   0 will never be chosen in either case since its count
-        #   is not a max; argmax will always pick the nonzero mode.
-        #
-        #   ex: for the case of a = [1,2,2], b = bincount(a) = [0,1,2].
-        #   b[0] = 0, so b = [0,1,2] (no effect). so mode = argmax(b) = 2.
-        #
-        #   ex: for the case of a = [0,1,2,2], b = bincount(a) = [1,1,2].
-        #   b[0] = 0, so b = [0,1,2]. so mode = argmax(b) = 2.
-        #
-        # for the presence data, bincount[mode] will return the
-        # number of times our mode occurs (for a nonzero mode).
-        # for a zero mode (all 0's), it will return a presence of 0.
-
-        resolution_sized_subarray_bincount = \
-                        bincount(resolution_partitioned_input_array[i])
         resolution_sized_subarray_bincount[0] = 0
+
+        # in the case of ties for the max count, argmax takes the
+        # smallest numbered index.
         mode = argmax(resolution_sized_subarray_bincount)
         downsampled_input_array[i] = mode
-        presence_downsampled_input_array[i] = \
-                        resolution_sized_subarray_bincount[mode]
+
+        # Get the count of the mode in our input partition
+        presence_downsampled_input_array[i] = (
+            resolution_sized_subarray_bincount[mode]
+            )
 
     return downsampled_input_array, presence_downsampled_input_array
 
@@ -450,10 +402,8 @@ def _save_window(float_filename, int_filename, float_data, resolution,
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
     if supervision_data is not None:
-        downsampled_supervision_arrays = \
-            downsample_array_by_mode(supervision_data, resolution)
-        supervision_data = downsampled_supervision_arrays[0]
-        presence_supervision_data = downsampled_supervision_arrays[1]
+        supervision_data, presence_supervision_data = \
+            get_downsampled_mode_and_presence(supervision_data, resolution)
 
         int_blocks.append(supervision_data)
         int_blocks.append(presence_supervision_data)
