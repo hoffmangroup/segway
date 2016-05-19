@@ -58,6 +58,22 @@ class StructureSaver(Saver):
         # parent
         return " | ".join([missing_spec] + [present_spec] * self.resolution)
 
+    def make_supervisionLabel_conditionalparents_spec(self, trackname):
+        """
+        this defines the parents of every observation
+        """
+
+        missing_spec = "CONDITIONALPARENTS_NIL_DISCRETE"
+        present_spec = 'supervisionLabel(0), seg(0) using '\
+            'DeterministicCPT("supervisionLabel_seg_alwaysTrue")'
+
+        # The switching parent ("presence__...") is overloaded for
+        # both switching weight and switching conditional parents. If
+        # resolution > 1, then we repeat the present_spec as many
+        # times as necessary to match the cardinality of the switching
+        # parent
+        return " | ".join([missing_spec] + [present_spec] * self.resolution)
+
     def make_mapping(self):
         num_track_groups = self.num_track_groups
         num_datapoints = self.num_datapoints
@@ -116,9 +132,16 @@ class StructureSaver(Saver):
             next_int_track_index += 2
 
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
+            supervisionLabel_weight_spec = self.make_weight_spec(1)
+            supervisionLabel_conditionalparents_spec =  \
+                self.make_supervisionLabel_conditionalparents_spec("supervisionLabel")
+
             add_observation(observation_items, "supervision.tmpl",
-                            track_index=next_int_track_index)
-            next_int_track_index += 1
+                            track_index=next_int_track_index,
+                            presence_index=next_int_track_index + 1,
+                            conditionalparents_spec=supervisionLabel_conditionalparents_spec,
+                            weight_spec=supervisionLabel_weight_spec)
+            next_int_track_index += 2
 
         assert observation_items  # must be at least one track
         observations = "\n".join(observation_items)
