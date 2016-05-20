@@ -59,6 +59,24 @@ class StructureSaver(Saver):
         # parent
         return " | ".join([missing_spec] + [present_spec] * self.resolution)
 
+    def add_supervision_observation(self, observation_items, next_int_track_index):
+        # SUPERVISIONLABEL_WEIGHT_MULTIPLIER = 1 since we are
+        # not normalising against the max length of the data tracks
+        weight_spec = self.make_weight_spec(SUPERVISIONLABEL_WEIGHT_MULTIPLIER)
+
+        # create the supervision label's conditional parents
+        # using GMTK specification
+        spec = 'supervisionLabel(0), seg(0) '\
+            'using DeterministicCPT("supervisionLabel_seg_alwaysTrue")'
+        conditionalparents_spec = " | ".join([spec] * (self.resolution+1))
+
+        add_observation(observation_items, "supervision.tmpl",
+                        track_index=next_int_track_index,
+                        presence_index=next_int_track_index + 1,
+                        conditionalparents_spec=conditionalparents_spec,
+                        weight_spec=weight_spec)
+        return
+
     def make_mapping(self):
         num_track_groups = self.num_track_groups
         num_datapoints = self.num_datapoints
@@ -117,29 +135,7 @@ class StructureSaver(Saver):
             next_int_track_index += 2
 
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
-            # SUPERVISIONLABEL_WEIGHT_MULTIPLIER = 1 since we are
-            # not normalising against the max length of the data tracks
-            supervisionlabel_weight_spec = self.make_weight_spec(
-                                             SUPERVISIONLABEL_WEIGHT_MULTIPLIER
-                                           )
-
-            # create the supervision label's conditional parents
-            # using GMTK specification
-            supervisionlabel_missing_spec = "CONDITIONALPARENTS_NIL_DISCRETE"
-            supervisionlabel_present_spec = 'supervisionLabel(0), seg(0) '\
-                'using DeterministicCPT("supervisionLabel_seg_alwaysTrue")'
-            supervisionlabel_conditionalparents_spec = " | ".join(
-                        [supervisionlabel_missing_spec] +
-                        [supervisionlabel_present_spec] *
-                        self.resolution
-                    )
-
-            add_observation(observation_items, "supervision.tmpl",
-                            track_index=next_int_track_index,
-                            presence_index=next_int_track_index + 1,
-                            conditionalparents_spec= \
-                            supervisionlabel_conditionalparents_spec,
-                            weight_spec=supervisionlabel_weight_spec)
+            self.add_supervision_observation(observation_items, next_int_track_index)
             next_int_track_index += 2
 
         assert observation_items  # must be at least one track

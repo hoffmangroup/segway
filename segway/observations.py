@@ -249,16 +249,20 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
 
     # split input_array into subarrays of length resolution.
     # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
-    resolution_partitioned_input_array = (input_array[i:i+resolution] for i in
-                                          xrange(0, len(input_array), resolution))
+    resolution_partitioned_input_array = (
+            input_array[index:index+resolution]
+            for index in xrange(0, len(input_array), resolution)
+            )
 
     downsampled_input_array = zeros(calc_downsampled_shape(input_array,
                                     resolution), input_array.dtype)
     presence_downsampled_input_array = zeros(calc_downsampled_shape(input_array,
                                              resolution), input_array.dtype)
-    # For each input partition find it's mode
-    for i, input_partition in enumerate(resolution_partitioned_input_array):
-        # Get the number of times each index occurs in the input partition
+    # For each input partition find its mode
+    for index, input_partition in enumerate(resolution_partitioned_input_array):
+        # Get the number of times each index occurs in the input partition.
+        # bincount(a) returns an array where the elements are the number
+        # of times each index occurs in a.
         resolution_sized_subarray_bincount = bincount(input_partition)
 
         # by setting the 0th value of bincount to 0, we take care
@@ -277,10 +281,10 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
         # in the case of ties for the max count, argmax takes the
         # smallest numbered index.
         mode = argmax(resolution_sized_subarray_bincount)
-        downsampled_input_array[i] = mode
+        downsampled_input_array[index] = mode
 
         # Get the count of the mode in our input partition
-        presence_downsampled_input_array[i] = \
+        presence_downsampled_input_array[index] = \
             resolution_sized_subarray_bincount[mode]
 
     return downsampled_input_array, presence_downsampled_input_array
