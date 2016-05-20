@@ -1,1 +1,3 @@
+ERROR: can't allocate any more memory, malloc() failed. Either decrease your model size, find a better triangulation, use more pruning, use low-memory options, increase the size of the argument to -maxMem, and/or use a machine with more memory.
+ERROR: can't allocate any more memory, malloc() failed. Either decrease your model size, find a better triangulation, use more pruning, use low-memory options, increase the size of the argument to -maxMem, and/or use a machine with more memory.
 NOTE: storing current accumulators (from training 1 segments) to file 'traindir/accumulators/acc.0.0.bin' and exiting.

@@ -1,5 +1,6 @@
 1.4.1:
 * segway: fix --prior-strength option
+* segway: local job submission now appends error logs instead of rewriting them
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
