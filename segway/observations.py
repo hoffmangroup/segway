@@ -217,7 +217,7 @@ def downsample_add(inarray, resolution):
     return res
 
 
-def get_downsampled_mode_and_presence(input_array, resolution):
+def get_downsampled_supervision_data_and_presence(input_array, resolution):
     """
     Downsample a 1-dimensional numpy array to a desired resolution
     by taking the mode of each resolution-sized frame.
@@ -226,8 +226,8 @@ def get_downsampled_mode_and_presence(input_array, resolution):
     This function returns a tuple (where each element is an array) of
     the form: [downsampled input array], [presence of downsampled
     input array] where 'presence' is the count of each mode in its
+    'window'.
 
-    This is similar to downsample_add, but downsamples by mode, instead.
     Only downsamples 1D numpy arrays.
 
     There is the possibility that there will be a 'remainder'
@@ -247,7 +247,7 @@ def get_downsampled_mode_and_presence(input_array, resolution):
         presence_array = clip(input_array, 0, 1)
         return input_array, presence_array
 
-    # split input_array into subarrays of length resolution. For example, if
+    # split input_array into subarrays of length resolution.
     # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
     resolution_partitioned_input_array = (input_array[i:i+resolution] for i in
                                           xrange(0, len(input_array), resolution))
@@ -280,9 +280,8 @@ def get_downsampled_mode_and_presence(input_array, resolution):
         downsampled_input_array[i] = mode
 
         # Get the count of the mode in our input partition
-        presence_downsampled_input_array[i] = (
+        presence_downsampled_input_array[i] = \
             resolution_sized_subarray_bincount[mode]
-            )
 
     return downsampled_input_array, presence_downsampled_input_array
 
@@ -403,7 +402,7 @@ def _save_window(float_filename, int_filename, float_data, resolution,
 
     if supervision_data is not None:
         supervision_data, presence_supervision_data = \
-            get_downsampled_mode_and_presence(supervision_data, resolution)
+            get_downsampled_supervision_data_and_presence(supervision_data, resolution)
 
         int_blocks.append(supervision_data)
         int_blocks.append(presence_supervision_data)
