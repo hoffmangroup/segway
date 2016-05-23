@@ -1,5 +1,6 @@
 1.4.1:
 * segway: fix --prior-strength option
+* segway: local job submission now appends error logs instead of rewriting them
 * segway: add --transition-prior-strength option, which adds a pseudocount to
   avoid ever getting zeros in the label-label transition matrix.
 
