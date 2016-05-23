@@ -522,6 +522,16 @@ includes the ``dpmf_always``, ``start_seg``, and all GMTK
 DeterministicCPT parameters. You are unlikely to use this unless you
 are generating your own models manually.
 
+The :option:`--transition-prior-strength`\=\ *number* option creates 
+a pseudocount to the label-label transition matrix. In general, if there is 
+zero probability for (say) label 1 to transition to label 2, then in the 
+inference step the algorithm will never assign any instances of this transition, 
+and so the probability will still be zero after the next parameter update step. 
+Thus EM gets stuck in a local optimum and a zero probability appears in the 
+label-label transition matrix. By adding a pseudocount is a way to avoid ever
+getting zeros in this matrix. It is a good idea to add a pseudocount for all 
+Segway runs.
+
 Seeding
 ~~~~~~~
 Segway can be forced to run with a specified random number generator seed by

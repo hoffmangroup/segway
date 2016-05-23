@@ -1,5 +1,7 @@
 1.4.1:
 * segway: fix --prior-strength option
+* segway: add --transition-prior-strength option, which adds a pseudocount to
+  avoid ever getting zeros in the label-label transition matrix.
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway

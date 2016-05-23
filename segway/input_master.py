@@ -43,6 +43,7 @@ ABSOLUTE_FUDGE = 0.001
 
 # here to avoid duplication
 NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
+NAME_SEG_SEG = "seg_seg"
 
 CARD_SEGTRANSITION = 3
 
@@ -375,7 +376,7 @@ class DenseCPTParamSpec(TableParamSpec):
     copy_attrs = TableParamSpec.copy_attrs \
         + ["len_seg_strength", "use_dinucleotide",
            "transition_seg_strength", "resolution",
-	   "card_seg_countdown", "seg_table",
+           "card_seg_countdown", "seg_table",
            "seg_countdowns_initial"]
 
     def make_table_spec(self, name, table, dirichlet=False):
@@ -413,7 +414,7 @@ class DenseCPTParamSpec(TableParamSpec):
     def make_dense_cpt_seg_seg_spec(self):
         cpt = make_zero_diagonal_table(self.num_segs)
 
-        return self.make_table_spec("seg_seg", cpt,
+        return self.make_table_spec(NAME_SEG_SEG, cpt,
                                     dirichlet=self.transition_seg_strength > 0)
 
     def make_dense_cpt_seg_subseg_subseg_spec(self):
@@ -464,7 +465,7 @@ class DirichletTabParamSpec(DenseCPTParamSpec):
     type_name = "DIRICHLET_TAB"
     copy_attrs = DenseCPTParamSpec.copy_attrs \
         + ["len_seg_strength", "num_bases",
-	"transition_seg_strength", "card_seg_countdown"]
+           "transition_seg_strength", "card_seg_countdown"]
 
     def make_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
@@ -496,12 +497,17 @@ class DirichletTabParamSpec(DenseCPTParamSpec):
 
     def generate_objects(self):
         # XXX: these called functions have confusing/duplicative names        
+        
+        # base code to create a table 
+        # create the table for the segCountDown_seg_segTransition spec 
         if (self.len_seg_strength > 0):
             dirichlet_table = self.make_len_dirichlet_table()
             yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION, dirichlet_table)
+        # related to the transition_prior_strength option 
+        # create the table for the  spec
         if (self.transition_seg_strength > 0):
             dirichlet_table = self.make_transition_dirichlet_table()
-            yield self.make_table_spec("seg_seg", dirichlet_table)
+            yield self.make_table_spec(NAME_SEG_SEG, dirichlet_table)
 
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
@@ -680,7 +686,8 @@ class InputMasterSaver(Saver):
 
         dt_spec = DTParamSpec(self)
 
-        if (self.len_seg_strength > 0) or (self.transition_seg_strength > 0):
+        if self.len_seg_strength > 0 or
+                self.transition_seg_strength > 0:
             dirichlet_spec = DirichletTabParamSpec(self)
         else:
             dirichlet_spec = ""
