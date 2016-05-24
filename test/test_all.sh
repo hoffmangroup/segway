@@ -25,6 +25,7 @@ rm */*-changes.tar.gz || true
 exit_status=0
 # Avoid creating a new subshell to get an error exit status by putting the
 # search commands for "run.sh" in a process substitution (file descriptor)
+# This ignores tests which do not have a run.sh such as simpleresubmit
 while read file
 do
     echo "Running $(dirname $file)"
