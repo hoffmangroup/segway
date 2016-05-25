@@ -4,11 +4,11 @@
 Number of cliques = 1
 == Clique number: 0, root/right-interface clique, root/right-interface clique, leaf
 Clique information: 9 packed bits, 1 unsigned words (0 splits), weight = 1.982271, jt_weight = 1.000000
-14 Nodes: segCountDown(0)[2],seg(0)[2],subseg(0)[2],presence__testtrack1(0)[2],testtrack1(0),presence__testtrack2(0)[2],testtrack2(0),alwaysTrue(0)[2],supervisionLabel(0)[3],ruler(1)[2],segCountDown(1)[2],segTransition(1)[3],seg(1)[2],subseg(1)[2]
-14 Assigned: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),alwaysTrue(0),supervisionLabel(0),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1)
-14 Assigned Sorted: seg(0)[2],subseg(0)[2],presence__testtrack1(0)[2],testtrack1(0),presence__testtrack2(0)[2],testtrack2(0),supervisionLabel(0)[3],alwaysTrue(0)[2],segCountDown(0)[2],ruler(1)[2],segTransition(1)[3],seg(1)[2],segCountDown(1)[2],subseg(1)[2]
-14 Dispositions: 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-14 Assigned Prob: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),alwaysTrue(0),supervisionLabel(0),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1)
+15 Nodes: segCountDown(0)[2],seg(0)[2],subseg(0)[2],presence__testtrack1(0)[2],testtrack1(0),presence__testtrack2(0)[2],testtrack2(0),alwaysTrue(0)[2],presence__supervisionLabel(0)[2],supervisionLabel(0)[3],ruler(1)[2],segCountDown(1)[2],segTransition(1)[3],seg(1)[2],subseg(1)[2]
+15 Assigned: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),alwaysTrue(0),presence__supervisionLabel(0),supervisionLabel(0),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1)
+15 Assigned Sorted: seg(0)[2],subseg(0)[2],presence__testtrack1(0)[2],testtrack1(0),presence__testtrack2(0)[2],testtrack2(0),presence__supervisionLabel(0)[2],supervisionLabel(0)[3],alwaysTrue(0)[2],segCountDown(0)[2],ruler(1)[2],segTransition(1)[3],seg(1)[2],segCountDown(1)[2],subseg(1)[2]
+15 Dispositions: 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+15 Assigned Prob: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),alwaysTrue(0),presence__supervisionLabel(0),supervisionLabel(0),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1)
 0 Cum Assigned Prob: 
 0 Union Incomming Seps: 
 0 Unassigned Iterated: 
@@ -30,12 +30,12 @@ Number of separators = 0
 Number of cliques = 1
 == Clique number: 0, root/right-interface clique, root/right-interface clique, leaf/left-interface clique
 Clique information: 9 packed bits, 1 unsigned words (0 splits), weight = 2.283301, jt_weight = 1.000000
-15 Nodes: frameIndex(1)[2000000],segCountDown(1)[2],seg(1)[2],subseg(1)[2],presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),alwaysTrue(1)[2],supervisionLabel(1)[3],ruler(2)[2],segCountDown(2)[2],segTransition(2)[3],seg(2)[2],subseg(2)[2]
-12 Assigned: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),alwaysTrue(1),supervisionLabel(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
-12 Assigned Sorted: presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),frameIndex(1)[2000000],supervisionLabel(1)[3],alwaysTrue(1)[2],ruler(2)[2],segTransition(2)[3],seg(2)[2],segCountDown(2)[2],subseg(2)[2]
-12 Dispositions: 0 0 0 0 0 0 0 0 0 0 0 0
-12 Assigned Prob: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),alwaysTrue(1),supervisionLabel(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
-14 Cum Assigned Prob: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),alwaysTrue(0),supervisionLabel(0),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1)
+16 Nodes: frameIndex(1)[2000000],segCountDown(1)[2],seg(1)[2],subseg(1)[2],presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),alwaysTrue(1)[2],presence__supervisionLabel(1)[2],supervisionLabel(1)[3],ruler(2)[2],segCountDown(2)[2],segTransition(2)[3],seg(2)[2],subseg(2)[2]
+13 Assigned: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),alwaysTrue(1),presence__supervisionLabel(1),supervisionLabel(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
+13 Assigned Sorted: presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),frameIndex(1)[2000000],presence__supervisionLabel(1)[2],supervisionLabel(1)[3],alwaysTrue(1)[2],ruler(2)[2],segTransition(2)[3],seg(2)[2],segCountDown(2)[2],subseg(2)[2]
+13 Dispositions: 0 0 0 0 0 0 0 0 0 0 0 0 0
+13 Assigned Prob: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),alwaysTrue(1),presence__supervisionLabel(1),supervisionLabel(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
+15 Cum Assigned Prob: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),alwaysTrue(0),presence__supervisionLabel(0),supervisionLabel(0),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1)
 3 Union Incomming Seps: segCountDown(1),seg(1),subseg(1)
 0 Unassigned Iterated: 
 0 Cumulative Unassigned: 
@@ -63,12 +63,12 @@ Separator information: 0 acc packed bits (0 words, 0 splits), 3 rem packed bits 
 Number of cliques = 1
 == Clique number: 0, root/right-interface clique, root clique, leaf/left-interface clique
 Clique information: 3 packed bits, 1 unsigned words (0 splits), weight = 0.903090, jt_weight = 1.000000
-10 Nodes: frameIndex(2)[2000000],segCountDown(2)[2],seg(2)[2],subseg(2)[2],presence__testtrack1(2)[2],testtrack1(2),presence__testtrack2(2)[2],testtrack2(2),alwaysTrue(2)[2],supervisionLabel(2)[3]
-7 Assigned: frameIndex(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2),alwaysTrue(2),supervisionLabel(2)
-7 Assigned Sorted: presence__testtrack1(2)[2],testtrack1(2),presence__testtrack2(2)[2],testtrack2(2),frameIndex(2)[2000000],supervisionLabel(2)[3],alwaysTrue(2)[2]
-7 Dispositions: 0 0 0 0 0 0 0
-7 Assigned Prob: frameIndex(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2),alwaysTrue(2),supervisionLabel(2)
-26 Cum Assigned Prob: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),alwaysTrue(0),supervisionLabel(0),frameIndex(1),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),alwaysTrue(1),supervisionLabel(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
+11 Nodes: frameIndex(2)[2000000],segCountDown(2)[2],seg(2)[2],subseg(2)[2],presence__testtrack1(2)[2],testtrack1(2),presence__testtrack2(2)[2],testtrack2(2),alwaysTrue(2)[2],presence__supervisionLabel(2)[2],supervisionLabel(2)[3]
+8 Assigned: frameIndex(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2),alwaysTrue(2),presence__supervisionLabel(2),supervisionLabel(2)
+8 Assigned Sorted: presence__testtrack1(2)[2],testtrack1(2),presence__testtrack2(2)[2],testtrack2(2),frameIndex(2)[2000000],presence__supervisionLabel(2)[2],supervisionLabel(2)[3],alwaysTrue(2)[2]
+8 Dispositions: 0 0 0 0 0 0 0 0
+8 Assigned Prob: frameIndex(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2),alwaysTrue(2),presence__supervisionLabel(2),supervisionLabel(2)
+28 Cum Assigned Prob: segCountDown(0),seg(0),subseg(0),presence__testtrack1(0),testtrack1(0),presence__testtrack2(0),testtrack2(0),alwaysTrue(0),presence__supervisionLabel(0),supervisionLabel(0),frameIndex(1),ruler(1),segCountDown(1),segTransition(1),seg(1),subseg(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),alwaysTrue(1),presence__supervisionLabel(1),supervisionLabel(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
 3 Union Incomming Seps: segCountDown(2),seg(2),subseg(2)
 0 Unassigned Iterated: 
 0 Cumulative Unassigned: 
