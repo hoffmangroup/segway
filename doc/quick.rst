@@ -6,7 +6,7 @@ Installation and configuration
 ==============================
 
 1. To install Segway first install `GMTK
-   <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.0.tar.gz>`_,
+   <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.4.tar.gz>`_,
    and install `HDF5 <http://www.hdfgroup.org/downloads/index.html>`_,.
    Then run this command from :program:`bash`::
 
