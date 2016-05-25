@@ -244,14 +244,17 @@ at a low resolution to start with, this can be an appealing option.
 
 In semi-supervised mode, with the resolution option enabled, the 
 supervision labels are also downsampled to a lower resolution, but
-by a different method. This means that segway will partition the 
+by a different method. In particular, segway will partition the 
 input supervision labels into fixed windows of size *res* and use 
 a modified 'mode' to choose which label will represent that 
 window during training. This modified 'mode' works according to 
-the following rules: 1) in general, segway takes the highest-count 
-label not zero in a given window, 2) in the case of ties, segway takes 
-the lowest numbered label not zero, 3) segway takes the mode to be 0 
-(no label) iff all elements of the window are 0.
+the following rules: 
+
+    1) In general, segway takes the highest-count label not zero in 
+    a given window.
+    2) In the case of ties, segway takes the lowest nonzero label.
+    3) Segway takes the mode to be 0 (no label) if and only if all 
+    elements of the window are 0.
 
 Model generation
 ================
