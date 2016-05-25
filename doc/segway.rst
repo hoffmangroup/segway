@@ -250,8 +250,8 @@ a modified 'mode' to choose which label will represent that
 window during training. This modified 'mode' works according to 
 the following rules: 
 
-    1) In general, segway takes the highest nonzero label in 
-    a given window.
+    1) In general, segway takes the highest-count nonzero label in 
+    a given resolution-sized window to be the mode for that window.
     2) In the case of ties, segway takes the lowest nonzero label.
     3) Segway takes the mode to be 0 (no label) if and only if all 
     elements of the window are 0.
