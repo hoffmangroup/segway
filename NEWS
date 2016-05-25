@@ -1,8 +1,9 @@
 1.4.1:
 * segway: fix --prior-strength option
 * segway: local job submission now appends error logs instead of rewriting them
+* segway: add resolution functionality for semisupervised mode (thanks to Rachel Chan)
 * segway: add --transition-prior-strength option, which adds a pseudocount to
-  avoid ever getting zeros in the label-label transition matrix.
+  avoid ever getting zeros in the label-label transition matrix (thanks to Max Libbrecht, Shiqi Zou)
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway

@@ -128,6 +128,8 @@ LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
 NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
+NUM_SUPERVISION_COLS = 2 # supervision_data, presence_supervision_data
+
 MAX_SPLIT_SEQUENCE_LENGTH = 2000000  # 2 million
 MAX_FRAMES = MAX_SPLIT_SEQUENCE_LENGTH
 MEM_USAGE_BUNDLE = 100 * MB  # XXX: should start using this again
@@ -1109,7 +1111,7 @@ class Runner(object):
         if self.use_dinucleotide:
             res += NUM_SEQ_COLS
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
-            res += 1
+            res += NUM_SUPERVISION_COLS
 
         return res
 

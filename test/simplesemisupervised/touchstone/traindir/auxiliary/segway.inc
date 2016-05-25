@@ -21,7 +21,7 @@
 % only continues to exist for dinucleotide
 #define CARD_PRESENCE CARD_BOOLEAN
 #else /* USE_MFSDG */
-#define CARD_PRESENCE 2
+#define CARD_PRESENCE 11
 #endif /* USE_MFSDG */
 
 % transition or not?
@@ -29,7 +29,7 @@
 
 % maximum number of frames
 #ifndef CARD_FRAMEINDEX
-#define CARD_FRAMEINDEX 2000000
+#define CARD_FRAMEINDEX 200000
 #endif
 
 % allow transition or not?

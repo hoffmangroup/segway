@@ -15,6 +15,7 @@ from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
 
 MAX_WEIGHT_SCALE = 25
 
+SUPERVISIONLABEL_WEIGHT_MULTIPLIER = 1
 
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
@@ -57,6 +58,24 @@ class StructureSaver(Saver):
         # times as necessary to match the cardinality of the switching
         # parent
         return " | ".join([missing_spec] + [present_spec] * self.resolution)
+
+    def add_supervision_observation(self, observation_items, next_int_track_index):
+        # SUPERVISIONLABEL_WEIGHT_MULTIPLIER = 1 since we are
+        # not normalising against the max length of the data tracks
+        weight_spec = self.make_weight_spec(SUPERVISIONLABEL_WEIGHT_MULTIPLIER)
+
+        # create the supervision label's conditional parents
+        # using GMTK specification
+        spec = 'supervisionLabel(0), seg(0) '\
+            'using DeterministicCPT("supervisionLabel_seg_alwaysTrue")'
+        conditionalparents_spec = " | ".join([spec] * (self.resolution+1))
+
+        add_observation(observation_items, "supervision.tmpl",
+                        track_index=next_int_track_index,
+                        presence_index=next_int_track_index + 1,
+                        conditionalparents_spec=conditionalparents_spec,
+                        weight_spec=weight_spec)
+        return
 
     def make_mapping(self):
         num_track_groups = self.num_track_groups
@@ -116,9 +135,8 @@ class StructureSaver(Saver):
             next_int_track_index += 2
 
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
-            add_observation(observation_items, "supervision.tmpl",
-                            track_index=next_int_track_index)
-            next_int_track_index += 1
+            self.add_supervision_observation(observation_items, next_int_track_index)
+            next_int_track_index += 2
 
         assert observation_items  # must be at least one track
         observations = "\n".join(observation_items)

@@ -7,8 +7,8 @@ num_segs	4
 num_subsegs	1
 output_label	seg
 params_filename	traindir/params/params.params
-resolution	1
-ruler_scale	10
+resolution	10
+ruler_scale	100
 seg_table_filename	
 segtransition_weight_scale	1.0
 structure_filename	traindir/segway.str
