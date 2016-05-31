@@ -128,9 +128,6 @@ def find_overlaps_exclude(start, end, exclude_coords):
     # diagram of how this works:
     #        --------------------- (include)
     #
-    # diagram of how this works:
-    #        --------------------- (include)
-    #
     # various exclude cases:
     # A   --
     # B                              --
