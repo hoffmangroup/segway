@@ -2,19 +2,19 @@
 % Structure File Identification Information
 0 segCountDown 0 2 D 0 1 1 seg 0
 1 seg 0 4 D 0 1 0
-2 presence__testtrack1 0 2 D 0 1 0
-3 testtrack1 0 0 C 1 presence__testtrack1 0 2 0 1 seg 0
-4 presence__testtrack2 0 2 D 0 1 0
-5 testtrack2 0 0 C 1 presence__testtrack2 0 2 0 1 seg 0
-6 frameIndex 1 2000000 D 0 1 0
+2 presence__testtrack1 0 11 D 0 1 0
+3 testtrack1 0 0 C 1 presence__testtrack1 0 11 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0
+4 presence__testtrack2 0 11 D 0 1 0
+5 testtrack2 0 0 C 1 presence__testtrack2 0 11 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0
+6 frameIndex 1 200000 D 0 1 0
 7 ruler 1 2 D 0 1 1 frameIndex 0
 8 segCountDown 1 2 D 0 1 4 segTransition 0 ruler 0 seg 0 segCountDown -1
 9 segTransition 1 3 D 0 1 2 segCountDown -1 seg -1
 10 seg 1 4 D 1 segTransition 0 3 1 seg -1 1 seg -1 1 seg -1
-11 presence__testtrack1 1 2 D 0 1 0
-12 testtrack1 1 0 C 1 presence__testtrack1 0 2 0 1 seg 0
-13 presence__testtrack2 1 2 D 0 1 0
-14 testtrack2 1 0 C 1 presence__testtrack2 0 2 0 1 seg 0
+11 presence__testtrack1 1 11 D 0 1 0
+12 testtrack1 1 0 C 1 presence__testtrack1 0 11 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0
+13 presence__testtrack2 1 11 D 0 1 0
+14 testtrack2 1 0 C 1 presence__testtrack2 0 11 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0 1 seg 0
 1 1
 @@@!!!TRIFILE_END_OF_ID_STRING!!!@@@
 

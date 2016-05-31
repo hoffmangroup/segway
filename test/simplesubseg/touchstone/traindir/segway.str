@@ -72,14 +72,25 @@ frame: 0 {
    variable: alwaysTrue {
      type: discrete observed value 1 cardinality CARD_BOOLEAN;
 
-     conditionalparents: supervisionLabel(0), seg(0)
-                         using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+     switchingparents: presence__supervisionLabel(0) using mapping("internal:copyParent");
+
+     conditionalparents: supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+
+     weight: scale 1.000000;
+   }
+
+   variable: presence__supervisionLabel {
+     type: discrete observed 5:5 cardinality CARD_PRESENCE;
+
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
+
    }
 
    variable: supervisionLabel {
      type: discrete observed 4:4 cardinality CARD_SUPERVISIONLABEL;
 
      conditionalparents: CONDITIONALPARENTS_NIL_DISCRETE;
+
    }
 #endif /* CARD_SUPERVISIONLABEL >= 0 */
 }
@@ -177,14 +188,25 @@ frame: 1 {
    variable: alwaysTrue {
      type: discrete observed value 1 cardinality CARD_BOOLEAN;
 
-     conditionalparents: supervisionLabel(0), seg(0)
-                         using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+     switchingparents: presence__supervisionLabel(0) using mapping("internal:copyParent");
+
+     conditionalparents: supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+
+     weight: scale 1.000000;
+   }
+
+   variable: presence__supervisionLabel {
+     type: discrete observed 5:5 cardinality CARD_PRESENCE;
+
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
+
    }
 
    variable: supervisionLabel {
      type: discrete observed 4:4 cardinality CARD_SUPERVISIONLABEL;
 
      conditionalparents: CONDITIONALPARENTS_NIL_DISCRETE;
+
    }
 #endif /* CARD_SUPERVISIONLABEL >= 0 */
 }

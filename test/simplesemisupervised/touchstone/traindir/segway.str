@@ -38,10 +38,10 @@ frame: 0 {
 #else
       switchingparents: presence__testtrack1(0) using mapping("internal:copyParent");
 
-      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS;
+      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS;
 #endif
 
-      weight: scale 1.000000;
+      weight: scale 0.000000 | scale 1.000000 | scale 2.000000 | scale 3.000000 | scale 4.000000 | scale 5.000000 | scale 6.000000 | scale 7.000000 | scale 8.000000 | scale 9.000000 | scale 10.000000;
    }
 
 #ifndef USE_MFSDG
@@ -62,24 +62,35 @@ frame: 0 {
 #else
       switchingparents: presence__testtrack2(0) using mapping("internal:copyParent");
 
-      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS;
+      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS;
 #endif
 
-      weight: scale 1.000000;
+      weight: scale 0.000000 | scale 1.000000 | scale 2.000000 | scale 3.000000 | scale 4.000000 | scale 5.000000 | scale 6.000000 | scale 7.000000 | scale 8.000000 | scale 9.000000 | scale 10.000000;
    }
 
 #if CARD_SUPERVISIONLABEL >= 0
    variable: alwaysTrue {
      type: discrete observed value 1 cardinality CARD_BOOLEAN;
 
-     conditionalparents: supervisionLabel(0), seg(0)
-                         using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+     switchingparents: presence__supervisionLabel(0) using mapping("internal:copyParent");
+
+     conditionalparents: supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+
+     weight: scale 0.000000 | scale 1.000000 | scale 2.000000 | scale 3.000000 | scale 4.000000 | scale 5.000000 | scale 6.000000 | scale 7.000000 | scale 8.000000 | scale 9.000000 | scale 10.000000;
+   }
+
+   variable: presence__supervisionLabel {
+     type: discrete observed 5:5 cardinality CARD_PRESENCE;
+
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
+
    }
 
    variable: supervisionLabel {
      type: discrete observed 4:4 cardinality CARD_SUPERVISIONLABEL;
 
      conditionalparents: CONDITIONALPARENTS_NIL_DISCRETE;
+
    }
 #endif /* CARD_SUPERVISIONLABEL >= 0 */
 }
@@ -143,10 +154,10 @@ frame: 1 {
 #else
       switchingparents: presence__testtrack1(0) using mapping("internal:copyParent");
 
-      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS;
+      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack1") MAPPING_OBS;
 #endif
 
-      weight: scale 1.000000;
+      weight: scale 0.000000 | scale 1.000000 | scale 2.000000 | scale 3.000000 | scale 4.000000 | scale 5.000000 | scale 6.000000 | scale 7.000000 | scale 8.000000 | scale 9.000000 | scale 10.000000;
    }
 
 #ifndef USE_MFSDG
@@ -167,24 +178,35 @@ frame: 1 {
 #else
       switchingparents: presence__testtrack2(0) using mapping("internal:copyParent");
 
-      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS;
+      conditionalparents: CONDITIONALPARENTS_NIL_CONTINUOUS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS | CONDITIONALPARENTS_OBS using mixture collection("collection_seg_testtrack2") MAPPING_OBS;
 #endif
 
-      weight: scale 1.000000;
+      weight: scale 0.000000 | scale 1.000000 | scale 2.000000 | scale 3.000000 | scale 4.000000 | scale 5.000000 | scale 6.000000 | scale 7.000000 | scale 8.000000 | scale 9.000000 | scale 10.000000;
    }
 
 #if CARD_SUPERVISIONLABEL >= 0
    variable: alwaysTrue {
      type: discrete observed value 1 cardinality CARD_BOOLEAN;
 
-     conditionalparents: supervisionLabel(0), seg(0)
-                         using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+     switchingparents: presence__supervisionLabel(0) using mapping("internal:copyParent");
+
+     conditionalparents: supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue") | supervisionLabel(0), seg(0) using DeterministicCPT("supervisionLabel_seg_alwaysTrue");
+
+     weight: scale 0.000000 | scale 1.000000 | scale 2.000000 | scale 3.000000 | scale 4.000000 | scale 5.000000 | scale 6.000000 | scale 7.000000 | scale 8.000000 | scale 9.000000 | scale 10.000000;
+   }
+
+   variable: presence__supervisionLabel {
+     type: discrete observed 5:5 cardinality CARD_PRESENCE;
+
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
+
    }
 
    variable: supervisionLabel {
      type: discrete observed 4:4 cardinality CARD_SUPERVISIONLABEL;
 
      conditionalparents: CONDITIONALPARENTS_NIL_DISCRETE;
+
    }
 #endif /* CARD_SUPERVISIONLABEL >= 0 */
 }

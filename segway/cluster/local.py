@@ -29,15 +29,17 @@ class JobTemplate(object):
 
 class Job(object):
     @staticmethod
-    def _open_from_template_path(path):
+    def _open_from_template_path(path, mode):
         filename = path.partition(":")[2]  # get the filename component only
-        return open(filename, "w")
+        return open(filename, mode)
 
     def __init__(self, job_tmpl):
         self.job_tmpl = job_tmpl
 
-        self.outfile = self._open_from_template_path(job_tmpl.outputPath)
-        self.errfile = self._open_from_template_path(job_tmpl.errorPath)
+        # Overwrite stdout of job on resubmissions
+        self.outfile = self._open_from_template_path(job_tmpl.outputPath, "w")
+        # Append stderr of job on resubmissions
+        self.errfile = self._open_from_template_path(job_tmpl.errorPath, "a")
 
         cmd = [job_tmpl.remoteCommand] + job_tmpl.args
         self.proc = Popen(cmd,

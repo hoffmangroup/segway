@@ -1,2 +1,4 @@
+ERROR: can't allocate any more memory, malloc() failed. Either decrease your model size, find a better triangulation, use more pruning, use low-memory options, increase the size of the argument to -maxMem, and/or use a machine with more memory.
+ERROR: can't allocate any more memory, malloc() failed. Either decrease your model size, find a better triangulation, use more pruning, use low-memory options, increase the size of the argument to -maxMem, and/or use a machine with more memory.
 WARNING: DenseCPT named 'seg_subseg' received only -1.000000e+17 accumulated probability in EM iteration. Using previous iteraton values.
 WARNING: DenseCPT named 'seg_subseg_subseg' received only -1.000000e+17 accumulated probability in EM iteration. Using previous iteraton values.
