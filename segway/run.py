@@ -2525,7 +2525,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
-                       genomedata_archives_text, self.genomedataname, float_filepath, int_filepath,
+                       genomedata_archives_text, float_filepath, int_filepath,
                        self.distribution, track_indexes_text, self.mix_components]
 
         output_filename = None

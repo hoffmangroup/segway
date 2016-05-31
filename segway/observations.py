@@ -19,10 +19,8 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 
-from numpy import sum as npsum
-from numpy import square as npsquare
-from numpy import (absolute, add, append, any, arange, arcsinh, array, column_stack, empty, sign,sqrt,
-                   invert, isnan, maximum, power as to_power, transpose, where, zeros, nansum,nan_to_num,fromfile,float32)
+from numpy import (absolute, add, append, any, arange, arcsinh, array, column_stack, copy, empty, sign,sqrt, sum as npsum,
+                   square as npsquare, invert, isnan, maximum, power as to_power, transpose, where, zeros, nansum,nan_to_num,fromfile,float32)
 
 from path import path
 from tabdelim import ListWriter
@@ -518,6 +516,16 @@ class Observations(object):
         if self.use_dinucleotide:
             return chromosome.seq[start:end]
 
+    def make_continuous_cells_simple(self, world, chromosome, start, end):
+        """
+        returns 2-dimensional numpy.ndarray of continuous observation
+        data for specified interval. This data is untransformed
+
+        dim 0: position
+        dim 1: track
+        """
+        track_indexes = self.world_track_indexes[world]
+        return chromosome[start:end, track_indexes]
 
     def make_supervision_cells(self, chrom, start, end):
         """
@@ -569,7 +577,7 @@ class Observations(object):
             for window_index, (world, chrom, start, end) in enumerate(self.windows):
                 chromosome = genome[chrom]
                 continuous_cells = \
-                                   self.make_continuous_cells(world, chromosome, start, end)
+                                   self.make_continuous_cells_simple(world, chromosome, start, end)
                 tracks_sums += npsum(nan_to_num(arcsinh(continuous_cells)),axis=0)
                 tracks_num_datapoints += npsum(~isnan(continuous_cells),axis=0)
                 tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
@@ -634,4 +642,4 @@ class Observations(object):
         with open_writable(self.float_filelistpath) as float_filelist:
             with open_writable(self.int_filelistpath) as int_filelist:
                 with open_writable(self.float_tabfilepath) as float_tabfile:
-                    self.write(float_filelist, genome, int_filelist, float_tabfile)
+                    self.write(genome, float_filelist, int_filelist, float_tabfile)
