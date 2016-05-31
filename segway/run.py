@@ -228,7 +228,7 @@ TRAIN_OPTION_TYPES = \
          distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
          num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
-         reverse_worlds=[int],mix_components=int)
+         reverse_worlds=[int], mix_components=int)
 
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
@@ -702,6 +702,7 @@ class Runner(object):
                         ("max_train_rounds", "max_em_iters"),
                         ("reverse_world", "reverse_worlds"),
                         ("track", "track_specs")]
+   
     @classmethod
     def fromargs(cls, args):
         """Parses the arguments (not options) that were given to segway"""
@@ -1518,8 +1519,6 @@ class Runner(object):
         # Get the data type for this genomedata attribute
         with Genome(self.genomedata_names[0]) as genome:
             attr = getattr(genome, name)
-            print "attr,genome,name"
-            print attr,genome,name
 
         track_groups = self.track_groups
         # Create an empty list of the same type as the genomedata attribute and
@@ -1555,7 +1554,6 @@ class Runner(object):
         subset_metadata_attr("sums")
         subset_metadata_attr("sums_squares")
         subset_metadata_attr("num_datapoints")
-        #subset_metadata_attr(genome, "num_tracks_continuous")
 
     def save_input_master(self, instance_index=None, new=False):
         if new:

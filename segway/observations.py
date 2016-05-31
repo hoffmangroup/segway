@@ -18,8 +18,11 @@ import sys
 from tempfile import gettempdir
 
 from genomedata import Genome
-from numpy import (absolute, add, append, any, arange, arcsinh, array, bincount, clip, column_stack, copy, empty, sign,sqrt, sum as npsum,
-                   square as npsquare, invert, isnan, maximum, power as to_power, transpose, where, zeros, nansum,nan_to_num,fromfile,float32)
+from numpy import (absolute, add, append, any, arange, arcsinh, array,
+                   bincount, clip, column_stack, copy, empty, sign,sqrt,
+                   sum as npsum, square as npsquare, invert, isnan, maximum,
+                   power as to_power, transpose, where, zeros, nansum,
+                   nan_to_num, fromfile, float32)
 
 from path import path
 from tabdelim import ListWriter
@@ -123,6 +126,9 @@ def find_overlaps_exclude(start, end, exclude_coords):
     """
     takes a start and end and removes everything in exclude_coords
     """
+    # diagram of how this works:
+    #        --------------------- (include)
+    #
     # diagram of how this works:
     #        --------------------- (include)
     #
@@ -321,9 +327,6 @@ def make_dinucleotide_int_data(seq):
     # disregard the whole dinucleotide when half is N
     dinucleotide_missing = (nucleotide_missing[:-1] + nucleotide_missing[1:])
 
-    dinucleotide_presence = empty(dinucleotide_missing.shape, DTYPE_OBS_INT)
-    invert(dinucleotide_missing, dinucleotide_presence)
-
     # XXXopt: set these up properly in the first place instead of
     # column_stacking at the end
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
@@ -367,7 +370,9 @@ def make_continuous_cells(track_indexes, genomedata_names,
 
     return continuous_cells
 
-def _save_window(float_filename, int_filename, float_data, resolution, distribution,zscore=False,tracks_means=None,tracks_vars=None,seq_data=None, supervision_data=None):
+def _save_window(float_filename, int_filename, float_data, resolution, 
+                 distribution, zscore=False, tracks_means=None, 
+                 tracks_vars=None, seq_data=None, supervision_data=None):
     # called by task.py as well as observation.py
 
     # input function in GMTK_ObservationMatrix.cc:
@@ -409,6 +414,11 @@ def _save_window(float_filename, int_filename, float_data, resolution, distribut
         float_data.tofile(float_filename)
 
     if seq_data is not None:
+        assert resolution == 1  # not implemented yet
+        int_blocks.append(make_dinucleotide_int_data(seq_data))
+
+    if supervision_data is not None:
+        supervision_data, presence_supervision_data = \
         assert resolution == 1  # not implemented yet
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
@@ -514,11 +524,6 @@ class Observations(object):
             new_ends = append(new_starts[1:], end)
 
             return zip(new_starts, new_ends)
-
-        return [[start, end]]
-
-    def locate_windows(self, genome):
-        """
         input: Genome instance, include_coords, exclude_ coords, max_frames
 
         sets: window_coords
@@ -557,7 +562,9 @@ class Observations(object):
 
     def save_window(self, float_filename, int_filename, float_data,tracks_means,
                     tracks_vars,seq_data=None, supervision_data=None):
-        return _save_window(float_filename, int_filename, float_data,self.resolution, self.distribution, self.zscore,tracks_means,tracks_vars,seq_data,supervision_data)
+        return _save_window(float_filename, int_filename, float_data, 
+                            self.resolution, self.distribution, self.zscore,
+                            tracks_means, tracks_vars, seq_data, supervision_data)
 
     @staticmethod
     def make_filepath(dirpath, prefix, suffix):
@@ -658,6 +665,8 @@ class Observations(object):
                 tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
             tracks_means = tracks_sums / tracks_num_datapoints
             tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
+        elif self.zscore and self.distribution != DISTRIBUTION_ASINH_NORMAL
+            
         elif self.zscore:
             tracks_means = genome.means
             tracks_vars = genome.vars
@@ -680,9 +689,9 @@ class Observations(object):
                 # Get the first genome from this world to use for generating
                 # sequence cells
                 genomedata_name = self.world_genomedata_names[world][0]
-                with Genome(genomedata_name) as genome_data:
-                    chromosome = genome_data[chrom]
-                    seq_cells = self.make_seq_cells(chromosome, start, end)
+                
+                chromosome = genome[chrom]
+                seq_cells = self.make_seq_cells(chromosome, start, end)
 
                 supervision_cells = \
                     self.make_supervision_cells(chrom, start, end)
@@ -703,7 +712,7 @@ class Observations(object):
 
                 # data is transformed as part of _save_window()
                 save_window(float_filepath, int_filepath, continuous_cells,
-                            tracks_means, tracks_vars,seq_cells, supervision_cells)
+                            tracks_means, tracks_vars, seq_cells, supervision_cells)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):

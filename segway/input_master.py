@@ -794,8 +794,6 @@ class InputMasterSaver(Saver):
         if distribution in DISTRIBUTIONS_LIKE_NORM:
             mean_spec = MeanParamSpec(self)
             if COVAR_TIED:
-                print "tied"
-                print COVAR_TIED
                 covar_spec = TiedCovarParamSpec(self)
             else:
                 covar_spec = CovarParamSpec(self)
