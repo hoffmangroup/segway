@@ -539,7 +539,6 @@ Thus EM gets stuck in a local optimum.  Adding a pseudocount is a way to avoid
 this pitfall.  A pseudocount of 1 is added by default; if very small transition 
 probabilities are observed, it may be necessary to increase this value.
 
-
 The :option:`--dont-train`\=\ *file* option specifies a file with a
 newline-delimited list of parameters not to train. By default, this
 includes the ``dpmf_always``, ``start_seg``, and all GMTK
