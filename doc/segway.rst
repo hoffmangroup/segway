@@ -544,7 +544,9 @@ and so the probability will still be zero after the next parameter update step.
 Thus EM gets stuck in a local optimum and a zero probability appears in the 
 label-label transition matrix. By adding a pseudocount is a way to avoid ever
 getting zeros in this matrix. It is a good idea to add a pseudocount for all 
-Segway runs.
+Segway runs. Since we want just get out of the local optimum and a zero probability,
+1 should be the sufficient pseudocount for most cases.
+The number would depend on how quick the user would get out.
 
 Seeding
 ~~~~~~~
