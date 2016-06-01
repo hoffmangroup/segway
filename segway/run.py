@@ -16,7 +16,7 @@ from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
 from os import environ, extsep
-from random import sample
+from random import sample, seed
 import re
 from shutil import copy2
 from string import letters
@@ -2667,6 +2667,15 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         self.save_gmtk_input()
 
+        # seed the python random module
+        try:
+            seed_text = environ["SEGWAY_RAND_SEED"]
+        except KeyError:
+            pass
+        else:
+            seed(int(seed_text))
+
+        print sample(range(10),5)
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:
                 print >>self.cmdline_short_file, run_msg
