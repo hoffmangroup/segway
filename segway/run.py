@@ -2675,7 +2675,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         else:
             seed(int(seed_text))
 
-        print sample(range(10),5)
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:
                 print >>self.cmdline_short_file, run_msg
