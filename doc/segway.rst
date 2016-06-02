@@ -541,10 +541,10 @@ a pseudocount to the label-label transition matrix. For example, if there is
 zero probability for (say) label 1 to transition to label 2, then in the 
 inference step the algorithm will never assign any instances of this transition, 
 and so the probability will still be zero after the next parameter update step. 
-Thus EM gets stuck in a local optimum and a zero probability appears in the 
-label-label transition matrix. By adding a pseudocount is a way to avoid ever
-getting zeros in this matrix. It is a good idea to add a pseudocount for all 
-Segway runs.
+Thus EM gets stuck in a local optimum. Adding a pseudocount is a way to avoid
+this pitfall. A pseudocount of 1 is added by default; if very small transition
+probabilities are observed, it may be necessary to increase this value. The scale
+of the number is positive integers.
 
 Seeding
 ~~~~~~~
