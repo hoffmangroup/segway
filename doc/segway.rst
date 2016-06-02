@@ -530,6 +530,15 @@ combine any overlapping labels before specifying them to Segway.
 
 General options
 ---------------
+The :option:`--transition-prior-strength`\=\ *number* option creates 
+a pseudocount to the label-label transition matrix. In general, if there is 
+zero probability for (say) label 1 to transition to label 2, then in the 
+inference step the algorithm will never assign any instances of this transition, 
+and so the probability will still be zero after the next parameter update step. 
+Thus EM gets stuck in a local optimum.  Adding a pseudocount is a way to avoid 
+this pitfall.  A pseudocount of 1 is added by default; if very small transition 
+probabilities are observed, it may be necessary to increase this value.
+
 The :option:`--dont-train`\=\ *file* option specifies a file with a
 newline-delimited list of parameters not to train. By default, this
 includes the ``dpmf_always``, ``start_seg``, and all GMTK
