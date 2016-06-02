@@ -686,8 +686,8 @@ class InputMasterSaver(Saver):
 
         dt_spec = DTParamSpec(self)
 
-        if self.len_seg_strength > 0 or
-            self.transition_seg_strength > 0:
+        if (self.len_seg_strength > 0 or
+            self.transition_seg_strength > 0):
             dirichlet_spec = DirichletTabParamSpec(self)
         else:
             dirichlet_spec = ""
