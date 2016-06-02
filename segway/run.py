@@ -16,7 +16,6 @@ from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
 from os import environ, extsep
-from random import sample, seed
 import re
 from shutil import copy2
 from string import letters
@@ -30,6 +29,7 @@ from warnings import warn
 from genomedata import Genome
 from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
+from numpy.random import choice
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -2051,7 +2051,7 @@ class Runner(object):
         else:
             train_windows_all = list(self.window_lens_sorted())
             num_train_windows = len(train_windows_all)
-            train_window_indices_shuffled = sample(range(num_train_windows),
+            train_window_indices_shuffled = choice(range(num_train_windows),
                                                    num_train_windows)
             train_windows = []
             cur_bases = 0
@@ -2666,14 +2666,6 @@ to find the winning instance anyway.""" % thread.instance_index)
             )
 
         self.save_gmtk_input()
-
-        # seed the python random module
-        try:
-            seed_text = environ["SEGWAY_RAND_SEED"]
-        except KeyError:
-            pass
-        else:
-            seed(int(seed_text))
 
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:
