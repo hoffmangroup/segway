@@ -1,9 +1,14 @@
 1.4.1:
+* segway: --num-minibatch-windows can now be seeded with SEGWAY_RAND_SEED and
+  will select the same windows with when given the same seed 
+  (thanks to Rachel Chan)
 * segway: fix --prior-strength option
 * segway: local job submission now appends error logs instead of rewriting them
-* segway: add resolution functionality for semisupervised mode (thanks to Rachel Chan)
+* segway: add resolution functionality for semisupervised mode 
+  (thanks to Rachel Chan)
 * segway: add --transition-prior-strength option, which adds a pseudocount to
-  avoid ever getting zeros in the label-label transition matrix (thanks to Max Libbrecht, Shiqi Zou)
+  avoid ever getting zeros in the label-label transition matrix 
+  (thanks to Max Libbrecht, Shiqi Zou)
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
