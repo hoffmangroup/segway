@@ -2052,7 +2052,8 @@ class Runner(object):
             train_windows_all = list(self.window_lens_sorted())
             num_train_windows = len(train_windows_all)
             train_window_indices_shuffled = choice(range(num_train_windows),
-                                                   num_train_windows)
+                                                   num_train_windows,
+                                                   replace=False)
             train_windows = []
             cur_bases = 0
             total_bases = sum(
