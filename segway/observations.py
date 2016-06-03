@@ -18,11 +18,10 @@ import sys
 from tempfile import gettempdir
 
 from genomedata import Genome
-from numpy import (absolute, add, append, any, arange, arcsinh, array,
-                   bincount, clip, column_stack, copy, empty, sign,sqrt,
-                   sum as npsum, square as npsquare, invert, isnan, maximum,
-                   power as to_power, transpose, where, zeros, nansum,
-                   nan_to_num, fromfile, float32)
+from numpy import (add, append, arange, arcsinh, array, bincount, clip,
+                   column_stack, copy, empty, sqrt, sum as npsum,
+                   square as npsquare, invert, isnan, maximum, where,
+                   zeros, nan_to_num, float32)
 
 from path import path
 from tabdelim import ListWriter
@@ -126,9 +125,6 @@ def find_overlaps_exclude(start, end, exclude_coords):
     """
     takes a start and end and removes everything in exclude_coords
     """
-    # diagram of how this works:
-    #        --------------------- (include)
-    #
     # diagram of how this works:
     #        --------------------- (include)
     #
