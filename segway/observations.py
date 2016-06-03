@@ -332,6 +332,9 @@ def make_dinucleotide_int_data(seq):
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
 
 def zscore_norm(float_data, tracks_means, tracks_vars):
+    """
+    set up the norm for the --zscore option
+    """
     assert float_data.shape[1] == tracks_means.shape[0]
     assert tracks_means.shape[0] == tracks_vars.shape[0]
     num_tracks = tracks_means.shape[0]
@@ -414,11 +417,6 @@ def _save_window(float_filename, int_filename, float_data, resolution,
         float_data.tofile(float_filename)
 
     if seq_data is not None:
-        assert resolution == 1  # not implemented yet
-        int_blocks.append(make_dinucleotide_int_data(seq_data))
-
-    if supervision_data is not None:
-        supervision_data, presence_supervision_data = \
         assert resolution == 1  # not implemented yet
         int_blocks.append(make_dinucleotide_int_data(seq_data))
 
@@ -524,6 +522,11 @@ class Observations(object):
             new_ends = append(new_starts[1:], end)
 
             return zip(new_starts, new_ends)
+        
+        return [[start, end]]
+
+    def locate_windows(self, genome):
+        """
         input: Genome instance, include_coords, exclude_ coords, max_frames
 
         sets: window_coords
@@ -560,7 +563,7 @@ class Observations(object):
 
         self.windows = windows
 
-    def save_window(self, float_filename, int_filename, float_data,tracks_means,
+    def save_window(self, float_filename, int_filename, float_data, tracks_means,
                     tracks_vars,seq_data=None, supervision_data=None):
         return _save_window(float_filename, int_filename, float_data, 
                             self.resolution, self.distribution, self.zscore,
@@ -652,7 +655,8 @@ class Observations(object):
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
  
-        if self.zscore and self.distribution == DISTRIBUTION_ASINH_NORMAL:
+        if (self.zscore and
+            self.distribution == DISTRIBUTION_ASINH_NORMAL):
             tracks_sums = [0]*genome.num_tracks_continuous
             tracks_num_datapoints = [0]*genome.num_tracks_continuous
             tracks_sums_squared = [0]*genome.num_tracks_continuous
@@ -665,8 +669,8 @@ class Observations(object):
                 tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
             tracks_means = tracks_sums / tracks_num_datapoints
             tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
-        elif self.zscore and self.distribution != DISTRIBUTION_ASINH_NORMAL
-            
+        elif self.zscore and self.distribution != DISTRIBUTION_NORMAL:
+            raise NotImplementedError
         elif self.zscore:
             tracks_means = genome.means
             tracks_vars = genome.vars
