@@ -15,7 +15,7 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
-from os import environ, extsep
+from os import chmod, environ, extsep
 import re
 from shutil import copy2
 from string import letters
@@ -1095,6 +1095,10 @@ class Runner(object):
         return self.make_output_dirpath("e", self.instance_index)
 
     @memoized_property
+    def jobscript_dirpath(self):
+        return self.make_jobscript_dirpath(self.instance_index)
+
+    @memoized_property
     def use_dinucleotide(self):
         return TRACK_DINUCLEOTIDE in self.tracks
 
@@ -1447,6 +1451,12 @@ class Runner(object):
 
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
+        self.make_dir(res)
+
+        return res
+
+    def make_jobscript_dirpath(self, instance_index):
+        res = self.work_dirpath / "cmdline" / str(instance_index)
         self.make_dir(res)
 
         return res
@@ -1829,12 +1839,15 @@ class Runner(object):
         for window_len, window_index in zipper:
             yield window_index, window_len
 
-    def log_cmdline(self, cmdline, args=None):
+    def log_cmdline(self, cmdline, args=None, jobscript_file=None):
         if args is None:
             args = cmdline
 
         _log_cmdline(self.cmdline_short_file, cmdline)
         _log_cmdline(self.cmdline_long_file, args)
+
+        if jobscript_file is not None:
+            _log_cmdline(jobscript_file, cmdline)
 
     def calc_tmp_usage_obs(self, num_frames, prog):
         if prog not in TMP_OBS_PROGS:
@@ -1856,9 +1869,18 @@ class Runner(object):
         else:
             args = gmtk_cmdline
 
-        # this doesn't include use of segway-wrapper, which takes the
-        # memory usage as an argument, and may be run multiple times
-        self.log_cmdline(gmtk_cmdline, args)
+        shell_job_name = job_name + "." + EXT_SH
+        jobscript_filename = self.jobscript_dirpath / shell_job_name
+    
+        with open(jobscript_filename, 'w') as jobscript_file:
+            print >>jobscript_file, "#!/usr/bin/env bash"
+            # this doesn't include use of segway-wrapper, which takes the
+            # memory usage as an argument, and may be run multiple times
+            self.log_cmdline(gmtk_cmdline, args, jobscript_file)
+        
+        # set permissions for script to run
+        chmod(jobscript_filename, 0775)  # the chmod function requires
+        # the permissions option to be in octal (0775)
 
         if self.dry_run:
             return None
@@ -1868,7 +1890,7 @@ class Runner(object):
 
         job_tmpl.jobName = job_name
         job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = map(str, args)
+        job_tmpl.args = [jobscript_filename]
 
         # this is going to cause problems on heterogeneous systems
         environment = environ.copy()
