@@ -147,6 +147,8 @@ class RestartableJob(object):
 
         return res
 
+    def __del__(self):
+        self.job_tmpl_factory.deleteJobTemplate(self.session)
 
 class RestartableJobDict(dict):
     def __init__(self, session, job_log_file, *args, **kwargs):
