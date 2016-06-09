@@ -6,6 +6,7 @@
 * segway: local job submission now appends error logs instead of rewriting them
 * segway: add resolution functionality for semisupervised mode 
   (thanks to Rachel Chan)
+* segway: fix memory leak due to DRMAA job templates not being deleted
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
