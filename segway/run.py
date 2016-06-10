@@ -1095,8 +1095,8 @@ class Runner(object):
         return self.make_output_dirpath("e", self.instance_index)
 
     @memoized_property
-    def jobscript_dirpath(self):
-        return self.make_jobscript_dirpath(self.instance_index)
+    def job_script_dirpath(self):
+        return self.make_job_script_dirpath(self.instance_index)
 
     @memoized_property
     def use_dinucleotide(self):
@@ -1455,7 +1455,7 @@ class Runner(object):
 
         return res
 
-    def make_jobscript_dirpath(self, instance_index):
+    def make_job_script_dirpath(self, instance_index):
         res = self.work_dirpath / "cmdline" / str(instance_index)
         self.make_dir(res)
 
@@ -1839,15 +1839,15 @@ class Runner(object):
         for window_len, window_index in zipper:
             yield window_index, window_len
 
-    def log_cmdline(self, cmdline, args=None, jobscript_file=None):
+    def log_cmdline(self, cmdline, args=None, script_file=None):
         if args is None:
             args = cmdline
 
         _log_cmdline(self.cmdline_short_file, cmdline)
         _log_cmdline(self.cmdline_long_file, args)
 
-        if jobscript_file is not None:
-            _log_cmdline(jobscript_file, args)
+        if script_file is not None:
+            _log_cmdline(script_file, args)
 
     def calc_tmp_usage_obs(self, num_frames, prog):
         if prog not in TMP_OBS_PROGS:
@@ -1870,16 +1870,16 @@ class Runner(object):
             args = gmtk_cmdline
 
         shell_job_name = job_name + "." + EXT_SH
-        jobscript_filename = self.jobscript_dirpath / shell_job_name
+        job_script_filename = self.job_script_dirpath / shell_job_name
     
-        with open(jobscript_filename, 'w') as jobscript_file:
-            print >>jobscript_file, "#!/usr/bin/env bash"
+        with open(job_script_filename, 'w') as job_script_file:
+            print >>job_script_file, "#!/usr/bin/env bash"
             # this doesn't include use of segway-wrapper, which takes the
             # memory usage as an argument, and may be run multiple times
-            self.log_cmdline(gmtk_cmdline, args, jobscript_file)
+            self.log_cmdline(gmtk_cmdline, args, job_script_file)
         
         # set permissions for script to run
-        chmod(jobscript_filename, 0775)  # the chmod function requires
+        chmod(job_script_filename, 0775)  # the chmod function requires
         # the permissions option to be in octal (0775)
 
         if self.dry_run:
@@ -1890,7 +1890,7 @@ class Runner(object):
 
         job_tmpl.jobName = job_name
         job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = [jobscript_filename]
+        job_tmpl.args = [job_script_filename]
 
         # this is going to cause problems on heterogeneous systems
         environment = environ.copy()
