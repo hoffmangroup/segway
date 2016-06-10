@@ -1847,7 +1847,7 @@ class Runner(object):
         _log_cmdline(self.cmdline_long_file, args)
 
         if jobscript_file is not None:
-            _log_cmdline(jobscript_file, cmdline)
+            _log_cmdline(jobscript_file, args)
 
     def calc_tmp_usage_obs(self, num_frames, prog):
         if prog not in TMP_OBS_PROGS:
