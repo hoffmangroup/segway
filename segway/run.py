@@ -283,15 +283,11 @@ def quote_trackname(text):
 
 def quote_spaced_str(item):
     """
-    add quotes around text if it has spaces in it
+    add quotes around text
     """
     text = str(item)
 
-    if " " in text:
-        return '"%s"' % text
-    else:
-        return text
-
+    return '"%s"' % text
 
 class NoAdvance(str):
     """
@@ -1871,7 +1867,7 @@ class Runner(object):
 
         shell_job_name = job_name + "." + EXT_SH
         job_script_filename = self.job_script_dirpath / shell_job_name
-    
+
         with open(job_script_filename, 'w') as job_script_file:
             print >>job_script_file, "#!/usr/bin/env bash"
             # this doesn't include use of segway-wrapper, which takes the
