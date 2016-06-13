@@ -2066,6 +2066,15 @@ class Runner(object):
                     cur_bases += train_windows_all[train_window_index][1]
                 else:
                     break
+            # GMTK has an internal limit that the number of windows in
+            # loadAccRange must be less than 9999. However, it also seems
+            # to expect a sorted sequential list of the form 1:9999. So if
+            # minibatch chooses a number n greater than 9999 as the last
+            # index, GMTK will assume the number of windows is n, and thus
+            # greater than 9999, and error out (even if the actual number of
+            # windows is much less than 9999. By sorting in reverse, we 
+            # ensure that the last window index is the smallest number
+            # possible.
             train_windows.sort(reverse=True)
 
         restartable_jobs = \
