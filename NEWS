@@ -6,6 +6,8 @@
 * segway: local job submission now appends error logs instead of rewriting them
 * segway: add resolution functionality for semisupervised mode 
   (thanks to Rachel Chan)
+* segway: change stderr message to specify whether the job is queued or
+  run locally
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
