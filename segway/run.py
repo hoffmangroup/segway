@@ -651,7 +651,7 @@ class Runner(object):
         for task in tasks:
             if task == "train":
                 self.train = True
-            elif task == "identify":
+            elif task == "identify" or task == "identify":
                 self.identify = True
             elif task == "posterior":
                 self.posterior = True
