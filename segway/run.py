@@ -2072,7 +2072,7 @@ class Runner(object):
             # minibatch chooses a number n greater than 9999 as the last
             # index, GMTK will assume the number of windows is n, and thus
             # greater than 9999, and error out (even if the actual number of
-            # windows is much less than 9999. By sorting in reverse, we 
+            # windows is much less than 9999). By sorting in reverse, we 
             # ensure that the last window index is the smallest number
             # possible.
             train_windows.sort(reverse=True)
