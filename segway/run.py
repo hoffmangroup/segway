@@ -2066,6 +2066,7 @@ class Runner(object):
                     cur_bases += train_windows_all[train_window_index][1]
                 else:
                     break
+            train_windows.sort(reverse=True)
 
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
