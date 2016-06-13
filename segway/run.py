@@ -2070,7 +2070,7 @@ class Runner(object):
             # the last number is greater than 9999, it errors out even
             # though the number of values given is less than 9999. By
             # sorting in reverse, we ensure that the last window index
-            # is he smallest number possible.
+            # is the smallest number possible.
             train_windows.sort(reverse=True)
 
         restartable_jobs = \
