@@ -317,7 +317,7 @@ class Segmentation(defaultdict):
                         segments_label_list.append((end-1, end))
 
                     # pad beginning if necessary
-                    if not len(segments_label) or segments_label[0, OFFSET_START] != 0:
+                    if not len(segments_label) or segments_label[0, OFFSET_START] != start:
                         segments_label_list.insert(0, (start, start+1))
 
                     segments_label = vstack(segments_label_list)
