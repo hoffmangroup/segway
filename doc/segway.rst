@@ -426,6 +426,16 @@ be a function of both :option:`--segtransition-weight-scale` and
 One may effectively use the hard length constraints and soft length
 priors simultaneously.
 
+The :option:`--transition-prior-strength`\=\ *number* option creates
+a pseudocount to the label-label transition matrix. In general, if there is
+zero probability for (say) label 1 to transition to label 2, then in the
+inference step the algorithm will never assign any instances of this transition,
+and so the probability will still be zero after the next parameter update step.
+Thus EM gets stuck in a local optimum.  Adding a pseudocount is a way to avoid
+this pitfall.  A pseudocount of 1 is added by default; if very small transition
+probabilities are observed, it may be necessary to increase this value.
+The scale of the number is positive integers.
+
 Task selection
 ==============
 Segway will perform either (a) model generation and training or (b)
@@ -530,16 +540,6 @@ combine any overlapping labels before specifying them to Segway.
 
 General options
 ---------------
-The :option:`--transition-prior-strength`\=\ *number* option creates 
-a pseudocount to the label-label transition matrix. In general, if there is 
-zero probability for (say) label 1 to transition to label 2, then in the 
-inference step the algorithm will never assign any instances of this transition, 
-and so the probability will still be zero after the next parameter update step. 
-Thus EM gets stuck in a local optimum.  Adding a pseudocount is a way to avoid 
-this pitfall.  A pseudocount of 1 is added by default; if very small transition 
-probabilities are observed, it may be necessary to increase this value.
-The scale of the number is positive integers.
-
 The :option:`--dont-train`\=\ *file* option specifies a file with a
 newline-delimited list of parameters not to train. By default, this
 includes the ``dpmf_always``, ``start_seg``, and all GMTK
