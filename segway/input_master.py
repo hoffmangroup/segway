@@ -484,7 +484,7 @@ class DirichletTabParamSpec(TableParamSpec):
         return pseudocounts
     
     def make_components_table(self):
-        return array([100]*self.mix_components)
+        return array([100]*self.num_mix_components)
 
     def generate_objects(self):
         # XXX: these called functions have confusing/duplicative names
@@ -563,7 +563,7 @@ class MeanParamSpec(ParamSpec):
         """
         substitute = Template(self.object_tmpl).substitute
 
-        for component in range(self.mix_components):
+        for component in range(self.num_mix_components):
             data = self.make_data()
             for mapping in self.generate_tmpl_mappings():
                 track_index = mapping["track_index"]
@@ -594,7 +594,7 @@ class CovarParamSpec(ParamSpec):
         with names
         """
         substitute = Template(self.object_tmpl).substitute
-        for component in range(self.mix_components):
+        for component in range(self.num_mix_components):
             data = self.make_data()
             for mapping in self.generate_tmpl_mappings():
                 track_index = mapping["track_index"]
@@ -685,7 +685,7 @@ class NormMCParamSpec(MCParamSpec):
         with names
         """
         substitute = Template(self.object_tmpl).substitute
-        for component in xrange(self.mix_components):
+        for component in xrange(self.num_mix_components):
             for mapping in self.generate_tmpl_mappings():
                 track_index = mapping["track_index"]
                 if self.distribution == DISTRIBUTION_GAMMA:
@@ -710,7 +710,7 @@ class MXParamSpec(ParamSpec):
         with names
         """
         object_tmpl = "1 mx_${seg}_${subseg}_${track} ${mix_components} dpmf_${seg}_${subseg}_${track}"
-        for component in xrange(self.mix_components):
+        for component in xrange(self.num_mix_components):
             add = " mc_${distribution}_${seg}_${subseg}_${track}_component%s" % component
             object_tmpl += add
         substitute = Template(object_tmpl).substitute
@@ -718,7 +718,7 @@ class MXParamSpec(ParamSpec):
         data = self.make_data()
         for mapping in self.generate_tmpl_mappings():
             track_index = mapping["track_index"]
-            mapping["mix_components"] = self.mix_components
+            mapping["mix_components"] = self.num_mix_components
             if self.distribution == DISTRIBUTION_GAMMA:
                 mapping["min_track"] = self.get_track_lt_min(track_index)
             if data is not None:
@@ -739,13 +739,13 @@ class DPMFParamSpec(DenseCPTParamSpec):
 
         object_tmpl = "dpmf_${seg}_${subseg}_${track} ${mix_components} "\
                       "DirichletTable dirichlet_mix_components ${weights}"
-        weights = (" " + str(1.0 / self.mix_components))*self.mix_components
+        weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
         substitute = Template(object_tmpl).substitute
         data = self.make_data()
         for mapping in self.generate_tmpl_mappings():
             mapping["weights"] = weights
             track_index = mapping["track_index"]
-            mapping["mix_components"] = self.mix_components
+            mapping["mix_components"] = self.num_mix_components
             if self.distribution == DISTRIBUTION_GAMMA:
                 mapping["min_track"] = self.get_track_lt_min(track_index)
 

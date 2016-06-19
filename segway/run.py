@@ -634,7 +634,7 @@ class Runner(object):
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
         self.supervision_label_range_size = 0
-        self.mix_components = MIX_COMPONENTS
+        self.num_mix_components = MIX_COMPONENTS
         self.var_floor = VAR_FLOOR
 
         # flags
@@ -2527,7 +2527,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
                        genomedata_archives_text, float_filepath, int_filepath,
-                       self.distribution, track_indexes_text, self.mix_components]
+                       self.distribution, track_indexes_text, self.num_mix_components]
 
         output_filename = None
 
