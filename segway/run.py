@@ -2066,11 +2066,13 @@ class Runner(object):
                     cur_bases += train_windows_all[train_window_index][1]
                 else:
                     break
-            # In a comma-separated range, GMTK has a minor bug where if
-            # the last number is greater than 9999, it errors out even
-            # though the number of values given is less than 9999. By
-            # sorting in reverse, we ensure that the last window index
-            # is the smallest number possible.
+
+            # Workaround a GMTK bug
+            # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
+            # that raises an error if the last number in a list given to
+            # -loadAccRange is greater than 9999. By sorting in reverse, we
+            # ensure that the last window index is the smallest number
+            # possible.
             train_windows.sort(reverse=True)
 
         restartable_jobs = \
