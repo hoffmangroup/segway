@@ -111,7 +111,9 @@ class _JobTemplateFactory(object):
         """
         raise NotImplementedError
 
-    def deleteJobTemplate(self, session):
+    def delete_job_template(self, session):
+        # upon deletion of RestartableJob, the JobTemplateFactory should
+        # delete its own job template object
         session.deleteJobTemplate(self.template)
 
 def make_native_spec(*args, **kwargs):
