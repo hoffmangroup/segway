@@ -203,6 +203,7 @@ TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 
 SUBDIRNAME_ACC = "accumulators"
 SUBDIRNAME_AUX = "auxiliary"
+SUBDIRNAME_JOB_SCRIPT = "cmdline"
 SUBDIRNAME_LIKELIHOOD = "likelihood"
 SUBDIRNAME_OBS = "observations"
 SUBDIRNAME_POSTERIOR = "posterior"
@@ -281,7 +282,7 @@ def quote_trackname(text):
     return res
 
 
-def quote_spaced_str(item):
+def quote_str(item):
     """
     add quotes around text
     """
@@ -469,7 +470,7 @@ def cmdline2text(cmdline=sys.argv):
 
 
 def _log_cmdline(logfile, cmdline):
-    print >>logfile, " ".join(map(quote_spaced_str, cmdline))
+    print >>logfile, " ".join(map(quote_str, cmdline))
 
 
 def check_overlapping_supervision_labels(start, end, chrom, coords):
@@ -1452,7 +1453,7 @@ class Runner(object):
         return res
 
     def make_job_script_dirpath(self, instance_index):
-        res = self.work_dirpath / "cmdline" / str(instance_index)
+        res = self.work_dirpath / SUBDIRNAME_JOB_SCRIPT / str(instance_index)
         self.make_dir(res)
 
         return res
