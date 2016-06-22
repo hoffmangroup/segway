@@ -148,6 +148,8 @@ class RestartableJob(object):
         return res
 
     def free_job_template(self):
+        # upon deletion of RestartableJob, the JobTemplateFactory should
+        # delete its own job template object
         self.job_tmpl_factory.delete_job_template(self.session)
 
 class RestartableJobDict(dict):
