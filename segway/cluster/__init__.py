@@ -147,7 +147,7 @@ class RestartableJob(object):
 
         return res
 
-    def __del__(self):
+    def free_job_template(self):
         self.job_tmpl_factory.delete_job_template(self.session)
 
 class RestartableJobDict(dict):
@@ -269,6 +269,7 @@ class RestartableJobDict(dict):
         print >>self.job_log_file, "\t".join(row)
         self.job_log_file.flush()  # allow reading file now
 
+        restartable_job.free_job_template()
         del self[jobid]
 
     def wait(self):
