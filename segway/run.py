@@ -81,7 +81,6 @@ CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
 VAR_FLOOR = -1
 
-
 ISLAND = True
 
 # XXX: temporary code to allow easy switching
@@ -702,7 +701,7 @@ class Runner(object):
                         ("max_train_rounds", "max_em_iters"),
                         ("reverse_world", "reverse_worlds"),
                         ("track", "track_specs")]
-   
+
     @classmethod
     def fromargs(cls, args):
         """Parses the arguments (not options) that were given to segway"""
@@ -1174,7 +1173,6 @@ class Runner(object):
     @memoized_property
     def card_seg_countdown(self):
         return self.seg_countdowns_initial.max() + 1
-
 
     @memoized_property
     def num_track_groups(self):
@@ -2109,7 +2107,7 @@ class Runner(object):
         if round_index == 0:
             # if round > 0, this is set by self.recover_train_instance()
             self.save_input_master(instance_index, new)
-        
+
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
                       lldp=LOG_LIKELIHOOD_DIFF_FRAC * 100.0,
@@ -2820,7 +2818,6 @@ def parse_options(argv):
     group.add_argument("-r", "--recover", metavar="DIR",
                        help="continue from interrupted run in DIR")
 
-
     group = parser.add_argument_group("Output files")
     group.add_argument("-b", "--bed", metavar="FILE",
                        help="create identification BED track in FILE"
@@ -2871,7 +2868,7 @@ def parse_options(argv):
                        help="use RATIO times the number of data counts as"
                        " the number of pseudocounts for the segment length"
                        " prior (default %f)" % PRIOR_STRENGTH)
-    
+
     group.add_argument("--segtransition-weight-scale", type=float,
                        metavar="SCALE",
                        help="exponent for segment transition probability "
@@ -2896,7 +2893,7 @@ def parse_options(argv):
                        help="try each float in PROGRESSION as the number "
                        "of gibibytes of memory to allocate in turn "
                        "(default %s)" % MEM_USAGE_PROGRESSION)
-   
+
     group.add_argument("-S", "--split-sequences", metavar="SIZE",
                        default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
                        help="split up sequences that are larger than SIZE "
