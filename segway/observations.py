@@ -18,7 +18,7 @@ import sys
 from tempfile import gettempdir
 
 from genomedata import Genome
-from numpy import (add, append, arange, arcsinh, array, bincount, clip,
+from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, sqrt, sum as npsum,
                    square as npsquare, invert, isnan, maximum, where,
                    zeros, nan_to_num, float32)

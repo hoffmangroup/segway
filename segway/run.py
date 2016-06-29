@@ -228,7 +228,7 @@ TRAIN_OPTION_TYPES = \
          distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
          num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
-         reverse_worlds=[int], mix_components=int)
+         reverse_worlds=[int], num_mix_components=int)
 
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
@@ -695,7 +695,7 @@ class Runner(object):
                         ("ruler_scale",),
                         ("resolution",),
                         ("var_floor",),
-                        ("mixture_components","mix_components",),
+                        ("mixture_components","num_mix_components",),
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
                         ("output_label", "output_label"),
@@ -2883,11 +2883,11 @@ def parse_options(argv):
                        " (0-based)")
 
     group.add_argument("--var-floor", type=float,
-                         help="Controls the variance floor, meaning that if any" 
-                         "of the diagonal variances of a Gaussian falls below" 
-                         "this value, then the variance is “floored” (prohibited" 
-                         "from falling below the floor value). The variance, in" 
-                         "this case, is set to the corresponding variance from" 
+                         help="Controls the variance floor, meaning that if any "
+                         "of the diagonal variances of a Gaussian falls below "
+                         'this value, then the variance is "floored" (prohibited '
+                         "from falling below the floor value). The variance, in "
+                         "this case, is set to the corresponding variance from "
                          "the previous EM iteration.")
 
     group = parser.add_argument_group("Technical variables")

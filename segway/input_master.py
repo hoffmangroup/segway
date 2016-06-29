@@ -140,7 +140,7 @@ class ParamSpec(object):
     type_name = None
     object_tmpl = None
     copy_attrs = ["distribution", "mins", "num_segs", "num_subsegs",
-                  "num_track_groups", "track_groups", "mix_components"]
+                  "num_track_groups", "track_groups", "num_mix_components"]
 
     def __init__(self, saver):
         # copy all variables from saver that it copied from Runner
@@ -462,7 +462,7 @@ class DenseCPTParamSpec(TableParamSpec):
 class DirichletTabParamSpec(TableParamSpec):
     type_name = "DIRICHLET_TAB"
     copy_attrs = TableParamSpec.copy_attrs \
-        + ["len_seg_strength", "num_bases", "card_seg_countdown","mix_components",
+        + ["len_seg_strength", "num_bases", "card_seg_countdown","num_mix_components",
            "len_seg_strength"]
 
     def make_table_spec(self, name, table):
@@ -496,7 +496,7 @@ class DirichletTabParamSpec(TableParamSpec):
             yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
                                    dirichlet_table)
         dirichlet_table = self.make_components_table()
-        yield self.make_table_spec("mix_components", dirichlet_table)
+        yield self.make_table_spec("num_mix_components", dirichlet_table)
 
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
@@ -539,7 +539,7 @@ class MeanParamSpec(ParamSpec):
     object_tmpl = "mean_${seg}_${subseg}_${track}_component${component} 1 ${datum}"
     jitter_std_bound = 0.2
 
-    copy_attrs = ParamSpec.copy_attrs + ["means", "vars", "mix_components"]
+    copy_attrs = ParamSpec.copy_attrs + ["means", "vars", "num_mix_components"]
 
     def make_data(self):
         num_segs = self.num_segs
@@ -586,7 +586,7 @@ class CovarParamSpec(ParamSpec):
     type_name = "COVAR"
     object_tmpl = "covar_${seg}_${subseg}_${track}_component${component} 1 ${datum}"
 
-    copy_attrs = ParamSpec.copy_attrs + ["vars","mix_components"]
+    copy_attrs = ParamSpec.copy_attrs + ["vars","num_mix_components"]
 
     def make_data(self):
         return vstack_tile(self.vars, self.num_segs, self.num_subsegs)
@@ -668,7 +668,7 @@ class MCParamSpec(ParamSpec):
 
 
 class NormMCParamSpec(MCParamSpec):
-    copy_attrs = ParamSpec.copy_attrs + ["mix_components"]
+    copy_attrs = ParamSpec.copy_attrs + ["num_mix_components"]
 
     if USE_MFSDG:
         # dimensionality component_type name mean covar weights
@@ -712,7 +712,7 @@ class MXParamSpec(ParamSpec):
         returns: iterable of strs containing gmtk parameter objects starting
         with names
         """
-        object_tmpl = "1 mx_${seg}_${subseg}_${track} ${mix_components} dpmf_${seg}_${subseg}_${track}"
+        object_tmpl = "1 mx_${seg}_${subseg}_${track} ${num_mix_components} dpmf_${seg}_${subseg}_${track}"
         for component in xrange(self.num_mix_components):
             add = " mc_${distribution}_${seg}_${subseg}_${track}_component%s" % component
             object_tmpl += add
@@ -721,7 +721,7 @@ class MXParamSpec(ParamSpec):
         data = self.make_data()
         for mapping in self.generate_tmpl_mappings():
             track_index = mapping["track_index"]
-            mapping["mix_components"] = self.num_mix_components
+            mapping["num_mix_components"] = self.num_mix_components
             if self.distribution == DISTRIBUTION_GAMMA:
                 mapping["min_track"] = self.get_track_lt_min(track_index)
             if data is not None:
@@ -732,7 +732,7 @@ class MXParamSpec(ParamSpec):
 
 class DPMFParamSpec(DenseCPTParamSpec):
     type_name = "DPMF"
-    copy_attrs = ParamSpec.copy_attrs + ["mix_components"]
+    copy_attrs = ParamSpec.copy_attrs + ["num_mix_components"]
 
     def generate_objects(self):
         """
@@ -740,15 +740,15 @@ class DPMFParamSpec(DenseCPTParamSpec):
         with names
         """
 
-        object_tmpl = "dpmf_${seg}_${subseg}_${track} ${mix_components} "\
-                      "DirichletTable dirichlet_mix_components ${weights}"
+        object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
+                      "DirichletTable dirichlet_num_mix_components ${weights}"
         weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
         substitute = Template(object_tmpl).substitute
         data = self.make_data()
         for mapping in self.generate_tmpl_mappings():
             mapping["weights"] = weights
             track_index = mapping["track_index"]
-            mapping["mix_components"] = self.num_mix_components
+            mapping["num_mix_components"] = self.num_mix_components
             if self.distribution == DISTRIBUTION_GAMMA:
                 mapping["min_track"] = self.get_track_lt_min(track_index)
 
@@ -765,7 +765,7 @@ class InputMasterSaver(Saver):
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
-                  "gmtk_include_filename_relative", "track_groups","mix_components"]
+                  "gmtk_include_filename_relative", "track_groups","num_mix_components"] 
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
