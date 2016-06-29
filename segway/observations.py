@@ -518,7 +518,7 @@ class Observations(object):
             new_ends = append(new_starts[1:], end)
 
             return zip(new_starts, new_ends)
-        
+
         return [[start, end]]
 
     def locate_windows(self, genome):

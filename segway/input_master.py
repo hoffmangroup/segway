@@ -462,8 +462,8 @@ class DenseCPTParamSpec(TableParamSpec):
 class DirichletTabParamSpec(TableParamSpec):
     type_name = "DIRICHLET_TAB"
     copy_attrs = TableParamSpec.copy_attrs \
-        + ["len_seg_strength", "num_bases", "card_seg_countdown","num_mix_components",
-           "len_seg_strength"]
+        + ["len_seg_strength", "num_bases", "card_seg_countdown",
+           "num_mix_components"]
 
     def make_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
