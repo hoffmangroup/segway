@@ -70,7 +70,7 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
-MIX_COMPONENTS = 1
+NUM_MIX_COMPONENTS = 1
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -633,7 +633,7 @@ class Runner(object):
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
         self.supervision_label_range_size = 0
-        self.num_mix_components = MIX_COMPONENTS
+        self.num_mix_components = NUM_MIX_COMPONENTS
         self.var_floor = VAR_FLOOR
 
         # flags
@@ -2833,9 +2833,9 @@ def parse_options(argv):
                        " (default %s)" % DISTRIBUTION_DEFAULT)
 
     group.add_argument("--mixture-components", type=int,
-                         default=MIX_COMPONENTS,
+                         default=NUM_MIX_COMPONENTS,
                          help="Number of component for the mixture"
-                         " of Gaussians (default %d)" % MIX_COMPONENTS)
+                         " of Gaussians (default %d)" % NUM_MIX_COMPONENTS)
 
     group.add_argument("--num-instances", type=int,
                        default=NUM_INSTANCES, metavar="NUM",
