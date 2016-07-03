@@ -369,8 +369,8 @@ def make_continuous_cells(track_indexes, genomedata_names,
 
     return continuous_cells
 
-def _save_window(float_filename, int_filename, float_data, resolution, 
-                 distribution, zscore=False, tracks_means=None, 
+def _save_window(float_filename, int_filename, float_data, resolution,
+                 distribution, zscore=False, tracks_means=None,
                  tracks_vars=None, seq_data=None, supervision_data=None):
     # called by task.py as well as observation.py
 
@@ -561,7 +561,7 @@ class Observations(object):
 
     def save_window(self, float_filename, int_filename, float_data, tracks_means,
                     tracks_vars,seq_data=None, supervision_data=None):
-        return _save_window(float_filename, int_filename, float_data, 
+        return _save_window(float_filename, int_filename, float_data,
                             self.resolution, self.distribution, self.zscore,
                             tracks_means, tracks_vars, seq_data, supervision_data)
 
@@ -642,7 +642,7 @@ class Observations(object):
 
         return res
 
-    def write(self, genome, float_filelist, int_filelist, float_tabfile):
+    def write(self, float_filelist, int_filelist, float_tabfile):
         print_filepaths_custom = partial(self.print_filepaths,
                                          float_filelist, int_filelist,
                                          temp=self.identify)
@@ -650,26 +650,27 @@ class Observations(object):
 
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
- 
+
         if (self.zscore and
             self.distribution == DISTRIBUTION_ASINH_NORMAL):
-            tracks_sums = [0]*genome.num_tracks_continuous
-            tracks_num_datapoints = [0]*genome.num_tracks_continuous
-            tracks_sums_squared = [0]*genome.num_tracks_continuous
-            for window_index, (world, chrom, start, end) in enumerate(self.windows):
-                chromosome = genome[chrom]
-                continuous_cells = \
-                                   self.make_continuous_cells_simple(world, chromosome, start, end)
-                tracks_sums += npsum(nan_to_num(arcsinh(continuous_cells)),axis=0)
-                tracks_num_datapoints += npsum(~isnan(continuous_cells),axis=0)
-                tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
-            tracks_means = tracks_sums / tracks_num_datapoints
-            tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
-        elif self.zscore and self.distribution != DISTRIBUTION_NORMAL:
+            tracks_num_datapoints = []
+            tracks_sums = []
+            tracks_sums_squared = []
+            zipper = zip(track_indexes, genomedata_names)
+            for track_index, genomedata_name in zipper:
+                with Genome(genomedata_name) as genome:
+                    # XXX does this handle multiple worlds properly?
+                    for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                        chromosome = genome[chrom]
+                        continuous_cells = \
+                            self.make_continuous_cells_simple(world, chromosome, start, end)
+                        tracks_num_datapoints += npsum(~isnan(continuous_cells),axis=0)
+                        tracks_sums += npsum(nan_to_num(arcsinh(continuous_cells)),axis=0)
+                        tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
+                    tracks_means = tracks_sums / tracks_num_datapoints
+                    tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
+        elif self.zscore and self.distribution != DISTRIBUTION_ASINH_NORMAL:
             raise NotImplementedError
-        elif self.zscore:
-            tracks_means = genome.means
-            tracks_vars = genome.vars
         else:
             tracks_means = None
             tracks_vars = None
@@ -689,7 +690,7 @@ class Observations(object):
                 # Get the first genome from this world to use for generating
                 # sequence cells
                 genomedata_name = self.world_genomedata_names[world][0]
-                
+
                 chromosome = genome[chrom]
                 seq_cells = self.make_seq_cells(chromosome, start, end)
 
@@ -720,10 +721,10 @@ class Observations(object):
         else:
             return open(filepath, "w")
 
-    def save(self, genome):
+    def save(self):
         open_writable = self.open_writable_or_dummy
 
         with open_writable(self.float_filelistpath) as float_filelist:
             with open_writable(self.int_filelistpath) as int_filelist:
                 with open_writable(self.float_tabfilepath) as float_tabfile:
-                    self.write(genome, float_filelist, int_filelist, float_tabfile)
+                    self.write(float_filelist, int_filelist, float_tabfile)

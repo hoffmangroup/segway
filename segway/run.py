@@ -29,7 +29,7 @@ from warnings import warn
 from genomedata import Genome
 from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
-from numpy.random import choice
+from random import choice
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -1736,8 +1736,8 @@ class Runner(object):
             self.windows = observations.windows
             # XXX: does this need to be done before save()?
             self.subset_metadata()
-            
-            observations.save(genome)
+
+        observations.save()
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
@@ -2113,7 +2113,7 @@ class Runner(object):
                       lldp=LOG_LIKELIHOOD_DIFF_FRAC * 100.0,
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
-        
+
         if self.var_floor != -1: # means it was defined
             kwargs["varFloor"] = self.var_floor
 
