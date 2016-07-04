@@ -29,7 +29,7 @@ from warnings import warn
 from genomedata import Genome
 from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
-from random import choice
+from numpy.random import choice
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -1733,10 +1733,9 @@ class Runner(object):
         with Genome(self.genomedata_names[0]) as genome:
             observations.locate_windows(genome)
 
-            self.windows = observations.windows
-            # XXX: does this need to be done before save()?
-            self.subset_metadata()
-
+        self.windows = observations.windows
+        # XXX: does this need to be done before save()?
+        self.subset_metadata()
         observations.save()
 
         self.float_filepaths = observations.float_filepaths

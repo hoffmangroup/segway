@@ -653,24 +653,44 @@ class Observations(object):
 
         if (self.zscore and
             self.distribution == DISTRIBUTION_ASINH_NORMAL):
-            tracks_num_datapoints = []
-            tracks_sums = []
-            tracks_sums_squared = []
-            zipper = zip(track_indexes, genomedata_names)
-            for track_index, genomedata_name in zipper:
-                with Genome(genomedata_name) as genome:
-                    # XXX does this handle multiple worlds properly?
-                    for window_index, (world, chrom, start, end) in enumerate(self.windows):
-                        chromosome = genome[chrom]
-                        continuous_cells = \
-                            self.make_continuous_cells_simple(world, chromosome, start, end)
-                        tracks_num_datapoints += npsum(~isnan(continuous_cells),axis=0)
-                        tracks_sums += npsum(nan_to_num(arcsinh(continuous_cells)),axis=0)
-                        tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
-                    tracks_means = tracks_sums / tracks_num_datapoints
-                    tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
-        elif self.zscore and self.distribution != DISTRIBUTION_ASINH_NORMAL:
+            for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                # For every track in each genomedata archive
+                genomedata_names = self.world_genomedata_names[world]
+                for genomedata_name in genomedata_names:
+                    with Genome(genomedata_name) as genome:
+                        if track_sums is None:
+                            tracks_sums = [0]*genome.num_tracks_continuous
+                            tracks_num_datapoints = [0]*genome.num_tracks_continuous
+                            tracks_sums_squared = [0]*genome.num_tracks_continuous
+                        else:
+                            chromosome = genome[chrom]
+                            continuous_cells = \
+                                               self.make_continuous_cells_simple(world, chromosome, start, end)
+                            tracks_sums += npsum(nan_to_num(arcsinh(continuous_cells)),axis=0)
+                            tracks_num_datapoints += npsum(~isnan(continuous_cells),axis=0)
+                            tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
+                        tracks_means = tracks_sums / tracks_num_datapoints
+                        tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
+        # else, if not distribution_asinh_normal or distribution_normal
+        elif self.zscore and self.distribution != DISTRIBUTION_NORMAL:
             raise NotImplementedError
+        # if distribution_normal
+        elif self.zscore:
+            # not sure if this is a good way to resolve this case?
+            # XXX: this should be refined, rough idea only
+            track_means = 0
+            track_vars = 0
+            counter = 0
+            for window_index, (world, chrom, start, end) in enumerate(self.windows):
+                genomedata_names = self.world_genomedata_names[world]
+                for genomedata_name in genomedata_names:
+                    with Genome(genomedata_name) as genome:
+                        tracks_means += genome.means
+                        tracks_vars += genome.vars
+                    counter+=1
+            track_means /= counter
+            track_vars /= counter
+        # if self.zscore = false
         else:
             tracks_means = None
             tracks_vars = None
@@ -690,9 +710,10 @@ class Observations(object):
                 # Get the first genome from this world to use for generating
                 # sequence cells
                 genomedata_name = self.world_genomedata_names[world][0]
-
-                chromosome = genome[chrom]
-                seq_cells = self.make_seq_cells(chromosome, start, end)
+                
+                with Genome(genomedata_name) as genome:
+                    chromosome = genome[chrom]
+                    seq_cells = self.make_seq_cells(chromosome, start, end)
 
                 supervision_cells = \
                     self.make_supervision_cells(chrom, start, end)
