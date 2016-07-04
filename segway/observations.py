@@ -656,9 +656,6 @@ class Observations(object):
 
         if (self.zscore and
             self.distribution == DISTRIBUTION_ASINH_NORMAL):
-            tracks_num_datapoints = []
-            tracks_sums = []
-            tracks_sums_squared = []
             for window_index, (world, chrom, start, end) in enumerate(self.windows):
                 # For every track in each genomedata archive
                 genomedata_names = self.world_genomedata_names[world]
@@ -697,7 +694,6 @@ class Observations(object):
                 # Get the first genome from this world to use for generating
                 # sequence cells
                 genomedata_name = self.world_genomedata_names[world][0]
-                
                 with Genome(genomedata_name) as genome:
                     chromosome = genome[chrom]
                     seq_cells = self.make_seq_cells(chromosome, start, end)
