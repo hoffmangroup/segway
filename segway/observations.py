@@ -674,8 +674,8 @@ class Observations(object):
                         tracks_sums += npsum(nan_to_num(arcsinh(continuous_cells)),axis=0)
                         tracks_num_datapoints += npsum(~isnan(continuous_cells),axis=0)
                         tracks_sums_squared += npsum(nan_to_num(npsquare(arcsinh(continuous_cells))),axis=0)
-            tracks_means = tracks_sums / tracks_num_datapoints
-            tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
+                    tracks_means = tracks_sums / tracks_num_datapoints
+                    tracks_vars = (tracks_sums_squared / tracks_num_datapoints) - npsquare(tracks_means)
         elif self.zscore and self.distribution != DISTRIBUTION_ASINH_NORMAL:
             raise NotImplementedError
         else:
