@@ -323,6 +323,9 @@ def make_dinucleotide_int_data(seq):
     # disregard the whole dinucleotide when half is N
     dinucleotide_missing = (nucleotide_missing[:-1] + nucleotide_missing[1:])
 
+    dinucleotide_presence = empty(dinucleotide_missing.shape, DTYPE_OBS_INT)
+    invert(dinucleotide_missing, dinucleotide_presence)
+
     # XXXopt: set these up properly in the first place instead of
     # column_stacking at the end
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
