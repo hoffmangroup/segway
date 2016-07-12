@@ -714,8 +714,29 @@ class Runner(object):
         else:
             # The genomedata archives except the final train directory and
             # posterior/identify working directory
-            res.genomedata_names = args[1:-2]
             train_dir_name = args[-2]
+
+            traindir_segway_command_file_path = train_dir_name + "/" \
+                + SUBDIRNAME_LOG + "/" + PREFIX_CMDLINE_TOP \
+                + "." + EXT_SH
+            with open(traindir_segway_command_file_path, 'r') \
+                    as traindir_segway_command_file:
+                traindir_segway_command_file_contents = \
+                    traindir_segway_command_file.readlines()
+
+            # obtain the part of the training commandline file that is
+            # parameters, directories, and task and split them into an
+            # array where each entry is a parameter, directory, or task
+            traindir_segway_commandline = \
+                str(traindir_segway_command_file_contents[-1]).split('" "')
+
+            # find the index of the train task. we want the entries between
+            # 'train' and the final entry (train directory) specified. these
+            # are our genomedata archives
+            train_task_index = traindir_segway_commandline.index("train")
+            res.genomedata_names = \
+                traindir_segway_commandline[train_task_index+1:-1]
+
             res.work_dirname = args[-1]
 
             try:
@@ -2907,8 +2928,8 @@ def parse_options(argv):
         if len(args) < 3:
             parser.error("Expected at least 3 arguments for the train task.")
     else:
-        if len(args) < 4:
-            parser.error("Expected at least 4 arguments for the identify "
+        if len(args) < 3:
+            parser.error("Expected at least 3 arguments for the identify "
                          "task.")
 
     return options, args
