@@ -18,6 +18,7 @@ from math import ceil, ldexp
 from os import chmod, environ, extsep
 import re
 from shutil import copy2
+import stat
 from string import letters
 import sys
 from threading import Event, Lock, Thread
@@ -33,6 +34,7 @@ from numpy.random import choice
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
+import pipes
 from pkg_resources import Requirement, working_set
 from tabdelim import DictReader, ListWriter
 
@@ -213,6 +215,11 @@ SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
                      SUBDIRNAME_PARAMS]
 
+# job script file permissions: owner has read/write/execute
+# permissions, group/others have read/execute permissions
+JOB_SCRIPT_FILE_PERMISSIONS = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP \
+                              | stat.S_IROTH | stat.S_IXOTH
+
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
                       "num_frames", "maxvmem", "cpu", "exit_status"]
 # XXX: should add num_subsegs as well, but it's complicated to pass
@@ -281,14 +288,6 @@ def quote_trackname(text):
 
     return res
 
-
-def quote_str(item):
-    """
-    add quotes around text
-    """
-    text = str(item)
-
-    return '"%s"' % text
 
 class NoAdvance(str):
     """
@@ -470,7 +469,13 @@ def cmdline2text(cmdline=sys.argv):
 
 
 def _log_cmdline(logfile, cmdline):
-    print >>logfile, " ".join(map(quote_str, cmdline))
+    quoted_cmdline_list = []
+    for cmdarg in cmdline:
+        # pipes.quote() will only quote arguments that need
+        # quotes to be run on shell commandline
+        quoted_cmdline_list.append(pipes.quote(str(cmdarg)))
+    quoted_cmdline = ' '.join(quoted_cmdline_list)
+    print >>logfile, quoted_cmdline
 
 
 def check_overlapping_supervision_labels(start, end, chrom, coords):
@@ -1866,18 +1871,17 @@ class Runner(object):
         else:
             args = gmtk_cmdline
 
-        shell_job_name = job_name + "." + EXT_SH
+        shell_job_name = extsep.join([job_name, EXT_SH])
         job_script_filename = self.job_script_dirpath / shell_job_name
 
-        with open(job_script_filename, 'w') as job_script_file:
+        with open(job_script_filename, "w") as job_script_file:
             print >>job_script_file, "#!/usr/bin/env bash"
             # this doesn't include use of segway-wrapper, which takes the
             # memory usage as an argument, and may be run multiple times
             self.log_cmdline(gmtk_cmdline, args, job_script_file)
-        
+
         # set permissions for script to run
-        chmod(job_script_filename, 0775)  # the chmod function requires
-        # the permissions option to be in octal (0775)
+        chmod(job_script_filename, JOB_SCRIPT_FILE_PERMISSIONS)
 
         if self.dry_run:
             return None
