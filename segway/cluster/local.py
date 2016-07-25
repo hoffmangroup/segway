@@ -170,6 +170,13 @@ class Session(object):
     def createJobTemplate(self):  # noqa
         return JobTemplate()
 
+    def deleteJobTemplate(self, session):
+        # since JobTemplate is a python object in local, upon 0
+        # references it should automatically clean up after itself.
+        # Thus, no deleteJobTemplate method is actually needed for
+        # local.
+        pass
+
 
 class JobState:
     """
