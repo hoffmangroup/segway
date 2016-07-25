@@ -473,6 +473,7 @@ def _log_cmdline(logfile, cmdline):
     for cmdarg in cmdline:
         # pipes.quote() will only quote arguments that need
         # quotes to be run on shell commandline
+        # NOTE: move to shlex.quote() when moving to python 3.3
         quoted_cmdline_list.append(pipes.quote(str(cmdarg)))
     quoted_cmdline = ' '.join(quoted_cmdline_list)
     print >>logfile, quoted_cmdline
