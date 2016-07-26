@@ -109,7 +109,16 @@ small number of these are still produced when :option:`--dry-run` is
 specified. The ``details.sh`` script contains the exact commands
 dispatched by Segway, including wrapper commands that monitor memory
 usage, create and delete local temporary files with observation data,
-and convert GMTK's output ot BED, among other things.
+and convert GMTK's output to BED, among other things.
+
+Segway also writes a ``cmdline`` directory in both the ``traindir``
+and ``identifydir``. Each instance has its own folder, and for each
+job segway queues, a shell script (with the job's name) is written
+containing the GMTK command of the queued job.
+
+For example, ``traindir/cmdline/0/emt0.0.0.uuid.sh`` is the shell
+script containing the GMTK commands and arguments for job 
+``emt0.0.0.uuid`` in instance 0 of training.
 
 Summary reports
 ---------------
