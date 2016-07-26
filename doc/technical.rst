@@ -204,6 +204,11 @@ workdir instead.
                                                     that are not trained
 |rarr| ``segway.inc``                               C preprocessor (``cpp``) include file
                                                     used in structure
+``cmdline``                                         shell scripts containing commandlines/arguments of
+                                                    individual GMTK jobs
+``cmdline/0,1,.../``                                GMTK job shell scripts for a particular training
+                                                    instance(0,1,...)
+``cmdline/identify/``                               GMTK job shell scripts for identification
 ``likelihood/``                                     GMTK's report of the log likelihood for
                                                     the most recent M-step of EM training
 |rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
