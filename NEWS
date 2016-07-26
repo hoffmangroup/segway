@@ -7,6 +7,9 @@
 * segway: add resolution functionality for semisupervised mode 
   (thanks to Rachel Chan)
 * segway: fix memory leak due to DRMAA job templates not being deleted
+* segway: change queueing functionality such that segway queues a shell file
+  containing the to-be-queued arguments, instead of queueing the arguments
+  themselves
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
