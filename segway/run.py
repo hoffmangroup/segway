@@ -30,7 +30,7 @@ from warnings import warn
 from genomedata import Genome
 from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
-from numpy.random import choice
+from numpy.random import choice, uniform
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -129,7 +129,7 @@ LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
 NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
-NUM_SUPERVISION_COLS = 2 # supervision_data, presence_supervision_data
+NUM_SUPERVISION_COLS = 2  # supervision_data, presence_supervision_data
 
 MAX_SPLIT_SEQUENCE_LENGTH = 2000000  # 2 million
 MAX_FRAMES = MAX_SPLIT_SEQUENCE_LENGTH
@@ -2074,64 +2074,66 @@ class Runner(object):
             train_windows = list(self.window_lens_sorted())
         else:
             train_windows_all = list(self.window_lens_sorted())
+            num_train_windows = len(train_windows_all)
 
-            # Workaround a GMTK bug
-            # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
-            # that raises an error if the last number in a list given to
-            # -loadAccRange is greater than 9999 by always guaranteeing
-            # the last number is less than 10000
+            if num_train_windows > 9999:
+                # Workaround a GMTK bug
+                # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
+                # that raises an error if the last number in a list given to
+                # -loadAccRange is greater than 9999 by always guaranteeing
+                # the last number is less than 10000
 
-            # find all minibatch windows less than 10000
-            train_windows_less_than_10000 = []
-            for train_window in train_windows_all:
-                if train_window[0] < 10000:
-                    train_windows_less_than_10000.append(train_window)
+                # find all minibatch windows less than 10000
+                train_windows_less_than_10000 = []
+                for train_window in train_windows_all:
+                    if train_window[0] < 10000:
+                        train_windows_less_than_10000.append(train_window)
 
-            # choose one index randomly
-            train_window_less_than_10000_index = int(choice(range(len(
-                                                 train_windows_less_than_10000
-                                                 )), 1))
+                # choose one index randomly
+                train_window_less_than_10000_index = int(uniform(0, len(
+                    train_windows_less_than_10000)))
 
-            # obtain the (window #, bases size) pair corresponding
-            # to the chosen index
-            train_window_less_than_10000 = train_windows_less_than_10000[
-                                           train_window_less_than_10000_index
-                                           ]
+                # obtain the (window #, bases size) pair corresponding
+                # to the chosen index
+                train_window_less_than_10000 = train_windows_less_than_10000[
+                    train_window_less_than_10000_index]
 
-            # create a list of train windows without the chosen window and
-            # use that instead, so that the window does not get chosen again
-            train_windows_remaining = train_windows_all[:]
-            train_windows_remaining.remove(train_window_less_than_10000)
+                # remove the chosen window from the list of windows,
+                # so that the window does not get chosen again
+                train_windows_all.remove(train_window_less_than_10000)
 
-            num_train_windows_remaining = len(train_windows_remaining)
-            train_window_indices_shuffled = choice(range(
-                                                   num_train_windows_remaining),
-                                                   num_train_windows_remaining,
+                # now shuffle the rest of the train windows indices
+                num_train_windows = len(train_windows_all)
+
+            train_window_indices_shuffled = choice(range(num_train_windows),
+                                                   num_train_windows,
                                                    replace=False)
 
-            # add the chosen window to the final list of train windows
             train_windows = []
-            train_windows.append(train_window_less_than_10000)
+            if num_train_windows > 9999:
+                # add the chosen window to the final list of train windows
+                train_windows.append(train_window_less_than_10000)
 
-            # start with the size of the chosen window
-            cur_bases = train_windows[0][1]
+            cur_bases = 0
+            if num_train_windows > 9999:
+                # start with the size of the chosen window
+                cur_bases = train_windows[0][1]
 
             total_bases = sum(
                 train_window[1] for train_window in train_windows_all
             )
 
-            # choose the rest of the minibatch windows from the rest of the set
             for train_window_index in train_window_indices_shuffled:
                 if (float(cur_bases) / total_bases) < self.minibatch_fraction:
-                    train_windows.append(
-                        train_windows_remaining[train_window_index])
-                    cur_bases += train_windows_remaining[train_window_index][1]
+                    train_windows.append(train_windows_all[train_window_index])
+                    cur_bases += train_windows_all[train_window_index][1]
                 else:
                     break
 
-            # sort in reverse to ensure that the last number in the list
-            # given to -loadAccRange is our chosen window (<10000)
-            train_windows.sort(reverse=True)
+            if num_train_windows > 9999:
+                # sort in reverse to ensure that the last number in the list
+                # given to -loadAccRange is our chosen window (<10000)
+                train_windows.sort(reverse=True)
 
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
