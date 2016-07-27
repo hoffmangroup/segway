@@ -2074,29 +2074,63 @@ class Runner(object):
             train_windows = list(self.window_lens_sorted())
         else:
             train_windows_all = list(self.window_lens_sorted())
-            num_train_windows = len(train_windows_all)
-            train_window_indices_shuffled = choice(range(num_train_windows),
-                                                   num_train_windows,
-                                                   replace=False)
-            train_windows = []
-            cur_bases = 0
-            total_bases = sum(
-                train_window[1] for train_window in train_windows_all
-            )
-
-            for train_window_index in train_window_indices_shuffled:
-                if (float(cur_bases) / total_bases) < self.minibatch_fraction:
-                    train_windows.append(train_windows_all[train_window_index])
-                    cur_bases += train_windows_all[train_window_index][1]
-                else:
-                    break
 
             # Workaround a GMTK bug
             # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
             # that raises an error if the last number in a list given to
-            # -loadAccRange is greater than 9999. By sorting in reverse, we
-            # ensure that the last window index is the smallest number
-            # possible.
+            # -loadAccRange is greater than 9999 by always guaranteeing
+            # the last number is less than 10000
+
+            # find all minibatch windows less than 10000
+            train_windows_less_than_10000 = []
+            for train_window in train_windows_all:
+                if train_window[0] < 10000:
+                    train_windows_less_than_10000.append(train_window)
+
+            # choose one index randomly
+            train_window_less_than_10000_index = int(choice(range(len(
+                                                 train_windows_less_than_10000
+                                                 )), 1))
+
+            # obtain the (window #, bases size) pair corresponding
+            # to the chosen index
+            train_window_less_than_10000 = train_windows_less_than_10000[
+                                           train_window_less_than_10000_index
+                                           ]
+
+            # create a list of train windows without the chosen window and
+            # use that instead, so that the window does not get chosen again
+            train_windows_remaining = train_windows_all[:]
+            train_windows_remaining.remove(train_window_less_than_10000)
+
+            num_train_windows_remaining = len(train_windows_remaining)
+            train_window_indices_shuffled = choice(range(
+                                                   num_train_windows_remaining),
+                                                   num_train_windows_remaining,
+                                                   replace=False)
+
+            # add the chosen window to the final list of train windows
+            train_windows = []
+            train_windows.append(train_window_less_than_10000)
+
+            # start with the size of the chosen window
+            cur_bases = train_windows[0][1]
+
+            total_bases = sum(
+                train_window[1] for train_window in train_windows_all
+            )
+
+            # choose the rest of the minibatch windows from the rest of the set
+            for train_window_index in train_window_indices_shuffled:
+                if (float(cur_bases) / total_bases) < self.minibatch_fraction:
+                    train_windows.append(
+                        train_windows_remaining[train_window_index])
+                    cur_bases += train_windows_remaining[train_window_index][1]
+                else:
+                    break
+
+            # sort in reverse to ensure that the last number in the list
+            # given to -loadAccRange is our chosen window (<10000)
             train_windows.sort(reverse=True)
 
         restartable_jobs = \
