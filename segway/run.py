@@ -138,6 +138,10 @@ MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
 
 TMP_USAGE_BASE = 10 * MB  # just a guess
 
+# train_window object has structure (windows #, # of bases)
+TRAIN_WINDOWS_WINDOW_NUM_INDEX = 0
+TRAIN_WINDOWS_NUM_BASES_INDEX = 1
+
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
 # defaults
@@ -2086,7 +2090,7 @@ class Runner(object):
                 # find all minibatch windows less than 10000
                 train_windows_less_than_10000 = []
                 for train_window in train_windows_all:
-                    if train_window[0] < 10000:
+                    if train_window[TRAIN_WINDOWS_WINDOW_NUM_INDEX] < 10000:
                         train_windows_less_than_10000.append(train_window)
 
                 # choose one index randomly
@@ -2117,7 +2121,9 @@ class Runner(object):
             cur_bases = 0
             if num_train_windows > 9999:
                 # start with the size of the chosen window
-                cur_bases = train_windows[0][1]
+                cur_bases = train_windows[
+                            TRAIN_WINDOWS_WINDOW_NUM_INDEX][
+                            TRAIN_WINDOWS_NUM_BASES_INDEX]
 
             total_bases = sum(
                 train_window[1] for train_window in train_windows_all
