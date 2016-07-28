@@ -2080,6 +2080,9 @@ class Runner(object):
             train_windows_all = list(self.window_lens_sorted())
             num_train_windows = len(train_windows_all)
 
+            train_windows = []
+            cur_bases = 0
+
             if num_train_windows > 9999:
                 # Workaround a GMTK bug
                 # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
@@ -2106,24 +2109,21 @@ class Runner(object):
                 # so that the window does not get chosen again
                 train_windows_all.remove(train_window_less_than_10000)
 
-                # now shuffle the rest of the train windows indices
+                # redefine the number of available train windows to be
+                # the previous number minus 1
                 num_train_windows = len(train_windows_all)
 
-            train_window_indices_shuffled = choice(range(num_train_windows),
-                                                   num_train_windows,
-                                                   replace=False)
-
-            train_windows = []
-            if num_train_windows > 9999:
                 # add the chosen window to the final list of train windows
                 train_windows.append(train_window_less_than_10000)
 
-            cur_bases = 0
-            if num_train_windows > 9999:
                 # start with the size of the chosen window
                 cur_bases = train_windows[
                             TRAIN_WINDOWS_WINDOW_NUM_INDEX][
                             TRAIN_WINDOWS_NUM_BASES_INDEX]
+
+            train_window_indices_shuffled = choice(range(num_train_windows),
+                                                   num_train_windows,
+                                                   replace=False)
 
             total_bases = sum(
                 train_window[1] for train_window in train_windows_all
