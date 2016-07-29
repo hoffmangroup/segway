@@ -15,7 +15,7 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
-from os import chmod, environ, extsep
+from os import fchmod, environ, extsep
 import re
 from shutil import copy2
 import stat
@@ -1880,9 +1880,8 @@ class Runner(object):
             # this doesn't include use of segway-wrapper, which takes the
             # memory usage as an argument, and may be run multiple times
             self.log_cmdline(gmtk_cmdline, args, job_script_file)
-
-        # set permissions for script to run
-        chmod(job_script_filename, JOB_SCRIPT_FILE_PERMISSIONS)
+            # set permissions for script to run
+            fchmod(job_script_file.fileno(), JOB_SCRIPT_FILE_PERMISSIONS)
 
         if self.dry_run:
             return None
