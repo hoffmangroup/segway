@@ -145,10 +145,12 @@ class RestartableJob(object):
 
         jobname = job_template.jobName
 
-        job_location = "queued"
         # alert the user if they are running locally
         if DRIVER_NAME_OVERRIDE == DRIVER_NAME_LOCAL:
             job_location = "running locally"
+        else:
+            job_location = "queued"
+
         print >>sys.stderr, "%s %s: %s (%s)" % (job_location, res, jobname, res_req)
 
         return res
