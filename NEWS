@@ -10,6 +10,8 @@
 * segway: change queueing functionality such that segway queues a shell file
   containing the to-be-queued arguments, instead of queueing the arguments
   themselves
+* segway: change output message to specify whether the job is queued or
+  run locally (thanks to Rachel Chan)
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
