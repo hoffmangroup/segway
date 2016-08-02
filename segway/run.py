@@ -141,6 +141,7 @@ TMP_USAGE_BASE = 10 * MB  # just a guess
 # train_window object has structure (windows #, # of bases)
 TRAIN_WINDOWS_WINDOW_NUM_INDEX = 0
 TRAIN_WINDOWS_NUM_BASES_INDEX = 1
+GMTK_TRAIN_WINDOWS_MAX_WINDOW_NUMBER = 9999
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -2082,27 +2083,28 @@ class Runner(object):
             train_windows = []
             cur_bases = 0
 
-            if num_train_windows > 9999:
+            if num_train_windows > GMTK_TRAIN_WINDOWS_MAX_WINDOW_NUMBER:
                 # Workaround a GMTK bug
                 # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
                 # that raises an error if the last number in a list given to
                 # -loadAccRange is greater than 9999 by always guaranteeing
                 # the last number is less than 10000
 
-                # find all minibatch windows less than 10000
-                train_windows_less_than_10000 = []
-                for train_window in train_windows_all:
-                    if train_window[TRAIN_WINDOWS_WINDOW_NUM_INDEX] < 10000:
-                        train_windows_less_than_10000.append(train_window)
-
-                # choose one index randomly
-                train_window_less_than_10000_index = int(uniform(0, len(
-                    train_windows_less_than_10000)))
+                # choose one train window randomly. uniform chooses from the
+                # half-open interval [a, b) so since window numbering begins
+                # at 0, choose between [0, 10000)
+                train_window_less_than_10000_window_number = int(
+                    uniform(0, GMTK_TRAIN_WINDOWS_MAX_WINDOW_NUMBER + 1)
+                    )
 
                 # obtain the (window #, bases size) pair corresponding
-                # to the chosen index
-                train_window_less_than_10000 = train_windows_less_than_10000[
-                    train_window_less_than_10000_index]
+                # to the chosen window #
+                train_window_less_than_10000 = [
+                    train_window_index for train_window_index in
+                    train_windows_all if
+                    train_window_index[TRAIN_WINDOWS_WINDOW_NUM_INDEX] ==
+                    train_window_less_than_10000_window_number
+                    ][0]
 
                 # remove the chosen window from the list of windows,
                 # so that the window does not get chosen again
@@ -2135,9 +2137,10 @@ class Runner(object):
                 else:
                     break
 
-            if num_train_windows > 9999:
-                # sort in reverse to ensure that the last number in the list
-                # given to -loadAccRange is our chosen window (<10000)
+            if num_train_windows > GMTK_TRAIN_WINDOWS_MAX_WINDOW_NUMBER:
+                # Regarding the same GMTK bug as above, sort in reverse
+                # to ensure that the last number in the list given to
+                # -loadAccRange is our chosen window (<10000)
                 train_windows.sort(reverse=True)
 
         restartable_jobs = \
