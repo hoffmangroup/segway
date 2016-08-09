@@ -15,9 +15,10 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
-from os import environ, extsep
+from os import fchmod, environ, extsep
 import re
 from shutil import copy2
+import stat
 from string import letters
 import sys
 from threading import Event, Lock, Thread
@@ -33,6 +34,7 @@ from numpy.random import choice
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
+import pipes
 from pkg_resources import Requirement, working_set
 from tabdelim import DictReader, ListWriter
 
@@ -203,6 +205,7 @@ TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 
 SUBDIRNAME_ACC = "accumulators"
 SUBDIRNAME_AUX = "auxiliary"
+SUBDIRNAME_JOB_SCRIPT = "cmdline"
 SUBDIRNAME_LIKELIHOOD = "likelihood"
 SUBDIRNAME_OBS = "observations"
 SUBDIRNAME_POSTERIOR = "posterior"
@@ -211,6 +214,11 @@ SUBDIRNAME_VITERBI = "viterbi"
 SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
                      SUBDIRNAME_PARAMS]
+
+# job script file permissions: owner has read/write/execute
+# permissions, group/others have read/execute permissions
+JOB_SCRIPT_FILE_PERMISSIONS = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP \
+                              | stat.S_IROTH | stat.S_IXOTH
 
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
                       "num_frames", "maxvmem", "cpu", "exit_status"]
@@ -279,18 +287,6 @@ def quote_trackname(text):
         res = "x__" + res
 
     return res
-
-
-def quote_spaced_str(item):
-    """
-    add quotes around text if it has spaces in it
-    """
-    text = str(item)
-
-    if " " in text:
-        return '"%s"' % text
-    else:
-        return text
 
 
 class NoAdvance(str):
@@ -473,7 +469,14 @@ def cmdline2text(cmdline=sys.argv):
 
 
 def _log_cmdline(logfile, cmdline):
-    print >>logfile, " ".join(map(quote_spaced_str, cmdline))
+    quoted_cmdline_list = []
+    for cmdarg in cmdline:
+        # pipes.quote() will only quote arguments that need
+        # quotes to be run on shell commandline
+        # NOTE: move to shlex.quote() when moving to python 3.3
+        quoted_cmdline_list.append(pipes.quote(str(cmdarg)))
+    quoted_cmdline = ' '.join(quoted_cmdline_list)
+    print >>logfile, quoted_cmdline
 
 
 def check_overlapping_supervision_labels(start, end, chrom, coords):
@@ -1096,6 +1099,10 @@ class Runner(object):
         return self.make_output_dirpath("e", self.instance_index)
 
     @memoized_property
+    def job_script_dirpath(self):
+        return self.make_job_script_dirpath(self.instance_index)
+
+    @memoized_property
     def use_dinucleotide(self):
         return TRACK_DINUCLEOTIDE in self.tracks
 
@@ -1448,6 +1455,12 @@ class Runner(object):
 
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
+        self.make_dir(res)
+
+        return res
+
+    def make_job_script_dirpath(self, instance_index):
+        res = self.work_dirpath / SUBDIRNAME_JOB_SCRIPT / str(instance_index)
         self.make_dir(res)
 
         return res
@@ -1830,12 +1843,15 @@ class Runner(object):
         for window_len, window_index in zipper:
             yield window_index, window_len
 
-    def log_cmdline(self, cmdline, args=None):
+    def log_cmdline(self, cmdline, args=None, script_file=None):
         if args is None:
             args = cmdline
 
         _log_cmdline(self.cmdline_short_file, cmdline)
         _log_cmdline(self.cmdline_long_file, args)
+
+        if script_file is not None:
+            _log_cmdline(script_file, args)
 
     def calc_tmp_usage_obs(self, num_frames, prog):
         if prog not in TMP_OBS_PROGS:
@@ -1857,9 +1873,16 @@ class Runner(object):
         else:
             args = gmtk_cmdline
 
-        # this doesn't include use of segway-wrapper, which takes the
-        # memory usage as an argument, and may be run multiple times
-        self.log_cmdline(gmtk_cmdline, args)
+        shell_job_name = extsep.join([job_name, EXT_SH])
+        job_script_filename = self.job_script_dirpath / shell_job_name
+
+        with open(job_script_filename, "w") as job_script_file:
+            print >>job_script_file, "#!/usr/bin/env bash"
+            # this doesn't include use of segway-wrapper, which takes the
+            # memory usage as an argument, and may be run multiple times
+            self.log_cmdline(gmtk_cmdline, args, job_script_file)
+            # set permissions for script to run
+            fchmod(job_script_file.fileno(), JOB_SCRIPT_FILE_PERMISSIONS)
 
         if self.dry_run:
             return None
@@ -1869,7 +1892,7 @@ class Runner(object):
 
         job_tmpl.jobName = job_name
         job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = map(str, args)
+        job_tmpl.args = [job_script_filename]
 
         # this is going to cause problems on heterogeneous systems
         environment = environ.copy()
