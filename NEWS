@@ -6,10 +6,11 @@
 * segway: local job submission now appends error logs instead of rewriting them
 * segway: add resolution functionality for semisupervised mode 
   (thanks to Rachel Chan)
+* segway: add 'annotate' as an alias for 'identify' (thanks to Rachel Chan)
 * segway: fix memory leak due to DRMAA job templates not being deleted
 * segway: change queueing functionality such that segway queues a shell file
   containing the to-be-queued arguments, instead of queueing the arguments
-  themselves
+  themselves (thanks to Rachel Chan)
 * segway: change output message to specify whether the job is queued or
   run locally (thanks to Rachel Chan)
 
