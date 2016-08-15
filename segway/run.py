@@ -138,10 +138,10 @@ MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
 
 TMP_USAGE_BASE = 10 * MB  # just a guess
 
-# train_window object has structure (windows #, # of bases)
+# train_window object has structure (window number, number of bases)
 TRAIN_WINDOWS_WINDOW_NUM_INDEX = 0
-TRAIN_WINDOWS_NUM_BASES_INDEX = 1
-GMTK_TRAIN_WINDOWS_MAX_WINDOW_NUMBER = 9999
+TRAIN_WINDOWS_BASES_INDEX = 1
+MAX_GMTK_WINDOW_COUNT = 10000
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -2084,28 +2084,30 @@ class Runner(object):
             train_windows = []
             cur_bases = 0
 
-            if num_train_windows > GMTK_TRAIN_WINDOWS_MAX_WINDOW_NUMBER:
+            if num_train_windows >= MAX_GMTK_WINDOW_COUNT:
                 # Workaround a GMTK bug
                 # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
                 # that raises an error if the last number in a list given to
                 # -loadAccRange is greater than 9999 by always guaranteeing
                 # the last number is less than 10000
 
-                # choose one train window randomly. uniform chooses from the
-                # half-open interval [a, b) so since window numbering begins
-                # at 0, choose between [0, 10000)
-                train_window_less_than_10000_window_number = int(
-                    uniform(0, GMTK_TRAIN_WINDOWS_MAX_WINDOW_NUMBER + 1)
+                # sort train windows
+                train_windows_all.sort()
+                # choose all train windows with index less than 10000
+                train_windows_less_than_10000 = train_windows_all[
+                                                0:MAX_GMTK_WINDOW_COUNT
+                                                ]
+                # choose one train window randomly.
+                # uniform chooses from the half-open interval [a, b)
+                # so since window numbering begins at 0, choose between
+                # [0, 10000)
+                valid_gmtk_window_index = int(
+                    uniform(0, MAX_GMTK_WINDOW_COUNT)
                     )
-
-                # obtain the (window #, bases size) pair corresponding
-                # to the chosen window #
-                train_window_less_than_10000 = [
-                    train_window_index for train_window_index in
-                    train_windows_all if
-                    train_window_index[TRAIN_WINDOWS_WINDOW_NUM_INDEX] ==
-                    train_window_less_than_10000_window_number
-                    ][0]
+                # obtain the train window corresponding to the chosen
+                # window index
+                train_window_less_than_10000 = \
+                    train_windows_less_than_10000[valid_gmtk_window_index]
 
                 # remove the chosen window from the list of windows,
                 # so that the window does not get chosen again
@@ -2121,7 +2123,7 @@ class Runner(object):
                 # start with the size of the chosen window
                 cur_bases = train_windows[
                             TRAIN_WINDOWS_WINDOW_NUM_INDEX][
-                            TRAIN_WINDOWS_NUM_BASES_INDEX]
+                            TRAIN_WINDOWS_BASES_INDEX]
 
             train_window_indices_shuffled = choice(range(num_train_windows),
                                                    num_train_windows,
@@ -2138,7 +2140,7 @@ class Runner(object):
                 else:
                     break
 
-            if num_train_windows > GMTK_TRAIN_WINDOWS_MAX_WINDOW_NUMBER:
+            if num_train_windows >= MAX_GMTK_WINDOW_COUNT - 1:
                 # Regarding the same GMTK bug as above, sort in reverse
                 # to ensure that the last number in the list given to
                 # -loadAccRange is our chosen window (<10000)
