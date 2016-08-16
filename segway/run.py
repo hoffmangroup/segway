@@ -2089,36 +2089,37 @@ class Runner(object):
                 # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
                 # that raises an error if the last number in a list given to
                 # -loadAccRange is greater than 9999 by always guaranteeing
-                # the last number is less than 10000
+                # the last number is less than MAX_GMTK_WINDOW_COUNT
 
                 # sort train windows
                 train_windows_all.sort()
-                # choose all train windows with index less than 10000
-                train_windows_less_than_10000 = train_windows_all[
+                # choose all train windows with index less than
+                # MAX_GMTK_WINDOW_COUNT
+                valid_train_windows = train_windows_all[
                                                 0:MAX_GMTK_WINDOW_COUNT
                                                 ]
                 # choose one train window randomly.
                 # uniform chooses from the half-open interval [a, b)
                 # so since window numbering begins at 0, choose between
-                # [0, 10000)
+                # [0, MAX_GMTK_WINDOW_COUNT)
                 valid_gmtk_window_index = int(
                     uniform(0, MAX_GMTK_WINDOW_COUNT)
                     )
                 # obtain the train window corresponding to the chosen
                 # window index
-                train_window_less_than_10000 = \
-                    train_windows_less_than_10000[valid_gmtk_window_index]
+                valid_train_window = \
+                    valid_train_windows[valid_gmtk_window_index]
 
                 # remove the chosen window from the list of windows,
                 # so that the window does not get chosen again
-                train_windows_all.remove(train_window_less_than_10000)
+                train_windows_all.remove(valid_train_window)
 
                 # redefine the number of available train windows to be
                 # the previous number minus 1
                 num_train_windows = len(train_windows_all)
 
                 # add the chosen window to the final list of train windows
-                train_windows.append(train_window_less_than_10000)
+                train_windows.append(valid_train_window)
 
                 # start with the size of the chosen window
                 cur_bases = train_windows[
