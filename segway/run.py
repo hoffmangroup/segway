@@ -2096,8 +2096,8 @@ class Runner(object):
                 # choose all train windows with index less than
                 # MAX_GMTK_WINDOW_COUNT
                 valid_train_windows = train_windows_all[
-                                                0:MAX_GMTK_WINDOW_COUNT
-                                                ]
+                                      0:MAX_GMTK_WINDOW_COUNT
+                                      ]
                 # choose one train window randomly.
                 # uniform chooses from the half-open interval [a, b)
                 # so since window numbering begins at 0, choose between
