@@ -30,7 +30,7 @@ from warnings import warn
 from genomedata import Genome
 from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
-from numpy.random import choice
+from numpy.random import RandomState
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -669,6 +669,7 @@ class Runner(object):
         if value or value == 0:
             setattr(self, name, value)
 
+
     options_to_attrs = [("recover", "recover_dirname"),
                         ("observations", "obs_dirname"),
                         ("bed", "bed_filename"),
@@ -731,6 +732,20 @@ class Runner(object):
 
         return res
 
+
+    def from_env(self):
+        # If there is a seed from the environment
+        try:
+            # Get the seed
+            self.random_generator_seed = int(environ["SEGWAY_RAND_SEED"])
+        # Otherwise set no seed
+        except KeyError:
+            self.random_generator_seed = None
+
+        # Create a random number generator for this runner
+        self.random_number_generator = RandomState(self.random_generator_seed)
+
+
     def add_track_group(self, tracknames):
         tracks = self.tracks
         track_group = TrackGroup()
@@ -759,7 +774,9 @@ class Runner(object):
 
         Calls Runner.fromargs() first.
         """
+        # TODO: Fix this from_env unsetting ooptions fromargs
         res = cls.fromargs(args)
+        res.from_env()
 
         # Preprocess options
         # Convert any track files into a list of tracks
@@ -2075,9 +2092,10 @@ class Runner(object):
         else:
             train_windows_all = list(self.window_lens_sorted())
             num_train_windows = len(train_windows_all)
-            train_window_indices_shuffled = choice(range(num_train_windows),
-                                                   num_train_windows,
-                                                   replace=False)
+            train_window_indices_shuffled = \
+            self.random_number_generator.choice(range(num_train_windows),
+                                                num_train_windows, replace=False)
+
             train_windows = []
             cur_bases = 0
             total_bases = sum(
@@ -2106,12 +2124,20 @@ class Runner(object):
         self.last_params_filename = curr_params_filename
 
     def run_train_instance(self):
+        instance_index = self.instance_index
+
+        # If a random number generator seed exists
+        if self.random_generator_seed:
+            # Create a new random number generator for this instance based on its
+            # own index
+            self.random_generator_seed += instance_index
+            self.random_number_generator = RandomState(self.random_generator_seed)
+
         self.set_triangulation_filename()
 
         # make new files if there is more than one instance
         new = self.instance_make_new_params
 
-        instance_index = self.instance_index
         self.set_log_likelihood_filenames(instance_index, new)
         self.set_params_filename(instance_index, new)
 
