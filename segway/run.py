@@ -774,7 +774,6 @@ class Runner(object):
 
         Calls Runner.fromargs() first.
         """
-        # TODO: Fix this from_env unsetting ooptions fromargs
         res = cls.fromargs(args)
         res.from_env()
 
