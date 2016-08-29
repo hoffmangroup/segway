@@ -669,7 +669,6 @@ class Runner(object):
         if value or value == 0:
             setattr(self, name, value)
 
-
     options_to_attrs = [("recover", "recover_dirname"),
                         ("observations", "obs_dirname"),
                         ("bed", "bed_filename"),
@@ -733,7 +732,7 @@ class Runner(object):
         return res
 
 
-    def from_env(self):
+    def from_environment(self):
         # If there is a seed from the environment
         try:
             # Get the seed
@@ -768,6 +767,7 @@ class Runner(object):
 
         self.track_groups.append(track_group)
 
+
     @classmethod
     def fromoptions(cls, args, options):
         """This is the usual way a Runner is created.
@@ -775,7 +775,7 @@ class Runner(object):
         Calls Runner.fromargs() first.
         """
         res = cls.fromargs(args)
-        res.from_env()
+        res.from_environment()
 
         # Preprocess options
         # Convert any track files into a list of tracks
