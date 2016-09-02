@@ -59,7 +59,7 @@ segway-winner = segway.winner:main
 # genomedata>1.3.1 for Chromosome.__getitem__[..., array] support
 
 install_requires = ["genomedata>1.3.1", "textinput", "optbuild>0.1.10",
-                    "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
+                    "optplus>0.1.0", "tables>2.0.4", "numpy>=1.11", "forked-path",
                     "colorbrewer", "drmaa>=0.4a3"]
 
 
