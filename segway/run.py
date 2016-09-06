@@ -28,8 +28,8 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (append, arcsinh, array, dtype, empty, finfo, float32, iinfo,
-                   int64, inf, square, vstack, zeros)
+from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
+                   square, vstack, zeros)
 from numpy.random import RandomState
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
@@ -840,38 +840,6 @@ class Runner(object):
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
-
-        # If the number of instances is more than 1 and the random generator
-        # seed exists
-        if (res.num_instances > 1 and
-            res.random_generator_seed):
-            # Create randomly generated initial states for all other instance's
-            # random number generator based on the given initial seed
-            random_state_size = 624 # defined by set_state in RandomState
-            dtype_uint = dtype("uint")
-            max_uint_value = iinfo(dtype_uint).max
-            reference_state = res.random_generator.get_state()
-
-            res.initial_rng_states = []
-
-            for index in xrange(res.num_instances - 1):
-                initial_rng_states = res.random_generator.randint(
-                    0, 
-                    max_uint_value,
-                    random_state_size,
-                    dtype_uint
-                )
-
-                # State contains: (String identifier, 624 uints, pos, has gaussian
-                # flag, cached gaussian value)
-                res.initial_rng_states.append(
-                        (reference_state[0], 
-                         initial_rng_states,
-                         reference_state[2],
-                         reference_state[3],
-                         reference_state[4],
-                        )
-                )
 
         return res
 
@@ -2157,15 +2125,12 @@ class Runner(object):
     def run_train_instance(self):
         instance_index = self.instance_index
 
-        # If a random number generator seed exists and we have more than one
-        # instance
-        if (self.random_generator_seed and
-            self.instance_index > 0):
+        # If a random number generator seed exists
+        if self.random_generator_seed:
             # Create a new random number generator for this instance based on its
             # own index
-            self.random_generator.set_state(
-                self.initial_rng_states[instance_index-1]
-            )
+            self.random_generator_seed += instance_index
+            self.random_generator = RandomState(self.random_generator_seed)
 
         self.set_triangulation_filename()
 
