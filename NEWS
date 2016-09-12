@@ -1,4 +1,6 @@
 1.4.1:
+* segway: fix --bigBed for assemblies with alt chromosomes not being sorted
+  correctly
 * segway: --num-minibatch-windows can now be seeded with SEGWAY_RAND_SEED and
   will select the same windows with when given the same seed 
   (thanks to Rachel Chan)
