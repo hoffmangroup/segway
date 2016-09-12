@@ -13,7 +13,7 @@ testdir="$(mktemp -dp . "test-$(date +%Y%m%d).XXXXXX")"
 echo >&2 "entering directory $testdir"
 cd "$testdir"
 
-segway-layer -m ../mnemonics -b segway.layered.bb < ../segway.bed > segway.layered.bed
+segway-layer -m ../mnemonics < ../segway.bed > segway.layered.bed
 
 cd ..
 
