@@ -364,7 +364,7 @@ class TableParamSpec(ParamSpec):
 class DenseCPTParamSpec(TableParamSpec):
     type_name = "DENSE_CPT"
     copy_attrs = TableParamSpec.copy_attrs \
-        + ["random_generator", "len_seg_strength", "use_dinucleotide"]
+        + ["random_state", "len_seg_strength", "use_dinucleotide"]
 
     def make_table_spec(self, name, table, dirichlet=False):
         """
@@ -411,7 +411,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
     def make_dinucleotide_table_row(self):
         # simple one-parameter model
-        gc = self.random_generator.uniform()
+        gc = self.random_state.uniform()
         at = 1 - gc
 
         a = at / 2
@@ -523,7 +523,7 @@ class MeanParamSpec(ParamSpec):
     jitter_std_bound = 0.2
 
     copy_attrs = ParamSpec.copy_attrs \
-        + ["means", "random_generator", "vars"]
+        + ["means", "random_state", "vars"]
 
     def make_data(self):
         num_segs = self.num_segs
@@ -538,7 +538,7 @@ class MeanParamSpec(ParamSpec):
         stds_tiled = vstack_tile(stds, num_segs, num_subsegs)
 
         jitter_std_bound = self.jitter_std_bound
-        noise = self.random_generator.uniform(-jitter_std_bound,
+        noise = self.random_state.uniform(-jitter_std_bound,
                 jitter_std_bound, stds_tiled.shape)
 
         return means_tiled + (stds_tiled * noise)
@@ -576,7 +576,7 @@ class GammaRealMatParamSpec(RealMatParamSpec):
     shape_tmpl = "gammashape_${seg}_${subseg}_${track} 1 1 ${datum}"
 
     copy_attrs = ParamSpec.copy_attrs \
-        + ["means", "random_generator", "vars"]
+        + ["means", "random_state", "vars"]
 
     def generate_objects(self):
         means = self.means
@@ -599,10 +599,10 @@ class GammaRealMatParamSpec(RealMatParamSpec):
         for mapping in self.generate_tmpl_mappings():
             track_index = mapping["track_index"]
 
-            scale = jitter(scales[track_index], self.random_generator)
+            scale = jitter(scales[track_index], self.random_state)
             yield substitute_scale(dict(datum=scale, **mapping))
 
-            shape = jitter(shapes[track_index], self.random_generator)
+            shape = jitter(shapes[track_index], self.random_state)
             yield substitute_shape(dict(datum=shape, **mapping))
 
 
@@ -641,7 +641,7 @@ class InputMasterSaver(Saver):
     copy_attrs = ["num_bases", "num_segs", "num_subsegs",
                   "num_track_groups", "card_seg_countdown",
                   "seg_countdowns_initial", "seg_table", "distribution",
-                  "len_seg_strength", "resolution", "random_generator",
+                  "len_seg_strength", "resolution", "random_state",
                   "supervision_type", "use_dinucleotide", "mins", "means",
                   "vars", "gmtk_include_filename_relative", "track_groups"]
 

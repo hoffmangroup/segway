@@ -736,13 +736,13 @@ class Runner(object):
         # If there is a seed from the environment
         try:
             # Get the seed
-            self.random_generator_seed = int(environ["SEGWAY_RAND_SEED"])
+            self.random_seed = int(environ["SEGWAY_RAND_SEED"])
         # Otherwise set no seed
         except KeyError:
-            self.random_generator_seed = None
+            self.random_seed = None
 
         # Create a random number generator for this runner
-        self.random_generator = RandomState(self.random_generator_seed)
+        self.random_state = RandomState(self.random_seed)
 
 
     def add_track_group(self, tracknames):
@@ -2092,7 +2092,7 @@ class Runner(object):
             train_windows_all = list(self.window_lens_sorted())
             num_train_windows = len(train_windows_all)
             train_window_indices_shuffled = \
-            self.random_generator.choice(range(num_train_windows),
+            self.random_state.choice(range(num_train_windows),
                                                 num_train_windows, replace=False)
 
             train_windows = []
@@ -2126,11 +2126,11 @@ class Runner(object):
         instance_index = self.instance_index
 
         # If a random number generator seed exists
-        if self.random_generator_seed:
+        if self.random_seed:
             # Create a new random number generator for this instance based on its
             # own index
-            self.random_generator_seed += instance_index
-            self.random_generator = RandomState(self.random_generator_seed)
+            self.random_seed += instance_index
+            self.random_state = RandomState(self.random_seed)
 
         self.set_triangulation_filename()
 
