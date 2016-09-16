@@ -14,7 +14,6 @@ from string import Template
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, sqrt, tile, vectorize, where,
                    zeros)
-from os import environ
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
