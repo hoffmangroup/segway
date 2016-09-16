@@ -23,7 +23,7 @@ from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import path
 from pkg_resources import resource_filename, resource_string
-from tables import Filters, NoSuchNodeError, openFile
+from tables import Filters, NoSuchNodeError, open_file
 
 # XXX: check that these are all in use
 
@@ -237,7 +237,7 @@ def init_num_obs(num_obs, continuous):
 def walk_supercontigs(h5file):
     root = h5file.root
 
-    for supercontig in h5file.walkGroups():
+    for supercontig in h5file.walk_groups():
         if supercontig == root:
             continue
 
@@ -313,7 +313,7 @@ def iter_chroms_coords(filenames, coords):
         if is_empty_array(chr_include_coords):
             continue
 
-        with openFile(filename) as chromosome:
+        with open_file(filename) as chromosome:
             yield chrom, filename, chromosome, chr_include_coords
 
 

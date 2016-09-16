@@ -289,7 +289,7 @@ class Segmentation(defaultdict):
 
         self.write_trackline(outfile)
 
-        for chrom, chromosome in self.iteritems():
+        for chrom, chromosome in sorted(self.iteritems()):
             for run in chromosome:
                 segments = array(run)
 
