@@ -129,7 +129,7 @@ LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
 NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
-NUM_SUPERVISION_COLS = 2 # supervision_data, presence_supervision_data
+NUM_SUPERVISION_COLS = 2  # supervision_data, presence_supervision_data
 
 MAX_SPLIT_SEQUENCE_LENGTH = 2000000  # 2 million
 MAX_FRAMES = MAX_SPLIT_SEQUENCE_LENGTH
@@ -137,6 +137,11 @@ MEM_USAGE_BUNDLE = 100 * MB  # XXX: should start using this again
 MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
 
 TMP_USAGE_BASE = 10 * MB  # just a guess
+
+# train_window object has structure (window number, number of bases)
+TRAIN_WINDOWS_WINDOW_NUM_INDEX = 0
+TRAIN_WINDOWS_BASES_INDEX = 1
+MAX_GMTK_WINDOW_COUNT = 10000
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -2091,12 +2096,56 @@ class Runner(object):
         else:
             train_windows_all = list(self.window_lens_sorted())
             num_train_windows = len(train_windows_all)
+
+            train_windows = []
+            cur_bases = 0
+
+            if num_train_windows >= MAX_GMTK_WINDOW_COUNT:
+                # Workaround a GMTK bug
+                # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
+                # that raises an error if the last number in a list given to
+                # -loadAccRange is greater than 9999 by always guaranteeing
+                # the last number is less than MAX_GMTK_WINDOW_COUNT
+
+                # sort train windows
+                train_windows_all.sort()
+                # choose all train windows with index less than
+                # MAX_GMTK_WINDOW_COUNT
+                valid_train_windows = train_windows_all[
+                                      0:MAX_GMTK_WINDOW_COUNT
+                                      ]
+                # choose one train window randomly.
+                # uniform chooses from the half-open interval [a, b)
+                # so since window numbering begins at 0, choose between
+                # [0, MAX_GMTK_WINDOW_COUNT)
+                valid_gmtk_window_index = int(
+                    self.random_state.uniform(0, MAX_GMTK_WINDOW_COUNT)
+                    )
+                # obtain the train window corresponding to the chosen
+                # window index
+                valid_train_window = \
+                    valid_train_windows[valid_gmtk_window_index]
+
+                # remove the chosen window from the list of windows,
+                # so that the window does not get chosen again
+                train_windows_all.remove(valid_train_window)
+
+                # redefine the number of available train windows to be
+                # the previous number minus 1
+                num_train_windows = len(train_windows_all)
+
+                # add the chosen window to the final list of train windows
+                train_windows.append(valid_train_window)
+
+                # start with the size of the chosen window
+                cur_bases = train_windows[
+                            TRAIN_WINDOWS_WINDOW_NUM_INDEX][
+                            TRAIN_WINDOWS_BASES_INDEX]
+
             train_window_indices_shuffled = \
             self.random_state.choice(range(num_train_windows),
                                                 num_train_windows, replace=False)
 
-            train_windows = []
-            cur_bases = 0
             total_bases = sum(
                 train_window[1] for train_window in train_windows_all
             )
@@ -2107,6 +2156,12 @@ class Runner(object):
                     cur_bases += train_windows_all[train_window_index][1]
                 else:
                     break
+
+            if num_train_windows >= MAX_GMTK_WINDOW_COUNT - 1:
+                # Regarding the same GMTK bug as above, sort in reverse
+                # to ensure that the last number in the list given to
+                # -loadAccRange is our chosen window (<10000)
+                train_windows.sort(reverse=True)
 
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,

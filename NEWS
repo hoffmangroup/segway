@@ -15,6 +15,8 @@
   themselves (thanks to Rachel Chan)
 * segway: change output message to specify whether the job is queued or
   run locally (thanks to Rachel Chan)
+* segway: work around a GMTK bug when indexing a genomic region with a number
+  greater than 9999 (thanks to Rachel Chan)
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
