@@ -533,7 +533,7 @@ set by Segway for GMTK. This happens when your supervision labels specify a
 a transition that doesn't fall on a ruler boundary. For example, if your 
 supervision labels are directly adjacent, such as::
 
-    chr1    10    20   o:2
+    chr1    10    20   0:2
     chr1    20    30   2:4
 
 and your ruler is set so it won't allow a transition to occur on `20`
