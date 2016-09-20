@@ -536,7 +536,7 @@ supervision labels are directly adjacent, such as::
     chr1    10    20   o:2
     chr1    20    30   2:4
 
-and your ruler is set so it won't allow a transition to occur on "20"
+and your ruler is set so it won't allow a transition to occur on `20`
 then your jobs will terminate with a 'zero clique' error. To resolve this,
 either avoid having directly adjacent superivison labels or, if possible,
 set `--ruler-scale=1` and run Segway again.
