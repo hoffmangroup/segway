@@ -530,7 +530,7 @@ combine any overlapping labels before specifying them to Segway.
 
 It is also possible for nonoverlapping labels to violate the ruler constraints
 set by Segway for GMTK. This happens when your supervision labels specify a
-a transition that doesn't fall on a ruler boundary. For example, if your 
+transition that doesn't fall on a ruler boundary. For example, if your 
 supervision labels are directly adjacent, such as::
 
     chr1    10    20   0:2
