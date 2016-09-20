@@ -529,14 +529,17 @@ None of the supervision labels can overlap with each other. You should
 combine any overlapping labels before specifying them to Segway.
 
 It is also possible for nonoverlapping labels to violate the ruler constraints
-set by Segway for GMTK. For example, if your supervision labels are directly
-adjacent, such as:
+set by Segway for GMTK. This happens when your supervision labels specify a
+a transition that doesn't fall on a ruler boundary. For example, if your 
+supervision labels are directly adjacent, such as::
 
     chr1    10    20   o:2
     chr1    20    30   2:4
 
-then your jobs may terminate with a 'zero clique' error. To resolve this,
-simply set `--ruler-scale=1` and run Segway again.
+and your ruler is set so it won't allow a transition to occur on "20"
+then your jobs will terminate with a 'zero clique' error. To resolve this,
+either avoid having directly adjacent superivison labels or, if possible,
+set `--ruler-scale=1` and run Segway again.
 
 
 General options
