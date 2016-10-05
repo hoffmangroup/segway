@@ -552,13 +552,16 @@ are generating your own models manually.
 Seeding
 ~~~~~~~
 Segway can be forced to run with a specified random number generator seed by
-setting the :envvar:`SEGWAY_RAND_SEED` environment variable. This can be useful for
-reproducing results in the future. For example, if you are using bash as your
-shell you can run::
+setting the :envvar:`SEGWAY_RAND_SEED` environment variable. This is an
+optional for Segway and is primarily useful for reproducing results future
+results or debugging . For example, if you are using bash as your shell you can
+run::
 
     SEGWAY_RAND_SEED=1498730685
 
-To set the random number generator seed to the number 1498730685.
+To set the random number generator seed to the number 1498730685. If you decide
+to seed the random number generator, it is recommended to pick a number unique
+for your own usage.
 
 Recovery
 --------
