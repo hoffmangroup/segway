@@ -329,6 +329,19 @@ using the equations |mu| = *k*\ |theta| and |sigma|:sup:`2` = *k*\
 values is less well-understood. I recommend the use of ``asinh_norm``
 in most cases.
 
+.. _model-customization:
+
+Model Customization
+-------------------
+
+You can supply your own custom or modified models to Segway by using the
+:option:`--structure` option. The model is defined by the syntax that GMTK
+uses. To learn more about using GMTK to create your own models there is a
+`GMTK tutorial`_ and the `GMTK documentation`_.
+
+.. _GMTK tutorial: http://melodi.ee.washington.edu/~bilmes/gmtk_timit_tutorial.pdf
+.. _GMTK documentation: http://melodi.ee.washington.edu/~bilmes/gmtk_docs_draft_09_08_2014.pdf
+
 .. _segment-duration-model:
 
 Segment duration model
