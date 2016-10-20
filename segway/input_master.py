@@ -437,9 +437,17 @@ class DenseCPTParamSpec(TableParamSpec):
 
     def generate_objects(self):
         yield self.make_dense_cpt_start_seg_spec()
-        yield self.make_dense_cpt_seg_subseg_spec()
+
+        # use seg_subseg objects only when hierarchial segmentation
+        # is enabled
+        if self.num_subsegs > 1:
+            yield self.make_dense_cpt_seg_subseg_spec()
+
         yield self.make_dense_cpt_seg_seg_spec()
-        yield self.make_dense_cpt_seg_subseg_subseg_spec()
+
+        if self.num_subsegs > 1:
+            yield self.make_dense_cpt_seg_subseg_subseg_spec()
+
         yield self.make_dense_cpt_segCountDown_seg_segTransition_spec()
 
         if self.use_dinucleotide:
