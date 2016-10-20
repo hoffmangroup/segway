@@ -14,22 +14,12 @@ DPMF_IN_FILE inline
 0 dpmf_always 1 1.0
 
 DETERMINISTIC_CPT_IN_FILE inline
-#if CARD_SUBSEG > 1
-
-#if CARD_SUPERVISIONLABEL == -1
-5
-#else /* CARD_SUPERVISIONLABEL != -1 */
+#if (CARD_SUBSEG > 1) && (CARD_SUPERVISIONLABEL != -1)
 6
-#endif /* CARD_SUPERVISIONLABEL == -1 */
-
-#else
-
-#if CARD_SUPERVISIONLABEL == -1
+#elif !(CARD_SUBSEG > 1) && (CARD_SUPERVISIONLABEL == -1)
 4
-#else /* CARD_SUPERVISIONLABEL != -1 */
+# else /* */
 5
-#endif /* CARD_SUPERVISIONLABEL == -1 */
-
 #endif
 
 0 seg_segCountDown
@@ -57,23 +47,17 @@ internal:copyParent
 1
 CARD_SUBSEG CARD_SUBSEG
 internal:copyParent
+#endif
 
 #if CARD_SUPERVISIONLABEL != -1
+#if CARD_SUBSEG > 1
 5 supervisionLabel_seg_alwaysTrue
-2
-CARD_SUPERVISIONLABEL CARD_SEG CARD_BOOLEAN
-map_supervisionLabel_seg_alwaysTrue
-#endif
-
 #else
-
-#if CARD_SUPERVISIONLABEL != -1
 4 supervisionLabel_seg_alwaysTrue
+#endif
 2
 CARD_SUPERVISIONLABEL CARD_SEG CARD_BOOLEAN
 map_supervisionLabel_seg_alwaysTrue
-#endif
-
 #endif
 
 #ifndef INPUT_PARAMS_FILENAME
