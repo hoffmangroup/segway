@@ -846,10 +846,11 @@ class Runner(object):
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
 
-        if res.train and res.verbosity == -1:
-            res.verbosity = 6
-        else:
-            res.verbosity = 0
+        if res.verbosity == -1:
+            if res.train:
+                res.verbosity = 6
+            else:
+                res.verbosity = 0
 
         return res
 
