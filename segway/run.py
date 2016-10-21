@@ -107,7 +107,7 @@ JOIN_TIMEOUT = finfo(float).max
 SWAP_ENDIAN = False
 
 # option defaults
-VERBOSITY = 0
+VERBOSITY = -1
 PRIOR_STRENGTH = 0
 
 FINFO_FLOAT32 = finfo(float32)
@@ -845,6 +845,11 @@ class Runner(object):
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
+
+        if res.train and res.verbosity == -1:
+            res.verbosity = 6
+        else:
+            res.verbosity = 0
 
         return res
 
