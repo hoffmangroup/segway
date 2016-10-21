@@ -659,7 +659,7 @@ class Runner(object):
         for task in tasks:
             if task == "train":
                 self.train = True
-            elif (task == "identify" or
+            elif (task == "identify" or 
                   task == "annotate"):
                 self.identify = True
             elif task == "posterior":
@@ -736,6 +736,7 @@ class Runner(object):
 
         return res
 
+
     def from_environment(self):
         # If there is a seed from the environment
         try:
@@ -747,6 +748,7 @@ class Runner(object):
 
         # Create a random number generator for this runner
         self.random_state = RandomState(self.random_seed)
+
 
     def add_track_group(self, tracknames):
         tracks = self.tracks
@@ -769,6 +771,7 @@ class Runner(object):
             tracknames_unquoted.add(trackname)
 
         self.track_groups.append(track_group)
+
 
     @classmethod
     def fromoptions(cls, args, options):
@@ -2144,8 +2147,8 @@ class Runner(object):
                             TRAIN_WINDOWS_BASES_INDEX]
 
             train_window_indices_shuffled = \
-                self.random_state.choice(range(num_train_windows),
-                                         num_train_windows, replace=False)
+            self.random_state.choice(range(num_train_windows),
+                                                num_train_windows, replace=False)
 
             total_bases = sum(
                 train_window[1] for train_window in train_windows_all
@@ -2183,8 +2186,8 @@ class Runner(object):
 
         # If a random number generator seed exists
         if self.random_seed:
-            # Create a new random number generator for this instance based
-            # on its own index
+            # Create a new random number generator for this instance based on its
+            # own index
             self.random_seed += instance_index
             self.random_state = RandomState(self.random_seed)
 
