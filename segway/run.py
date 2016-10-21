@@ -772,6 +772,7 @@ class Runner(object):
 
         self.track_groups.append(track_group)
 
+
     @classmethod
     def fromoptions(cls, args, options):
         """This is the usual way a Runner is created.
@@ -2143,7 +2144,7 @@ class Runner(object):
 
             train_window_indices_shuffled = \
             self.random_state.choice(range(num_train_windows),
-                                         num_train_windows, replace=False)
+                                                num_train_windows, replace=False)
 
             total_bases = sum(
                 train_window[1] for train_window in train_windows_all
