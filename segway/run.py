@@ -843,10 +843,6 @@ class Runner(object):
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
 
-        if res.identify and res.verbosity > 0:
-            warn("Running Segway in identify mode with non-zero verbosity"
-                 " is currently not supported and may result in errors.")
-
         return res
 
     @memoized_property

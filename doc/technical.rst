@@ -162,9 +162,6 @@ helpful in diagnosing model problems. Keep in mind that very high
 values (above ``60``) will produce tons of output===maybe
 terabytes.
 
-Note that running Segway in identify mode with non-zero verbosity is
-currently not supported and may result in errors.
-
 Performance
 ===========
 Some factors that affect compute time and memory requirements:
