@@ -31,6 +31,16 @@ For a conceptual overview see the paper:
 <http://www.ncbi.nlm.nih.gov/pmc/articles/PMC3340533/>`_ available at
 PubMed Central requires no subscription.
 
+For a preprint of a protocol on using Segway see:
+
+  Roberts EG, Mendez M, Viner C, Karimzadeh M, Chan RCW, Ancar R, Chicco D,
+  Hesselberth JR, Kundaje A, Hoffman MM. 2016.
+  `Semi-automated genome annotation using epigenomic data and
+  Segway
+  <http://doi.org/10.1101/080382>`_.
+  Preprint: `<http://doi.org/10.1101/080382>`_
+
+
 .. toctree::
    :maxdepth: 2
 
