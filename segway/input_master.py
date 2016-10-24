@@ -260,7 +260,9 @@ class DTParamSpec(ParamSpec):
         yield data_string("map_frameIndex_ruler.dt.txt")
         yield self.make_map_seg_segCountDown_dt_spec()
         yield self.make_map_segTransition_ruler_seg_segCountDown_segCountDown_dt_spec()  # noqa
-        yield data_string("map_seg_subseg_obs.dt.txt")
+
+        if self.num_subsegs > 1:
+            yield data_string("map_seg_subseg_obs.dt.txt")
 
         supervision_type = self.supervision_type
         if supervision_type == SUPERVISION_SEMISUPERVISED:
