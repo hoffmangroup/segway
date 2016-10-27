@@ -1,4 +1,5 @@
 1.4.2:
+* segway: remove hierarchial segmentation when it is not enabled
 
 1.4.1:
 * segway: fix --bigBed for assemblies with alt chromosomes not being sorted
