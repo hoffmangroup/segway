@@ -1,4 +1,6 @@
 1.4.2:
+* segway: Change Segway to raise warning if running Segway in identify mode
+  with non-zero verbosity.
 
 1.4.1:
 * segway: fix --bigBed for assemblies with alt chromosomes not being sorted
