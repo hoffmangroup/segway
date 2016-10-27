@@ -1,4 +1,6 @@
 1.4.2:
+* segway: change default verbosity to 6 for training only, and leave as 0
+  for all other tasks
 
 1.4.1:
 * segway: fix --bigBed for assemblies with alt chromosomes not being sorted

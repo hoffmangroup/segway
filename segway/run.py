@@ -107,7 +107,9 @@ JOIN_TIMEOUT = finfo(float).max
 SWAP_ENDIAN = False
 
 # option defaults
-VERBOSITY = -1
+DEFAULT_VERBOSITY = -1
+DEFAULT_TRAIN_VERBOSITY = 6
+DEFAULT_NON_TRAIN_VERBOSITY = 0
 PRIOR_STRENGTH = 0
 
 FINFO_FLOAT32 = finfo(float32)
@@ -647,7 +649,7 @@ class Runner(object):
         self.posterior = False
         self.identify = False  # viterbi
         self.dry_run = False
-        self.verbosity = VERBOSITY
+        self.verbosity = DEFAULT_VERBOSITY
 
         self.__dict__.update(kwargs)
 
@@ -846,11 +848,11 @@ class Runner(object):
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
 
-        if res.verbosity == -1:
+        if res.verbosity == DEFAULT_VERBOSITY:
             if res.train:
-                res.verbosity = 6
+                res.verbosity = DEFAULT_TRAIN_VERBOSITY
             else:
-                res.verbosity = 0
+                res.verbosity = DEFAULT_NON_TRAIN_VERBOSITY
 
         return res
 
@@ -2983,10 +2985,11 @@ def parse_options(argv):
                        help="split up sequences that are larger than SIZE "
                        "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
 
-    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
+    group.add_argument("-v", "--verbosity", type=int, default=DEFAULT_VERBOSITY,
                        metavar="NUM",
                        help="show messages with verbosity NUM"
-                       " (default %d)" % VERBOSITY)
+                       " (default for training %d, else default %d)" % (
+                       DEFAULT_TRAIN_VERBOSITY, DEFAULT_NON_TRAIN_VERBOSITY))
 
     group.add_argument("--cluster-opt", action="append", default=[],
                        metavar="OPT",
