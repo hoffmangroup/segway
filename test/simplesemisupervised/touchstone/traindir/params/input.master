@@ -5,7 +5,7 @@
 #endif
 
 DT_IN_FILE inline
-5
+4
 
 0 map_frameIndex_ruler
 1
@@ -42,13 +42,7 @@ DT_IN_FILE inline
             -1 { max(p3-1, 0) } % subtract 1 from previous value, or 0
 
 
-3 % XXXopt: good candidate for a linear combination C deterministic mapper
-
-map_seg_subseg_obs
-2       % num parents
-        -1 { p0*CARD_SUBSEG + p1 } 
-
-4 map_supervisionLabel_seg_alwaysTrue
+3 map_supervisionLabel_seg_alwaysTrue
 2              % num parents
 % first parent is the label: 0 = no label; 1+ = (desired-1)
 % second parent is target
@@ -94,11 +88,13 @@ DPMF_IN_FILE inline
 0 dpmf_always 1 1.0
 
 DETERMINISTIC_CPT_IN_FILE inline
-#if CARD_SUPERVISIONLABEL == -1
-5
-#else /* CARD_SUPERVISIONLABEL != -1 */
+#if (CARD_SUBSEG > 1) && (CARD_SUPERVISIONLABEL != -1)
 6
-#endif /* CARD_SUPERVISIONLABEL == -1 */
+#elif (CARD_SUBSEG > 1) || (CARD_SUPERVISIONLABEL != -1)
+5
+#else
+4
+#endif
 
 0 seg_segCountDown
 1
@@ -120,13 +116,19 @@ map_segTransition_ruler_seg_segCountDown_segCountDown
 CARD_SEG CARD_SEG
 internal:copyParent
 
+#if CARD_SUBSEG > 1
 4 subseg_subseg_copy
 1
 CARD_SUBSEG CARD_SUBSEG
 internal:copyParent
+#endif
 
 #if CARD_SUPERVISIONLABEL != -1
+#if CARD_SUBSEG > 1
 5 supervisionLabel_seg_alwaysTrue
+#else
+4 supervisionLabel_seg_alwaysTrue
+#endif
 2
 CARD_SUPERVISIONLABEL CARD_SEG CARD_BOOLEAN
 map_supervisionLabel_seg_alwaysTrue
@@ -135,33 +137,18 @@ map_supervisionLabel_seg_alwaysTrue
 #ifndef INPUT_PARAMS_FILENAME
 
 DENSE_CPT_IN_FILE inline
-5
+3
 
 0 start_seg 0 4
 0.25 0.25 0.25 0.25
 
-1 seg_subseg 1 4 1
-1.0
-1.0
-1.0
-1.0
-
-2 seg_seg 1 4 4
+1 seg_seg 1 4 4
 0.0 0.333333333333 0.333333333333 0.333333333333
 0.333333333333 0.0 0.333333333333 0.333333333333
 0.333333333333 0.333333333333 0.0 0.333333333333
 0.333333333333 0.333333333333 0.333333333333 0.0
 
-3 seg_subseg_subseg 2 4 1 1
-1.0
-
-1.0
-
-1.0
-
-1.0
-
-4 segCountDown_seg_segTransition 2 2 4 3
+2 segCountDown_seg_segTransition 2 2 4 3
 0.90900000909 0.090900000909 9.99900009999e-05
 0.90900000909 0.090900000909 9.99900009999e-05
 0.90900000909 0.090900000909 9.99900009999e-05
