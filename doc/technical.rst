@@ -109,7 +109,16 @@ small number of these are still produced when :option:`--dry-run` is
 specified. The ``details.sh`` script contains the exact commands
 dispatched by Segway, including wrapper commands that monitor memory
 usage, create and delete local temporary files with observation data,
-and convert GMTK's output ot BED, among other things.
+and convert GMTK's output to BED, among other things.
+
+Segway also writes a ``cmdline`` directory in both the ``traindir``
+and ``identifydir``. Each instance has its own folder, and for each
+job segway queues, a shell script (with the job's name) is written
+containing the GMTK command of the queued job.
+
+For example, ``traindir/cmdline/0/emt0.0.0.uuid.sh`` is the shell
+script containing the GMTK commands and arguments for job 
+``emt0.0.0.uuid`` in instance 0 of training.
 
 Summary reports
 ---------------
@@ -153,6 +162,11 @@ helpful in diagnosing model problems. Keep in mind that very high
 values (above ``60``) will produce tons of output===maybe
 terabytes.
 
+.. warning::
+
+  Running Segway in identify mode with non-zero verbosity is
+  currently not supported and may result in errors.
+
 Performance
 ===========
 Some factors that affect compute time and memory requirements:
@@ -195,6 +209,11 @@ workdir instead.
                                                     that are not trained
 |rarr| ``segway.inc``                               C preprocessor (``cpp``) include file
                                                     used in structure
+``cmdline``                                         shell scripts containing commandlines/arguments of
+                                                    individual GMTK jobs
+``cmdline/0,1,.../``                                GMTK job shell scripts for a particular training
+                                                    instance(0,1,...)
+``cmdline/identify/``                               GMTK job shell scripts for identification
 ``likelihood/``                                     GMTK's report of the log likelihood for
                                                     the most recent M-step of EM training
 |rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an

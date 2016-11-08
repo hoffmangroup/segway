@@ -278,7 +278,7 @@ class Segmentation(defaultdict):
             final_outfile = outfile._items[0]
         except AttributeError:
             final_outfile = outfile
-        print >>final_outfile, " ".join(self.trackline)
+        print >>final_outfile, " ".join(self.trackline).rstrip()
 
     def write(self, outfile):
         ends = {}
@@ -289,7 +289,7 @@ class Segmentation(defaultdict):
 
         self.write_trackline(outfile)
 
-        for chrom, chromosome in self.iteritems():
+        for chrom, chromosome in sorted(self.iteritems()):
             for run in chromosome:
                 segments = array(run)
 
@@ -317,7 +317,7 @@ class Segmentation(defaultdict):
                         segments_label_list.append((end-1, end))
 
                     # pad beginning if necessary
-                    if not len(segments_label) or segments_label[0, OFFSET_START] != 0:
+                    if not len(segments_label) or segments_label[0, OFFSET_START] != start:
                         segments_label_list.insert(0, (start, start+1))
 
                     segments_label = vstack(segments_label_list)

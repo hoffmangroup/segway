@@ -35,9 +35,9 @@ do
     cd $TEST_ROOT
 done < <(find . -maxdepth 2 -name "run.sh" -type f | sort)
 
-mkdir all-test-changes || true
-cp */*-changes.tar.gz all-test-changes || true
-tar -cf all-test-changes.tar all-test-changes || true
-rm -rf all-test-changes || true
+#mkdir all-test-changes || true
+#cp */*-changes.tar.gz all-test-changes || true
+#tar -cf all-test-changes.tar all-test-changes || true
+#rm -rf all-test-changes || true
 
 exit $exit_status

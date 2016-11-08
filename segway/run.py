@@ -15,9 +15,10 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
-from os import environ, extsep
+from os import fchmod, environ, extsep
 import re
 from shutil import copy2
+import stat
 from string import letters
 import sys
 from threading import Event, Lock, Thread
@@ -29,10 +30,11 @@ from warnings import warn
 from genomedata import Genome
 from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
-from numpy.random import choice
+from numpy.random import RandomState
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
+import pipes
 from pkg_resources import Requirement, working_set
 from tabdelim import DictReader, ListWriter
 
@@ -129,7 +131,7 @@ LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 
 NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
-NUM_SUPERVISION_COLS = 2 # supervision_data, presence_supervision_data
+NUM_SUPERVISION_COLS = 2  # supervision_data, presence_supervision_data
 
 MAX_SPLIT_SEQUENCE_LENGTH = 2000000  # 2 million
 MAX_FRAMES = MAX_SPLIT_SEQUENCE_LENGTH
@@ -137,6 +139,11 @@ MEM_USAGE_BUNDLE = 100 * MB  # XXX: should start using this again
 MEM_USAGE_PROGRESSION = "2,3,4,6,8,10,12,14,15"
 
 TMP_USAGE_BASE = 10 * MB  # just a guess
+
+# train_window object has structure (window number, number of bases)
+TRAIN_WINDOWS_WINDOW_NUM_INDEX = 0
+TRAIN_WINDOWS_BASES_INDEX = 1
+MAX_GMTK_WINDOW_COUNT = 10000
 
 POSTERIOR_CLIQUE_INDICES = dict(p=1, c=1, e=1)
 
@@ -205,6 +212,7 @@ TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 
 SUBDIRNAME_ACC = "accumulators"
 SUBDIRNAME_AUX = "auxiliary"
+SUBDIRNAME_JOB_SCRIPT = "cmdline"
 SUBDIRNAME_LIKELIHOOD = "likelihood"
 SUBDIRNAME_OBS = "observations"
 SUBDIRNAME_POSTERIOR = "posterior"
@@ -213,6 +221,11 @@ SUBDIRNAME_VITERBI = "viterbi"
 SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
                      SUBDIRNAME_PARAMS]
+
+# job script file permissions: owner has read/write/execute
+# permissions, group/others have read/execute permissions
+JOB_SCRIPT_FILE_PERMISSIONS = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP \
+                              | stat.S_IROTH | stat.S_IXOTH
 
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
                       "num_frames", "maxvmem", "cpu", "exit_status"]
@@ -281,18 +294,6 @@ def quote_trackname(text):
         res = "x__" + res
 
     return res
-
-
-def quote_spaced_str(item):
-    """
-    add quotes around text if it has spaces in it
-    """
-    text = str(item)
-
-    if " " in text:
-        return '"%s"' % text
-    else:
-        return text
 
 
 class NoAdvance(str):
@@ -475,7 +476,14 @@ def cmdline2text(cmdline=sys.argv):
 
 
 def _log_cmdline(logfile, cmdline):
-    print >>logfile, " ".join(map(quote_spaced_str, cmdline))
+    quoted_cmdline_list = []
+    for cmdarg in cmdline:
+        # pipes.quote() will only quote arguments that need
+        # quotes to be run on shell commandline
+        # NOTE: move to shlex.quote() when moving to python 3.3
+        quoted_cmdline_list.append(pipes.quote(str(cmdarg)))
+    quoted_cmdline = ' '.join(quoted_cmdline_list)
+    print >>logfile, quoted_cmdline
 
 
 def check_overlapping_supervision_labels(start, end, chrom, coords):
@@ -656,7 +664,8 @@ class Runner(object):
         for task in tasks:
             if task == "train":
                 self.train = True
-            elif task == "identify":
+            elif (task == "identify" or 
+                  task == "annotate"):
                 self.identify = True
             elif task == "posterior":
                 self.posterior = True
@@ -735,6 +744,20 @@ class Runner(object):
 
         return res
 
+
+    def from_environment(self):
+        # If there is a seed from the environment
+        try:
+            # Get the seed
+            self.random_seed = int(environ["SEGWAY_RAND_SEED"])
+        # Otherwise set no seed
+        except KeyError:
+            self.random_seed = None
+
+        # Create a random number generator for this runner
+        self.random_state = RandomState(self.random_seed)
+
+
     def add_track_group(self, tracknames):
         tracks = self.tracks
         track_group = TrackGroup()
@@ -757,6 +780,7 @@ class Runner(object):
 
         self.track_groups.append(track_group)
 
+
     @classmethod
     def fromoptions(cls, args, options):
         """This is the usual way a Runner is created.
@@ -764,6 +788,7 @@ class Runner(object):
         Calls Runner.fromargs() first.
         """
         res = cls.fromargs(args)
+        res.from_environment()
 
         # Preprocess options
         # Convert any track files into a list of tracks
@@ -828,6 +853,10 @@ class Runner(object):
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
+
+        if res.identify and res.verbosity > 0: 
+            warn("Running Segway in identify mode with non-zero verbosity"
+                 " is currently not supported and may result in errors.")
 
         return res
 
@@ -1101,6 +1130,10 @@ class Runner(object):
     @memoized_property
     def error_dirpath(self):
         return self.make_output_dirpath("e", self.instance_index)
+
+    @memoized_property
+    def job_script_dirpath(self):
+        return self.make_job_script_dirpath(self.instance_index)
 
     @memoized_property
     def use_dinucleotide(self):
@@ -1455,6 +1488,12 @@ class Runner(object):
 
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
+        self.make_dir(res)
+
+        return res
+
+    def make_job_script_dirpath(self, instance_index):
+        res = self.work_dirpath / SUBDIRNAME_JOB_SCRIPT / str(instance_index)
         self.make_dir(res)
 
         return res
@@ -1837,12 +1876,15 @@ class Runner(object):
         for window_len, window_index in zipper:
             yield window_index, window_len
 
-    def log_cmdline(self, cmdline, args=None):
+    def log_cmdline(self, cmdline, args=None, script_file=None):
         if args is None:
             args = cmdline
 
         _log_cmdline(self.cmdline_short_file, cmdline)
         _log_cmdline(self.cmdline_long_file, args)
+
+        if script_file is not None:
+            _log_cmdline(script_file, args)
 
     def calc_tmp_usage_obs(self, num_frames, prog):
         if prog not in TMP_OBS_PROGS:
@@ -1864,9 +1906,16 @@ class Runner(object):
         else:
             args = gmtk_cmdline
 
-        # this doesn't include use of segway-wrapper, which takes the
-        # memory usage as an argument, and may be run multiple times
-        self.log_cmdline(gmtk_cmdline, args)
+        shell_job_name = extsep.join([job_name, EXT_SH])
+        job_script_filename = self.job_script_dirpath / shell_job_name
+
+        with open(job_script_filename, "w") as job_script_file:
+            print >>job_script_file, "#!/usr/bin/env bash"
+            # this doesn't include use of segway-wrapper, which takes the
+            # memory usage as an argument, and may be run multiple times
+            self.log_cmdline(gmtk_cmdline, args, job_script_file)
+            # set permissions for script to run
+            fchmod(job_script_file.fileno(), JOB_SCRIPT_FILE_PERMISSIONS)
 
         if self.dry_run:
             return None
@@ -1876,7 +1925,7 @@ class Runner(object):
 
         job_tmpl.jobName = job_name
         job_tmpl.remoteCommand = ENV_CMD
-        job_tmpl.args = map(str, args)
+        job_tmpl.args = [job_script_filename]
 
         # this is going to cause problems on heterogeneous systems
         environment = environ.copy()
@@ -2059,11 +2108,56 @@ class Runner(object):
         else:
             train_windows_all = list(self.window_lens_sorted())
             num_train_windows = len(train_windows_all)
-            train_window_indices_shuffled = choice(range(num_train_windows),
-                                                   num_train_windows,
-                                                   replace=False)
+
             train_windows = []
             cur_bases = 0
+
+            if num_train_windows >= MAX_GMTK_WINDOW_COUNT:
+                # Workaround a GMTK bug
+                # (https://gmtk-trac.bitnamiapp.com/trac/gmtk/ticket/588)
+                # that raises an error if the last number in a list given to
+                # -loadAccRange is greater than 9999 by always guaranteeing
+                # the last number is less than MAX_GMTK_WINDOW_COUNT
+
+                # sort train windows
+                train_windows_all.sort()
+                # choose all train windows with index less than
+                # MAX_GMTK_WINDOW_COUNT
+                valid_train_windows = train_windows_all[
+                                      0:MAX_GMTK_WINDOW_COUNT
+                                      ]
+                # choose one train window randomly.
+                # uniform chooses from the half-open interval [a, b)
+                # so since window numbering begins at 0, choose between
+                # [0, MAX_GMTK_WINDOW_COUNT)
+                valid_gmtk_window_index = int(
+                    self.random_state.uniform(0, MAX_GMTK_WINDOW_COUNT)
+                    )
+                # obtain the train window corresponding to the chosen
+                # window index
+                valid_train_window = \
+                    valid_train_windows[valid_gmtk_window_index]
+
+                # remove the chosen window from the list of windows,
+                # so that the window does not get chosen again
+                train_windows_all.remove(valid_train_window)
+
+                # redefine the number of available train windows to be
+                # the previous number minus 1
+                num_train_windows = len(train_windows_all)
+
+                # add the chosen window to the final list of train windows
+                train_windows.append(valid_train_window)
+
+                # start with the size of the chosen window
+                cur_bases = train_windows[
+                            TRAIN_WINDOWS_WINDOW_NUM_INDEX][
+                            TRAIN_WINDOWS_BASES_INDEX]
+
+            train_window_indices_shuffled = \
+            self.random_state.choice(range(num_train_windows),
+                                                num_train_windows, replace=False)
+
             total_bases = sum(
                 train_window[1] for train_window in train_windows_all
             )
@@ -2074,6 +2168,12 @@ class Runner(object):
                     cur_bases += train_windows_all[train_window_index][1]
                 else:
                     break
+
+            if num_train_windows >= MAX_GMTK_WINDOW_COUNT - 1:
+                # Regarding the same GMTK bug as above, sort in reverse
+                # to ensure that the last number in the list given to
+                # -loadAccRange is our chosen window (<10000)
+                train_windows.sort(reverse=True)
 
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
@@ -2090,12 +2190,20 @@ class Runner(object):
         self.last_params_filename = curr_params_filename
 
     def run_train_instance(self):
+        instance_index = self.instance_index
+
+        # If a random number generator seed exists
+        if self.random_seed:
+            # Create a new random number generator for this instance based on its
+            # own index
+            self.random_seed += instance_index
+            self.random_state = RandomState(self.random_seed)
+
         self.set_triangulation_filename()
 
         # make new files if there is more than one instance
         new = self.instance_make_new_params
 
-        instance_index = self.instance_index
         self.set_log_likelihood_filenames(instance_index, new)
         self.set_params_filename(instance_index, new)
 

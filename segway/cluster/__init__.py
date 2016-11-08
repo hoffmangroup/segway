@@ -13,13 +13,15 @@ from time import sleep
 
 DRIVER_NAME_OVERRIDE = environ.get("SEGWAY_CLUSTER")
 
-if DRIVER_NAME_OVERRIDE == "local":
+DRIVER_NAME_LOCAL = "local"
+
+if DRIVER_NAME_OVERRIDE == DRIVER_NAME_LOCAL:
     from .local import ExitTimeoutException, JobState, Session
 else:
     try:
         from drmaa import ExitTimeoutException, JobState, Session
     except (ImportError, RuntimeError):
-        DRIVER_NAME_OVERRIDE = "local"  # no DRMAA available
+        DRIVER_NAME_OVERRIDE = DRIVER_NAME_LOCAL  # no DRMAA available
         from .local import ExitTimeoutException, JobState, Session
 
 from .._util import constant
@@ -143,10 +145,20 @@ class RestartableJob(object):
 
         jobname = job_template.jobName
 
-        print >>sys.stderr, "queued %s: %s (%s)" % (res, jobname, res_req)
+        # alert the user if they are running locally
+        if DRIVER_NAME_OVERRIDE == DRIVER_NAME_LOCAL:
+            job_location = "running locally"
+        else:
+            job_location = "queued"
+
+        print >>sys.stderr, "%s %s: %s (%s)" % (job_location, res, jobname, res_req)
 
         return res
 
+    def free_job_template(self):
+        # the JobTemplateFactory should delete its own job template object
+        # when it's no longer needed
+        self.job_tmpl_factory.delete_job_template(self.session)
 
 class RestartableJobDict(dict):
     def __init__(self, session, job_log_file, *args, **kwargs):
@@ -240,6 +252,8 @@ class RestartableJobDict(dict):
                 job_template_factory = restartable_job.job_tmpl_factory
                 job_name = job_template_factory.template.jobName
                 error_filename = job_template_factory.error_filename
+                # job will not be resubmitted, so free the job template
+                restartable_job.free_job_template()
                 raise RuntimeError(MSG_JOB_ERROR %
                                    (jobid, job_name, error_filename))
             # Otherwise
@@ -267,6 +281,9 @@ class RestartableJobDict(dict):
         print >>self.job_log_file, "\t".join(row)
         self.job_log_file.flush()  # allow reading file now
 
+        if exit_status == 0:
+            # job will not be resubmitted, so free the job template
+            restartable_job.free_job_template()
         del self[jobid]
 
     def wait(self):

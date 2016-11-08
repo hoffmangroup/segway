@@ -111,6 +111,9 @@ class _JobTemplateFactory(object):
         """
         raise NotImplementedError
 
+    def delete_job_template(self, session):
+        session.deleteJobTemplate(self.template)
+
 def make_native_spec(*args, **kwargs):
     return " ".join(NATIVE_SPEC_PROG.build_args(args=args, options=kwargs))
 

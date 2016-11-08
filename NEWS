@@ -1,4 +1,10 @@
+1.4.2:
+* segway: Change Segway to raise warning if running Segway in identify mode
+  with non-zero verbosity.
+
 1.4.1:
+* segway: fix --bigBed for assemblies with alt chromosomes not being sorted
+  correctly
 * segway: --num-minibatch-windows can now be seeded with SEGWAY_RAND_SEED and
   will select the same windows with when given the same seed 
   (thanks to Rachel Chan)
@@ -6,6 +12,15 @@
 * segway: local job submission now appends error logs instead of rewriting them
 * segway: add resolution functionality for semisupervised mode 
   (thanks to Rachel Chan)
+* segway: add 'annotate' as an alias for 'identify' (thanks to Rachel Chan)
+* segway: fix memory leak due to DRMAA job templates not being deleted
+* segway: change queueing functionality such that segway queues a shell file
+  containing the to-be-queued arguments, instead of queueing the arguments
+  themselves (thanks to Rachel Chan)
+* segway: change output message to specify whether the job is queued or
+  run locally (thanks to Rachel Chan)
+* segway: work around a GMTK bug when indexing a genomic region with a number
+  greater than 9999 (thanks to Rachel Chan)
 
 1.4.0:
 * segway: added support for --num-minibatch-windows, which causes Segway
