@@ -2216,7 +2216,7 @@ class Runner(object):
             self.save_input_master(instance_index, new)
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
-                      maxEmIters=1,
+                      maxEmIters=1, varFloor=0.001,
                       lldp=LOG_LIKELIHOOD_DIFF_FRAC * 100.0,
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
