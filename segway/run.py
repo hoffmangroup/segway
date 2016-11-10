@@ -81,7 +81,7 @@ RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
-VAR_FLOOR = -1
+VAR_FLOOR_DEFAULT = 0.001
 
 ISLAND = True
 
@@ -642,7 +642,7 @@ class Runner(object):
         self.reverse_worlds = []  # XXXopt: this should be a set
         self.supervision_label_range_size = 0
         self.num_mix_components = NUM_MIX_COMPONENTS
-        self.var_floor = VAR_FLOOR
+        self.var_floor = VAR_FLOOR_DEFAULT
 
         # flags
         self.clobber = False
@@ -2216,13 +2216,11 @@ class Runner(object):
             self.save_input_master(instance_index, new)
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
-                      maxEmIters=1, varFloor=0.001,
+                      maxEmIters=1,
+                      varFloor=self.var_floor,
                       lldp=LOG_LIKELIHOOD_DIFF_FRAC * 100.0,
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
-
-        if self.var_floor != -1: # means it was defined
-            kwargs["varFloor"] = self.var_floor
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
