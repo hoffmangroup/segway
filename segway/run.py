@@ -72,7 +72,7 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
-NUM_MIX_COMPONENTS = 1
+NUM_MIX_COMPONENTS_DEFAULT = 1
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -81,7 +81,8 @@ RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
-VAR_FLOOR_DEFAULT = 0.001
+VAR_FLOOR_DEFAULT = -1
+VAR_FLOOR_GMM_DEFAULT = 0.001
 
 ISLAND = True
 
@@ -641,7 +642,7 @@ class Runner(object):
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
         self.supervision_label_range_size = 0
-        self.num_mix_components = NUM_MIX_COMPONENTS
+        self.num_mix_components = NUM_MIX_COMPONENTS_DEFAULT
         self.var_floor = VAR_FLOOR_DEFAULT
 
         # flags
@@ -2217,10 +2218,20 @@ class Runner(object):
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
-                      varFloor=self.var_floor,
                       lldp=LOG_LIKELIHOOD_DIFF_FRAC * 100.0,
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
+
+        # var floor was specified
+        if self.var_floor != VAR_FLOOR_DEFAULT:
+            kwargs["varFloor"] = self.var_floor
+
+        #if using mixture models and variance floor not specified,
+        # use  default variance floor value to ensure convergence
+        if ((self.num_mix_components != NUM_MIX_COMPONENTS_DEFAULT) and
+            (self.var_floor == VAR_FLOOR_DEFAULT)):
+            self.var_floor = VAR_FLOOR_GMM_DEFAULT
+            kwargs["varFloor"] = self.var_floor
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
@@ -2938,9 +2949,9 @@ def parse_options(argv):
                        " (default %s)" % DISTRIBUTION_DEFAULT)
 
     group.add_argument("--mixture-components", type=int,
-                         default=NUM_MIX_COMPONENTS,
+                         default=NUM_MIX_COMPONENTS_DEFAULT,
                          help="Number of component for the mixture"
-                         " of Gaussians (default %d)" % NUM_MIX_COMPONENTS)
+                         " of Gaussians (default %d)" % NUM_MIX_COMPONENTS_DEFAULT)
 
     group.add_argument("--num-instances", type=int,
                        default=NUM_INSTANCES, metavar="NUM",
