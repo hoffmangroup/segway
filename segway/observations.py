@@ -620,11 +620,10 @@ class Observations(object):
 
         return res
 
-    def write(self, float_filelist, int_filelist, float_tabfile):
+    def write_tab_file(self, float_filelist, int_filelist, float_tabfile):
         print_filepaths_custom = partial(self.print_filepaths,
                                          float_filelist, int_filelist,
                                          temp=(self.identify or self.train))
-        save_window = self.save_window
 
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
@@ -639,42 +638,6 @@ class Observations(object):
             float_tabwriter.writerow(row)
             print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
 
-            # if they don't both exist
-            if not (float_filepath.exists() and int_filepath.exists()):
-                # Get the first genome from this world to use for generating
-                # sequence cells
-                genomedata_name = self.world_genomedata_names[world][0]
-                with Genome(genomedata_name) as genome:
-                    chromosome = genome[chrom]
-                    seq_cells = self.make_seq_cells(chromosome, start, end)
-
-                supervision_cells = \
-                    self.make_supervision_cells(chrom, start, end)
-
-                if __debug__:
-                    if self.identify:
-                        assert seq_cells is None and supervision_cells is None
-
-                # TODO: REMOVE ALL CODE BELOW THIS SINCE TASK WILL ALSO WRITE
-                # OUT THE WINDOW
-                # TODO: Entire if statement might be redundant, this might only
-                # report windows used - should be written to file as a separate
-                # job?
-
-                # if not self.train:
-                # if True:
-                #     # don't actually write data--it is done by task.py instead
-                #     continue
-
-                # track_indexes = self.world_track_indexes[world]
-                # genomedata_names = self.world_genomedata_names[world]
-                # continuous_cells = \
-                #     make_continuous_cells(track_indexes, genomedata_names,
-                #                           chrom, start, end)
-
-                # # data is transformed as part of _save_window()
-                # save_window(float_filepath, int_filepath, continuous_cells,
-                #             seq_cells, supervision_cells)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
@@ -688,4 +651,4 @@ class Observations(object):
         with open_writable(self.float_filelistpath) as float_filelist:
             with open_writable(self.int_filelistpath) as int_filelist:
                 with open_writable(self.float_tabfilepath) as float_tabfile:
-                    self.write(float_filelist, int_filelist, float_tabfile)
+                    self.write_tab_file(float_filelist, int_filelist, float_tabfile)
