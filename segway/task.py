@@ -9,6 +9,7 @@ task: wraps a GMTK subtask to reduce size of output
 
 from errno import ENOENT
 from os import extsep, fdopen, EX_TEMPFAIL
+from os.path import isfile
 import re
 import sys
 from tempfile import gettempdir, mkstemp
@@ -21,7 +22,7 @@ from path import path
 from .observations import make_continuous_cells, _save_window
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array,
-                    find_segment_starts, get_label_color,
+                    find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
 
@@ -401,10 +402,68 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     return parse_viterbi_save_bed(coord, resolution, do_reverse,
                                   lines, outfilename, num_labels, output_label)
 
+
+def run_train(coord, resolution, do_reverse, outfilename,
+              genomedata_names, float_filename, int_filename, distribution,
+              track_indexes_text, *args):
+
+    # Create and save the train window
+    genomedata_names = genomedata_names.split(",")
+
+    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
+                     for genomedata_track_indexes_text
+                     in track_indexes_text.split(';')]
+
+    (chrom, start, end) = coord
+
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
+
+    # Create observation file temporary paths
+    float_filepath = TEMP_DIRPATH / float_filename
+    int_filepath = TEMP_DIRPATH / int_filename
+
+    temp_filepaths = [float_filepath, int_filepath]
+
+    # Replace GMTK observation arguments with new temporary file paths
+    args = list(args) # convert from tuple
+    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
+    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
+                                                 EXT_FLOAT)
+    try:
+        print_to_fd(float_filelistfd, float_filename)
+        print_to_fd(int_filelistfd, int_filename)
+
+        _save_window(float_filename, int_filename, continuous_cells,
+                     resolution, distribution)
+
+        # XXXopt: does this work? or do we need to use a subprocess to
+        # do the loading?
+        # remove from memory
+        del continuous_cells
+
+        output = TRAIN_PROG.getoutput(*args)
+    finally:
+        for filepath in temp_filepaths:
+            # don't raise a nested exception if the file was never created
+            try:
+                filepath.remove()
+            except OSError, err:
+                if err.errno == ENOENT:
+                    pass
+
+
+def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
+    output = TRAIN_PROG.getoutput(*args)
+
+
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,
          ("run", "posterior"): run_posterior_save_bed,
-         ("load", "posterior"): load_posterior_save_bed}
+         ("load", "posterior"): load_posterior_save_bed,
+         ("run", "train"): run_train,
+         ("run", "bundle-train"): run_bundle_train,
+         }
 
 
 def task(verb, kind, outfilename, chrom, start, end, resolution,

@@ -160,6 +160,12 @@ ENV_CMD = "/usr/bin/env"
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 
+# Tasks
+ANNOTATE_TASK_KIND = "viterbi"
+POSTERIOR_TASK_KIND = "posterior"
+TRAIN_TASK_KIND = "train"
+BUNDLE_TRAIN_TASK_KIND = "bundle-train"
+
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
 # extensions and suffixes
@@ -1887,6 +1893,7 @@ class Runner(object):
     def calc_tmp_usage(self, num_frames, prog):
         return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
+    #TODO: Rename? It now always queues segway-task
     def queue_gmtk(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
@@ -1968,12 +1975,81 @@ class Runner(object):
         everyone will share their min/max memory usage. Used for calls
         from queue_train_bundle()
         """
+
         kwargs["inputMasterFile"] = self.input_master_filename
 
         name = self.make_job_name_train(instance_index, round_index,
                                         window_index)
+        output_filename = ""
 
-        return self.queue_gmtk(self.train_prog, kwargs, name, num_frames)
+        # TODO: Fix this weird "bundle" constant passing
+        if not (window_index == NAME_BUNDLE_PLACEHOLDER):
+            window = self.windows[window_index]
+            num_frames = self.window_lens[window_index]
+
+            # TODO: Replace redundant code? str probably not necessary
+            is_reverse = str(int(self.is_in_reversed_world(window_index)))
+
+            # TODO: Put all of this below in queue_gmtk OR put into a separate
+            # function
+
+            # The track indexes should be semi-colon separated for each genomedata
+            # archive
+            track_string_list = []
+
+            # The genomedata names for the worlds needs to be ordered and unique
+            # from the world it comes from
+            world_genomedata_names = self.world_genomedata_names[window.world]
+            ordered_unique_world_genomedata_names = []
+            for genomedata_name in world_genomedata_names:
+                if genomedata_name not in ordered_unique_world_genomedata_names:
+                    ordered_unique_world_genomedata_names.append(genomedata_name)
+
+            # For each unique genomedata archive in this world
+            for genomedata_name in ordered_unique_world_genomedata_names:
+                # For every track in this world
+                tracks_from_world = zip(*self.track_groups)[window.world]
+                track_list = [track.index for track in tracks_from_world
+                              if track.genomedata_name == genomedata_name]
+                # Build a comma separated string
+                track_string = ",".join(map(str, track_list))
+                track_string_list.append(track_string)
+            # Build a semi-colon separated string
+            track_indexes_text = ";".join(track_string_list)
+
+            genomedata_archives_text = ",".join(
+                ordered_unique_world_genomedata_names)
+
+            float_filepath = self.float_filepaths[window_index]
+            int_filepath = self.int_filepaths[window_index]
+
+            prefix_args = [find_executable("segway-task"),
+                           "run", 
+                           TRAIN_TASK_KIND,
+                           output_filename, #output filename # TODO - does this matter?
+                           window.chrom, window.start, window.end,
+                           self.resolution,
+                           is_reverse, # end requirement for segway-task
+                           genomedata_archives_text,
+                           float_filepath,
+                           int_filepath,
+                           self.distribution,
+                           track_indexes_text
+                           ]
+        else :
+            prefix_args = [find_executable("segway-task"),
+                           "run", 
+                           BUNDLE_TRAIN_TASK_KIND,
+                           output_filename, #output filename # TODO - does this matter?
+                           0,0,0, # empty window
+                           self.resolution,
+                           0, # is_reverse is irrelevant for bundling
+                           ]
+
+
+        return self.queue_gmtk(self.train_prog, kwargs, name, num_frames,
+                               prefix_args=prefix_args
+                              )
 
     def queue_train_parallel(self, input_params_filename, instance_index,
                              round_index, train_windows, **kwargs):
@@ -2577,9 +2653,9 @@ to find the winning instance anyway.""" % thread.instance_index)
         kwargs = self.get_identify_kwargs(window_index, kwargs)
 
         if prog == VITERBI_PROG:
-            kind = "viterbi"
+            kind = ANNOTATE_TASK_KIND
         else:
-            kind = "posterior"
+            kind = POSTERIOR_TASK_KIND
 
         # "0" or "1"
         is_reverse = str(int(self.is_in_reversed_world(window_index)))

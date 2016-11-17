@@ -623,7 +623,7 @@ class Observations(object):
     def write(self, float_filelist, int_filelist, float_tabfile):
         print_filepaths_custom = partial(self.print_filepaths,
                                          float_filelist, int_filelist,
-                                         temp=self.identify)
+                                         temp=(self.identify or self.train))
         save_window = self.save_window
 
         float_tabwriter = ListWriter(float_tabfile)
@@ -655,19 +655,26 @@ class Observations(object):
                     if self.identify:
                         assert seq_cells is None and supervision_cells is None
 
-                if not self.train:
-                    # don't actually write data--it is done by task.py instead
-                    continue
+                # TODO: REMOVE ALL CODE BELOW THIS SINCE TASK WILL ALSO WRITE
+                # OUT THE WINDOW
+                # TODO: Entire if statement might be redundant, this might only
+                # report windows used - should be written to file as a separate
+                # job?
 
-                track_indexes = self.world_track_indexes[world]
-                genomedata_names = self.world_genomedata_names[world]
-                continuous_cells = \
-                    make_continuous_cells(track_indexes, genomedata_names,
-                                          chrom, start, end)
+                # if not self.train:
+                # if True:
+                #     # don't actually write data--it is done by task.py instead
+                #     continue
 
-                # data is transformed as part of _save_window()
-                save_window(float_filepath, int_filepath, continuous_cells,
-                            seq_cells, supervision_cells)
+                # track_indexes = self.world_track_indexes[world]
+                # genomedata_names = self.world_genomedata_names[world]
+                # continuous_cells = \
+                #     make_continuous_cells(track_indexes, genomedata_names,
+                #                           chrom, start, end)
+
+                # # data is transformed as part of _save_window()
+                # save_window(float_filepath, int_filepath, continuous_cells,
+                #             seq_cells, supervision_cells)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
