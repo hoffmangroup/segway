@@ -42,7 +42,7 @@ else:
 ABSOLUTE_FUDGE = 0.001
 
 # define the pseudocount for training the mixture distribution weights
-MIX_PSEUDOCOUNT = 1
+MIX_PSEUDOCOUNT = 100
 
 # here to avoid duplication
 NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
