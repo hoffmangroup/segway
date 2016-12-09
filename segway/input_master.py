@@ -549,6 +549,7 @@ class MeanParamSpec(ParamSpec):
 
         return means_tiled + (stds_tiled * noise)
 
+
     def generate_objects(self):
         """
         returns: iterable of strs containing gmtk parameter objects starting

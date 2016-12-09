@@ -328,6 +328,7 @@ def make_dinucleotide_int_data(seq):
     # column_stacking at the end
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
 
+
 def make_continuous_cells(track_indexes, genomedata_names,
                           chromosome_name, start, end):
     """
@@ -584,6 +585,7 @@ class Observations(object):
     def make_seq_cells(self, chromosome, start, end):
         if self.use_dinucleotide:
             return chromosome.seq[start:end]
+
 
     def make_supervision_cells(self, chrom, start, end):
         """
