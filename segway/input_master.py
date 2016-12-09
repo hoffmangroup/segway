@@ -14,8 +14,6 @@ from string import Template
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, sqrt, tile, vectorize, where,
                    zeros)
-from numpy.random import seed, uniform
-from os import environ
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
@@ -24,14 +22,6 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED, USE_MFSDG)
-
-# allow setting random seed for testing purposes
-try:
-    seed_text = environ["SEGWAY_RAND_SEED"]
-except KeyError:
-    pass
-else:
-    seed(int(seed_text))
 
 if USE_MFSDG:
     # because tying not implemented yet
