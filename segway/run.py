@@ -647,6 +647,7 @@ class Runner(object):
         self.posterior = False
         self.identify = False  # viterbi
         self.dry_run = False
+        self.zscore = False
         self.verbosity = VERBOSITY
 
         self.__dict__.update(kwargs)
