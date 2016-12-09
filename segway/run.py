@@ -652,7 +652,6 @@ class Runner(object):
         self.posterior = False
         self.identify = False  # viterbi
         self.dry_run = False
-        self.zscore = False
         self.verbosity = VERBOSITY
 
         self.__dict__.update(kwargs)
@@ -693,7 +692,6 @@ class Runner(object):
                         ("split_sequences", "max_split_sequence_length"),
                         ("clobber",),
                         ("dry_run",),
-                        ("zscore",),
                         ("input_master", "input_master_filename"),
                         ("structure", "structure_filename"),
                         ("dont_train", "dont_train_filename"),
@@ -3033,8 +3031,6 @@ def parse_options(argv):
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any"
                        " executables")
-    group.add_argument("--zscore", action="store_true",
-                         help="zscore normalize the genomedata tracks")
 
     # Positional arguments
     parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
