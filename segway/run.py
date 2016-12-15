@@ -2224,8 +2224,8 @@ class Runner(object):
         if self.var_floor != VAR_FLOOR_DEFAULT:
             kwargs["varFloor"] = self.var_floor
 
-        #if using mixture models and variance floor not specified,
-        # use  default variance floor value to ensure convergence
+        # if using mixture models and variance floor not specified,
+        # use default variance floor value to ensure convergence
         if ((self.num_mix_components != NUM_MIX_COMPONENTS_DEFAULT) and
             (self.var_floor == VAR_FLOOR_DEFAULT)):
             self.var_floor = VAR_FLOOR_GMM_DEFAULT
@@ -2995,11 +2995,12 @@ def parse_options(argv):
 
     group.add_argument("--var-floor", type=float,
                          help="Controls the variance floor, meaning that if any "
-                         "of the diagonal variances of a Gaussian falls below "
+                         "of the variances of a Gaussian falls below "
                          'this value, then the variance is "floored" (prohibited '
                          "from falling below the floor value). The variance, in "
                          "this case, is set to the corresponding variance from "
-                         "the previous EM iteration.")
+                         "the previous EM iteration. If not using GMM, default "
+                         "unused, else default %f" % VAR_FLOOR_GMM_DEFAULT)
 
     group = parser.add_argument_group("Technical variables")
     group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
