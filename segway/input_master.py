@@ -728,7 +728,7 @@ class DPMFParamSpec(DenseCPTParamSpec):
 
     def generate_objects(self):
         """
-        returns: iterable of strs containing gmtk parameter objects starsting
+        returns: iterable of strs containing gmtk parameter objects starting
         with names
         """
 
