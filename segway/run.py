@@ -1771,9 +1771,11 @@ class Runner(object):
             observations.locate_windows(genome)
 
         self.windows = observations.windows
+
         # XXX: does this need to be done before save()?
         self.subset_metadata()
-        observations.save()
+        # observations.save()
+        observations.create_filepaths(temp=True)
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
@@ -1980,76 +1982,63 @@ class Runner(object):
 
         name = self.make_job_name_train(instance_index, round_index,
                                         window_index)
+
         output_filename = ""
 
-        # TODO: Fix this weird "bundle" constant passing
-        if not (window_index == NAME_BUNDLE_PLACEHOLDER):
+        if window_index == NAME_BUNDLE_PLACEHOLDER:
+            prefix_args = [find_executable("segway-task"),
+                           "run",
+                           BUNDLE_TRAIN_TASK_KIND,
+                           output_filename,  # output filename
+                           0, 0, 0,  # empty window
+                           self.resolution,
+                           0  # is_reverse is irrelevant for bundling
+                           ]
+        else:
             window = self.windows[window_index]
             num_frames = self.window_lens[window_index]
 
-            # TODO: Replace redundant code? str probably not necessary
             is_reverse = str(int(self.is_in_reversed_world(window_index)))
 
-            # TODO: Put all of this below in queue_gmtk OR put into a separate
-            # function
+            track_indexes = self.world_track_indexes[window.world]
+            genomedata_names = self.world_genomedata_names[window.world]
 
-            # The track indexes should be semi-colon separated for each genomedata
-            # archive
-            track_string_list = []
-
-            # The genomedata names for the worlds needs to be ordered and unique
-            # from the world it comes from
-            world_genomedata_names = self.world_genomedata_names[window.world]
-            ordered_unique_world_genomedata_names = []
-            for genomedata_name in world_genomedata_names:
-                if genomedata_name not in ordered_unique_world_genomedata_names:
-                    ordered_unique_world_genomedata_names.append(genomedata_name)
-
-            # For each unique genomedata archive in this world
-            for genomedata_name in ordered_unique_world_genomedata_names:
-                # For every track in this world
-                tracks_from_world = zip(*self.track_groups)[window.world]
-                track_list = [track.index for track in tracks_from_world
-                              if track.genomedata_name == genomedata_name]
-                # Build a comma separated string
-                track_string = ",".join(map(str, track_list))
-                track_string_list.append(track_string)
-            # Build a semi-colon separated string
-            track_indexes_text = ";".join(track_string_list)
-
-            genomedata_archives_text = ",".join(
-                ordered_unique_world_genomedata_names)
+            track_indexes_text = ",".join(map(str, track_indexes))
+            genomedata_names_text = ",".join(genomedata_names)
 
             float_filepath = self.float_filepaths[window_index]
             int_filepath = self.int_filepaths[window_index]
 
+            is_semisupervised = (self.supervision_type ==
+                                 SUPERVISION_SEMISUPERVISED)
+
+            if is_semisupervised:
+                supervision_coords = self.supervision_coords[window.chrom]
+                supervision_labels = self.supervision_labels[window.chrom]
+            else:
+                supervision_coords = None
+                supervision_labels = None
+
             prefix_args = [find_executable("segway-task"),
-                           "run", 
+                           "run",
                            TRAIN_TASK_KIND,
-                           output_filename, #output filename # TODO - does this matter?
+                           output_filename,  # not used
                            window.chrom, window.start, window.end,
                            self.resolution,
-                           is_reverse, # end requirement for segway-task
-                           genomedata_archives_text,
+                           is_reverse,  # end requirement for segway-task
+                           genomedata_names_text,
                            float_filepath,
                            int_filepath,
                            self.distribution,
-                           track_indexes_text
+                           track_indexes_text,
+                           is_semisupervised,
+                           supervision_coords,
+                           supervision_labels
                            ]
-        else :
-            prefix_args = [find_executable("segway-task"),
-                           "run", 
-                           BUNDLE_TRAIN_TASK_KIND,
-                           output_filename, #output filename # TODO - does this matter?
-                           0,0,0, # empty window
-                           self.resolution,
-                           0, # is_reverse is irrelevant for bundling
-                           ]
-
 
         return self.queue_gmtk(self.train_prog, kwargs, name, num_frames,
                                prefix_args=prefix_args
-                              )
+                               )
 
     def queue_train_parallel(self, input_params_filename, instance_index,
                              round_index, train_windows, **kwargs):

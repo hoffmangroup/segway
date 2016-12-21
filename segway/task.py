@@ -7,6 +7,7 @@ task: wraps a GMTK subtask to reduce size of output
 
 # Copyright 2009-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
+from ast import literal_eval
 from errno import ENOENT
 from os import extsep, fdopen, EX_TEMPFAIL
 from os.path import isfile
@@ -19,7 +20,8 @@ from numpy import argmax, array, empty, where, diff, r_, zeros
 import optbuild
 from path import path
 
-from .observations import make_continuous_cells, _save_window
+from .observations import (make_continuous_cells, make_supervision_cells,
+                           _save_window)
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array,
                     find_segment_starts, get_label_color, TRAIN_PROG,
@@ -39,8 +41,9 @@ EXT_OPTIONS = {}
 EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
-USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
+DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 
+GMTK_TRRNG_OPTION_STRING = "-trrng" # Range to train over segment file
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
@@ -405,19 +408,39 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
 def run_train(coord, resolution, do_reverse, outfilename,
               genomedata_names, float_filename, int_filename, distribution,
-              track_indexes_text, *args):
+              track_indexes,
+              is_semisupervised, supervision_coords, supervision_labels,
+              *args):
 
     # Create and save the train window
     genomedata_names = genomedata_names.split(",")
-
-    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
-                     for genomedata_track_indexes_text
-                     in track_indexes_text.split(';')]
+    track_indexes = map(int, track_indexes.split(","))
 
     (chrom, start, end) = coord
 
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
+
+    # Only set these when dinucleotide is set
+    # Get the first genome from this world to use for generating
+    # sequence cells
+    # with Genome(genomedata_names[0]) as genome:
+    #     chromosome = genome[chrom]
+    #     seq_cells = self.make_seq_cells(chromosome, start, end)
+
+    # If this training regions is supervised
+    if is_semisupervised == "True":
+        # Create the supervision cells for this region
+        # Convert supervision parameters back from text
+        supervision_coords = literal_eval(supervision_coords)
+        supervision_labels = literal_eval(supervision_labels)
+
+        supervision_cells = make_supervision_cells(supervision_coords,
+                                                   supervision_labels,
+                                                   start, end)
+    else:
+        # Otherwise ignore supervision
+        supervision_cells = None
 
     # Create observation file temporary paths
     float_filepath = TEMP_DIRPATH / float_filename
@@ -425,25 +448,29 @@ def run_train(coord, resolution, do_reverse, outfilename,
 
     temp_filepaths = [float_filepath, int_filepath]
 
+    args = list(args)  # convert from tuple
+
     # Replace GMTK observation arguments with new temporary file paths
-    args = list(args) # convert from tuple
     int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
+    # Set the range of observations to train over to only the first file in the
+    # temporarily generated list
+    args[args.index(GMTK_TRRNG_OPTION_STRING) + 1] = "0"
+
     try:
         print_to_fd(float_filelistfd, float_filename)
         print_to_fd(int_filelistfd, int_filename)
 
+        # XXX: Add seq_data for dinucleotide (not impl)
         _save_window(float_filename, int_filename, continuous_cells,
-                     resolution, distribution)
+                     resolution, distribution,
+                     supervision_data=supervision_cells)
 
-        # XXXopt: does this work? or do we need to use a subprocess to
-        # do the loading?
-        # remove from memory
-        del continuous_cells
-
-        output = TRAIN_PROG.getoutput(*args)
+        TRAIN_PROG.getoutput(*args)
+    # After the training round is finished
     finally:
+        # Remove all temporarily created files
         for filepath in temp_filepaths:
             # don't raise a nested exception if the file was never created
             try:
@@ -454,7 +481,35 @@ def run_train(coord, resolution, do_reverse, outfilename,
 
 
 def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
-    output = TRAIN_PROG.getoutput(*args)
+    # Create a list of temporary filenames
+    temp_filepaths = []
+    args = list(args)
+
+    # Replace the GMTK observation list argument file with a temporarily
+    # created one and append the filename to the list of temporary files
+    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
+    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
+                                                 EXT_FLOAT)
+
+    # Try to write out a dummy observation filename to each observation file
+    # list
+    try:
+        print_to_fd(float_filelistfd, DUMMY_OBSERVATION_FILENAME)
+        print_to_fd(int_filelistfd, DUMMY_OBSERVATION_FILENAME)
+
+        # Run EM bundling
+        TRAIN_PROG.getoutput(*args)
+    # After the EM bundling is finished
+    finally:
+        # Delete list of temporary files
+        for filepath in temp_filepaths:
+            # Don't raise a nested exception if the file was never created
+            try:
+                filepath.remove()
+                pass
+            except OSError, err:
+                if err.errno == ENOENT:
+                    pass
 
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,

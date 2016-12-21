@@ -328,6 +328,34 @@ def make_dinucleotide_int_data(seq):
     return column_stack([dinucleotide_int_data, dinucleotide_presence])
 
 
+def make_supervision_cells(supervision_coords, supervision_labels, start, end):
+    """
+    supervision_coords: list of tuples (start, end)
+    supervision_labels: list of ints (label as number)
+    start: int
+    end: int
+
+    returns a 1-dimensional numpy.ndarray for the region specified by chrom,
+    start, end, where each cell is the transformed label of that region
+
+    the transformation results in the cell being 0 for no supervision
+    or SUPERVISION_LABEL_OFFSET (1)+the supervision label for supervision
+    """
+
+    res = zeros(end - start, dtype=DTYPE_OBS_INT)
+
+    supercontig_coords_labels = \
+        find_overlaps_include(start, end, supervision_coords,
+                              supervision_labels)
+
+    for label_start, label_end, label_index in supercontig_coords_labels:
+        # adjust so that zero means no label
+        label_adjusted = label_index + SUPERVISION_LABEL_OFFSET
+        res[(label_start - start):(label_end - start)] = label_adjusted
+
+    return res
+
+
 def make_continuous_cells(track_indexes, genomedata_names,
                           chromosome_name, start, end):
     """
@@ -581,44 +609,23 @@ class Observations(object):
 
         return float_filepath, int_filepath
 
+    def create_filepaths(self, temp=False):
+        """ Returns a tuple of the float and int observation lists filename and
+        path. temp is a flag to determine whether or not the filepaths will be
+        given a temporary directory """
+
+        for window_index, window in enumerate(self.windows):
+            float_filepath, int_filepath = self.make_filepaths(
+                                            window.chrom, window_index,
+                                            temp)
+            self.float_filepaths.append(float_filepath)
+            self.int_filepaths.append(int_filepath)
+
+
     def make_seq_cells(self, chromosome, start, end):
         if self.use_dinucleotide:
             return chromosome.seq[start:end]
 
-
-    def make_supervision_cells(self, chrom, start, end):
-        """
-        chrom: str
-        start: int
-        end: int
-
-        returns either None (unsupervised) or 1-dimensional
-        numpy.ndarray for the region specified by chrom, start, end,
-        where each cell is the transformed label of that region
-
-        the transformation results in the cell being 0 for no supervision
-        or SUPERVISION_LABEL_OFFSET (1)+the supervision label for supervision
-        """
-        supervision_type = self.supervision_type
-        if supervision_type == SUPERVISION_UNSUPERVISED:
-            return  # None
-
-        assert supervision_type == SUPERVISION_SEMISUPERVISED
-
-        coords_chrom = self.supervision_coords[chrom]
-        labels_chrom = self.supervision_labels[chrom]
-
-        res = zeros(end - start, dtype=DTYPE_OBS_INT)
-
-        supercontig_coords_labels = \
-            find_overlaps_include(start, end, coords_chrom, labels_chrom)
-
-        for label_start, label_end, label_index in supercontig_coords_labels:
-            # adjust so that zero means no label
-            label_adjusted = label_index + SUPERVISION_LABEL_OFFSET
-            res[(label_start - start):(label_end - start)] = label_adjusted
-
-        return res
 
     def write_tab_file(self, float_filelist, int_filelist, float_tabfile):
         print_filepaths_custom = partial(self.print_filepaths,
