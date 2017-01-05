@@ -41,6 +41,7 @@ EXT_OPTIONS = {}
 EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
+USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
 DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 
 GMTK_TRRNG_OPTION_STRING = "-trrng" # Range to train over segment file
