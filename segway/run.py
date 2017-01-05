@@ -788,6 +788,14 @@ class Runner(object):
         res = cls.fromargs(args)
         res.from_environment()
 
+        # If the observations directory has been specified
+        if options.observations:
+            # Stop segway and show a "not implemented error" with description
+            raise NotImplementedError(
+                "'--observations' option not used: "
+                "Segway only creates observations in a temporary directory"
+            )
+
         # Preprocess options
         # Convert any track files into a list of tracks
         track_specs = []
@@ -847,12 +855,19 @@ class Runner(object):
             # local to each value of track_spec
             res.add_track_group(track_spec.split(","))
 
+        # Check if the dinucleotide option has been specified
+        if any([track.name == "dinucleotide" for track in res.tracks]):
+            # Stop segway and show a "not implemented error" with description
+            raise NotImplementedError(
+                "'dinucleotide' track option not supported"
+            )
+
         if res.num_worlds > 1:
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
 
-        if res.identify and res.verbosity > 0: 
+        if res.identify and res.verbosity > 0:
             warn("Running Segway in identify mode with non-zero verbosity"
                  " is currently not supported and may result in errors.")
 
@@ -1774,7 +1789,6 @@ class Runner(object):
 
         # XXX: does this need to be done before save()?
         self.subset_metadata()
-        # observations.save()
         observations.create_filepaths(temp=True)
 
         self.float_filepaths = observations.float_filepaths
@@ -1895,9 +1909,9 @@ class Runner(object):
     def calc_tmp_usage(self, num_frames, prog):
         return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
-    #TODO: Rename? It now always queues segway-task
-    def queue_gmtk(self, prog, kwargs, job_name, num_frames,
+    def queue_task(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
+        """ Returns a restartable job object to run segway-task """
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         if prefix_args:
@@ -1971,7 +1985,7 @@ class Runner(object):
 
     def queue_train(self, instance_index, round_index, window_index,
                     num_frames=0, **kwargs):
-        """this calls Runner.queue_gmtk()
+        """this calls Runner.queue_task()
 
         if num_frames is not specified, then it is set to 0, where
         everyone will share their min/max memory usage. Used for calls
@@ -2036,7 +2050,7 @@ class Runner(object):
                            supervision_labels
                            ]
 
-        return self.queue_gmtk(self.train_prog, kwargs, name, num_frames,
+        return self.queue_task(self.train_prog, kwargs, name, num_frames,
                                prefix_args=prefix_args
                                )
 
@@ -2143,7 +2157,7 @@ class Runner(object):
                       verbosity=self.verbosity)
 
         # XXX: need exist/clobber logic here
-        # XXX: repetitive with queue_gmtk
+        # XXX: repetitive with queue_task
         self.log_cmdline(prog.build_cmdline(options=kwargs))
 
         prog(**kwargs)
@@ -2691,7 +2705,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         num_frames = self.window_lens[window_index]
 
-        restartable_job = self.queue_gmtk(prog, kwargs, job_name,
+        restartable_job = self.queue_task(prog, kwargs, job_name,
                                           num_frames,
                                           output_filename=output_filename,
                                           prefix_args=prefix_args)

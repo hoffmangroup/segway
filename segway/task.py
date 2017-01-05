@@ -463,6 +463,9 @@ def run_train(coord, resolution, do_reverse, outfilename,
         print_to_fd(int_filelistfd, int_filename)
 
         # XXX: Add seq_data for dinucleotide (not impl)
+        # XXX: Add exception handling on IOError?
+        # Would have to parse error message?
+        # e.g. Disk full vs No such file or directory
         _save_window(float_filename, int_filename, continuous_cells,
                      resolution, distribution,
                      supervision_data=supervision_cells)
@@ -506,7 +509,6 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
             # Don't raise a nested exception if the file was never created
             try:
                 filepath.remove()
-                pass
             except OSError, err:
                 if err.errno == ENOENT:
                     pass
