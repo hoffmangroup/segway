@@ -2015,7 +2015,7 @@ class Runner(object):
             num_frames = self.window_lens[window_index]
 
             # Set task to the bundle train task
-            task_kind = TRAIN_TASK_KIND,
+            task_kind = TRAIN_TASK_KIND
 
             window = self.windows[window_index]
             chrom = window.chrom
