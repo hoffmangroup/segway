@@ -13,24 +13,9 @@ its tasks, and it does this in the directory specified by the required
 when running identification *workdir* is *IDENTIFYDIR*.
 
 The observation files can be quite large, taking up 8 bytes per track
-per position and cannot be compressed. Since they are needed multiple
-times during training, they are generated in the working directory. As
-an exception, if you turn off training and specify only the identify
-task, the files will be generated independently on temporary space on
-each machine. This is because otherwise they could take terabytes for
+per position and cannot be compressed. As a result they are written out to a
+temporary directory on an as-needed basis. This is because otherwise they could take terabytes for
 identifying on the whole human genome with dozens of tracks.
-
-To change the location of the observation files, use the
-:option:`--observations`\=\ *dir* option. This can be helpful when you
-plan to conduct multiple training tasks on the same data but with
-different parameters. Be careful to finish observation writing for at
-least one task first, so all the observations will be written out,
-before trying to start the next task. If you fail to do this, race
-conditions may lead to undefined effects. Also, all data selection
-options (:option:`--track`, :option:`--include-coords`,
-:option:`--exclude-coords`) must be exactly the same when sharing
-observation files. Otherwise you are likely to get unexplained
-failures.
 
 You will find a full description of all the working files in the
 :ref:`workdir-files` section.
@@ -305,7 +290,4 @@ Tracks
 ------
 
 Tracks are named according to their name in the Genomedata archive.
-For GMTK internal use, periods are converted to underscores. There is
-a special track name ``dinucleotide``. Use this track name to model a
-dinucleotide symbol at each position with a 16-symbol multionmial
-distribution specified in the form of a conditional probability table.
+For GMTK internal use, periods are converted to underscores.

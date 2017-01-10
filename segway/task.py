@@ -42,9 +42,13 @@ EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
 USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
+
+# Dummy observation filename required for gmtk EM bundling. Has no effect but a
+# name is necessary.
 DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 
-GMTK_TRRNG_OPTION_STRING = "-trrng" # Range to train over segment file
+GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
+
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
@@ -422,6 +426,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
+    # XXX: Currently disabled until dinucleotide is enabled
     # Only set these when dinucleotide is set
     # Get the first genome from this world to use for generating
     # sequence cells

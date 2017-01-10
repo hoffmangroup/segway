@@ -856,7 +856,7 @@ class Runner(object):
             res.add_track_group(track_spec.split(","))
 
         # Check if the dinucleotide option has been specified
-        if any([track.name == "dinucleotide" for track in res.tracks]):
+        if any(track.name == "dinucleotide" for track in res.tracks):
             # Stop segway and show a "not implemented error" with description
             raise NotImplementedError(
                 "'dinucleotide' track option not supported"
@@ -1997,20 +1997,30 @@ class Runner(object):
         name = self.make_job_name_train(instance_index, round_index,
                                         window_index)
 
-        output_filename = ""
+        segway_task_path = find_executable("segway-task")
+        segway_task_verb = "run"
+        output_filename = ""  # not used for training
 
         if window_index == NAME_BUNDLE_PLACEHOLDER:
-            prefix_args = [find_executable("segway-task"),
-                           "run",
-                           BUNDLE_TRAIN_TASK_KIND,
-                           output_filename,  # output filename
-                           0, 0, 0,  # empty window
-                           self.resolution,
-                           0  # is_reverse is irrelevant for bundling
-                           ]
+            # Set empty window
+            chrom = 0
+            window_start = 0
+            window_end = 0
+            # Set task to the bundle train task
+            task_kind = BUNDLE_TRAIN_TASK_KIND
+            is_reverse = 0  # is_reverse is irrelevant for bundling
+
+            additional_prefix_args = []
         else:
-            window = self.windows[window_index]
             num_frames = self.window_lens[window_index]
+
+            # Set task to the bundle train task
+            task_kind = TRAIN_TASK_KIND,
+
+            window = self.windows[window_index]
+            chrom = window.chrom
+            window_start = window.start
+            window_end = window.end
 
             is_reverse = str(int(self.is_in_reversed_world(window_index)))
 
@@ -2033,22 +2043,26 @@ class Runner(object):
                 supervision_coords = None
                 supervision_labels = None
 
-            prefix_args = [find_executable("segway-task"),
-                           "run",
-                           TRAIN_TASK_KIND,
-                           output_filename,  # not used
-                           window.chrom, window.start, window.end,
-                           self.resolution,
-                           is_reverse,  # end requirement for segway-task
-                           genomedata_names_text,
-                           float_filepath,
-                           int_filepath,
-                           self.distribution,
-                           track_indexes_text,
-                           is_semisupervised,
-                           supervision_coords,
-                           supervision_labels
-                           ]
+            additional_prefix_args = [
+               genomedata_names_text,
+               float_filepath,
+               int_filepath,
+               self.distribution,
+               track_indexes_text,
+               is_semisupervised,
+               supervision_coords,
+               supervision_labels
+            ]
+
+        prefix_args = [segway_task_path,
+                       segway_task_verb,
+                       task_kind,
+                       output_filename,  # output filename
+                       chrom, window_start, window_end,
+                       self.resolution,
+                       is_reverse,  # end requirements for base segway-task
+                       ]
+        prefix_args.extend(additional_prefix_args)
 
         return self.queue_task(self.train_prog, kwargs, name, num_frames,
                                prefix_args=prefix_args
@@ -2985,7 +2999,8 @@ def parse_options(argv):
 
     group = parser.add_argument_group("Intermediate files")
     group.add_argument("-o", "--observations", metavar="DIR",
-                       help="use or create observations in DIR"
+                       help="DEPRECATED - temp files are now used and "
+                       " recommended. Previously would use or create observations in DIR"
                        " (default %s)" %
                        (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
 

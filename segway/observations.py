@@ -68,7 +68,7 @@ def update_starts(starts, ends, new_starts, new_ends):
     ends.extendleft(reversed(new_ends))
 
 
-def find_overlaps_include(start, end, coords, data=repeat(NoData)):
+def intersect_regions(start, end, coords, data=repeat(NoData)):
     """
     find items in coords that overlap (start, end)
 
@@ -118,7 +118,7 @@ def find_overlaps_include(start, end, coords, data=repeat(NoData)):
     return res
 
 
-def find_overlaps_exclude(start, end, exclude_coords):
+def subtract_regions(start, end, exclude_coords):
     """
     takes a start and end and removes everything in exclude_coords
     """
@@ -335,8 +335,9 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     start: int
     end: int
 
-    returns a 1-dimensional numpy.ndarray for the region specified by chrom,
-    start, end, where each cell is the transformed label of that region
+    returns a 1-dimensional numpy.ndarray for the region specified by
+    superivion_coords where each cell is the transformed label specified by
+    supervision_labels for that region
 
     the transformation results in the cell being 0 for no supervision
     or SUPERVISION_LABEL_OFFSET (1)+the supervision label for supervision
@@ -344,8 +345,9 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
 
     res = zeros(end - start, dtype=DTYPE_OBS_INT)
 
+    # Get supervision regions that overlap with the start and end coords
     supercontig_coords_labels = \
-        find_overlaps_include(start, end, supervision_coords,
+        intersect_regions(start, end, supervision_coords,
                               supervision_labels)
 
     for label_start, label_end, label_index in supercontig_coords_labels:
@@ -558,8 +560,7 @@ class Observations(object):
 
                 end = ends.popleft()  # should not ever cause an IndexError
 
-                new_windows = find_overlaps_exclude(start, end,
-                                                    chr_exclude_coords)
+                new_windows = subtract_regions(start, end, chr_exclude_coords)
                 start, end = process_new_windows(new_windows, starts, ends)
                 if start is None:
                     continue
@@ -610,8 +611,8 @@ class Observations(object):
         return float_filepath, int_filepath
 
     def create_filepaths(self, temp=False):
-        """ Returns a tuple of the float and int observation lists filename and
-        path. temp is a flag to determine whether or not the filepaths will be
+        """ Creates a list of observations full filepaths for each window.
+        temp is a flag to determine whether or not the filepaths will be
         given a temporary directory """
 
         for window_index, window in enumerate(self.windows):
@@ -627,6 +628,10 @@ class Observations(object):
             return chromosome.seq[start:end]
 
 
+    # XXX: Dead code. Observations.save (which calls this function) no longer
+    # called. May be used when --observations is re enabled for caching
+    # observation files
+    # XXX: Determine if posterior will also use a temporary file path as well
     def write_tab_file(self, float_filelist, int_filelist, float_tabfile):
         print_filepaths_custom = partial(self.print_filepaths,
                                          float_filelist, int_filelist,
@@ -652,6 +657,8 @@ class Observations(object):
         else:
             return open(filepath, "w")
 
+    # XXX: Dead code. Observations.save no longer called. May be used when
+    # --observations is re enabled for caching observation files
     def save(self):
         open_writable = self.open_writable_or_dummy
 
