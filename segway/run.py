@@ -992,11 +992,14 @@ class Runner(object):
             res = self.work_dirpath / SUBDIRNAME_OBS
             self.obs_dirname = res
 
-        try:
-            self.make_dir(res)
-        except OSError, err:
-            if not (err.errno == EEXIST and res.isdir()):
-                raise
+        # XXX: Disable creating the observation directory until the observation
+        # option is re-enabled.
+        # XXX: The following 3 properties are technically unused as a result
+        # try:
+        #     self.make_dir(res)
+        # except OSError, err:
+        #     if not (err.errno == EEXIST and res.isdir()):
+        #         raise
 
         return res
 
