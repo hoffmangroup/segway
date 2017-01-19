@@ -220,18 +220,11 @@ workdir instead.
                                                     that create and clean up temporary files such as
                                                     observations used during identification
 |rarr| ``segway.sh``                                reports the command-line used to run Segway itself
-``observations/``                                   decompressed, and potentially large raw observation
-                                                    files created from a Genomedata archive located
-                                                    elsewhere
 |rarr| \*\ ``.``\ \*\ ``.float32``                  continuous data for a particular region
 |rarr| \*\ ``.``\ \*\ ``.int``                      indicator data (present/absent) for a particular
                                                     region
 |rarr| ``float32.list``                             list of continuous data files
 |rarr| ``int.list``                                 list of indicator data files
-|rarr| ``observations.tab``                         tab-delimited description of observations used|rarr| Used
-                                                    to check that an existing directory specified with
-                                                    :option:`--observations` matches the data specified
-                                                    at the command-line
 ``output/``                                         diagnostic output of individual GMTK jobs
 ``output/e/``                                       stderr
 ``output/e/0,1,``...                                stderr for a particular training instance (0, 1,
