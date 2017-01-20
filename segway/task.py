@@ -10,7 +10,6 @@ task: wraps a GMTK subtask to reduce size of output
 from ast import literal_eval
 from errno import ENOENT
 from os import extsep, fdopen, EX_TEMPFAIL
-from os.path import isfile
 import re
 import sys
 from tempfile import gettempdir, mkstemp

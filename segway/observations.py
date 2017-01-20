@@ -26,8 +26,7 @@ from tabdelim import ListWriter
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
                     get_chrom_coords, make_prefix_fmt,
-                    SUPERVISION_LABEL_OFFSET, SUPERVISION_SEMISUPERVISED,
-                    SUPERVISION_UNSUPERVISED, USE_MFSDG, Window)
+                    SUPERVISION_LABEL_OFFSET, USE_MFSDG, Window)
 
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
