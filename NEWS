@@ -1,3 +1,5 @@
+1.4.3:
+
 1.4.2:
 * segway: training is now submitted as a segway-task
 * segway: all observations are now written out to temporary storage. As a
