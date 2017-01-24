@@ -1,4 +1,6 @@
 1.4.3:
+* segway: fix "bad interpreter: Text file busy" errors reported by submitted
+  jobs
 
 1.4.2:
 * segway: training is now submitted as a segway-task
