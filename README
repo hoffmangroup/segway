@@ -7,17 +7,10 @@ by Michael Hoffman <michael.hoffman at utoronto dot ca>
    :alt: Join the chat at https://gitter.im/hoffman/segway
    :target: https://gitter.im/hoffman/segway?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
 
-.. image:: https://drone.io/bitbucket.org/hoffmanlab/segway/status.png
-    :target: https://drone.io/bitbucket.org/hoffmanlab/segway/latest
-    :alt: Build Status
-
-.. image:: https://pypip.in/version/segway/badge.png
+.. image:: https://img.shields.io/pypi/v/segway.png
     :target: https://pypi.python.org/pypi/segway/
     :alt: Latest Version
 
-.. image:: https://pypip.in/download/segway/badge.png
-    :target: https://pypi.python.org/pypi/segway/
-    :alt: Downloads
 
 Description
 ===========
