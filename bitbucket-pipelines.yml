@@ -10,5 +10,7 @@ pipelines:
     - step:
         script: # Modify the commands below to build your repository.
           - pip install .
-          - cd test
-          - ./test_all.sh
+          - python --version
+          - pip list
+          - gmtkPrint -version
+          - cd test && ./test_all.sh
