@@ -44,20 +44,20 @@ Left_interface:Run_Bdry_Alg(T),Bnd_Heurs(S),TravFrac(1.000000),Tri_Heur(complete
 
 % ---
 % --- P partition information: variables and their neighbors
-% segCountDown(0) : seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% seg(0) : segCountDown(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% subseg(0) : segCountDown(0), seg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% presence__testtrack1(0) : segCountDown(0), seg(0), subseg(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% testtrack1(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% presence__testtrack2(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), testtrack2(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% testtrack2(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% ruler(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% segCountDown(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segTransition(1), seg(1), subseg(1),
-% segTransition(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segCountDown(1), seg(1), subseg(1),
-% seg(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segCountDown(1), segTransition(1), subseg(1),
-% subseg(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
+% (%.*%)
 % --- P partition definition
-P_PARTITION 12 segCountDown 0 seg 0 subseg 0 presence__testtrack1 0 testtrack1 0 presence__testtrack2 0 testtrack2 0 ruler 1 segCountDown 1 segTransition 1 seg 1 subseg 1
+P_PARTITION 12 (%.*%)
 
 % ---
 % --- C partition information: variables and their neighbors
@@ -111,10 +111,10 @@ CE_PARTITION 3 segCountDown 2 seg 2 subseg 2
 % ---- 1 total max-cliques
 % ---- Triangulation came from method: 1-completed
 % 0 : 12  1.982271
-%    segCountDown(0)
-%    seg(0)
-%    subseg(0)
-%    presence__testtrack1(0)
+%(%.*%)
+%(%.*%)
+%(%.*%)
+%(%.*%)
 %    testtrack1(0)
 %    presence__testtrack2(0)
 %    testtrack2(0)
@@ -126,7 +126,7 @@ CE_PARTITION 3 segCountDown 2 seg 2 subseg 2
 % Maximum clique state space = 1e1.982271, total state space = 1e1.982271
 1-completed
 2
-0 12 segCountDown 0 seg 0 subseg 0 presence__testtrack1 0 testtrack1 0 presence__testtrack2 0 testtrack2 0 ruler 1 segCountDown 1 segTransition 1 seg 1 subseg 1
+0 12 (%.*%)
 1 2 seg 0 subseg 0
 
 % ---
