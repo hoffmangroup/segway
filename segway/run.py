@@ -15,7 +15,8 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
-from os import fchmod, environ, extsep
+from os import (environ, extsep, fdopen, open as os_open, O_WRONLY, O_CREAT,
+                O_SYNC, O_TRUNC)
 import re
 from shutil import copy2
 import stat
@@ -228,8 +229,10 @@ SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
 
 # job script file permissions: owner has read/write/execute
 # permissions, group/others have read/execute permissions
+JOB_SCRIPT_FILE_OPEN_FLAGS = O_WRONLY | O_CREAT | O_SYNC | O_TRUNC
 JOB_SCRIPT_FILE_PERMISSIONS = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP \
                               | stat.S_IROTH | stat.S_IXOTH
+
 
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
                       "num_frames", "maxvmem", "cpu", "exit_status"]
@@ -1927,13 +1930,14 @@ class Runner(object):
         shell_job_name = extsep.join([job_name, EXT_SH])
         job_script_filename = self.job_script_dirpath / shell_job_name
 
-        with open(job_script_filename, "w") as job_script_file:
+        job_script_fd = os_open(job_script_filename,
+                                JOB_SCRIPT_FILE_OPEN_FLAGS,
+                                JOB_SCRIPT_FILE_PERMISSIONS)
+        with fdopen(job_script_fd, "w") as job_script_file:
             print >>job_script_file, "#!/usr/bin/env bash"
             # this doesn't include use of segway-wrapper, which takes the
             # memory usage as an argument, and may be run multiple times
             self.log_cmdline(gmtk_cmdline, args, job_script_file)
-            # set permissions for script to run
-            fchmod(job_script_file.fileno(), JOB_SCRIPT_FILE_PERMISSIONS)
 
         if self.dry_run:
             return None
