@@ -1,3 +1,5 @@
+1.4.4:
+
 1.4.3:
 * segway: fix "bad interpreter: Text file busy" errors reported by submitted
   jobs
