@@ -3,8 +3,12 @@ Segway
 ======
 by Michael Hoffman <michael.hoffman at utoronto dot ca>
 
-.. image:: https://img.shields.io/pypi/v/genomedata.png
-    :target: https://pypi.python.org/pypi/genomedata/
+.. image:: https://badges.gitter.im/Join%20Chat.png
+   :alt: Join the chat at https://gitter.im/hoffman/segway
+   :target: https://gitter.im/hoffman/segway?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge
+
+.. image:: https://img.shields.io/pypi/v/segway.png
+    :target: https://pypi.python.org/pypi/segway/
     :alt: Latest Version
 
 
