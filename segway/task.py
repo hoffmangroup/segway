@@ -7,6 +7,7 @@ task: wraps a GMTK subtask to reduce size of output
 
 # Copyright 2009-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
+from ast import literal_eval
 from errno import ENOENT
 from os import extsep, fdopen, EX_TEMPFAIL
 import re
@@ -18,10 +19,11 @@ from numpy import argmax, array, empty, where, diff, r_, zeros
 import optbuild
 from path import path
 
-from .observations import make_continuous_cells, _save_window
+from .observations import (make_continuous_cells, make_supervision_cells,
+                           _save_window)
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array,
-                    find_segment_starts, get_label_color,
+                    find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     VITERBI_PROG)
 
@@ -39,6 +41,12 @@ EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
 
 USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
+
+# Dummy observation filename required for gmtk EM bundling. Has no effect but a
+# name is necessary.
+DUMMY_OBSERVATION_FILENAME = "/dev/zero"
+
+GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
 
 def make_track_indexes(text):
@@ -401,10 +409,123 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     return parse_viterbi_save_bed(coord, resolution, do_reverse,
                                   lines, outfilename, num_labels, output_label)
 
+
+def run_train(coord, resolution, do_reverse, outfilename,
+              genomedata_names, float_filename, int_filename, distribution,
+              track_indexes,
+              is_semisupervised, supervision_coords, supervision_labels,
+              *args):
+
+    # Create and save the train window
+    genomedata_names = genomedata_names.split(",")
+    track_indexes = map(int, track_indexes.split(","))
+
+    (chrom, start, end) = coord
+
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
+
+    # XXX: Currently disabled until dinucleotide is enabled
+    # Only set these when dinucleotide is set
+    # Get the first genome from this world to use for generating
+    # sequence cells
+    # with Genome(genomedata_names[0]) as genome:
+    #     chromosome = genome[chrom]
+    #     seq_cells = self.make_seq_cells(chromosome, start, end)
+
+    # If this training regions is supervised
+    if is_semisupervised == "True":
+        # Create the supervision cells for this region
+        # Convert supervision parameters back from text
+        supervision_coords = literal_eval(supervision_coords)
+        supervision_labels = literal_eval(supervision_labels)
+
+        supervision_cells = make_supervision_cells(supervision_coords,
+                                                   supervision_labels,
+                                                   start, end)
+    else:
+        # Otherwise ignore supervision
+        supervision_cells = None
+
+    # Create observation file temporary paths
+    float_filepath = TEMP_DIRPATH / float_filename
+    int_filepath = TEMP_DIRPATH / int_filename
+
+    temp_filepaths = [float_filepath, int_filepath]
+
+    args = list(args)  # convert from tuple
+
+    # Replace GMTK observation arguments with new temporary file paths
+    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
+    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
+                                                 EXT_FLOAT)
+    # Set the range of observations to train over to only the first file in the
+    # temporarily generated list
+    args[args.index(GMTK_TRRNG_OPTION_STRING) + 1] = "0"
+
+    try:
+        print_to_fd(float_filelistfd, float_filename)
+        print_to_fd(int_filelistfd, int_filename)
+
+        # XXX: Add seq_data for dinucleotide (not impl)
+        # XXX: Add exception handling on IOError?
+        # Would have to parse error message?
+        # e.g. Disk full vs No such file or directory
+        _save_window(float_filename, int_filename, continuous_cells,
+                     resolution, distribution,
+                     supervision_data=supervision_cells)
+
+        TRAIN_PROG.getoutput(*args)
+    # After the training round is finished
+    finally:
+        # Remove all temporarily created files
+        for filepath in temp_filepaths:
+            # don't raise a nested exception if the file was never created
+            try:
+                filepath.remove()
+            except OSError, err:
+                if err.errno == ENOENT:
+                    pass
+
+
+def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
+    # Create a list of temporary filenames
+    temp_filepaths = []
+    args = list(args)
+
+    # Replace the GMTK observation list argument file with a temporarily
+    # created one and append the filename to the list of temporary files
+    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
+    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
+                                                 EXT_FLOAT)
+
+    # Try to write out a dummy observation filename to each observation file
+    # list
+    try:
+        print_to_fd(float_filelistfd, DUMMY_OBSERVATION_FILENAME)
+        print_to_fd(int_filelistfd, DUMMY_OBSERVATION_FILENAME)
+
+        # Run EM bundling
+        TRAIN_PROG.getoutput(*args)
+    # After the EM bundling is finished
+    finally:
+        # Delete list of temporary files
+        for filepath in temp_filepaths:
+            # Don't raise a nested exception if the file was never created
+            try:
+                filepath.remove()
+            except OSError, err:
+                if err.errno == ENOENT:
+                    pass
+
+
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,
          ("run", "posterior"): run_posterior_save_bed,
-         ("load", "posterior"): load_posterior_save_bed}
+         ("load", "posterior"): load_posterior_save_bed,
+         ("run", "train"): run_train,
+         ("run", "bundle-train"): run_bundle_train,
+         }
 
 
 def task(verb, kind, outfilename, chrom, start, end, resolution,

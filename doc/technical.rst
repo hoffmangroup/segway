@@ -13,24 +13,9 @@ its tasks, and it does this in the directory specified by the required
 when running identification *workdir* is *IDENTIFYDIR*.
 
 The observation files can be quite large, taking up 8 bytes per track
-per position and cannot be compressed. Since they are needed multiple
-times during training, they are generated in the working directory. As
-an exception, if you turn off training and specify only the identify
-task, the files will be generated independently on temporary space on
-each machine. This is because otherwise they could take terabytes for
+per position and cannot be compressed. As a result they are written out to a
+temporary directory on an as-needed basis. This is because otherwise they could take terabytes for
 identifying on the whole human genome with dozens of tracks.
-
-To change the location of the observation files, use the
-:option:`--observations`\=\ *dir* option. This can be helpful when you
-plan to conduct multiple training tasks on the same data but with
-different parameters. Be careful to finish observation writing for at
-least one task first, so all the observations will be written out,
-before trying to start the next task. If you fail to do this, race
-conditions may lead to undefined effects. Also, all data selection
-options (:option:`--track`, :option:`--include-coords`,
-:option:`--exclude-coords`) must be exactly the same when sharing
-observation files. Otherwise you are likely to get unexplained
-failures.
 
 You will find a full description of all the working files in the
 :ref:`workdir-files` section.
@@ -235,18 +220,11 @@ workdir instead.
                                                     that create and clean up temporary files such as
                                                     observations used during identification
 |rarr| ``segway.sh``                                reports the command-line used to run Segway itself
-``observations/``                                   decompressed, and potentially large raw observation
-                                                    files created from a Genomedata archive located
-                                                    elsewhere
 |rarr| \*\ ``.``\ \*\ ``.float32``                  continuous data for a particular region
 |rarr| \*\ ``.``\ \*\ ``.int``                      indicator data (present/absent) for a particular
                                                     region
 |rarr| ``float32.list``                             list of continuous data files
 |rarr| ``int.list``                                 list of indicator data files
-|rarr| ``observations.tab``                         tab-delimited description of observations used|rarr| Used
-                                                    to check that an existing directory specified with
-                                                    :option:`--observations` matches the data specified
-                                                    at the command-line
 ``output/``                                         diagnostic output of individual GMTK jobs
 ``output/e/``                                       stderr
 ``output/e/0,1,``...                                stderr for a particular training instance (0, 1,
@@ -305,7 +283,4 @@ Tracks
 ------
 
 Tracks are named according to their name in the Genomedata archive.
-For GMTK internal use, periods are converted to underscores. There is
-a special track name ``dinucleotide``. Use this track name to model a
-dinucleotide symbol at each position with a 16-symbol multionmial
-distribution specified in the form of a conditional probability table.
+For GMTK internal use, periods are converted to underscores.

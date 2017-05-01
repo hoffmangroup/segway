@@ -20,16 +20,15 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, sqrt, sum as npsum,
-                   square as npsquare, invert, isnan, maximum, where,
-                   zeros, nan_to_num, float32)
+                   square as npsquare, invert, isnan, maximum,
+                   zeros, nan_to_num)
 from path import path
 from tabdelim import ListWriter
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
                     get_chrom_coords, make_prefix_fmt,
-                    SUPERVISION_LABEL_OFFSET, SUPERVISION_SEMISUPERVISED,
-                    SUPERVISION_UNSUPERVISED, USE_MFSDG, Window)
+                    SUPERVISION_LABEL_OFFSET, USE_MFSDG, Window)
 
 # number of frames in a segment must be at least number of frames in model
 MIN_FRAMES = 2
@@ -70,7 +69,7 @@ def update_starts(starts, ends, new_starts, new_ends):
     ends.extendleft(reversed(new_ends))
 
 
-def find_overlaps_include(start, end, coords, data=repeat(NoData)):
+def intersect_regions(start, end, coords, data=repeat(NoData)):
     """
     find items in coords that overlap (start, end)
 
@@ -120,7 +119,7 @@ def find_overlaps_include(start, end, coords, data=repeat(NoData)):
     return res
 
 
-def find_overlaps_exclude(start, end, exclude_coords):
+def subtract_regions(start, end, exclude_coords):
     """
     takes a start and end and removes everything in exclude_coords
     """
@@ -340,6 +339,35 @@ def zscore_norm(float_data, tracks_means, tracks_vars):
         float_data[:,track] = (float_data[:,track] - tracks_means[track])/sqrt(tracks_vars[track])
     return float_data
 
+def make_supervision_cells(supervision_coords, supervision_labels, start, end):
+    """
+    supervision_coords: list of tuples (start, end)
+    supervision_labels: list of ints (label as number)
+    start: int
+    end: int
+
+    returns a 1-dimensional numpy.ndarray for the region specified by
+    superivion_coords where each cell is the transformed label specified by
+    supervision_labels for that region
+
+    the transformation results in the cell being 0 for no supervision
+    or SUPERVISION_LABEL_OFFSET (1)+the supervision label for supervision
+    """
+
+    res = zeros(end - start, dtype=DTYPE_OBS_INT)
+
+    # Get supervision regions that overlap with the start and end coords
+    supercontig_coords_labels = \
+        intersect_regions(start, end, supervision_coords,
+                              supervision_labels)
+
+    for label_start, label_end, label_index in supercontig_coords_labels:
+        # adjust so that zero means no label
+        label_adjusted = label_index + SUPERVISION_LABEL_OFFSET
+        res[(label_start - start):(label_end - start)] = label_adjusted
+
+    return res
+
 def make_continuous_cells(track_indexes, genomedata_names,
                           chromosome_name, start, end):
     """
@@ -546,8 +574,7 @@ class Observations(object):
 
                 end = ends.popleft()  # should not ever cause an IndexError
 
-                new_windows = find_overlaps_exclude(start, end,
-                                                    chr_exclude_coords)
+                new_windows = subtract_regions(start, end, chr_exclude_coords)
                 start, end = process_new_windows(new_windows, starts, ends)
                 if start is None:
                     continue
@@ -597,6 +624,18 @@ class Observations(object):
 
         return float_filepath, int_filepath
 
+    def create_filepaths(self, temp=False):
+        """ Creates a list of observations full filepaths for each window.
+        temp is a flag to determine whether or not the filepaths will be
+        given a temporary directory """
+
+        for window_index, window in enumerate(self.windows):
+            float_filepath, int_filepath = self.make_filepaths(
+                                            window.chrom, window_index,
+                                            temp)
+            self.float_filepaths.append(float_filepath)
+            self.int_filepaths.append(int_filepath)
+
     def make_seq_cells(self, chromosome, start, end):
         if self.use_dinucleotide:
             return chromosome.seq[start:end]
@@ -612,45 +651,15 @@ class Observations(object):
         track_indexes = self.world_track_indexes[world]
         return chromosome[start:end, track_indexes]
 
-    def make_supervision_cells(self, chrom, start, end):
-        """
-        chrom: str
-        start: int
-        end: int
 
-        returns either None (unsupervised) or 1-dimensional
-        numpy.ndarray for the region specified by chrom, start, end,
-        where each cell is the transformed label of that region
-
-        the transformation results in the cell being 0 for no supervision
-        or SUPERVISION_LABEL_OFFSET (1)+the supervision label for supervision
-        """
-        supervision_type = self.supervision_type
-        if supervision_type == SUPERVISION_UNSUPERVISED:
-            return  # None
-
-        assert supervision_type == SUPERVISION_SEMISUPERVISED
-
-        coords_chrom = self.supervision_coords[chrom]
-        labels_chrom = self.supervision_labels[chrom]
-
-        res = zeros(end - start, dtype=DTYPE_OBS_INT)
-
-        supercontig_coords_labels = \
-            find_overlaps_include(start, end, coords_chrom, labels_chrom)
-
-        for label_start, label_end, label_index in supercontig_coords_labels:
-            # adjust so that zero means no label
-            label_adjusted = label_index + SUPERVISION_LABEL_OFFSET
-            res[(label_start - start):(label_end - start)] = label_adjusted
-
-        return res
-
-    def write(self, float_filelist, int_filelist, float_tabfile):
+    # XXX: Dead code. Observations.save (which calls this function) no longer
+    # called. May be used when --observations is re enabled for caching
+    # observation files
+    # XXX: Determine if posterior will also use a temporary file path as well
+    def write_tab_file(self, float_filelist, int_filelist, float_tabfile):
         print_filepaths_custom = partial(self.print_filepaths,
                                          float_filelist, int_filelist,
-                                         temp=self.identify)
-        save_window = self.save_window
+                                         temp=(self.identify or self.train))
 
         float_tabwriter = ListWriter(float_tabfile)
         float_tabwriter.writerow(FLOAT_TAB_FIELDNAMES)
@@ -690,35 +699,6 @@ class Observations(object):
             float_tabwriter.writerow(row)
             print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
 
-            # if they don't both exist
-            if not (float_filepath.exists() and int_filepath.exists()):
-                # Get the first genome from this world to use for generating
-                # sequence cells
-                genomedata_name = self.world_genomedata_names[world][0]
-                with Genome(genomedata_name) as genome:
-                    chromosome = genome[chrom]
-                    seq_cells = self.make_seq_cells(chromosome, start, end)
-
-                supervision_cells = \
-                    self.make_supervision_cells(chrom, start, end)
-
-                if __debug__:
-                    if self.identify:
-                        assert seq_cells is None and supervision_cells is None
-
-                if not self.train:
-                    # don't actually write data--it is done by task.py instead
-                    continue
-
-                track_indexes = self.world_track_indexes[world]
-                genomedata_names = self.world_genomedata_names[world]
-                continuous_cells = \
-                    make_continuous_cells(track_indexes, genomedata_names,
-                                          chrom, start, end)
-
-                # data is transformed as part of _save_window()
-                save_window(float_filepath, int_filepath, continuous_cells,
-                            tracks_means, tracks_vars, seq_cells, supervision_cells)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
@@ -726,10 +706,12 @@ class Observations(object):
         else:
             return open(filepath, "w")
 
+    # XXX: Dead code. Observations.save no longer called. May be used when
+    # --observations is re enabled for caching observation files
     def save(self):
         open_writable = self.open_writable_or_dummy
 
         with open_writable(self.float_filelistpath) as float_filelist:
             with open_writable(self.int_filelistpath) as int_filelist:
                 with open_writable(self.float_tabfilepath) as float_tabfile:
-                    self.write(float_filelist, int_filelist, float_tabfile)
+                    self.write_tab_file(float_filelist, int_filelist, float_tabfile)

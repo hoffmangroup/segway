@@ -15,7 +15,8 @@ from errno import EEXIST, ENOENT
 from functools import partial
 from itertools import count, izip, product
 from math import ceil, ldexp
-from os import fchmod, environ, extsep
+from os import (environ, extsep, fdopen, open as os_open, O_WRONLY, O_CREAT,
+                O_SYNC, O_TRUNC)
 import re
 from shutil import copy2
 import stat
@@ -160,6 +161,12 @@ ENV_CMD = "/usr/bin/env"
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 
+# Tasks
+ANNOTATE_TASK_KIND = "viterbi"
+POSTERIOR_TASK_KIND = "posterior"
+TRAIN_TASK_KIND = "train"
+BUNDLE_TRAIN_TASK_KIND = "bundle-train"
+
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
 # extensions and suffixes
@@ -222,8 +229,10 @@ SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
 
 # job script file permissions: owner has read/write/execute
 # permissions, group/others have read/execute permissions
+JOB_SCRIPT_FILE_OPEN_FLAGS = O_WRONLY | O_CREAT | O_SYNC | O_TRUNC
 JOB_SCRIPT_FILE_PERMISSIONS = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP \
                               | stat.S_IROTH | stat.S_IXOTH
+
 
 JOB_LOG_FIELDNAMES = ["jobid", "jobname", "prog", "num_segs",
                       "num_frames", "maxvmem", "cpu", "exit_status"]
@@ -784,6 +793,14 @@ class Runner(object):
         res = cls.fromargs(args)
         res.from_environment()
 
+        # If the observations directory has been specified
+        if options.observations:
+            # Stop segway and show a "not implemented error" with description
+            raise NotImplementedError(
+                "'--observations' option not used: "
+                "Segway only creates observations in a temporary directory"
+            )
+
         # Preprocess options
         # Convert any track files into a list of tracks
         track_specs = []
@@ -843,12 +860,19 @@ class Runner(object):
             # local to each value of track_spec
             res.add_track_group(track_spec.split(","))
 
+        # Check if the dinucleotide option has been specified
+        if any(track.name == "dinucleotide" for track in res.tracks):
+            # Stop segway and show a "not implemented error" with description
+            raise NotImplementedError(
+                "'dinucleotide' track option not supported"
+            )
+
         if res.num_worlds > 1:
             res.check_world_fmt("bed_filename")
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
 
-        if res.identify and res.verbosity > 0: 
+        if res.identify and res.verbosity > 0:
             warn("Running Segway in identify mode with non-zero verbosity"
                  " is currently not supported and may result in errors.")
 
@@ -973,11 +997,14 @@ class Runner(object):
             res = self.work_dirpath / SUBDIRNAME_OBS
             self.obs_dirname = res
 
-        try:
-            self.make_dir(res)
-        except OSError, err:
-            if not (err.errno == EEXIST and res.isdir()):
-                raise
+        # XXX: Disable creating the observation directory until the observation
+        # option is re-enabled.
+        # XXX: The following 3 properties are technically unused as a result
+        # try:
+        #     self.make_dir(res)
+        # except OSError, err:
+        #     if not (err.errno == EEXIST and res.isdir()):
+        #         raise
 
         return res
 
@@ -1767,9 +1794,10 @@ class Runner(object):
             observations.locate_windows(genome)
 
         self.windows = observations.windows
+
         # XXX: does this need to be done before save()?
         self.subset_metadata()
-        observations.save()
+        observations.create_filepaths(temp=True)
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
@@ -1889,8 +1917,9 @@ class Runner(object):
     def calc_tmp_usage(self, num_frames, prog):
         return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
-    def queue_gmtk(self, prog, kwargs, job_name, num_frames,
+    def queue_task(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
+        """ Returns a restartable job object to run segway-task """
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         if prefix_args:
@@ -1903,13 +1932,14 @@ class Runner(object):
         shell_job_name = extsep.join([job_name, EXT_SH])
         job_script_filename = self.job_script_dirpath / shell_job_name
 
-        with open(job_script_filename, "w") as job_script_file:
+        job_script_fd = os_open(job_script_filename,
+                                JOB_SCRIPT_FILE_OPEN_FLAGS,
+                                JOB_SCRIPT_FILE_PERMISSIONS)
+        with fdopen(job_script_fd, "w") as job_script_file:
             print >>job_script_file, "#!/usr/bin/env bash"
             # this doesn't include use of segway-wrapper, which takes the
             # memory usage as an argument, and may be run multiple times
             self.log_cmdline(gmtk_cmdline, args, job_script_file)
-            # set permissions for script to run
-            fchmod(job_script_file.fileno(), JOB_SCRIPT_FILE_PERMISSIONS)
 
         if self.dry_run:
             return None
@@ -1964,18 +1994,88 @@ class Runner(object):
 
     def queue_train(self, instance_index, round_index, window_index,
                     num_frames=0, **kwargs):
-        """this calls Runner.queue_gmtk()
+        """this calls Runner.queue_task()
 
         if num_frames is not specified, then it is set to 0, where
         everyone will share their min/max memory usage. Used for calls
         from queue_train_bundle()
         """
+
         kwargs["inputMasterFile"] = self.input_master_filename
 
         name = self.make_job_name_train(instance_index, round_index,
                                         window_index)
 
-        return self.queue_gmtk(self.train_prog, kwargs, name, num_frames)
+        segway_task_path = find_executable("segway-task")
+        segway_task_verb = "run"
+        output_filename = ""  # not used for training
+
+        if window_index == NAME_BUNDLE_PLACEHOLDER:
+            # Set empty window
+            chrom = 0
+            window_start = 0
+            window_end = 0
+            # Set task to the bundle train task
+            task_kind = BUNDLE_TRAIN_TASK_KIND
+            is_reverse = 0  # is_reverse is irrelevant for bundling
+
+            additional_prefix_args = []
+        else:
+            num_frames = self.window_lens[window_index]
+
+            # Set task to the bundle train task
+            task_kind = TRAIN_TASK_KIND
+
+            window = self.windows[window_index]
+            chrom = window.chrom
+            window_start = window.start
+            window_end = window.end
+
+            is_reverse = str(int(self.is_in_reversed_world(window_index)))
+
+            track_indexes = self.world_track_indexes[window.world]
+            genomedata_names = self.world_genomedata_names[window.world]
+
+            track_indexes_text = ",".join(map(str, track_indexes))
+            genomedata_names_text = ",".join(genomedata_names)
+
+            float_filepath = self.float_filepaths[window_index]
+            int_filepath = self.int_filepaths[window_index]
+
+            is_semisupervised = (self.supervision_type ==
+                                 SUPERVISION_SEMISUPERVISED)
+
+            if is_semisupervised:
+                supervision_coords = self.supervision_coords[window.chrom]
+                supervision_labels = self.supervision_labels[window.chrom]
+            else:
+                supervision_coords = None
+                supervision_labels = None
+
+            additional_prefix_args = [
+               genomedata_names_text,
+               float_filepath,
+               int_filepath,
+               self.distribution,
+               track_indexes_text,
+               is_semisupervised,
+               supervision_coords,
+               supervision_labels
+            ]
+
+        prefix_args = [segway_task_path,
+                       segway_task_verb,
+                       task_kind,
+                       output_filename,  # output filename
+                       chrom, window_start, window_end,
+                       self.resolution,
+                       is_reverse,  # end requirements for base segway-task
+                       ]
+        prefix_args.extend(additional_prefix_args)
+
+        return self.queue_task(self.train_prog, kwargs, name, num_frames,
+                               prefix_args=prefix_args
+                               )
 
     def queue_train_parallel(self, input_params_filename, instance_index,
                              round_index, train_windows, **kwargs):
@@ -2080,7 +2180,7 @@ class Runner(object):
                       verbosity=self.verbosity)
 
         # XXX: need exist/clobber logic here
-        # XXX: repetitive with queue_gmtk
+        # XXX: repetitive with queue_task
         self.log_cmdline(prog.build_cmdline(options=kwargs))
 
         prog(**kwargs)
@@ -2579,9 +2679,9 @@ to find the winning instance anyway.""" % thread.instance_index)
         kwargs = self.get_identify_kwargs(window_index, kwargs)
 
         if prog == VITERBI_PROG:
-            kind = "viterbi"
+            kind = ANNOTATE_TASK_KIND
         else:
-            kind = "posterior"
+            kind = POSTERIOR_TASK_KIND
 
         # "0" or "1"
         is_reverse = str(int(self.is_in_reversed_world(window_index)))
@@ -2628,7 +2728,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         num_frames = self.window_lens[window_index]
 
-        restartable_job = self.queue_gmtk(prog, kwargs, job_name,
+        restartable_job = self.queue_task(prog, kwargs, job_name,
                                           num_frames,
                                           output_filename=output_filename,
                                           prefix_args=prefix_args)
@@ -2908,7 +3008,8 @@ def parse_options(argv):
 
     group = parser.add_argument_group("Intermediate files")
     group.add_argument("-o", "--observations", metavar="DIR",
-                       help="use or create observations in DIR"
+                       help="DEPRECATED - temp files are now used and "
+                       " recommended. Previously would use or create observations in DIR"
                        " (default %s)" %
                        (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
 

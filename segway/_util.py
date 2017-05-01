@@ -89,6 +89,7 @@ EB = 2 ** 60
 OptionBuilder_GMTK = (Mixin_UseFullProgPath +
                       OptionBuilder_ShortOptWithSpace_TF)
 
+TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 
