@@ -145,11 +145,6 @@ which may be repeated. For example::
 
 will include the two tracks ``dnasei`` and ``h3k36me3`` and no others.
 
-There is also a special track name, ``dinucleotide``. When you specify
-``--track=dinucleotide``, Segway will create a track containing
-the dinucleotide that starts at a particular position. This can help
-in modeling CpG or G+C bias.
-
 You can run a concatenated segmentation by separating tracks with a
 comma. For example::
 

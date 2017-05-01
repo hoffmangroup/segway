@@ -1,4 +1,14 @@
+1.4.4:
+
+1.4.3:
+* segway: fix "bad interpreter: Text file busy" errors reported by submitted
+  jobs
+
 1.4.2:
+* segway: training is now submitted as a segway-task
+* segway: all observations are now written out to temporary storage. As a
+  result, the --observation option has been disabled
+* segway: disabled the erroneous --dinucleotide option
 * segway: Change Segway to raise warning if running Segway in identify mode
   with non-zero verbosity.
 * segway: Add mixture of Gaussians and variance floor functionality to Segway
