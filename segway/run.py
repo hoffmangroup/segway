@@ -73,7 +73,7 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
-NUM_MIX_COMPONENTS_DEFAULT = 1
+NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT = 1
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -82,7 +82,6 @@ RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
-VAR_FLOOR_DEFAULT = None
 VAR_FLOOR_GMM_DEFAULT = 0.00001
 
 ISLAND = True
@@ -651,8 +650,8 @@ class Runner(object):
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
         self.supervision_label_range_size = 0
-        self.num_mix_components = NUM_MIX_COMPONENTS_DEFAULT
-        self.var_floor = VAR_FLOOR_DEFAULT
+        self.num_mix_components = NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT
+        self.var_floor = None
 
         # flags
         self.clobber = False
@@ -881,7 +880,7 @@ class Runner(object):
             warn("Running Segway in identify mode with non-zero verbosity"
                  " is currently not supported and may result in errors.")
 
-        if res.var_floor != VAR_FLOOR_DEFAULT and res.var_floor < 0:
+        if res.var_floor and res.var_floor < 0:
             raise ValueError("The variance floor cannot be less than 0")
 
         return res
@@ -2324,13 +2323,13 @@ class Runner(object):
                       **self.make_gmtk_kwargs())
 
         # var floor was specified
-        if self.var_floor != VAR_FLOOR_DEFAULT:
+        if self.var_floor:
             kwargs["varFloor"] = self.var_floor
 
         # if using mixture models and variance floor not specified,
         # use default variance floor value to ensure convergence
-        if ((self.num_mix_components != NUM_MIX_COMPONENTS_DEFAULT) and
-            (self.var_floor == VAR_FLOOR_DEFAULT)):
+        if ((self.num_mix_components != NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT)
+            and not self.var_floor):
             self.var_floor = VAR_FLOOR_GMM_DEFAULT
             kwargs["varFloor"] = self.var_floor
 
@@ -3051,9 +3050,10 @@ def parse_options(argv):
                        " (default %s)" % DISTRIBUTION_DEFAULT)
 
     group.add_argument("--mixture-components", type=int,
-                         default=NUM_MIX_COMPONENTS_DEFAULT,
+                         default=NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT,
                          help="Number of Gaussian mixture "
-                         "components (default %d)" % NUM_MIX_COMPONENTS_DEFAULT)
+                         "components (default %d)" 
+                         % NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT)
 
     group.add_argument("--num-instances", type=int,
                        default=NUM_INSTANCES, metavar="NUM",
@@ -3097,7 +3097,7 @@ def parse_options(argv):
                        help="reverse sequences in concatenated world WORLD"
                        " (0-based)")
 
-    group.add_argument("--var-floor", type=float,
+    group.add_argument("--var-floor", type=float, default=None,
                          help="Controls the variance floor, meaning that if any "
                          "of the variances of a track falls below "
                          'this value, then the variance is "floored" (prohibited '
