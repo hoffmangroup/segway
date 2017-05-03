@@ -82,7 +82,7 @@ RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
-VAR_FLOOR_DEFAULT = -1
+VAR_FLOOR_DEFAULT = None
 VAR_FLOOR_GMM_DEFAULT = 0.00001
 
 ISLAND = True
@@ -880,6 +880,9 @@ class Runner(object):
         if res.identify and res.verbosity > 0:
             warn("Running Segway in identify mode with non-zero verbosity"
                  " is currently not supported and may result in errors.")
+
+        if res.var_floor != VAR_FLOOR_DEFAULT and res.var_floor < 0:
+            raise ValueError("The variance floor cannot be less than 0")
 
         return res
 
@@ -3049,8 +3052,8 @@ def parse_options(argv):
 
     group.add_argument("--mixture-components", type=int,
                          default=NUM_MIX_COMPONENTS_DEFAULT,
-                         help="Number of component for the mixture"
-                         " of Gaussians (default %d)" % NUM_MIX_COMPONENTS_DEFAULT)
+                         help="Number of Gaussian mixture "
+                         "components (default %d)" % NUM_MIX_COMPONENTS_DEFAULT)
 
     group.add_argument("--num-instances", type=int,
                        default=NUM_INSTANCES, metavar="NUM",
@@ -3096,12 +3099,11 @@ def parse_options(argv):
 
     group.add_argument("--var-floor", type=float,
                          help="Controls the variance floor, meaning that if any "
-                         "of the variances of a Gaussian falls below "
+                         "of the variances of a track falls below "
                          'this value, then the variance is "floored" (prohibited '
-                         "from falling below the floor value). The variance, in "
-                         "this case, is set to the corresponding variance from "
-                         "the previous EM iteration. If not using GMM, default "
-                         "unused, else default %f" % VAR_FLOOR_GMM_DEFAULT)
+                         "from falling below the floor value). If not using a "
+                         "mixture of Gaussians, default unused, else default %f"
+                         % VAR_FLOOR_GMM_DEFAULT)
 
     group = parser.add_argument_group("Technical variables")
     group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,

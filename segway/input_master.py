@@ -32,7 +32,7 @@ else:
 ABSOLUTE_FUDGE = 0.001
 
 # define the pseudocount for training the mixture distribution weights
-MIX_PSEUDOCOUNT = 100
+MIXTURE_WEIGHTS_PSEUDOCOUNT = 100
 
 # here to avoid duplication
 NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
@@ -477,7 +477,7 @@ class DirichletTabParamSpec(TableParamSpec):
         return pseudocounts
     
     def make_components_table(self):
-        return array([MIX_PSEUDOCOUNT]*self.num_mix_components)
+        return array([MIXTURE_WEIGHTS_PSEUDOCOUNT]*self.num_mix_components)
 
     def generate_objects(self):
         # XXX: these called functions have confusing/duplicative names
