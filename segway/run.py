@@ -81,6 +81,7 @@ RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
+VALIDATION_FRAC_DEFAULT = 0.00
 
 ISLAND = True
 
@@ -160,11 +161,14 @@ ENV_CMD = "/usr/bin/env"
 # XXX: need to differentiate this (prog) from prog.prog == progname throughout
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
+VALIDATE_PROG = OptionBuilder_GMTK("gmtkJT")
 
 # Tasks
 ANNOTATE_TASK_KIND = "viterbi"
 POSTERIOR_TASK_KIND = "posterior"
 TRAIN_TASK_KIND = "train"
+VALIDATE_TASK_KIND = "validate"
+CREATE_VALIDATION_SET_WINDOW_TASK_KIND = "validation-set-window"
 BUNDLE_TRAIN_TASK_KIND = "bundle-train"
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
@@ -220,6 +224,7 @@ SUBDIRNAME_AUX = "auxiliary"
 SUBDIRNAME_JOB_SCRIPT = "cmdline"
 SUBDIRNAME_LIKELIHOOD = "likelihood"
 SUBDIRNAME_OBS = "observations"
+SUBDIRNAME_VALIDATION = "validation"
 SUBDIRNAME_POSTERIOR = "posterior"
 SUBDIRNAME_VITERBI = "viterbi"
 
@@ -600,11 +605,13 @@ class Runner(object):
         self.log_likelihood_tab_filename = None
 
         self.obs_dirname = None
+        self.validation_obs_dirname = None
 
         self.include_coords_filename = None
         self.exclude_coords_filename = None
 
         self.minibatch_fraction = MINIBATCH_DEFAULT
+        self.validation_fraction = VALIDATION_FRAC_DEFAULT
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
@@ -630,6 +637,7 @@ class Runner(object):
         # data
         # a "window" is what GMTK calls a segment
         self.windows = None
+        self.validation_windows = None
         self.mins = None
         self.track_specs = []
 
@@ -655,6 +663,7 @@ class Runner(object):
         self.train = False  # EM train
         self.posterior = False
         self.identify = False  # viterbi
+        self.validate = False
         self.dry_run = False
         self.verbosity = VERBOSITY
 
@@ -691,6 +700,7 @@ class Runner(object):
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
                         ("minibatch_fraction",),
+                        ("validation_fraction",),
                         ("num_instances",),
                         ("verbosity",),
                         ("split_sequences", "max_split_sequence_length"),
@@ -874,6 +884,18 @@ class Runner(object):
             warn("Running Segway in identify mode with non-zero verbosity"
                  " is currently not supported and may result in errors.")
 
+        # if validation fraction nonzero, set validate to True
+        if res.validation_fraction != VALIDATION_FRAC_DEFAULT:
+            res.validate = True
+
+        # if minibatch enabled but validation fraction not set, set validate to True
+        # and default validation_fraction to 10*minibatch_frac
+        if (res.minibatch_fraction != MINIBATCH_DEFAULT and
+            res.validation_fraction == VALIDATION_FRAC_DEFAULT):
+            res.validate = True
+            res.validation_fraction = 10 * res.minibatch_fraction
+
+
         return res
 
     @memoized_property
@@ -986,6 +1008,18 @@ class Runner(object):
         return res
 
     @memoized_property
+    def validation_obs_dirpath(self):
+        res = self.work_dirpath / SUBDIRNAME_OBS / SUBDIRNAME_VALIDATION
+        self.validation_obs_dirname = res
+        try:
+            self.make_dir(res)
+        except OSError, err:
+            if not (err.errno == EEXIST and res.isdir()):
+                raise
+
+        return res
+
+    @memoized_property
     def obs_dirpath(self):
         obs_dirname = self.obs_dirname
 
@@ -1013,6 +1047,14 @@ class Runner(object):
     @memoized_property
     def int_filelistpath(self):
         return self.make_obs_filelistpath(EXT_INT)
+
+    @memoized_property
+    def validation_float_filelistpath(self):
+        return self.make_validation_obs_filelistpath(EXT_FLOAT)
+
+    @memoized_property
+    def validation_int_filelistpath(self):
+        return self.make_validation_obs_filelistpath(EXT_INT)
 
     @memoized_property
     def float_tabfilepath(self):
@@ -1150,7 +1192,6 @@ class Runner(object):
     def error_dirpath(self):
         return self.make_output_dirpath("e", self.instance_index)
 
-    @memoized_property
     def job_script_dirpath(self):
         return self.make_job_script_dirpath(self.instance_index)
 
@@ -1193,6 +1234,10 @@ class Runner(object):
     @memoized_property
     def train_prog(self):
         return self.prog_factory(EM_TRAIN_PROG)
+
+    @memoized_property
+    def validate_prog(self):
+        return self.prog_factory(VALIDATE_PROG)
 
     @memoized_property
     def seg_countdowns_initial(self):
@@ -1513,7 +1558,11 @@ class Runner(object):
 
     def make_job_script_dirpath(self, instance_index):
         res = self.work_dirpath / SUBDIRNAME_JOB_SCRIPT / str(instance_index)
-        self.make_dir(res)
+        try:
+            self.make_dir(res)
+        # ignore if it already exists; fix this...
+        except OSError, err:
+            pass
 
         return res
 
@@ -1548,6 +1597,9 @@ class Runner(object):
 
     def make_obs_filelistpath(self, ext):
         return make_filelistpath(self.obs_dirpath, ext)
+
+    def make_validation_obs_filelistpath(self, ext):
+        return make_filelistpath(self.validation_obs_dirpath, ext)
 
     def save_resource(self, resname, subdirname=""):
         orig_filename = data_filename(resname)
@@ -1792,13 +1844,18 @@ class Runner(object):
             observations.locate_windows(genome)
 
         self.windows = observations.windows
+        self.validation_windows = observations.validation_windows
 
         # XXX: does this need to be done before save()?
         self.subset_metadata()
         observations.create_filepaths(temp=True)
+        observations.create_validation_filepaths(temp=False)
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
+
+        self.validation_float_filepaths = observations.validation_float_filepaths
+        self.validation_int_filepaths = observations.validation_int_filepaths
 
         if self.train:
             self.set_log_likelihood_filenames()
@@ -1836,6 +1893,10 @@ class Runner(object):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, instance_index,
                                      round_index, window_index,
                                      self.work_dirpath.name, self.uuid)
+
+    def make_job_name_validate(self, instance_index, round_index, window_index):
+        return "%s%d.%d.%s.%s" % (PREFIX_JOB_NAME_VALIDATE, instance_index,
+                                     round_index, self.work_dirpath.name, self.uuid)
 
     def make_job_name_identify(self, prefix, window_index):
         return "%s%d.%s.%s" % (prefix, window_index, self.work_dirpath.name,
@@ -1928,7 +1989,8 @@ class Runner(object):
             args = gmtk_cmdline
 
         shell_job_name = extsep.join([job_name, EXT_SH])
-        job_script_filename = self.job_script_dirpath / shell_job_name
+        job_script_filename = self.job_script_dirpath() / shell_job_name
+        print job_script_filename
 
         job_script_fd = os_open(job_script_filename,
                                 JOB_SCRIPT_FILE_OPEN_FLAGS,
@@ -2134,6 +2196,94 @@ class Runner(object):
 
         return res
 
+    def queue_create_validation_set_window(self, validation_window, num_frames=0, **kwargs):
+        
+        segway_task_path = find_executable("segway-task")
+        segway_task_verb = "create"
+        output_filename = "" 
+
+        chrom = validation_window.chrom
+        window_start = validation_window.start
+        window_end = validation_window.end
+        name = "create_validation_set_%s_%s_%s" % (chrom, window_start, window_end)
+
+        task_kind = CREATE_VALIDATION_SET_WINDOW_TASK_KIND
+
+        track_indexes = self.world_track_indexes[validation_window.world]
+        genomedata_names = self.world_genomedata_names[validation_window.world]
+
+        track_indexes_text = ",".join(map(str, track_indexes))
+        genomedata_names_text = ",".join(genomedata_names)
+
+        # validate float filepaths here
+        validation_window_index = self.validation_windows.index(validation_window)
+        float_filepath = self.validation_float_filepaths[validation_window_index]# validation float filepaths
+        int_filepath = self.validation_int_filepaths[validation_window_index]# validation int filepaths
+
+        with open("%s" % self.validation_int_filelistpath, "a") as int_filelist_fd:
+            int_filelist_fd.write("%s\n" % int_filepath)
+
+        with open("%s" % self.validation_float_filelistpath, "a") as float_filelist_fd:
+            float_filelist_fd.write("%s\n" % float_filepath)
+
+        is_reverse = 0
+
+        prefix_args = [segway_task_path,
+                       segway_task_verb,
+                       task_kind,
+                       output_filename,  # output filename
+                       chrom, window_start, window_end,
+                       self.resolution,
+                       is_reverse,  # end requirements for base segway-task
+                       genomedata_names_text,
+                       float_filepath,
+                       int_filepath,
+                       self.distribution,
+                       track_indexes_text,
+                       self.validation_windows,
+                    ]
+
+        return self.queue_task(self.train_prog, kwargs, name, num_frames,
+                               prefix_args=prefix_args
+                               )
+
+    def queue_validate(self, input_params_filename, instance_index, round_index,
+                    num_frames=0, **kwargs):
+        """take params output from bundling and validates on holdout set
+        """
+
+        cpp_options = self.make_cpp_options(input_params_filename)
+
+        kwargs["inputMasterFile"] = self.input_master_filename
+
+        name = self.make_job_name_validate(instance_index, round_index)
+
+        segway_task_path = find_executable("segway-task")
+        segway_task_verb = "run"
+        output_filename = ""  # not used for training
+
+        # Set task to the bundle train task
+        task_kind = VALIDATE_TASK_KIND
+
+        # validate float filepaths here
+        float_filepath = self.float_filepaths[window_index]
+        int_filepath = self.int_filepaths[window_index]
+
+        prefix_args = [segway_task_path,
+                       segway_task_verb,
+                       task_kind,
+                       output_filename,  # output filename
+                       self.resolution,
+                       float_filepath,
+                       int_filepath,
+                       ]
+
+        kwargs = dict(cppCommandOptions=cpp_options, **kwargs)
+
+        return self.queue_task(self.validate_prog, kwargs, name, num_frames,
+                               prefix_args=prefix_args
+                               )
+
     def get_posterior_clique_print_ranges(self):
         res = {}
 
@@ -2278,6 +2428,13 @@ class Runner(object):
                                     llStoreFile=self.log_likelihood_filename,
                                     **kwargs)
         restartable_jobs.wait()
+
+ #       # validate here
+  #      restartable_jobs = \
+   #         self.queue_validate(curr_params_filename, instance_index,
+    #                            round_index, **kwargs)
+#
+ #       restartable_jobs.wait()
 
         self.last_params_filename = curr_params_filename
 
@@ -2425,6 +2582,18 @@ class Runner(object):
             # always overwrite params.params
             copy2(last_params_filename, self.make_params_filename())
 
+    def create_validation_set(self):
+        with Session() as session:
+            self.session = session
+            self.instance_index = "validation"
+            res = RestartableJobDict(self.session, self.job_log_file)
+            for validation_window in self.validation_windows:
+                restartable_job = self.queue_create_validation_set_window(validation_window)
+                res.queue(restartable_job)
+            res.wait()
+        self.session = None
+        self.instance_index = None
+
     def run_train(self):
         dst_filenames = self.setup_train()
 
@@ -2460,6 +2629,8 @@ class Runner(object):
         self.obs_dirpath
         self.float_filelistpath
         self.int_filelistpath
+        self.validation_float_filelistpath
+        self.validation_int_filelistpath
         self.float_tabfilepath
         self.gmtk_include_filename_relative
         self.means
@@ -2471,6 +2642,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
+        self.validate_prog
         self.supervision_label_range_size
 
         threads = []
@@ -2886,6 +3058,9 @@ to find the winning instance anyway.""" % thread.instance_index)
                 with open(job_log_filename, "w") as self.job_log_file:
                     print >>self.job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
 
+                    if self.validate and self.train:
+                        self.create_validation_set()
+
                     if self.train:
                         self.run_train()
 
@@ -2974,6 +3149,14 @@ def parse_options(argv):
                        " iteration. Removes the likelihood stopping criterion,"
                        " so training always runs to the number of rounds"
                        " specified by --max-train-rounds")
+
+    group.add_argument("--validation-fraction", type=float, metavar="FRAC",
+                       default=VALIDATION_FRAC_DEFAULT,
+                       help="Use a random holdout set of size FRAC positions"
+                       " to validate the parameters learned by each training"
+                       " round. The instance/round with the best likelihood"
+                       " as validated by the holdout set will be chosen as"
+                       " as the winner after the specified --max-train-rounds")
 
     group = parser.add_argument_group("Model files")
     group.add_argument("-i", "--input-master", metavar="FILE",

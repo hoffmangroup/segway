@@ -518,6 +518,42 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
                 if err.errno == ENOENT:
                     pass
 
+def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
+              genomedata_names, float_filename, int_filename, distribution,
+              track_indexes,
+              *args):
+
+    (chrom, start, end) = coord
+
+    #import pdb
+    #pdb = pdb.Pdb()
+    #pdb.use_rawinput=0
+    #pdb.set_trace()
+
+    genomedata_names = genomedata_names.split(",")
+    track_indexes = map(int, track_indexes.split(","))
+
+    # this should be some VALIDATION_OBS_DIRPATH.......
+    float_filepath = path(float_filename)
+    int_filepath = path(int_filename)
+
+    # what is this doing? ask Eric
+    filepaths = [float_filepath, int_filepath]
+    args = list(args)
+    int_filelistfd = replace_args_filelistname(args, filepaths, EXT_INT)
+    float_filelistfd = replace_args_filelistname(args, filepaths,
+                                                 EXT_FLOAT)
+
+    print_to_fd(float_filelistfd, float_filename)
+    print_to_fd(int_filelistfd, int_filename)
+
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
+
+    print int_filename
+    print float_filename
+    _save_window(float_filename, int_filename, continuous_cells,
+        resolution, distribution)
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,
@@ -525,6 +561,8 @@ TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "posterior"): load_posterior_save_bed,
          ("run", "train"): run_train,
          ("run", "bundle-train"): run_bundle_train,
+#         ("run", "validate"): run_validate,
+         ("create", "validation-set-window"): create_validation_set_window,
          }
 
 

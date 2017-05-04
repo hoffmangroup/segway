@@ -462,18 +462,22 @@ def process_new_windows(new_windows, starts, ends):
 class Observations(object):
     copy_attrs = ["include_coords", "exclude_coords", "max_frames",
                   "float_filelistpath", "int_filelistpath",
-                  "float_tabfilepath", "obs_dirpath", "uuid", "resolution",
+                  "validation_float_filelistpath", "validation_int_filelistpath",
+                  "float_tabfilepath", "validation_obs_dirpath", "obs_dirpath", "uuid", "resolution",
                   "distribution", "train", "identify", "supervision_type",
                   "supervision_coords", "supervision_labels",
                   "use_dinucleotide", "world_track_indexes",
                   "world_genomedata_names", "clobber",
-                  "num_worlds"]
+                  "num_worlds", "validation_fraction"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)
 
         self.float_filepaths = []
         self.int_filepaths = []
+
+        self.validation_float_filepaths = []
+        self.validation_int_filepaths = []
 
     def generate_coords_include(self):
         for chrom, coords_list in self.include_coords.iteritems():
@@ -573,6 +577,18 @@ class Observations(object):
                 for world in xrange(self.num_worlds):
                     windows.append(Window(world, chrom, start, end))
 
+        total_bases = sum((window.end - window.start) for window in windows)
+        cur_bases = 0
+        validation_windows = []
+
+        # remove windows until validation_windows is of the correct size
+        while ((float(cur_bases) / total_bases) < self.validation_fraction):
+            window = windows.pop()
+            validation_windows.append(window)
+            cur_bases += (window.end - window.start)
+        self.validation_windows = validation_windows
+
+        # remaining windows can be passed into training now
         self.windows = windows
 
     def save_window(self, float_filename, int_filename, float_data,
@@ -584,6 +600,20 @@ class Observations(object):
     @staticmethod
     def make_filepath(dirpath, prefix, suffix):
         return dirpath / (prefix + suffix)
+
+    def make_validation_filepaths(self, chrom, window_index, temp=False):
+        prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_WINDOWS))
+        prefix = prefix_feature_tmpl % window_index
+
+        if temp:
+            prefix = "".join([prefix, self.uuid, extsep])
+            dirpath = path(gettempdir())
+        else:
+            dirpath = self.validation_obs_dirpath
+
+        make_filepath_custom = partial(self.make_filepath, dirpath, prefix)
+
+        return (make_filepath_custom(EXT_FLOAT), make_filepath_custom(EXT_INT))
 
     def make_filepaths(self, chrom, window_index, temp=False):
         prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_WINDOWS))
@@ -599,7 +629,7 @@ class Observations(object):
 
         return (make_filepath_custom(EXT_FLOAT), make_filepath_custom(EXT_INT))
 
-    def print_filepaths(self, float_filelist, int_filelist, *args, **kwargs):
+    def floatnt_filepaths(self, float_filelist, int_filelist, *args, **kwargs):
         float_filepath, int_filepath = self.make_filepaths(*args, **kwargs)
         print >>float_filelist, float_filepath
         print >>int_filelist, int_filepath
@@ -621,6 +651,18 @@ class Observations(object):
             self.float_filepaths.append(float_filepath)
             self.int_filepaths.append(int_filepath)
 
+
+    def create_validation_filepaths(self, temp=False):
+        """ Creates a list of observations full filepaths for each window.
+        temp is a flag to determine whether or not the filepaths will be
+        given a temporary directory """
+
+        for window_index, window in enumerate(self.validation_windows):
+            float_filepath, int_filepath = self.make_validation_filepaths(
+                                            window.chrom, window_index,
+                                            temp)
+            self.validation_float_filepaths.append(float_filepath)
+            self.validation_int_filepaths.append(int_filepath)
 
     def make_seq_cells(self, chromosome, start, end):
         if self.use_dinucleotide:
