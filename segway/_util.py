@@ -92,6 +92,7 @@ OptionBuilder_GMTK = (Mixin_UseFullProgPath +
 TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
+VALIDATE_PROG = OptionBuilder_GMTK("gmtkJT")
 
 BED_SCORE = "1000"
 BED_STRAND = "."

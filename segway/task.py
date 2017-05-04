@@ -25,7 +25,7 @@ from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array,
                     find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    VITERBI_PROG)
+                    VALIDATE_PROG, VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -555,13 +555,24 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
     _save_window(float_filename, int_filename, continuous_cells,
         resolution, distribution)
 
+def run_validate(coord, resolution, do_reverse, outfilename,
+              *args):
+    try:
+        # is there a less sketchy way to do this?
+        print args
+        output = VALIDATE_PROG.getoutput(*args)
+        validation_likelihood = re.search("(?<=Segment 0, after Prob E: log\(prob\(evidence\)\) = )(\d+\.\d{1,9})?", output)
+        print validation_likelihood.group(0)
+    except:
+        raise
+
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,
          ("run", "posterior"): run_posterior_save_bed,
          ("load", "posterior"): load_posterior_save_bed,
          ("run", "train"): run_train,
          ("run", "bundle-train"): run_bundle_train,
-#         ("run", "validate"): run_validate,
+         ("run", "validate"): run_validate,
          ("create", "validation-set-window"): create_validation_set_window,
          }
 

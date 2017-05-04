@@ -61,7 +61,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
-                    VITERBI_PROG)
+                    VALIDATE_PROG, VITERBI_PROG)
 from .version import __version__
 
 # set once per file run
@@ -161,7 +161,6 @@ ENV_CMD = "/usr/bin/env"
 # XXX: need to differentiate this (prog) from prog.prog == progname throughout
 TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
-VALIDATE_PROG = OptionBuilder_GMTK("gmtkJT")
 
 # Tasks
 ANNOTATE_TASK_KIND = "viterbi"
@@ -199,6 +198,7 @@ PREFIX_JOB_LOG = "jobs"
 PREFIX_JOB_NAME_TRAIN = "emt"
 PREFIX_JOB_NAME_VITERBI = "vit"
 PREFIX_JOB_NAME_POSTERIOR = "jt"
+PREFIX_JOB_NAME_VALIDATE = "validate"
 PREFIX_JOB_NAMES = dict(identify=PREFIX_JOB_NAME_VITERBI,
                         posterior=PREFIX_JOB_NAME_POSTERIOR)
 
@@ -1894,7 +1894,7 @@ class Runner(object):
                                      round_index, window_index,
                                      self.work_dirpath.name, self.uuid)
 
-    def make_job_name_validate(self, instance_index, round_index, window_index):
+    def make_job_name_validate(self, instance_index, round_index):
         return "%s%d.%d.%s.%s" % (PREFIX_JOB_NAME_VALIDATE, instance_index,
                                      round_index, self.work_dirpath.name, self.uuid)
 
@@ -2262,27 +2262,39 @@ class Runner(object):
         segway_task_verb = "run"
         output_filename = ""  # not used for training
 
-        # Set task to the bundle train task
-        task_kind = VALIDATE_TASK_KIND
+        chrom = 0
+        window_start = 0
+        window_end = 0
 
-        # validate float filepaths here
-        float_filepath = self.float_filepaths[window_index]
-        int_filepath = self.int_filepaths[window_index]
+        task_kind = VALIDATE_TASK_KIND
+        is_reverse = 0 # ignore for now
+
+        #kwargs["probE"] = True
 
         prefix_args = [segway_task_path,
                        segway_task_verb,
                        task_kind,
                        output_filename,  # output filename
+                       chrom, window_start, window_end,
                        self.resolution,
-                       float_filepath,
-                       int_filepath,
+                       is_reverse,  # end requirements for base segway-task
                        ]
 
-        kwargs = dict(cppCommandOptions=cpp_options, **kwargs)
+        kwargs = dict(cppCommandOptions=cpp_options,
+                      probE=True, cliqueTableNormalize=0.0, **kwargs)
+        kwargs["of1"] =  self.validation_float_filelistpath
+        kwargs["of2"] =  self.validation_int_filelistpath
+        del kwargs["lldp"]
+        del kwargs["maxEmIters"]
+        del kwargs["objsNotToTrain"]
 
-        return self.queue_task(self.validate_prog, kwargs, name, num_frames,
+        restartable_job = self.queue_task(self.validate_prog, kwargs, name, num_frames,
                                prefix_args=prefix_args
                                )
+
+        res = RestartableJobDict(self.session, self.job_log_file)
+        res.queue(restartable_job)
+        return res
 
     def get_posterior_clique_print_ranges(self):
         res = {}
@@ -2429,12 +2441,12 @@ class Runner(object):
                                     **kwargs)
         restartable_jobs.wait()
 
- #       # validate here
-  #      restartable_jobs = \
-   #         self.queue_validate(curr_params_filename, instance_index,
-    #                            round_index, **kwargs)
-#
- #       restartable_jobs.wait()
+        # validate here
+        restartable_jobs = \
+            self.queue_validate(curr_params_filename, instance_index,
+                                round_index, **kwargs)
+
+        restartable_jobs.wait()
 
         self.last_params_filename = curr_params_filename
 
