@@ -1184,11 +1184,9 @@ class Runner(object):
 
         return res
 
-    @memoized_property
     def output_dirpath(self):
         return self.make_output_dirpath("o", self.instance_index)
 
-    @memoized_property
     def error_dirpath(self):
         return self.make_output_dirpath("e", self.instance_index)
 
@@ -1552,7 +1550,11 @@ class Runner(object):
 
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
-        self.make_dir(res)
+        try:
+            self.make_dir(res)
+        # ignore if it already exists; fix this...
+        except OSError, err:
+            pass
 
         return res
 
@@ -1990,7 +1992,6 @@ class Runner(object):
 
         shell_job_name = extsep.join([job_name, EXT_SH])
         job_script_filename = self.job_script_dirpath() / shell_job_name
-        print job_script_filename
 
         job_script_fd = os_open(job_script_filename,
                                 JOB_SCRIPT_FILE_OPEN_FLAGS,
@@ -2024,8 +2025,8 @@ class Runner(object):
         job_tmpl.jobEnvironment = remove_bash_functions(environment)
 
         if output_filename is None:
-            output_filename = self.output_dirpath / job_name
-        error_filename = self.error_dirpath / job_name
+            output_filename = self.output_dirpath() / job_name
+        error_filename = self.error_dirpath() / job_name
 
         job_tmpl.blockEmail = True
 
