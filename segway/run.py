@@ -1393,8 +1393,23 @@ class Runner(object):
 
     def load_validation_likelihood(self):
         with open(self.validation_likelihood_filename) as infile:
-            validation_likelihood = float(infile.read().strip())
+            validation_output = [tuple(map(float, line.split(','))) for line in infile]
 
+        weighted_validation_likelihood_sum = 0
+        total_bases = 0
+
+        for validation_tuple in validation_output:
+            validation_window_index = int(validation_tuple[0])
+            validation_window = self.validation_windows[validation_window_index]
+            validation_window_size = validation_window.end - validation_window.start
+
+            validation_window_likelihood = validation_tuple[1]
+
+            weighted_validation_likelihood_sum += validation_window_size * validation_window_likelihood
+            total_bases += validation_window_size
+
+        validation_likelihood = weighted_validation_likelihood_sum / total_bases
+            
         with open(self.validation_likelihood_tab_filename, "a") as logfile:
             print >>logfile, str(validation_likelihood)
 
@@ -2304,7 +2319,6 @@ class Runner(object):
         is_reverse = 0 # ignore for now
 
         #kwargs["probE"] = True
-
         prefix_args = [segway_task_path,
                        segway_task_verb,
                        task_kind,
@@ -2541,17 +2555,13 @@ class Runner(object):
             if self.validate:
                 validation_likelihood = self.load_validation_likelihood()
 
-                print "validate[curr, %s]" % self.instance_index, validation_likelihood
-                print "validate[prev_best, %s]" % self.instance_index, best_validation_likelihood
                 if validation_likelihood > best_validation_likelihood:
                     result = Results(log_likelihood, self.num_segs, self.input_master_filename, self.last_params_filename, self.log_likelihood_filename, self.validation_likelihood_filename, validation_likelihood)
-                    print "new result", result
                     best_validation_likelihood = validation_likelihood
 
             round_index += 1
 
         if not self.validate:
-            validation_likelihood = None
             result = Results(log_likelihood, self.num_segs, self.input_master_filename, self.last_params_filename, self.log_likelihood_filename, self.validation_likelihood_filename, validation_likelihood)
 
         # log_likelihood, num_segs and a list of src_filenames to save
@@ -2639,7 +2649,6 @@ class Runner(object):
         elif not self.dry_run:
             # only one instance
             assert len(instance_params) == 1
-            print "instance_params", instance_params
             last_params_filename = instance_params[0].params_filename
             copy2(last_params_filename, self.params_filename)
 
@@ -2763,9 +2772,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         # finds the min by info_criterion (maximize log_likelihood)
         if self.validate:
-            print "full instance params", instance_params
             max_params = max(instance_params, key=lambda k: k.validation_likelihood)
-            print "max_params", max_params
         else:
             max_params = max(instance_params)
 
@@ -2781,9 +2788,6 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
         for name, src_filename, dst_filename in zipper:
-            print name
-            print src_filename
-            print dst_filename
             self.copy_results(name, src_filename, dst_filename)
 
     def recover_filename(self, resource):

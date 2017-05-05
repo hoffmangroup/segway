@@ -20,6 +20,7 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, invert, isnan, maximum, zeros)
+from numpy.random import shuffle
 from path import path
 from tabdelim import ListWriter
 
@@ -464,7 +465,7 @@ class Observations(object):
                   "float_filelistpath", "int_filelistpath",
                   "validation_float_filelistpath", "validation_int_filelistpath",
                   "float_tabfilepath", "validation_obs_dirpath", "obs_dirpath", "uuid", "resolution",
-                  "distribution", "train", "identify", "supervision_type",
+                  "distribution", "train", "identify", "random_state", "supervision_type",
                   "supervision_coords", "supervision_labels",
                   "use_dinucleotide", "world_track_indexes",
                   "world_genomedata_names", "clobber",
@@ -580,6 +581,7 @@ class Observations(object):
         total_bases = sum((window.end - window.start) for window in windows)
         cur_bases = 0
         validation_windows = []
+        self.random_state.shuffle(windows)
 
         # remove windows until validation_windows is of the correct size
         while ((float(cur_bases) / total_bases) < self.validation_fraction):
@@ -588,6 +590,7 @@ class Observations(object):
             cur_bases += (window.end - window.start)
         self.validation_windows = validation_windows
 
+        assert windows is not None, "Training set must be non-empty"
         # remaining windows can be passed into training now
         self.windows = windows
 

@@ -35,4 +35,4 @@ on_exit ()
 trap on_exit EXIT
 
 ## start a subshell so that going over ulimit only kills the subshell
-bash "$@" > "$stdout_filename"
+bash "$@" #> "$stdout_filename"
