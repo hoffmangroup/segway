@@ -629,7 +629,7 @@ class Observations(object):
 
         return (make_filepath_custom(EXT_FLOAT), make_filepath_custom(EXT_INT))
 
-    def floatnt_filepaths(self, float_filelist, int_filelist, *args, **kwargs):
+    def print_filepaths(self, float_filelist, int_filelist, *args, **kwargs):
         float_filepath, int_filepath = self.make_filepaths(*args, **kwargs)
         print >>float_filelist, float_filepath
         print >>int_filelist, int_filepath
