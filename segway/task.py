@@ -560,7 +560,6 @@ def run_validate(coord, resolution, do_reverse, outfilename,
         # is there a less sketchy way to do this?
         output = VALIDATE_PROG.getoutput(*args)
         validation_likelihood = re.search("(?<=Segment 0, after Prob E: log\(prob\(evidence\)\) = )(\d+\.\d{1,9})?", output)
-        print validation_likelihood.group(0)
         with open(outfilename, "w") as outfile:
             outfile.write("%s\n" % validation_likelihood.group(0))
     except:

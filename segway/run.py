@@ -282,7 +282,7 @@ REVERSE_GPR = "^0:-1:0"
 
 Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "input_master_filename", "params_filename",
-                                 "log_likelihood_filename", "validation_likelihood"])
+                                 "log_likelihood_filename", "validation_likelihood_filename", "validation_likelihood"])
 OFFSET_FILENAMES = 2  # where the filenames begin in Results
 
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
@@ -2475,12 +2475,11 @@ class Runner(object):
                                     **kwargs)
         restartable_jobs.wait()
 
-        # validate here
-        restartable_jobs = \
-            self.queue_validate(curr_params_filename, instance_index,
-                                round_index, **kwargs)
-
-        restartable_jobs.wait()
+        if self.validate:
+            restartable_jobs = \
+                self.queue_validate(curr_params_filename, instance_index,
+                                    round_index, **kwargs)
+            restartable_jobs.wait()
 
         self.last_params_filename = curr_params_filename
 
@@ -2520,7 +2519,7 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return Results(None, None, None, None, None, None)
+            return Results(None, None, None, None, None, None, None)
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
@@ -2542,10 +2541,10 @@ class Runner(object):
             if self.validate:
                 validation_likelihood = self.load_validation_likelihood()
 
-                print "validate[curr]", validation_likelihood
-                print "validate[prev_best]", best_validation_likelihood
+                print "validate[curr, %s]" % self.instance_index, validation_likelihood
+                print "validate[prev_best, %s]" % self.instance_index, best_validation_likelihood
                 if validation_likelihood > best_validation_likelihood:
-                    result = Results(log_likelihood, self.num_segs, self.input_master_filename, self.last_params_filename, self.log_likelihood_filename, validation_likelihood)
+                    result = Results(log_likelihood, self.num_segs, self.input_master_filename, self.last_params_filename, self.log_likelihood_filename, self.validation_likelihood_filename, validation_likelihood)
                     print "new result", result
                     best_validation_likelihood = validation_likelihood
 
@@ -2553,7 +2552,7 @@ class Runner(object):
 
         if not self.validate:
             validation_likelihood = None
-            result = Results(log_likelihood, self.num_segs, self.input_master_filename, self.last_params_filename, self.log_likelihood_filename, validation_likelihood)
+            result = Results(log_likelihood, self.num_segs, self.input_master_filename, self.last_params_filename, self.log_likelihood_filename, self.validation_likelihood_filename, validation_likelihood)
 
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
@@ -2764,6 +2763,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         # finds the min by info_criterion (maximize log_likelihood)
         if self.validate:
+            print "full instance params", instance_params
             max_params = max(instance_params, key=lambda k: k.validation_likelihood)
             print "max_params", max_params
         else:
