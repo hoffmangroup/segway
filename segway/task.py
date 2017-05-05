@@ -537,7 +537,6 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
     float_filepath = path(float_filename)
     int_filepath = path(int_filename)
 
-    # what is this doing? ask Eric
     filepaths = [float_filepath, int_filepath]
     args = list(args)
     int_filelistfd = replace_args_filelistname(args, filepaths, EXT_INT)
@@ -562,6 +561,8 @@ def run_validate(coord, resolution, do_reverse, outfilename,
         output = VALIDATE_PROG.getoutput(*args)
         validation_likelihood = re.search("(?<=Segment 0, after Prob E: log\(prob\(evidence\)\) = )(\d+\.\d{1,9})?", output)
         print validation_likelihood.group(0)
+        with open(outfilename, "w") as outfile:
+            outfile.write("%s\n" % validation_likelihood.group(0))
     except:
         raise
 

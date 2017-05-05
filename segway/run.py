@@ -56,7 +56,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     make_prefix_fmt, MB, memoized_property,
                     OFFSET_START, OFFSET_END, OFFSET_STEP,
                     OptionBuilder_GMTK, POSTERIOR_PROG,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, SEG_TABLE_WIDTH,
+                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, PREFIX_VALIDATION, SEG_TABLE_WIDTH,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
@@ -260,7 +260,7 @@ RES_DONT_TRAIN = "dont_train.list"
 RES_SEG_TABLE = "seg_table.tab"
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
-                   "log_likelihood_filename"]
+                   "log_likelihood_filename", "validation_likelihood_filename"]
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 COMMENT_POSTERIOR_TRIANGULATION = \
@@ -282,7 +282,7 @@ REVERSE_GPR = "^0:-1:0"
 
 Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "input_master_filename", "params_filename",
-                                 "log_likelihood_filename"])
+                                 "log_likelihood_filename", "validation_likelihood"])
 OFFSET_FILENAMES = 2  # where the filenames begin in Results
 
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
@@ -603,6 +603,8 @@ class Runner(object):
         self.work_dirname = None
         self.log_likelihood_filename = None
         self.log_likelihood_tab_filename = None
+        self.validation_likelihood_filename = None
+        self.validation_likelihood_tab_filename = None
 
         self.obs_dirname = None
         self.validation_obs_dirname = None
@@ -889,11 +891,11 @@ class Runner(object):
             res.validate = True
 
         # if minibatch enabled but validation fraction not set, set validate to True
-        # and default validation_fraction to 10*minibatch_frac
+        # and default validation_fraction to minibatch_frac
         if (res.minibatch_fraction != MINIBATCH_DEFAULT and
             res.validation_fraction == VALIDATION_FRAC_DEFAULT):
             res.validate = True
-            res.validation_fraction = 10 * res.minibatch_fraction
+            res.validation_fraction = res.minibatch_fraction
 
 
         return res
@@ -1389,6 +1391,15 @@ class Runner(object):
 
         return log_likelihood
 
+    def load_validation_likelihood(self):
+        with open(self.validation_likelihood_filename) as infile:
+            validation_likelihood = float(infile.read().strip())
+
+        with open(self.validation_likelihood_tab_filename, "a") as logfile:
+            print >>logfile, str(validation_likelihood)
+
+        return validation_likelihood
+
     def make_filename(self, *exts, **kwargs):
         """
         makes a filename by joining together exts
@@ -1532,6 +1543,11 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
+    def make_validation_likelihood_tab_filename(self, instance_index, dirname):
+        return self.make_filename(PREFIX_VALIDATION, instance_index, EXT_TAB,
+                                  dirname=dirname,
+                                  subdirname=SUBDIRNAME_LOG)
+
     def set_log_likelihood_filenames(self, instance_index=None, new=False):
         """
         None means the final params file, not for any particular thread
@@ -1548,6 +1564,21 @@ class Runner(object):
                 self.make_log_likelihood_tab_filename(instance_index,
                                                       self.work_dirname)
 
+    def set_validation_likelihood_filenames(self, instance_index=None, new=False):
+        """
+        None means the final params file, not for any particular thread
+        """
+        if new or not self.validation_likelihood_filename:
+            validation_likelihood_filename = \
+                self.make_filename(PREFIX_VALIDATION, instance_index,
+                                   EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.validation_likelihood_filename = validation_likelihood_filename
+
+            self.validation_likelihood_tab_filename = \
+                self.make_validation_likelihood_tab_filename(instance_index,
+                                                      self.work_dirname)
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
         try:
@@ -1861,6 +1892,9 @@ class Runner(object):
 
         if self.train:
             self.set_log_likelihood_filenames()
+
+            if self.validate:
+                self.set_validation_likelihood_filenames()
 
         self.save_include()
         self.set_params_filename()
@@ -2261,7 +2295,6 @@ class Runner(object):
 
         segway_task_path = find_executable("segway-task")
         segway_task_verb = "run"
-        output_filename = ""  # not used for training
 
         chrom = 0
         window_start = 0
@@ -2275,7 +2308,7 @@ class Runner(object):
         prefix_args = [segway_task_path,
                        segway_task_verb,
                        task_kind,
-                       output_filename,  # output filename
+                       self.validation_likelihood_filename,
                        chrom, window_start, window_end,
                        self.resolution,
                        is_reverse,  # end requirements for base segway-task
@@ -2468,9 +2501,11 @@ class Runner(object):
 
         self.set_log_likelihood_filenames(instance_index, new)
         self.set_params_filename(instance_index, new)
+        if self.validate:
+            self.set_validation_likelihood_filenames(instance_index, new)
 
         # get previous (or initial) values
-        last_log_likelihood, log_likelihood, round_index = \
+        last_log_likelihood, log_likelihood, round_index, validation_likelihood, best_validation_likelihood = \
             self.make_instance_initial_results()
 
         if round_index == 0:
@@ -2485,14 +2520,17 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return Results(None, None, None, None, None)
+            return Results(None, None, None, None, None, None)
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
-                                            round_index, kwargs)
+                                            round_index, 
+                                            validation_likelihood,
+                                            best_validation_likelihood,
+                                            kwargs)
 
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
-                                round_index, kwargs):
+                                round_index, validation_likelihood, best_validation_likelihood, kwargs):
         while (round_index < self.max_em_iters and
                ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
                 is_training_progressing(last_log_likelihood, log_likelihood))):
@@ -2500,12 +2538,25 @@ class Runner(object):
 
             last_log_likelihood = log_likelihood
             log_likelihood = self.load_log_likelihood()
+
+            if self.validate:
+                validation_likelihood = self.load_validation_likelihood()
+
+                print "validate[curr]", validation_likelihood
+                print "validate[prev_best]", best_validation_likelihood
+                if validation_likelihood > best_validation_likelihood:
+                    result = Results(log_likelihood, self.num_segs, self.input_master_filename, self.last_params_filename, self.log_likelihood_filename, validation_likelihood)
+                    print "new result", result
+                    best_validation_likelihood = validation_likelihood
+
             round_index += 1
 
+        if not self.validate:
+            validation_likelihood = None
+            result = Results(log_likelihood, self.num_segs, self.input_master_filename, self.last_params_filename, self.log_likelihood_filename, validation_likelihood)
+
         # log_likelihood, num_segs and a list of src_filenames to save
-        return Results(log_likelihood, self.num_segs,
-                       self.input_master_filename, self.last_params_filename,
-                       self.log_likelihood_filename)
+        return result
 
     def save_train_options(self):
         filename = self.make_filename(TRAIN_FILEBASENAME)
@@ -2575,7 +2626,7 @@ class Runner(object):
             input_master_filename = None
 
         return [input_master_filename, self.params_filename,
-                self.log_likelihood_filename]
+                self.log_likelihood_filename, self.validation_likelihood_filename]
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
@@ -2589,6 +2640,7 @@ class Runner(object):
         elif not self.dry_run:
             # only one instance
             assert len(instance_params) == 1
+            print "instance_params", instance_params
             last_params_filename = instance_params[0].params_filename
             copy2(last_params_filename, self.params_filename)
 
@@ -2711,12 +2763,16 @@ to find the winning instance anyway.""" % thread.instance_index)
             return
 
         # finds the min by info_criterion (maximize log_likelihood)
-        max_params = max(instance_params)
+        if self.validate:
+            max_params = max(instance_params, key=lambda k: k.validation_likelihood)
+            print "max_params", max_params
+        else:
+            max_params = max(instance_params)
 
         self.num_segs = max_params.num_segs
         self.set_triangulation_filename()
 
-        src_filenames = max_params[OFFSET_FILENAMES:]
+        src_filenames = max_params[OFFSET_FILENAMES:-1] # validation_likelihood is not a filename
 
         if None in src_filenames:
             raise ValueError("all training instances failed")
@@ -2725,6 +2781,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
         for name, src_filename, dst_filename in zipper:
+            print name
+            print src_filename
+            print dst_filename
             self.copy_results(name, src_filename, dst_filename)
 
     def recover_filename(self, resource):
@@ -2805,12 +2864,14 @@ to find the winning instance anyway.""" % thread.instance_index)
         last_log_likelihood = -inf
         log_likelihood = -inf
         final_round_index = 0
+        validation_likelihood = -inf
+        best_validation_likelihood = -inf
 
         if self.recover_dirpath:
             return self.recover_train_instance(last_log_likelihood,
                                                log_likelihood)
 
-        return last_log_likelihood, log_likelihood, final_round_index
+        return last_log_likelihood, log_likelihood, final_round_index, validation_likelihood, best_validation_likelihood
 
     def recover_viterbi_window(self, window_index):
         """

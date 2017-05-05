@@ -58,6 +58,7 @@ DISTRIBUTION_ASINH_NORMAL = "asinh_norm"
 PREFIX_INPUT = "input"
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_PARAMS = "params"
+PREFIX_VALIDATION = "validation"
 
 SUBDIRNAME_LOG = "log"
 SUBDIRNAME_PARAMS = "params"

@@ -27,9 +27,9 @@ fi
 set -x
 
 # seed from python -c "import random; print random.randrange(2**32)"
-SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=2 \
+SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=10 \
     "$cluster_arg" \
-    --split-sequences=131010 \
+    --split-sequences=35010 \
     --validation-fraction=0.10 \
     train ../test.genomedata traindir
 
