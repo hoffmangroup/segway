@@ -59,6 +59,7 @@ PREFIX_INPUT = "input"
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_PARAMS = "params"
 PREFIX_VALIDATION = "validation"
+PREFIX_VALIDATION_FULL = "validation.full"
 
 SUBDIRNAME_LOG = "log"
 SUBDIRNAME_PARAMS = "params"
