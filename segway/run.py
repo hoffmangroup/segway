@@ -3110,9 +3110,6 @@ to find the winning instance anyway.""" % thread.instance_index)
     def is_in_reversed_world(self, window_index):
         return self.windows[window_index].world in self.reverse_worlds
 
-    def is_validation_window_in_reversed_world(self, window_index):
-        return self.validation_windows[window_index].world in self.reverse_worlds
-
     def setup_identify_posterior(self):
         self.instance_index = "identify"
 
