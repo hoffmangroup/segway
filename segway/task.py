@@ -48,8 +48,7 @@ DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 
 GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
-GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: \
-    log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
 
 
 def make_track_indexes(text):
