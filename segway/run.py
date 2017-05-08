@@ -56,14 +56,31 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     make_prefix_fmt, MB, memoized_property,
                     OFFSET_START, OFFSET_END, OFFSET_STEP,
                     OptionBuilder_GMTK, POSTERIOR_PROG,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, PREFIX_VALIDATION,
-                    PREFIX_VALIDATION_FULL, SEG_TABLE_WIDTH,
+                    PREFIX_LIKELIHOOD, PREFIX_PARAMS,
+                    PREFIX_VALIDATION_OUTPUT,
+                    PREFIX_VALIDATION_WEIGHTEDSUM,
+                    PREFIX_VALIDATION_OUTPUT_WINNER,
+                    PREFIX_VALIDATION_WEIGHTEDSUM_WINNER,
+                    SEG_TABLE_WIDTH,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
                     VALIDATE_PROG, VITERBI_PROG)
 from .version import __version__
+
+# set once per file run
+UUID = uuid1().hex
+
+# XXX: I should really get some sort of Enum for this, I think Peter
+# Norvig has one
+DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
+                 DISTRIBUTION_ASINH_NORMAL]
+DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
+
+MIN_NUM_SEGS = 2
+NUM_SEGS = MIN_NUM_SEGS
+NUM_SUBSEGS = 1
 
 # set once per file run
 UUID = uuid1().hex
@@ -261,7 +278,8 @@ RES_DONT_TRAIN = "dont_train.list"
 RES_SEG_TABLE = "seg_table.tab"
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
-                   "log_likelihood_filename", "validation_likelihood_filename"]
+                   "log_likelihood_filename", "validation_output_filename",
+                   "validation_weightedsum_filename"]
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 COMMENT_POSTERIOR_TRIANGULATION = \
@@ -282,12 +300,13 @@ THREAD_START_SLEEP_TIME = 62  # XXX: this should become an option
 REVERSE_GPR = "^0:-1:0"
 
 Results = namedtuple("Results", ["log_likelihood", "num_segs",
+                                 "validation_likelihood",
                                  "input_master_filename", "params_filename",
                                  "log_likelihood_filename",
-                                 "validation_likelihood_filename",
-                                 "validation_likelihood"])
+                                 "validation_output_filename",
+                                 "validation_weightedsum_filename"])
 
-OFFSET_FILENAMES = 2  # where the filenames begin in Results
+OFFSET_FILENAMES = 3  # where the filenames begin in Results
 # where the validation likelihood begins in Results
 OFFSET_VALIDATION_LIKELIHOOD = -1
 
@@ -609,9 +628,14 @@ class Runner(object):
         self.work_dirname = None
         self.log_likelihood_filename = None
         self.log_likelihood_tab_filename = None
-        self.validation_likelihood_filename = None
-        self.validation_likelihood_tab_filename = None
-        self.full_validation_output_tab_filename = None
+
+        self.validation_output_filename = None
+        self.validation_output_winner_filename = None
+        self.validation_output_tab_filename = None
+
+        self.validation_weightedsum_filename = None
+        self.validation_weightedsum_winner_filename = None
+        self.validation_weightedsum_tab_filename = None
 
         self.obs_dirname = None
         self.validation_obs_dirname = None
@@ -1399,7 +1423,7 @@ class Runner(object):
         return log_likelihood
 
     def load_validation_likelihood(self):
-        with open(self.validation_likelihood_filename) as infile:
+        with open(self.validation_output_filename) as infile:
             validation_output = [
                 tuple(map(float, line.split(','))) for line in infile
                 ]
@@ -1431,13 +1455,16 @@ class Runner(object):
         validation_likelihood = \
             weighted_validation_likelihood_sum / total_bases
 
+        with open(self.validation_weightedsum_filename, "w") as logfile:
+            print >>logfile, str(validation_likelihood)
+
         # log full set of validation likelihoods for this round
         # before combining into weighted sum
-        with open(self.full_validation_output_tab_filename, "a") as logfile:
+        with open(self.validation_output_tab_filename, "a") as logfile:
             print >>logfile, full_validation_output
 
         # log final weighted validation likelihood for this round
-        with open(self.validation_likelihood_tab_filename, "a") as logfile:
+        with open(self.validation_weightedsum_tab_filename, "a") as logfile:
             print >>logfile, str(validation_likelihood)
 
         return validation_likelihood
@@ -1585,14 +1612,14 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
-    def make_validation_likelihood_tab_filename(self, instance_index, dirname):
-        return self.make_filename(PREFIX_VALIDATION, instance_index, EXT_TAB,
+    def make_validation_weightedsum_tab_filename(self, instance_index, dirname):
+        return self.make_filename(PREFIX_VALIDATION_WEIGHTEDSUM, instance_index, EXT_TAB,
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
-    def make_full_validation_output_tab_filename(self, instance_index,
+    def make_validation_output_tab_filename(self, instance_index,
                                                  dirname):
-        return self.make_filename(PREFIX_VALIDATION_FULL, instance_index,
+        return self.make_filename(PREFIX_VALIDATION_OUTPUT, instance_index,
                                   EXT_TAB, dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
@@ -1617,22 +1644,49 @@ class Runner(object):
         """
         None means the final params file, not for any particular thread
         """
-        if new or not self.validation_likelihood_filename:
-            validation_likelihood_filename = \
-                self.make_filename(PREFIX_VALIDATION, instance_index,
-                                   EXT_LIKELIHOOD,
+        if new or not self.validation_output_filename:
+            # create validation output files
+            validation_output_filename = \
+                self.make_filename(PREFIX_VALIDATION_OUTPUT,
+                                   instance_index, EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
 
-            self.validation_likelihood_filename = \
-                validation_likelihood_filename
 
-            self.validation_likelihood_tab_filename = \
-                self.make_validation_likelihood_tab_filename(instance_index,
-                                                             self.work_dirname)
+            self.validation_output_filename = \
+                validation_output_filename
 
-            self.full_validation_output_tab_filename = \
-                self.make_full_validation_output_tab_filename(
+            validation_output_winner_filename = \
+                self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
+                                   instance_index, EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.validation_output_winner_filename = \
+                validation_output_winner_filename
+
+            self.validation_output_tab_filename = \
+                self.make_validation_output_tab_filename(
                     instance_index, self.work_dirname)
+
+            # create validation weightedsum files
+            validation_weightedsum_filename = \
+                self.make_filename(PREFIX_VALIDATION_WEIGHTEDSUM,
+                                   instance_index, EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.validation_weightedsum_filename = \
+                validation_weightedsum_filename
+
+            validation_weightedsum_winner_filename = \
+                self.make_filename(PREFIX_VALIDATION_WEIGHTEDSUM_WINNER,
+                                   instance_index, EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.validation_weightedsum_winner_filename = \
+                validation_weightedsum_winner_filename
+
+            self.validation_weightedsum_tab_filename = \
+                self.make_validation_weightedsum_tab_filename(instance_index,
+                                                             self.work_dirname)
 
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
@@ -2358,7 +2412,7 @@ class Runner(object):
         prefix_args = [segway_task_path,
                        segway_task_verb,
                        task_kind,
-                       self.validation_likelihood_filename,
+                       self.validation_output_filename,
                        chrom, window_start, window_end,
                        self.resolution,
                        is_reverse,  # end requirements for base segway-task
@@ -2594,24 +2648,32 @@ class Runner(object):
             if self.validate:
                 validation_likelihood = self.load_validation_likelihood()
 
+                copy2(self.validation_output_filename,
+                      self.validation_output_winner_filename)
+
+                copy2(self.validation_weightedsum_filename,
+                      self.validation_weightedsum_winner_filename)
+
                 if validation_likelihood > best_validation_likelihood:
                     result = Results(log_likelihood, self.num_segs,
+                                     validation_likelihood,
                                      self.input_master_filename,
                                      self.last_params_filename,
                                      self.log_likelihood_filename,
-                                     self.validation_likelihood_filename,
-                                     validation_likelihood)
+                                     self.validation_output_winner_filename,
+                                     self.validation_weightedsum_winner_filename)
                     best_validation_likelihood = validation_likelihood
 
             round_index += 1
 
         if not self.validate:
             result = Results(log_likelihood, self.num_segs,
+                             validation_likelihood,
                              self.input_master_filename,
                              self.last_params_filename,
                              self.log_likelihood_filename,
-                             self.validation_likelihood_filename,
-                             validation_likelihood)
+                             self.validation_output_filename,
+                             self.validation_weightedsum_filename)
 
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
@@ -2685,7 +2747,8 @@ class Runner(object):
 
         return [input_master_filename, self.params_filename,
                 self.log_likelihood_filename,
-                self.validation_likelihood_filename]
+                self.validation_output_filename,
+                self.validation_weightedsum_filename]
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
@@ -2831,8 +2894,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         self.num_segs = max_params.num_segs
         self.set_triangulation_filename()
 
-        src_filenames = max_params[OFFSET_FILENAMES:
-                                   OFFSET_VALIDATION_LIKELIHOOD]
+        src_filenames = max_params[OFFSET_FILENAMES:]
 
         if None in src_filenames:
             raise ValueError("all training instances failed")
@@ -2841,6 +2903,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
         for name, src_filename, dst_filename in zipper:
+            print src_filename
+            print dst_filename
             self.copy_results(name, src_filename, dst_filename)
 
     def recover_filename(self, resource):

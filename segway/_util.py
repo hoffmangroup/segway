@@ -58,8 +58,11 @@ DISTRIBUTION_ASINH_NORMAL = "asinh_norm"
 PREFIX_INPUT = "input"
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_PARAMS = "params"
-PREFIX_VALIDATION = "validation"
-PREFIX_VALIDATION_FULL = "validation.full"
+
+PREFIX_VALIDATION_WEIGHTEDSUM_WINNER = "validation.weightedsum.winner"
+PREFIX_VALIDATION_WEIGHTEDSUM = "validation.weightedsum"
+PREFIX_VALIDATION_OUTPUT_WINNER = "validation.output.winner"
+PREFIX_VALIDATION_OUTPUT = "validation.output"
 
 SUBDIRNAME_LOG = "log"
 SUBDIRNAME_PARAMS = "params"
