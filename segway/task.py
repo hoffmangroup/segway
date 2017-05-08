@@ -48,7 +48,9 @@ DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 
 GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
-GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: \
+    log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
@@ -519,10 +521,11 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
                 if err.errno == ENOENT:
                     pass
 
+
 def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
-              genomedata_names, float_filename, int_filename, distribution,
-              track_indexes,
-              *args):
+                                 genomedata_names, float_filename,
+                                 int_filename, distribution,
+                                 track_indexes, *args):
 
     (chrom, start, end) = coord
 
@@ -546,7 +549,8 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
                                              chrom, start, end)
 
     _save_window(float_filename, int_filename, continuous_cells,
-        resolution, distribution)
+                 resolution, distribution)
+
 
 def run_validate(coord, resolution, do_reverse, outfilename, *args):
     try:
@@ -560,11 +564,15 @@ def run_validate(coord, resolution, do_reverse, outfilename, *args):
         for line in validation_output_list[:-1]:
             validation_likelihood = re.search(GMTKJT_OUTPUT_PATTERN, line)
             validation_window_indices.append(validation_likelihood.group(1))
-            validation_window_likelihoods.append(validation_likelihood.group(2))
+            validation_window_likelihoods.append(
+                validation_likelihood.group(2))
 
         with open(outfilename, "w") as outfile:
-            for validation_window_index,validation_window_likelihood in zip(validation_window_indices, validation_window_likelihoods):
-                outfile.write("%s, %s\n" % (validation_window_index, validation_window_likelihood))
+            for validation_window_index, validation_window_likelihood \
+                    in zip(validation_window_indices,
+                           validation_window_likelihoods):
+                outfile.write("%s, %s\n" % (validation_window_index,
+                                            validation_window_likelihood))
     except:
         raise
 
