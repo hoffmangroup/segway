@@ -294,8 +294,6 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "validation_weightedsum_filename"])
 
 OFFSET_FILENAMES = 3  # where the filenames begin in Results
-# where the validation likelihood begins in Results
-OFFSET_VALIDATION_LIKELIHOOD = -1
 
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 
@@ -1446,11 +1444,10 @@ class Runner(object):
             print >>logfile, str(validation_likelihood)
 
         # log full set of validation likelihoods for this round
-        # before combining into weighted sum
         with open(self.validation_output_tab_filename, "a") as logfile:
             print >>logfile, full_validation_output
 
-        # log final weighted validation likelihood for this round
+        # log final weighted sum of validation likelihoods for this round
         with open(self.validation_weightedsum_tab_filename, "a") as logfile:
             print >>logfile, str(validation_likelihood)
 
@@ -1599,8 +1596,10 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
-    def make_validation_weightedsum_tab_filename(self, instance_index, dirname):
-        return self.make_filename(PREFIX_VALIDATION_WEIGHTEDSUM, instance_index, EXT_TAB,
+    def make_validation_weightedsum_tab_filename(self, instance_index,
+                                                 dirname):
+        return self.make_filename(PREFIX_VALIDATION_WEIGHTEDSUM,
+                                  instance_index, EXT_TAB,
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
@@ -1637,7 +1636,6 @@ class Runner(object):
                 self.make_filename(PREFIX_VALIDATION_OUTPUT,
                                    instance_index, EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
-
 
             self.validation_output_filename = \
                 validation_output_filename
