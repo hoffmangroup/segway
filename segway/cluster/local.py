@@ -44,8 +44,8 @@ class Job(object):
         cmd = [job_tmpl.remoteCommand] + job_tmpl.args
         self.proc = Popen(cmd,
                           env=job_tmpl.jobEnvironment,
-                          #stdout=self.outfile,
-                          #stderr=self.errfile,
+                          stdout=self.outfile,
+                          stderr=self.errfile,
                           cwd=job_tmpl.workingDirectory)
 
     def poll(self):

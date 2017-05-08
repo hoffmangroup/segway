@@ -2888,8 +2888,6 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
         for name, src_filename, dst_filename in zipper:
-            print src_filename
-            print dst_filename
             self.copy_results(name, src_filename, dst_filename)
 
     def recover_filename(self, resource):
