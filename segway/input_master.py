@@ -482,7 +482,7 @@ class DirichletTabParamSpec(TableParamSpec):
 
     def generate_objects(self):
         # XXX: these called functions have confusing/duplicative names
-        if (self.len_seg_strength > 0):
+        if self.len_seg_strength > 0:
             dirichlet_table = self.make_dirichlet_table()
             yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
                                    dirichlet_table)

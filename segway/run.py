@@ -710,7 +710,7 @@ class Runner(object):
                         ("ruler_scale",),
                         ("resolution",),
                         ("var_floor",),
-                        ("mixture_components","num_mix_components",),
+                        ("mixture_components", "num_mix_components",),
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
                         ("output_label", "output_label"),
@@ -3098,7 +3098,7 @@ def parse_options(argv):
                        " (0-based)")
 
     group.add_argument("--var-floor", type=float, default=None,
-                         help="Controls the variance floor, meaning that if any "
+                         help="Sets the variance floor, meaning that if any "
                          "of the variances of a track falls below "
                          'this value, then the variance is "floored" (prohibited '
                          "from falling below the floor value). If not using a "
