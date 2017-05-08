@@ -20,7 +20,6 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, invert, isnan, maximum, zeros)
-from numpy.random import shuffle
 from path import path
 from tabdelim import ListWriter
 
@@ -348,7 +347,7 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     # Get supervision regions that overlap with the start and end coords
     supercontig_coords_labels = \
         intersect_regions(start, end, supervision_coords,
-                              supervision_labels)
+                          supervision_labels)
 
     for label_start, label_end, label_index in supercontig_coords_labels:
         # adjust so that zero means no label
@@ -463,9 +462,12 @@ def process_new_windows(new_windows, starts, ends):
 class Observations(object):
     copy_attrs = ["include_coords", "exclude_coords", "max_frames",
                   "float_filelistpath", "int_filelistpath",
-                  "validation_float_filelistpath", "validation_int_filelistpath",
-                  "float_tabfilepath", "validation_obs_dirpath", "obs_dirpath", "uuid", "resolution",
-                  "distribution", "train", "identify", "random_state", "supervision_type",
+                  "validation_float_filelistpath",
+                  "validation_int_filelistpath",
+                  "float_tabfilepath", "validation_obs_dirpath",
+                  "obs_dirpath", "uuid", "resolution",
+                  "distribution", "train", "identify", "random_state",
+                  "supervision_type",
                   "supervision_coords", "supervision_labels",
                   "use_dinucleotide", "world_track_indexes",
                   "world_genomedata_names", "clobber",
@@ -654,7 +656,6 @@ class Observations(object):
             self.float_filepaths.append(float_filepath)
             self.int_filepaths.append(int_filepath)
 
-
     def create_validation_filepaths(self, temp=False):
         """ Creates a list of observations full filepaths for each window.
         temp is a flag to determine whether or not the filepaths will be
@@ -693,7 +694,6 @@ class Observations(object):
                    str(end)]
             float_tabwriter.writerow(row)
             print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
-
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
