@@ -557,28 +557,28 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
 def run_validate(coord, resolution, do_reverse, outfilename, *args):
     if do_reverse:
         raise NotImplementedError
-    try:
-        # is there a less sketchy way to do this?
-        validation_output = VALIDATE_PROG.getoutput(*args)
-        validation_output_list = filter(None, validation_output.splitlines())
 
-        validation_window_indices = []
-        validation_window_likelihoods = []
+    # is there a less sketchy way to do this?
+    validation_output = VALIDATE_PROG.getoutput(*args)
+    validation_output_list = filter(None, validation_output.splitlines())
 
-        for line in validation_output_list[:-1]:
-            validation_likelihood = re.search(GMTKJT_OUTPUT_PATTERN, line)
-            validation_window_indices.append(validation_likelihood.group(1))
-            validation_window_likelihoods.append(
-                validation_likelihood.group(2))
+    validation_window_indices = []
+    validation_window_likelihoods = []
 
-        with open(outfilename, "w") as outfile:
-            for validation_window_index, validation_window_likelihood \
-                    in zip(validation_window_indices,
-                           validation_window_likelihoods):
-                outfile.write("%s, %s\n" % (validation_window_index,
-                                            validation_window_likelihood))
-    except:
-        raise
+    for line in validation_output_list[:-1]:
+        # returns a regex group where first match is validation
+        # window index, second match is validation window likelihood
+        validation_likelihood = re.search(GMTKJT_OUTPUT_PATTERN, line)
+        validation_window_indices.append(validation_likelihood.group(1))
+        validation_window_likelihoods.append(
+            validation_likelihood.group(2))
+
+    with open(outfilename, "w") as outfile:
+        for validation_window_index, validation_window_likelihood \
+                in zip(validation_window_indices,
+                       validation_window_likelihoods):
+            outfile.write("%s, %s\n" % (validation_window_index,
+                                        validation_window_likelihood))
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,
