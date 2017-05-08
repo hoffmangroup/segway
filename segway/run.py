@@ -2352,7 +2352,10 @@ class Runner(object):
         with open(self.validation_float_filelistpath, "a") as float_filelist_fd:
             float_filelist_fd.write("%s\n" % float_filepath)
 
-        is_reverse = 0
+        if self.reverse_worlds:
+            raise NotImplementedError
+        else:
+            is_reverse = 0
 
         prefix_args = [segway_task_path,
                        segway_task_verb,
@@ -2366,7 +2369,7 @@ class Runner(object):
                        int_filepath,
                        self.distribution,
                        track_indexes_text,
-                       self.validation_windows,
+                       self.validation_windows
                        ]
 
         return self.queue_task(self.train_prog, kwargs, name, num_frames,
@@ -2392,7 +2395,11 @@ class Runner(object):
         window_end = 0
 
         task_kind = VALIDATE_TASK_KIND
-        is_reverse = 0  # ignore for now
+
+        if self.reverse_worlds:
+            raise NotImplementedError
+        else:
+            is_reverse = 0
 
         prefix_args = [segway_task_path,
                        segway_task_verb,
@@ -2400,11 +2407,12 @@ class Runner(object):
                        self.validation_output_filename,
                        chrom, window_start, window_end,
                        self.resolution,
-                       is_reverse,  # end requirements for base segway-task
+                       is_reverse  # end requirements for base segway-task
                        ]
 
         kwargs = dict(cppCommandOptions=cpp_options,
                       probE=True, cliqueTableNormalize=0.0, **kwargs)
+
         kwargs["of1"] = self.validation_float_filelistpath
         kwargs["of2"] = self.validation_int_filelistpath
         del kwargs["lldp"]
@@ -3101,6 +3109,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def is_in_reversed_world(self, window_index):
         return self.windows[window_index].world in self.reverse_worlds
+
+    def is_validation_window_in_reversed_world(self, window_index):
+        return self.validation_windows[window_index].world in self.reverse_worlds
 
     def setup_identify_posterior(self):
         self.instance_index = "identify"

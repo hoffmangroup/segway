@@ -526,6 +526,9 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
                                  int_filename, distribution,
                                  track_indexes, *args):
 
+    if do_reverse:
+        raise NotImplementedError
+
     (chrom, start, end) = coord
 
     genomedata_names = genomedata_names.split(",")
@@ -552,6 +555,8 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
 
 
 def run_validate(coord, resolution, do_reverse, outfilename, *args):
+    if do_reverse:
+        raise NotImplementedError
     try:
         # is there a less sketchy way to do this?
         validation_output = VALIDATE_PROG.getoutput(*args)
