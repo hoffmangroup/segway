@@ -295,6 +295,8 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
 
 OFFSET_FILENAMES = 3  # where the filenames begin in Results
 
+GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 
 
@@ -1409,23 +1411,34 @@ class Runner(object):
 
     def load_validation_likelihood(self):
         with open(self.validation_output_filename) as infile:
-            validation_output = [
-                tuple(map(float, line.split(','))) for line in infile
-                ]
+            validation_output = infile.readlines()
+
+        validation_window_indices = []
+        validation_window_likelihoods = []
+
+        for line in validation_output:
+            # returns a regex group where first match is validation
+            # window index, second match is validation window likelihood
+            validation_match_group = re.search(GMTKJT_OUTPUT_PATTERN, line)
+            if validation_match_group:
+                validation_window_indices.append(int(validation_match_group.group(1)))
+                validation_window_likelihoods.append(float(validation_match_group.group(2)))
+            else:
+                if "SUCCESSFUL" not in line:
+                    raise Exception("Validation not successful: " + line)
 
         weighted_validation_likelihood_sum = 0
         total_bases = 0
 
         full_validation_output = []
 
-        for validation_tuple in validation_output:
-            validation_window_index = int(validation_tuple[0])
+        for validation_window_index, validation_window_likelihood \
+                in zip(validation_window_indices,
+                       validation_window_likelihoods):
             validation_window = \
                 self.validation_windows[validation_window_index]
             validation_window_size = \
                 validation_window.end - validation_window.start
-
-            validation_window_likelihood = validation_tuple[1]
 
             weighted_validation_likelihood_sum += \
                 validation_window_size * validation_window_likelihood
@@ -2641,13 +2654,13 @@ class Runner(object):
             if self.validate:
                 validation_likelihood = self.load_validation_likelihood()
 
-                copy2(self.validation_output_filename,
-                      self.validation_output_winner_filename)
-
-                copy2(self.validation_weightedsum_filename,
-                      self.validation_weightedsum_winner_filename)
-
                 if validation_likelihood > best_validation_likelihood:
+                    copy2(self.validation_output_filename,
+                          self.validation_output_winner_filename)
+
+                    copy2(self.validation_weightedsum_filename,
+                          self.validation_weightedsum_winner_filename)
+
                     result = Results(log_likelihood, self.num_segs,
                                      validation_likelihood,
                                      self.input_master_filename,

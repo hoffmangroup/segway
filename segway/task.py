@@ -48,8 +48,6 @@ DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 
 GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
-GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
-
 
 def make_track_indexes(text):
     return array(map(int, text.split(",")))
@@ -558,27 +556,10 @@ def run_validate(coord, resolution, do_reverse, outfilename, *args):
     if do_reverse:
         raise NotImplementedError
 
-    # is there a less sketchy way to do this?
     validation_output = VALIDATE_PROG.getoutput(*args)
-    validation_output_list = filter(None, validation_output.splitlines())
-
-    validation_window_indices = []
-    validation_window_likelihoods = []
-
-    for line in validation_output_list[:-1]:
-        # returns a regex group where first match is validation
-        # window index, second match is validation window likelihood
-        validation_likelihood = re.search(GMTKJT_OUTPUT_PATTERN, line)
-        validation_window_indices.append(validation_likelihood.group(1))
-        validation_window_likelihoods.append(
-            validation_likelihood.group(2))
-
     with open(outfilename, "w") as outfile:
-        for validation_window_index, validation_window_likelihood \
-                in zip(validation_window_indices,
-                       validation_window_likelihoods):
-            outfile.write("%s, %s\n" % (validation_window_index,
-                                        validation_window_likelihood))
+        outfile.write(validation_output)
+
 
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,
