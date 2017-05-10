@@ -58,9 +58,9 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     OptionBuilder_GMTK, POSTERIOR_PROG,
                     PREFIX_LIKELIHOOD, PREFIX_PARAMS,
                     PREFIX_VALIDATION_OUTPUT,
-                    PREFIX_VALIDATION_WEIGHTEDSUM,
+                    PREFIX_VALIDATION_WEIGHTEDAVERAGE,
                     PREFIX_VALIDATION_OUTPUT_WINNER,
-                    PREFIX_VALIDATION_WEIGHTEDSUM_WINNER,
+                    PREFIX_VALIDATION_WEIGHTEDAVERAGE_WINNER,
                     SEG_TABLE_WIDTH,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
@@ -266,7 +266,7 @@ RES_SEG_TABLE = "seg_table.tab"
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename", "validation_output_filename",
-                   "validation_weightedsum_filename"]
+                   "validation_weightedaverage_filename"]
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 COMMENT_POSTERIOR_TRIANGULATION = \
@@ -291,7 +291,7 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "input_master_filename", "params_filename",
                                  "log_likelihood_filename",
                                  "validation_output_filename",
-                                 "validation_weightedsum_filename"])
+                                 "validation_weightedaverage_filename"])
 
 OFFSET_FILENAMES = 3  # where the filenames begin in Results
 
@@ -620,9 +620,9 @@ class Runner(object):
         self.validation_output_winner_filename = None
         self.validation_output_tab_filename = None
 
-        self.validation_weightedsum_filename = None
-        self.validation_weightedsum_winner_filename = None
-        self.validation_weightedsum_tab_filename = None
+        self.validation_weightedaverage_filename = None
+        self.validation_weightedaverage_winner_filename = None
+        self.validation_weightedaverage_tab_filename = None
 
         self.obs_dirname = None
         self.validation_obs_dirname = None
@@ -1453,7 +1453,7 @@ class Runner(object):
         validation_likelihood = \
             weighted_validation_likelihood_sum / total_bases
 
-        with open(self.validation_weightedsum_filename, "w") as logfile:
+        with open(self.validation_weightedaverage_filename, "w") as logfile:
             print >>logfile, str(validation_likelihood)
 
         # log full set of validation likelihoods for this round
@@ -1461,7 +1461,7 @@ class Runner(object):
             print >>logfile, full_validation_output
 
         # log final weighted sum of validation likelihoods for this round
-        with open(self.validation_weightedsum_tab_filename, "a") as logfile:
+        with open(self.validation_weightedaverage_tab_filename, "a") as logfile:
             print >>logfile, str(validation_likelihood)
 
         return validation_likelihood
@@ -1609,9 +1609,9 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
-    def make_validation_weightedsum_tab_filename(self, instance_index,
+    def make_validation_weightedaverage_tab_filename(self, instance_index,
                                                  dirname):
-        return self.make_filename(PREFIX_VALIDATION_WEIGHTEDSUM,
+        return self.make_filename(PREFIX_VALIDATION_WEIGHTEDAVERAGE,
                                   instance_index, EXT_TAB,
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
@@ -1665,25 +1665,25 @@ class Runner(object):
                 self.make_validation_output_tab_filename(
                     instance_index, self.work_dirname)
 
-            # create validation weightedsum files
-            validation_weightedsum_filename = \
-                self.make_filename(PREFIX_VALIDATION_WEIGHTEDSUM,
+            # create validation weightedaverage files
+            validation_weightedaverage_filename = \
+                self.make_filename(PREFIX_VALIDATION_WEIGHTEDAVERAGE,
                                    instance_index, EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
 
-            self.validation_weightedsum_filename = \
-                validation_weightedsum_filename
+            self.validation_weightedaverage_filename = \
+                validation_weightedaverage_filename
 
-            validation_weightedsum_winner_filename = \
-                self.make_filename(PREFIX_VALIDATION_WEIGHTEDSUM_WINNER,
+            validation_weightedaverage_winner_filename = \
+                self.make_filename(PREFIX_VALIDATION_WEIGHTEDAVERAGE_WINNER,
                                    instance_index, EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
 
-            self.validation_weightedsum_winner_filename = \
-                validation_weightedsum_winner_filename
+            self.validation_weightedaverage_winner_filename = \
+                validation_weightedaverage_winner_filename
 
-            self.validation_weightedsum_tab_filename = \
-                self.make_validation_weightedsum_tab_filename(instance_index,
+            self.validation_weightedaverage_tab_filename = \
+                self.make_validation_weightedaverage_tab_filename(instance_index,
                                                              self.work_dirname)
 
     def make_output_dirpath(self, dirname, instance_index):
@@ -2658,8 +2658,8 @@ class Runner(object):
                     copy2(self.validation_output_filename,
                           self.validation_output_winner_filename)
 
-                    copy2(self.validation_weightedsum_filename,
-                          self.validation_weightedsum_winner_filename)
+                    copy2(self.validation_weightedaverage_filename,
+                          self.validation_weightedaverage_winner_filename)
 
                     result = Results(log_likelihood, self.num_segs,
                                      validation_likelihood,
@@ -2667,7 +2667,7 @@ class Runner(object):
                                      self.last_params_filename,
                                      self.log_likelihood_filename,
                                      self.validation_output_winner_filename,
-                                     self.validation_weightedsum_winner_filename)
+                                     self.validation_weightedaverage_winner_filename)
                     best_validation_likelihood = validation_likelihood
 
             round_index += 1
@@ -2679,7 +2679,7 @@ class Runner(object):
                              self.last_params_filename,
                              self.log_likelihood_filename,
                              self.validation_output_filename,
-                             self.validation_weightedsum_filename)
+                             self.validation_weightedaverage_filename)
 
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
@@ -2754,7 +2754,7 @@ class Runner(object):
         return [input_master_filename, self.params_filename,
                 self.log_likelihood_filename,
                 self.validation_output_filename,
-                self.validation_weightedsum_filename]
+                self.validation_weightedaverage_filename]
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
