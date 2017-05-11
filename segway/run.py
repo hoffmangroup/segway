@@ -86,7 +86,7 @@ RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
-VALIDATION_FRAC_DEFAULT = 0.00
+VALIDATION_FRAC_DEFAULT = 0.0
 
 ISLAND = True
 
@@ -1981,7 +1981,7 @@ class Runner(object):
         # XXX: does this need to be done before save()?
         self.subset_metadata()
         observations.create_filepaths(temp=True)
-        observations.create_validation_filepaths(temp=False)
+        observations.create_validation_filepaths()
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths

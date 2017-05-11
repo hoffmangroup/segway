@@ -592,7 +592,9 @@ class Observations(object):
             cur_bases += (window.end - window.start)
         self.validation_windows = validation_windows
 
-        assert windows is not None, "Training set must be non-empty"
+        if not windows:
+            raise ValueError("Set of training windows is empty")
+
         # remaining windows can be passed into training now
         self.windows = windows
 
@@ -606,15 +608,11 @@ class Observations(object):
     def make_filepath(dirpath, prefix, suffix):
         return dirpath / (prefix + suffix)
 
-    def make_validation_filepaths(self, chrom, window_index, temp=False):
+    def make_validation_filepaths(self, chrom, window_index):
         prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_WINDOWS))
         prefix = prefix_feature_tmpl % window_index
 
-        if temp:
-            prefix = "".join([prefix, self.uuid, extsep])
-            dirpath = path(gettempdir())
-        else:
-            dirpath = self.validation_obs_dirpath
+        dirpath = self.validation_obs_dirpath
 
         make_filepath_custom = partial(self.make_filepath, dirpath, prefix)
 
@@ -656,15 +654,13 @@ class Observations(object):
             self.float_filepaths.append(float_filepath)
             self.int_filepaths.append(int_filepath)
 
-    def create_validation_filepaths(self, temp=False):
-        """ Creates a list of observations full filepaths for each window.
-        temp is a flag to determine whether or not the filepaths will be
-        given a temporary directory """
+    def create_validation_filepaths(self):
+        """ Creates a list of observations full filepaths for each 
+        validation window."""
 
         for window_index, window in enumerate(self.validation_windows):
             float_filepath, int_filepath = self.make_validation_filepaths(
-                                            window.chrom, window_index,
-                                            temp)
+                                            window.chrom, window_index)
             self.validation_float_filepaths.append(float_filepath)
             self.validation_int_filepaths.append(int_filepath)
 
