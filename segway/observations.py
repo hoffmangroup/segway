@@ -20,6 +20,7 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, invert, isnan, maximum, zeros)
+
 from path import path
 from tabdelim import ListWriter
 

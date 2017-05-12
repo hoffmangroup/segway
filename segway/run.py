@@ -79,6 +79,7 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
                  DISTRIBUTION_ASINH_NORMAL]
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
+NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT = 1
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -87,6 +88,7 @@ RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
+VAR_FLOOR_GMM_DEFAULT = 0.00001
 VALIDATION_FRAC_DEFAULT = 0.0
 
 ISLAND = True
@@ -258,7 +260,7 @@ TRAIN_OPTION_TYPES = \
          distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
          num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
-         reverse_worlds=[int])
+         reverse_worlds=[int], num_mix_components=int)
 
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
@@ -679,6 +681,8 @@ class Runner(object):
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
         self.supervision_label_range_size = 0
+        self.num_mix_components = NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT
+        self.var_floor = None
 
         # flags
         self.clobber = False
@@ -738,6 +742,8 @@ class Runner(object):
                         ("segtransition_weight_scale",),
                         ("ruler_scale",),
                         ("resolution",),
+                        ("var_floor",),
+                        ("mixture_components", "num_mix_components",),
                         ("num_labels", "num_segs"),
                         ("num_sublabels", "num_subsegs"),
                         ("output_label", "output_label"),
@@ -906,6 +912,9 @@ class Runner(object):
         if res.identify and res.verbosity > 0:
             warn("Running Segway in identify mode with non-zero verbosity"
                  " is currently not supported and may result in errors.")
+
+        if res.var_floor and res.var_floor < 0:
+            raise ValueError("The variance floor cannot be less than 0")
 
         # if validation fraction nonzero, set validate to True
         if res.validation_fraction != VALIDATION_FRAC_DEFAULT:
@@ -2646,6 +2655,17 @@ class Runner(object):
                       triFile=self.triangulation_filename,
                       **self.make_gmtk_kwargs())
 
+        # var floor was specified
+        if self.var_floor:
+            kwargs["varFloor"] = self.var_floor
+
+        # if using mixture models and variance floor not specified,
+        # use default variance floor value to ensure convergence
+        if ((self.num_mix_components != NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT)
+            and not self.var_floor):
+            self.var_floor = VAR_FLOOR_GMM_DEFAULT
+            kwargs["varFloor"] = self.var_floor
+
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
             return Results(None, None, None, None, None, None, None)
@@ -3110,7 +3130,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
                        genomedata_archives_text, float_filepath, int_filepath,
-                       self.distribution, track_indexes_text]
+                       self.distribution, track_indexes_text, self.num_mix_components]
+
         output_filename = None
 
         num_frames = self.window_lens[window_index]
@@ -3434,6 +3455,12 @@ def parse_options(argv):
                        help="use DIST distribution"
                        " (default %s)" % DISTRIBUTION_DEFAULT)
 
+    group.add_argument("--mixture-components", type=int,
+                         default=NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT,
+                         help="Number of Gaussian mixture "
+                         "components (default %d)" 
+                         % NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT)
+
     group.add_argument("--num-instances", type=int,
                        default=NUM_INSTANCES, metavar="NUM",
                        help="run NUM training instances, randomizing start"
@@ -3475,6 +3502,14 @@ def parse_options(argv):
                        default=[], metavar="WORLD",
                        help="reverse sequences in concatenated world WORLD"
                        " (0-based)")
+
+    group.add_argument("--var-floor", type=float, default=None,
+                         help="Sets the variance floor, meaning that if any "
+                         "of the variances of a track falls below "
+                         'this value, then the variance is "floored" (prohibited '
+                         "from falling below the floor value). If not using a "
+                         "mixture of Gaussians, default unused, else default %f"
+                         % VAR_FLOOR_GMM_DEFAULT)
 
     group = parser.add_argument_group("Technical variables")
     group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,

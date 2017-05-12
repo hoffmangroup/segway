@@ -47,27 +47,55 @@ segCountDown_seg_segTransition
 % means
 8 
 0 
-mean_seg0_subseg0_testtrack1A 1 0.0000000000e+00 
+mean_seg0_subseg0_testtrack1A_component0 1 0.0000000000e+00 
 1 
-mean_seg0_subseg0_testtrack2A 1 8.8135629892e-01 
+mean_seg0_subseg0_testtrack2A_component0 1 8.8135629892e-01 
 2 
-mean_seg1_subseg0_testtrack1A 1 8.8135629892e-01 
+mean_seg1_subseg0_testtrack1A_component0 1 8.8135629892e-01 
 3 
-mean_seg1_subseg0_testtrack2A 1 0.0000000000e+00 
+mean_seg1_subseg0_testtrack2A_component0 1 0.0000000000e+00 
 4 
-mean_seg2_subseg0_testtrack1A 1 0.0000000000e+00 
+mean_seg2_subseg0_testtrack1A_component0 1 0.0000000000e+00 
 5 
-mean_seg2_subseg0_testtrack2A 1 0.0000000000e+00 
+mean_seg2_subseg0_testtrack2A_component0 1 0.0000000000e+00 
 6 
-mean_seg3_subseg0_testtrack1A 1 8.8135629892e-01 
+mean_seg3_subseg0_testtrack1A_component0 1 8.8135629892e-01 
 7 
-mean_seg3_subseg0_testtrack2A 1 8.8135629892e-01 
+mean_seg3_subseg0_testtrack2A_component0 1 8.8135629892e-01 
 
 
 % diagonal covariance matrices
 2 
 0 
-covar_testtrack1A 1 1.7870930606e-05 
+covar_testtrack1A_component0 1 1.7870930606e-05 
 1 
-covar_testtrack2A 1 1.7870994270e-05 
+covar_testtrack2A_component0 1 1.7870994270e-05 
+
+
+% dense PMFs
+8 
+0 
+dpmf_seg0_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components 
+1.00000000000000000e+00 
+1 
+dpmf_seg0_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components 
+1.00000000000000000e+00 
+2 
+dpmf_seg1_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components 
+1.00000000000000000e+00 
+3 
+dpmf_seg1_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components 
+1.00000000000000000e+00 
+4 
+dpmf_seg2_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components 
+1.00000000000000000e+00 
+5 
+dpmf_seg2_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components 
+1.00000000000000000e+00 
+6 
+dpmf_seg3_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components 
+1.00000000000000000e+00 
+7 
+dpmf_seg3_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components 
+1.00000000000000000e+00 
 
