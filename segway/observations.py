@@ -580,7 +580,7 @@ class Observations(object):
                 for world in xrange(self.num_worlds):
                     windows.append(Window(world, chrom, start, end))
 
-        total_bases = sum((window.end - window.start) for window in windows)
+        total_bases = sum(len(window) for window in windows)
         cur_bases = 0
         validation_windows = []
         self.random_state.shuffle(windows)
@@ -589,7 +589,7 @@ class Observations(object):
         while ((float(cur_bases) / total_bases) < self.validation_fraction):
             window = windows.pop()
             validation_windows.append(window)
-            cur_bases += (window.end - window.start)
+            cur_bases += len(window)
         self.validation_windows = validation_windows
 
         if not windows:

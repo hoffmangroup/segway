@@ -47,6 +47,7 @@ from .input_master import InputMasterSaver
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
+from .task import MSG_SUCCESS
 from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     DISTRIBUTION_GAMMA, DISTRIBUTION_ASINH_NORMAL,
                     EXT_BED, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS,
@@ -296,6 +297,8 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
 OFFSET_FILENAMES = 3  # where the filenames begin in Results
 
 GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+GMTKJT_PATTERN_WINDOW_MATCH_INDEX = 1
+GMTKJT_PATTERN_LIKLIHOOD_MATCH_INDEX = 2
 
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 
@@ -1410,6 +1413,17 @@ class Runner(object):
         return log_likelihood
 
     def load_validation_likelihood(self):
+        """
+        Parses gmtkJT output to obtain each window's probability of evidence 
+        (prob(E)) and calculates the weighted average based on window size.
+        Writes parsed gmtkJT output to file tabulating historical prob(E)
+        of each window for each round as well as a file tabulating
+        weighted average prob(E) for each round.
+        Also updates likelihood file such that it contains the latest
+        weighted average prob(E).
+
+        Returns weighted average prob(E).
+        """
         with open(self.validation_output_filename) as infile:
             validation_output = infile.readlines()
 
@@ -1419,13 +1433,17 @@ class Runner(object):
         for line in validation_output:
             # returns a regex group where first match is validation
             # window index, second match is validation window likelihood
-            validation_match_group = re.search(GMTKJT_OUTPUT_PATTERN, line)
-            if validation_match_group:
-                validation_window_indices.append(int(validation_match_group.group(1)))
-                validation_window_likelihoods.append(float(validation_match_group.group(2)))
+            validation_match = re.search(GMTKJT_OUTPUT_PATTERN, line)
+            if validation_match:
+                validation_window_indices.append(int(
+                    validation_match.group(GMTKJT_PATTERN_WINDOW_MATCH_INDEX)
+                    ))
+                validation_window_likelihoods.append(float(
+                    validation_match.group(GMTKJT_PATTERN_LIKLIHOOD_MATCH_INDEX)
+                    ))
             else:
-                if "SUCCESSFUL" not in line:
-                    raise Exception("Validation not successful: " + line)
+                if MSG_SUCCESS not in line:
+                    raise RuntimeError("Validation not successful: " + line)
 
         weighted_validation_likelihood_sum = 0
         total_bases = 0
@@ -1437,24 +1455,23 @@ class Runner(object):
                        validation_window_likelihoods):
             validation_window = \
                 self.validation_windows[validation_window_index]
-            validation_window_size = \
-                validation_window.end - validation_window.start
+            validation_window_size = len(validation_window)
 
             weighted_validation_likelihood_sum += \
                 validation_window_size * validation_window_likelihood
             total_bases += validation_window_size
 
-            full_validation_output.append(tuple((
+            full_validation_output.append((
                 validation_window_index,
                 validation_window_size,
                 validation_window_likelihood
-                )))
+                ))
 
         validation_likelihood = \
             weighted_validation_likelihood_sum / total_bases
 
         with open(self.validation_weightedaverage_filename, "w") as logfile:
-            print >>logfile, str(validation_likelihood)
+            logfile.write(str(validation_likelihood))
 
         # log full set of validation likelihoods for this round
         with open(self.validation_output_tab_filename, "a") as logfile:
@@ -1462,7 +1479,7 @@ class Runner(object):
 
         # log final weighted sum of validation likelihoods for this round
         with open(self.validation_weightedaverage_tab_filename, "a") as logfile:
-            print >>logfile, str(validation_likelihood)
+            logfile.write(str(validation_likelihood))
 
         return validation_likelihood
 
@@ -3348,15 +3365,21 @@ def parse_options(argv):
                        help="Use a random fraction FRAC positions for each EM"
                        " iteration. Removes the likelihood stopping criterion,"
                        " so training always runs to the number of rounds"
-                       " specified by --max-train-rounds")
+                       " specified by --max-train-rounds."
+                       " If --minibatch-fraction is used without specifying a"
+                       " validation fraction, the validation fraction will"
+                       " default to be the same as the minibatch fraction.")
 
     group.add_argument("--validation-fraction", type=float, metavar="FRAC",
                        default=VALIDATION_FRAC_DEFAULT,
-                       help="Use a random holdout set of size FRAC positions"
+                       help="Use a random held out set of size FRAC positions"
                        " to validate the parameters learned by each training"
                        " round. The instance/round with the best likelihood"
                        " as validated by the holdout set will be chosen as"
-                       " as the winner after the specified --max-train-rounds")
+                       " as the winner after the specified --max-train-rounds."
+                       " If --minibatch-fraction is used without specifying a"
+                       " validation fraction, the validation fraction will"
+                       " default to be the same as the minibatch fraction.")
 
     group = parser.add_argument_group("Model files")
     group.add_argument("-i", "--input-master", metavar="FILE",
