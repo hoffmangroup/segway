@@ -4,11 +4,11 @@
 Number of cliques = 2
 == Clique number: 0, root/right-interface clique, root/right-interface clique
 Clique information: 9 packed bits, 1 unsigned words (0 splits), weight = 1.982271, jt_weight = 1.000000
-12 Nodes: (testtrack1\(0\),?|segCountDown\(0\)\[2\],?|seg\(0\)\[2\],?|subseg\(0\)\[2\],?|presence__testtrack1\(0\)\[2\],?|presence__testtrack2\(0\)\[2\],?|testtrack2\(0\),?|ruler\(1\)\[2\],?|segCountDown\(1\)\[2\],?|segTransition\(1\)\[3\],?|seg\(1\)\[2\],?|subseg\(1\)\[2\],?){12}
-12 Assigned: (testtrack1\(0\),?|segCountDown\(0\),?|seg\(0\),?|subseg\(0\),?|presence__testtrack1\(0\),?|presence__testtrack2\(0\),?|testtrack2\(0\),?|ruler\(1\),?|segCountDown\(1\),?|segTransition\(1\),?|seg\(1\),?|subseg\(1\),?){12}
+12 Nodes: (%(testtrack1\(0\),?|segCountDown\(0\)\[2\],?|seg\(0\)\[2\],?|subseg\(0\)\[2\],?|presence__testtrack1\(0\)\[2\],?|presence__testtrack2\(0\)\[2\],?|testtrack2\(0\),?|ruler\(1\)\[2\],?|segCountDown\(1\)\[2\],?|segTransition\(1\)\[3\],?|seg\(1\)\[2\],?|subseg\(1\)\[2\],?){12}%)
+12 Assigned: (%(testtrack1\(0\),?|segCountDown\(0\),?|seg\(0\),?|subseg\(0\),?|presence__testtrack1\(0\),?|presence__testtrack2\(0\),?|testtrack2\(0\),?|ruler\(1\),?|segCountDown\(1\),?|segTransition\(1\),?|seg\(1\),?|subseg\(1\),?){12}%)
 10 Assigned Sorted: presence__testtrack1(0)[2],testtrack1(0),presence__testtrack2(0)[2],testtrack2(0),segCountDown(0)[2],ruler(1)[2],segTransition(1)[3],seg(1)[2],segCountDown(1)[2],subseg(1)[2]
 10 Dispositions: 0 0 0 0 0 0 0 0 0 0
-10 Assigned Prob: (testtrack1\(0\),?|segCountDown\(0\),?|subseg\(0\),?|presence__testtrack1\(0\),?|presence__testtrack2\(0\),?|testtrack2\(0\),?|ruler\(1\),?|segCountDown\(1\),?|segTransition\(1\),?|seg\(1\),?|subseg\(1\),?){11}
+10 Assigned Prob: (%(testtrack1\(0\),?|segCountDown\(0\),?|subseg\(0\),?|presence__testtrack1\(0\),?|presence__testtrack2\(0\),?|testtrack2\(0\),?|ruler\(1\),?|segCountDown\(1\),?|segTransition\(1\),?|seg\(1\),?|subseg\(1\),?){11}%)
 2 Cum Assigned Prob: seg(0),subseg(0)
 2 Union Incomming Seps: seg(0),subseg(0)
 0 Unassigned Iterated: 
@@ -59,7 +59,7 @@ Clique information: 9 packed bits, 1 unsigned words (0 splits), weight = 2.28330
 10 Assigned Sorted: presence__testtrack1(1)[2],testtrack1(1),presence__testtrack2(1)[2],testtrack2(1),frameIndex(1)[2000000],ruler(2)[2],segTransition(2)[3],seg(2)[2],segCountDown(2)[2],subseg(2)[2]
 10 Dispositions: 0 0 0 0 0 0 0 0 0 0
 10 Assigned Prob: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),ruler(2),segCountDown(2),segTransition(2),seg(2),subseg(2)
-12 Cum Assigned Prob: (testtrack1\(0\),?|segCountDown\(0\),?|seg\(0\),?|subseg\(0\),?|presence__testtrack1\(0\),?|presence__testtrack2\(0\),?|testtrack2\(0\),?|ruler\(1\),?|segCountDown\(1\),?|segTransition\(1\),?|seg\(1\),?|subseg\(1\),?){12}
+12 Cum Assigned Prob: (%(testtrack1\(0\),?|segCountDown\(0\),?|seg\(0\),?|subseg\(0\),?|presence__testtrack1\(0\),?|presence__testtrack2\(0\),?|testtrack2\(0\),?|ruler\(1\),?|segCountDown\(1\),?|segTransition\(1\),?|seg\(1\),?|subseg\(1\),?){12}%)
 3 Union Incomming Seps: (%(seg\(1\),)?%)segCountDown(1),(%(seg\(1\),)?%)subseg(1)
 0 Unassigned Iterated: 
 2 Cumulative Unassigned: seg(1),subseg(1)
@@ -116,7 +116,7 @@ Clique information: 2 packed bits, 1 unsigned words (0 splits), weight = 0.60206
 0 Assigned Sorted: 
 0 Dispositions:
 0 Assigned Prob: 
-27 Cum Assigned Prob: (testtrack1\([0-2]\),?|segCountDown\([0-2]\),?|seg\([0-2]\),?|subseg\([0-2]\),?|presence__testtrack1\([0-2]\),?|presence__testtrack2\([0-2]\),?|testtrack2\([0-2]\),?|frameIndex\([1-2]\),?|ruler\([1-2]\),?|segTransition\([1-2]\),?){27}
+27 Cum Assigned Prob: (%(testtrack1\([0-2]\),?|segCountDown\([0-2]\),?|seg\([0-2]\),?|subseg\([0-2]\),?|presence__testtrack1\([0-2]\),?|presence__testtrack2\([0-2]\),?|testtrack2\([0-2]\),?|frameIndex\([1-2]\),?|ruler\([1-2]\),?|segTransition\([1-2]\),?){27}%)
 2 Union Incomming Seps: seg(2),subseg(2)
 0 Unassigned Iterated: 
 0 Cumulative Unassigned: 
@@ -133,7 +133,7 @@ Send Sep: -1
   5 Assigned Sorted: presence__testtrack1(2)[2],testtrack1(2),presence__testtrack2(2)[2],testtrack2(2),frameIndex(2)[2000000]
   5 Dispositions: 0 0 0 0 0
   5 Assigned Prob: frameIndex(2),presence__testtrack1(2),testtrack1(2),presence__testtrack2(2),testtrack2(2)
-  22 Cum Assigned Prob: (testtrack1\([0-1]\),?|segCountDown\([0-2]\),?|seg\([0-2]\),?|subseg\([0-2]\),?|presence__testtrack1\([0-1]\),?|presence__testtrack2\([0-1]\),?|testtrack2\([0-1]\),?|frameIndex\(1\),?|ruler\([1-2]\),?|segTransition\([1-2]\),?){22}
+  22 Cum Assigned Prob: (%(testtrack1\([0-1]\),?|segCountDown\([0-2]\),?|seg\([0-2]\),?|subseg\([0-2]\),?|presence__testtrack1\([0-1]\),?|presence__testtrack2\([0-1]\),?|testtrack2\([0-1]\),?|frameIndex\(1\),?|ruler\([1-2]\),?|segTransition\([1-2]\),?){22}%)
   3 Union Incomming Seps: segCountDown(2),seg(2),subseg(2)
   0 Unassigned Iterated: 
   0 Cumulative Unassigned: 
