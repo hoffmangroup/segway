@@ -162,7 +162,7 @@ as those containing many repetitive sequences, which can cause
 artifacts in the training process. The :option:`--exclude-coords`\=\
 *file* and :option:`--include-coords`\=\ *file* options specify BED
 files with regions that should be excluded or included respectively.
-If both are specified, then inclusions are prcoessed first and the
+If both are specified, then inclusions are processed first and the
 exclusions are then taken out of the included regions.
 
 .. note::
