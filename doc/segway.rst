@@ -274,6 +274,21 @@ training results can be quite dependent on the initial parameters
 selected, so it is a good idea to try more than one. I usually use
 `--num-instances=10``.
 
+Using :option:`--mixture-components` will set the number of Gaussian
+mixture components to use in the model (default 1).
+
+Using :option:`--var-floor` will set the variance floor for the model,
+meaning that if any of the variances of a track falls below this value,
+then the variance will be floored (prohibited from falling below
+the floor value). This is by default turned off if not using a mixture of
+Gaussians; if using a mixture of Gaussians, then it has a default value of
+0.000010.
+
+.. warning::
+
+  You should know the scale of your data and set an appropriate variance
+  floor if the scale is very small.
+
 You may substitute your own ``input.master`` files but I recommend
 starting with a Segway-generated template. This will help avoid some
 common pitfalls. In particular, if you are going to perform training
