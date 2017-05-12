@@ -179,11 +179,11 @@ exclusions are then taken out of the included regions.
 
 For example, the ENCODE Data Coordination Center at University of
 California Santa Cruz keeps the coordinates of the ENCODE pilot
-regions in this format at
-<http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/referenceSequences/encodePilotRegions.hg19.bed>
-(GRCh37/hg19) and
-<http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/encodeRegions.txt.gz>
-(NCBI36/hg18). For human whole-genome studies, these regions have nice
+regions in this format for 
+`(GRCh37/hg19) http://hgdownload.cse.ucsc.edu/goldenPath/hg19/encodeDCC/referenceSequences/encodePilotRegions.hg19.bed`_
+ and
+`(NCBI36/hg18) http://hgdownload.cse.ucsc.edu/goldenPath/hg18/database/encodeRegions.txt.gz`_. 
+For human whole-genome studies, these regions have nice
 properties since they mark 1 percent of the genome, and were carefully
 picked to include a variety of different gene densities, and a number
 of more limited studies provide data just for these regions. All
