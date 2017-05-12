@@ -927,6 +927,10 @@ class Runner(object):
            res.validation_fraction == VALIDATION_FRAC_DEFAULT):
             res.validate = True
             res.validation_fraction = res.minibatch_fraction
+        if res.validate and (res.validation_fraction + 
+            res.minibatch_fraction > 1.0):
+            raise ValueError("The sum of the validation and "
+                "minibatch fractions cannot be greater than 1")
 
         return res
 
