@@ -920,25 +920,28 @@ class Runner(object):
 
         if (res.validation_fraction != VALIDATION_FRAC_DEFAULT) and \
             res.validation_coords_filename:
-            raise ValueError("Cannot specify validation set in \
-                more than 1 way")
+            raise ValueError("Cannot specify validation set in "
+                "more than 1 way")
         # if validation fraction nonzero, set validate to True
         if res.validation_fraction != VALIDATION_FRAC_DEFAULT:
             res.validate = True
 
-        # if minibatch enabled but validation fraction not set,
-        # set validate to True and default the validation_fraction
-        # to minibatch_frac
-        if (res.minibatch_fraction != MINIBATCH_DEFAULT and
-           res.validation_fraction == VALIDATION_FRAC_DEFAULT):
+        if res.validation_coords_filename:
+            res.validate = True
+
+        # if minibatch enabled but validation coordinate AND 
+        # fraction not set, set validate to True and default
+        # the validation_fraction to minibatch_frac
+        if (res.minibatch_fraction != MINIBATCH_DEFAULT) and \
+           (res.validation_fraction == VALIDATION_FRAC_DEFAULT) and \
+           (res.validation_coords_filename is None):
             res.validate = True
             res.validation_fraction = res.minibatch_fraction
+
         if res.validate and (res.validation_fraction + 
             res.minibatch_fraction > 1.0):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
-        if res.validation_coords_filename:
-            res.validate = True
 
         return res
 
