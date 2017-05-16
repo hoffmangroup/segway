@@ -1492,7 +1492,7 @@ class Runner(object):
 
         # log final weighted sum of validation likelihoods for this round
         with open(self.validation_weightedaverage_tab_filename, "a") as logfile:
-            logfile.write(str(validation_likelihood))
+            logfile.write(str(validation_likelihood) + '\n')
 
         return validation_likelihood
 
