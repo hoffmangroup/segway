@@ -59,8 +59,8 @@ PREFIX_INPUT = "input"
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_PARAMS = "params"
 
-PREFIX_VALIDATION_WEIGHTEDAVERAGE_WINNER = "validation.weightedaverage.winner"
-PREFIX_VALIDATION_WEIGHTEDAVERAGE = "validation.weightedaverage"
+PREFIX_VALIDATION_SUM_WINNER = "validation.sum.winner"
+PREFIX_VALIDATION_SUM = "validation.sum"
 PREFIX_VALIDATION_OUTPUT_WINNER = "validation.output.winner"
 PREFIX_VALIDATION_OUTPUT = "validation.output"
 

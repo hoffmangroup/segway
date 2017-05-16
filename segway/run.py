@@ -59,9 +59,9 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     OptionBuilder_GMTK, POSTERIOR_PROG,
                     PREFIX_LIKELIHOOD, PREFIX_PARAMS,
                     PREFIX_VALIDATION_OUTPUT,
-                    PREFIX_VALIDATION_WEIGHTEDAVERAGE,
+                    PREFIX_VALIDATION_SUM,
                     PREFIX_VALIDATION_OUTPUT_WINNER,
-                    PREFIX_VALIDATION_WEIGHTEDAVERAGE_WINNER,
+                    PREFIX_VALIDATION_SUM_WINNER,
                     SEG_TABLE_WIDTH,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
@@ -269,7 +269,7 @@ RES_SEG_TABLE = "seg_table.tab"
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
                    "log_likelihood_filename", "validation_output_filename",
-                   "validation_weightedaverage_filename"]
+                   "validation_sum_filename"]
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 COMMENT_POSTERIOR_TRIANGULATION = \
@@ -294,7 +294,7 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "input_master_filename", "params_filename",
                                  "log_likelihood_filename",
                                  "validation_output_filename",
-                                 "validation_weightedaverage_filename"])
+                                 "validation_sum_filename"])
 
 OFFSET_FILENAMES = 3  # where the filenames begin in Results
 
@@ -625,15 +625,16 @@ class Runner(object):
         self.validation_output_winner_filename = None
         self.validation_output_tab_filename = None
 
-        self.validation_weightedaverage_filename = None
-        self.validation_weightedaverage_winner_filename = None
-        self.validation_weightedaverage_tab_filename = None
+        self.validation_sum_filename = None
+        self.validation_sum_winner_filename = None
+        self.validation_sum_tab_filename = None
 
         self.obs_dirname = None
         self.validation_obs_dirname = None
 
         self.include_coords_filename = None
         self.exclude_coords_filename = None
+        self.validation_coords_filename = None
 
         self.minibatch_fraction = MINIBATCH_DEFAULT
         self.validation_fraction = VALIDATION_FRAC_DEFAULT
@@ -728,6 +729,7 @@ class Runner(object):
                         ("exclude_coords", "exclude_coords_filename"),
                         ("minibatch_fraction",),
                         ("validation_fraction",),
+                        ("validation_coords", "validation_coords_filename"),
                         ("num_instances",),
                         ("verbosity",),
                         ("split_sequences", "max_split_sequence_length"),
@@ -916,6 +918,10 @@ class Runner(object):
         if res.var_floor and res.var_floor < 0:
             raise ValueError("The variance floor cannot be less than 0")
 
+        if (res.validation_fraction != VALIDATION_FRAC_DEFAULT) and \
+            res.validation_coords_filename:
+            raise ValueError("Cannot specify validation set in \
+                more than 1 way")
         # if validation fraction nonzero, set validate to True
         if res.validation_fraction != VALIDATION_FRAC_DEFAULT:
             res.validate = True
@@ -931,6 +937,8 @@ class Runner(object):
             res.minibatch_fraction > 1.0):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
+        if res.validation_coords_filename:
+            res.validate = True
 
         return res
 
@@ -971,6 +979,10 @@ class Runner(object):
     @memoized_property
     def exclude_coords(self):
         return load_coords(self.exclude_coords_filename)
+
+    @memoized_property
+    def validation_coords(self):
+        return load_coords(self.validation_coords_filename)
 
     @memoized_property
     def seg_table(self):
@@ -1477,7 +1489,7 @@ class Runner(object):
             exp_validation_likelihood += exp**validation_window_likelihood
 
         validation_likelihood = natural_log(exp_validation_likelihood)
-        with open(self.validation_weightedaverage_filename, "w") as logfile:
+        with open(self.validation_sum_filename, "w") as logfile:
             logfile.write(str(validation_likelihood))
 
         # log full set of validation likelihoods for this round
@@ -1485,7 +1497,7 @@ class Runner(object):
             print >>logfile, full_validation_output
 
         # log final weighted sum of validation likelihoods for this round
-        with open(self.validation_weightedaverage_tab_filename, "a") as logfile:
+        with open(self.validation_sum_tab_filename, "a") as logfile:
             logfile.write(str(validation_likelihood) + '\n')
 
         return validation_likelihood
@@ -1633,9 +1645,9 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
-    def make_validation_weightedaverage_tab_filename(self, instance_index,
+    def make_validation_sum_tab_filename(self, instance_index,
                                                  dirname):
-        return self.make_filename(PREFIX_VALIDATION_WEIGHTEDAVERAGE,
+        return self.make_filename(PREFIX_VALIDATION_SUM,
                                   instance_index, EXT_TAB,
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
@@ -1689,25 +1701,25 @@ class Runner(object):
                 self.make_validation_output_tab_filename(
                     instance_index, self.work_dirname)
 
-            # create validation weightedaverage files
-            validation_weightedaverage_filename = \
-                self.make_filename(PREFIX_VALIDATION_WEIGHTEDAVERAGE,
+            # create validation sum files
+            validation_sum_filename = \
+                self.make_filename(PREFIX_VALIDATION_SUM,
                                    instance_index, EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
 
-            self.validation_weightedaverage_filename = \
-                validation_weightedaverage_filename
+            self.validation_sum_filename = \
+                validation_sum_filename
 
-            validation_weightedaverage_winner_filename = \
-                self.make_filename(PREFIX_VALIDATION_WEIGHTEDAVERAGE_WINNER,
+            validation_sum_winner_filename = \
+                self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
                                    instance_index, EXT_LIKELIHOOD,
                                    subdirname=SUBDIRNAME_LIKELIHOOD)
 
-            self.validation_weightedaverage_winner_filename = \
-                validation_weightedaverage_winner_filename
+            self.validation_sum_winner_filename = \
+                validation_sum_winner_filename
 
-            self.validation_weightedaverage_tab_filename = \
-                self.make_validation_weightedaverage_tab_filename(instance_index,
+            self.validation_sum_tab_filename = \
+                self.make_validation_sum_tab_filename(instance_index,
                                                              self.work_dirname)
 
     def make_output_dirpath(self, dirname, instance_index):
@@ -2693,8 +2705,8 @@ class Runner(object):
                     copy2(self.validation_output_filename,
                           self.validation_output_winner_filename)
 
-                    copy2(self.validation_weightedaverage_filename,
-                          self.validation_weightedaverage_winner_filename)
+                    copy2(self.validation_sum_filename,
+                          self.validation_sum_winner_filename)
 
                     result = Results(log_likelihood, self.num_segs,
                                      validation_likelihood,
@@ -2702,7 +2714,7 @@ class Runner(object):
                                      self.last_params_filename,
                                      self.log_likelihood_filename,
                                      self.validation_output_winner_filename,
-                                     self.validation_weightedaverage_winner_filename)
+                                     self.validation_sum_winner_filename)
                     best_validation_likelihood = validation_likelihood
 
             round_index += 1
@@ -2714,7 +2726,7 @@ class Runner(object):
                              self.last_params_filename,
                              self.log_likelihood_filename,
                              self.validation_output_filename,
-                             self.validation_weightedaverage_filename)
+                             self.validation_sum_filename)
 
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
@@ -2789,7 +2801,7 @@ class Runner(object):
         return [input_master_filename, self.params_filename,
                 self.log_likelihood_filename,
                 self.validation_output_filename,
-                self.validation_weightedaverage_filename]
+                self.validation_sum_filename]
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
@@ -2852,6 +2864,7 @@ class Runner(object):
         self.jt_info_filename
         self.include_coords
         self.exclude_coords
+        self.validation_coords
         self.minibatch_fraction
         self.card_seg_countdown
         self.obs_dirpath
@@ -3399,6 +3412,10 @@ def parse_options(argv):
                        " If --minibatch-fraction is used without specifying a"
                        " validation fraction, the validation fraction will"
                        " default to be the same as the minibatch fraction.")
+
+    group.add_argument("--validation-coords", metavar="FILE",
+                       help="Use genomic coordinates in FILE as a held out"
+                       " set (default none)")
 
     group = parser.add_argument_group("Model files")
     group.add_argument("-i", "--input-master", metavar="FILE",
