@@ -627,8 +627,8 @@ class Observations(object):
 
                         for world in xrange(self.num_worlds):
                             validation_windows.append(Window(world, chrom, start, end))
+
         self.validation_windows = validation_windows
-        print "validation windows", validation_windows
 
         if not windows:
             raise ValueError("Set of training windows is empty")
