@@ -29,8 +29,8 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
-                   square, vstack, zeros)
+from numpy import (append, arcsinh, array, e as exp, empty, finfo, float32, int64, inf,
+                   log as natural_log, square, vstack, zeros)
 from numpy.random import RandomState
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
@@ -1458,10 +1458,8 @@ class Runner(object):
                 if MSG_SUCCESS not in line:
                     raise RuntimeError("Validation not successful: " + line)
 
-        weighted_validation_likelihood_sum = 0
-        total_bases = 0
-
         full_validation_output = []
+        exp_validation_likelihood = 0
 
         for validation_window_index, validation_window_likelihood \
                 in zip(validation_window_indices,
@@ -1470,19 +1468,15 @@ class Runner(object):
                 self.validation_windows[validation_window_index]
             validation_window_size = len(validation_window)
 
-            weighted_validation_likelihood_sum += \
-                validation_window_size * validation_window_likelihood
-            total_bases += validation_window_size
-
             full_validation_output.append((
                 validation_window_index,
                 validation_window_size,
                 validation_window_likelihood
                 ))
 
-        validation_likelihood = \
-            weighted_validation_likelihood_sum / total_bases
+            exp_validation_likelihood += exp**validation_window_likelihood
 
+        validation_likelihood = natural_log(exp_validation_likelihood)
         with open(self.validation_weightedaverage_filename, "w") as logfile:
             logfile.write(str(validation_likelihood))
 
