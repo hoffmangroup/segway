@@ -29,8 +29,8 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (append, arcsinh, array, e as exp, empty, finfo, float32, int64, inf,
-                   log as natural_log, square, vstack, zeros)
+from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
+                   square, vstack, zeros)
 from numpy.random import RandomState
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
