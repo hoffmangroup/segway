@@ -1474,7 +1474,6 @@ class Runner(object):
                     raise RuntimeError("Validation not successful: " + line)
 
         full_validation_output = []
-        exp_validation_likelihood = 0
 
         for validation_window_index, validation_window_likelihood \
                 in zip(validation_window_indices,
@@ -1489,9 +1488,7 @@ class Runner(object):
                 validation_window_likelihood
                 ))
 
-            exp_validation_likelihood += exp**validation_window_likelihood
-
-        validation_likelihood = natural_log(exp_validation_likelihood)
+        validation_likelihood = sum(validation_window_likelihoods)
         with open(self.validation_sum_filename, "w") as logfile:
             logfile.write(str(validation_likelihood))
 
