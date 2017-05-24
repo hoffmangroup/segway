@@ -459,6 +459,10 @@ def process_new_windows(new_windows, starts, ends):
 
     return new_windows[0]
 
+def generate_coords_from_dict(coords_dict):
+    for chrom, coords_list in coords_dict.iteritems():
+        starts, ends = map(deque, zip(*coords_list))
+        yield chrom, starts, ends
 
 class Observations(object):
     copy_attrs = ["include_coords", "exclude_coords", "max_frames",
@@ -486,16 +490,6 @@ class Observations(object):
 
         self.validation_windows = []
 
-    def generate_coords_include(self):
-        for chrom, coords_list in self.include_coords.iteritems():
-            starts, ends = map(deque, zip(*coords_list))
-            yield chrom, starts, ends
-
-    def generate_coords_validation(self):
-        for chrom, coords_list in self.validation_coords.iteritems():
-            starts, ends = map(deque, zip(*coords_list))
-            yield chrom, starts, ends
-
     def generate_coords_all(self, genome):
         for chromosome in genome:
             starts = deque()
@@ -520,7 +514,7 @@ class Observations(object):
           starts and ends are deques
         """
         if self.include_coords:
-            return self.generate_coords_include()
+            return generate_coords_from_dict(self.include_coords)
         else:
             return self.generate_coords_all(genome)
 
@@ -580,7 +574,7 @@ class Observations(object):
 
         # otherwise, validation coordinates option chosen
         else:
-            for chrom, starts, ends in self.generate_coords_validation():
+            for chrom, starts, ends in generate_coords_from_dict(self.validation_coords):
                 chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
 
                 while len(starts) > 0:
