@@ -943,6 +943,9 @@ class Runner(object):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
 
+        if res.validate and res.identify:
+            raise NotImplementedError("Using --validation-fraction"
+                " or --validation-coords with identify is not supported")
         return res
 
     @memoized_property
