@@ -2690,6 +2690,17 @@ class Runner(object):
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
                                 round_index, validation_likelihood,
                                 best_validation_likelihood, kwargs):
+
+        if self.validate and self.recover_dirname:
+            # recover last set of best results
+            result = Results(log_likelihood, self.num_segs,
+                             validation_likelihood,
+                             self.input_master_filename,
+                             self.best_params_filename,
+                             self.log_likelihood_filename,
+                             self.validation_output_winner_filename,
+                             self.validation_sum_winner_filename)
+
         while (round_index < self.max_em_iters and
                ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
                 is_training_progressing(last_log_likelihood, log_likelihood))):
@@ -2815,6 +2826,7 @@ class Runner(object):
         elif not self.dry_run:
             # only one instance
             assert len(instance_params) == 1
+            # for validate, this is best, not last
             last_params_filename = instance_params[0].params_filename
             copy2(last_params_filename, self.params_filename)
 
@@ -2978,7 +2990,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         path(old_filename).copy2(new_filename)
         return new_filename
 
-    def recover_train_instance(self, last_log_likelihood, log_likelihood):
+    def recover_train_instance(self, last_log_likelihood, log_likelihood,
+                               validation_likelihood, best_validation_likelihood):
         instance_index = self.instance_index
         recover_dirname = self.recover_dirname
 
@@ -2998,6 +3011,89 @@ to find the winning instance anyway.""" % thread.instance_index)
                 path(self.make_log_likelihood_tab_filename(None,
                                                            recover_dirname))
 
+        if self.validate:
+            # recover validation sum tabfile
+            recover_validation_sum_tab_filepath = \
+                path(self.make_validation_sum_tab_filename(instance_index,
+                                                           recover_dirname))
+            if not recover_validation_sum_tab_filepath.isfile():
+                recover_validation_sum_tab_filepath = \
+                    path(self.make_validation_sum_tab_filename(None,
+                                                           recover_dirname))
+            copy2(recover_validation_sum_tab_filepath,
+                  self.validation_sum_tab_filename)
+
+            # recover validation output tabfile
+            recover_validation_output_tab_filepath = \
+                path(self.make_validation_output_tab_filename(instance_index,
+                                                           recover_dirname))
+            if not recover_validation_output_tab_filepath.isfile():
+                recover_validation_output_tab_filepath = \
+                    path(self.make_validation_output_tab_filename(None,
+                                                           recover_dirname))
+            copy2(recover_validation_output_tab_filepath,
+                  self.validation_output_tab_filename)
+
+            # recover last validation sum
+            recover_validation_sum_filename = \
+                path(self.make_filename(PREFIX_VALIDATION_SUM,
+                                       instance_index, EXT_LIKELIHOOD,
+                                       subdirname=SUBDIRNAME_LIKELIHOOD,
+                                       dirname=recover_dirname))
+            if not recover_validation_sum_filename.isfile():
+                recover_validation_sum_filename = \
+                    path(self.make_filename(PREFIX_VALIDATION_SUM,
+                                            None, EXT_LIKELIHOOD,
+                                            subdirname=SUBDIRNAME_LIKELIHOOD,
+                                            dirname=recover_dirname))
+            copy2(recover_validation_sum_filename,
+                  self.validation_sum_filename)
+
+            # recover last validation output
+            recover_validation_output_filename = \
+                path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
+                                        instance_index, EXT_LIKELIHOOD,
+                                        subdirname=SUBDIRNAME_LIKELIHOOD,
+                                        dirname=recover_dirname))
+            if not recover_validation_output_filename.isfile():
+                recover_validation_output_filename = \
+                    path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
+                                            None, EXT_LIKELIHOOD,
+                                            subdirname=SUBDIRNAME_LIKELIHOOD,
+                                            dirname=recover_dirname))
+            copy2(recover_validation_output_filename,
+                  self.validation_output_filename)
+
+            # recover validation sum winner
+            recover_validation_sum_winner_filename = \
+                path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
+                                        instance_index, EXT_LIKELIHOOD,
+                                        subdirname=SUBDIRNAME_LIKELIHOOD,
+                                        dirname=recover_dirname))
+            if not recover_validation_sum_winner_filename.isfile():
+                recover_validation_sum_winner_filename = \
+                    path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
+                                            None, EXT_LIKELIHOOD,
+                                            subdirname=SUBDIRNAME_LIKELIHOOD,
+                                            dirname=recover_dirname))
+            copy2(recover_validation_sum_winner_filename,
+                  self.validation_sum_winner_filename)
+
+            # recover validation output winner
+            recover_validation_output_winner_filename = \
+                path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
+                                        instance_index, EXT_LIKELIHOOD,
+                                        subdirname=SUBDIRNAME_LIKELIHOOD,
+                                        dirname=recover_dirname))
+            if not recover_validation_output_winner_filename.isfile():
+                recover_validation_output_winner_filename = \
+                    path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
+                                            None, EXT_LIKELIHOOD,
+                                            subdirname=SUBDIRNAME_LIKELIHOOD,
+                                            dirname=recover_dirname))
+            copy2(recover_validation_output_winner_filename,
+                  self.validation_output_winner_filename)
+
         with open(recover_log_likelihood_tab_filepath) \
                 as log_likelihood_tab_file:
             log_likelihoods = [float(line.rstrip())
@@ -3012,6 +3108,16 @@ to find the winning instance anyway.""" % thread.instance_index)
         log_likelihood_tab_filename = self.log_likelihood_tab_filename
         recover_log_likelihood_tab_filepath.copy2(log_likelihood_tab_filename)
 
+        if self.validate:
+            with open(recover_validation_sum_tab_filepath) \
+                as validation_sum_tab_file:
+                validation_sums = [float(line.rstrip())
+                                   for line in validation_sum_tab_file.readlines()]
+            validation_likelihood = validation_sums[-1]
+            best_validation_likelihood = max(validation_sums)
+            best_index = validation_sums.index(best_validation_likelihood)
+
+
         old_params_filename = self.make_params_filename(instance_index,
                                                         recover_dirname)
         new_params_filename = self.params_filename
@@ -3022,10 +3128,13 @@ to find the winning instance anyway.""" % thread.instance_index)
                                                str(round_index))
 
             path(old_curr_params_filename).copy2(new_curr_params_filename)
+            if round_index == best_index:
+                self.best_params_filename = new_curr_params_filename
 
         self.last_params_filename = new_curr_params_filename
 
-        return last_log_likelihood, log_likelihood, final_round_index
+        return last_log_likelihood, log_likelihood, final_round_index, \
+            validation_likelihood, best_validation_likelihood
 
     def make_instance_initial_results(self):
         """
@@ -3042,7 +3151,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         if self.recover_dirpath:
             return self.recover_train_instance(last_log_likelihood,
-                                               log_likelihood)
+                                               log_likelihood,
+                                               validation_likelihood,
+                                               best_validation_likelihood)
 
         return last_log_likelihood, log_likelihood, final_round_index, \
             validation_likelihood, best_validation_likelihood
