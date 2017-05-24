@@ -552,6 +552,54 @@ class Observations(object):
 
         return [[start, end]]
 
+    def create_validation_windows(self, exclude_coords, windows):
+        """
+        Creates set of validation windows depending on the
+        validation option chosen.
+
+        Note: only using a validation fraction will modify the
+        set of training windows
+        
+        Returns training windows, validation windows
+        """
+        validation_windows = []
+        # if validation fraction option chosen
+        if self.validation_fraction > 0.0:
+            total_bases = sum(len(window) for window in windows)
+            cur_bases = 0
+            self.random_state.shuffle(windows)
+
+            # remove windows until validation_windows is of the correct size
+            while ((float(cur_bases) / total_bases) < self.validation_fraction):
+                window = windows.pop()
+                validation_windows.append(window)
+                cur_bases += len(window)
+
+        # otherwise, validation coordinates option chosen
+        else:
+            for chrom, starts, ends in self.generate_coords_validation():
+                chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
+
+                while True:
+                    try:
+                        start = starts.popleft()
+                    except IndexError:
+                        break
+
+                    end = ends.popleft()  # should not ever cause an IndexError
+
+                    new_validation_windows = subtract_regions(start, end, chr_exclude_coords)
+                    start, end = process_new_windows(new_validation_windows, starts, ends)
+                    if start:
+                        # skip or split long sequences
+                        new_validation_windows = self.skip_or_split_window(start, end)
+                        start, end = process_new_windows(new_validation_windows, starts, ends)
+                        if start:
+                            for world in xrange(self.num_worlds):
+                                validation_windows.append(Window(world, chrom, start, end))
+
+        return windows, validation_windows
+
     def locate_windows(self, genome):
         """
         input: Genome instance, include_coords, exclude_ coords, max_frames
@@ -587,54 +635,16 @@ class Observations(object):
                 for world in xrange(self.num_worlds):
                     windows.append(Window(world, chrom, start, end))
 
-        validation_windows = []
         if self.validate:
-            # if validation fraction option chosen
-            if self.validation_fraction > 0.0:
-                total_bases = sum(len(window) for window in windows)
-                cur_bases = 0
-                self.random_state.shuffle(windows)
-
-                # remove windows until validation_windows is of the correct size
-                while ((float(cur_bases) / total_bases) < self.validation_fraction):
-                    window = windows.pop()
-                    validation_windows.append(window)
-                    cur_bases += len(window)
-
-            # otherwise, validation coordinates option chosen
-            else:
-                for chrom, starts, ends in self.generate_coords_validation():
-                    chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
-
-                    while True:
-                        try:
-                            start = starts.popleft()
-                        except IndexError:
-                            break
-
-                        end = ends.popleft()  # should not ever cause an IndexError
-
-                        new_validation_windows = subtract_regions(start, end, chr_exclude_coords)
-                        start, end = process_new_windows(new_validation_windows, starts, ends)
-                        if start is None:
-                            continue
-
-                        # skip or split long sequences
-                        new_validation_windows = self.skip_or_split_window(start, end)
-                        start, end = process_new_windows(new_validation_windows, starts, ends)
-                        if start is None:
-                            continue
-
-                        for world in xrange(self.num_worlds):
-                            validation_windows.append(Window(world, chrom, start, end))
-
-        self.validation_windows = validation_windows
+            windows, self.validation_windows = \
+                self.create_validation_windows(exclude_coords, windows)
 
         if not windows:
             raise ValueError("Set of training windows is empty")
 
         # remaining windows can be passed into training now
         self.windows = windows
+
 
     def save_window(self, float_filename, int_filename, float_data,
                     seq_data=None, supervision_data=None):
