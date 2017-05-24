@@ -3128,8 +3128,9 @@ to find the winning instance anyway.""" % thread.instance_index)
                                                str(round_index))
 
             path(old_curr_params_filename).copy2(new_curr_params_filename)
-            if round_index == best_index:
-                self.best_params_filename = new_curr_params_filename
+            if self.validate:
+                if round_index == best_index:
+                    self.best_params_filename = new_curr_params_filename
 
         self.last_params_filename = new_curr_params_filename
 
