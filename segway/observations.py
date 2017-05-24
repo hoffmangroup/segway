@@ -571,8 +571,9 @@ class Observations(object):
             cur_bases = 0
             self.random_state.shuffle(windows)
 
-            # remove windows until validation_windows is of the correct size
-            while ((float(cur_bases) / total_bases) < self.validation_fraction):
+            # remove windows until total number of bases chosen is at least
+            # as large as that required by the validation fraction
+            while (float(cur_bases) / total_bases) < self.validation_fraction:
                 window = windows.pop()
                 validation_windows.append(window)
                 cur_bases += len(window)
