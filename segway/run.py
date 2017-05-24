@@ -918,8 +918,8 @@ class Runner(object):
         if res.var_floor and res.var_floor < 0:
             raise ValueError("The variance floor cannot be less than 0")
 
-        if (res.validation_fraction != VALIDATION_FRAC_DEFAULT) and \
-            res.validation_coords_filename:
+        if (res.validation_fraction != VALIDATION_FRAC_DEFAULT and
+            res.validation_coords_filename):
             raise ValueError("Cannot specify validation set in "
                 "more than 1 way")
 
@@ -927,18 +927,16 @@ class Runner(object):
             raise ValueError("The validation fraction cannot be less than 0")
 
         # if validation fraction nonzero, set validate to True
-        if res.validation_fraction != VALIDATION_FRAC_DEFAULT:
-            res.validate = True
-
-        if res.validation_coords_filename:
+        if (res.validation_fraction != VALIDATION_FRAC_DEFAULT or
+            res.validation_coords_filename):
             res.validate = True
 
         # if minibatch enabled but validation coordinate AND 
         # fraction not set, set validate to True and default
         # the validation_fraction to minibatch_frac
-        if (res.minibatch_fraction != MINIBATCH_DEFAULT) and \
-           (res.validation_fraction == VALIDATION_FRAC_DEFAULT) and \
-           (res.validation_coords_filename is None):
+        if (res.minibatch_fraction != MINIBATCH_DEFAULT and
+           res.validation_fraction == VALIDATION_FRAC_DEFAULT and
+           res.validation_coords_filename is None):
             res.validate = True
             res.validation_fraction = res.minibatch_fraction
 
