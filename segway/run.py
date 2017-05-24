@@ -922,6 +922,10 @@ class Runner(object):
             res.validation_coords_filename:
             raise ValueError("Cannot specify validation set in "
                 "more than 1 way")
+
+        if res.validation_fraction < 0:
+            raise ValueError("The validation fraction cannot be less than 0")
+
         # if validation fraction nonzero, set validate to True
         if res.validation_fraction != VALIDATION_FRAC_DEFAULT:
             res.validate = True
