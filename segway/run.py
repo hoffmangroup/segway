@@ -3115,7 +3115,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                    for line in validation_sum_tab_file.readlines()]
             validation_likelihood = validation_sums[-1]
             best_validation_likelihood = max(validation_sums)
-            best_index = validation_sums.index(best_validation_likelihood)
+            best_validation_index = validation_sums.index(best_validation_likelihood)
 
 
         old_params_filename = self.make_params_filename(instance_index,
@@ -3129,7 +3129,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             path(old_curr_params_filename).copy2(new_curr_params_filename)
             if self.validate:
-                if round_index == best_index:
+                if round_index == best_validation_index:
                     self.best_params_filename = new_curr_params_filename
 
         self.last_params_filename = new_curr_params_filename
