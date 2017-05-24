@@ -581,15 +581,26 @@ class Observations(object):
                     start = starts.popleft()
                     end = ends.popleft()  # should not ever cause an IndexError
 
-                    new_validation_windows = subtract_regions(start, end, chr_exclude_coords)
-                    start, end = process_new_windows(new_validation_windows, starts, ends)
-                    if start:
+                    new_validation_windows = \
+                        subtract_regions(start, end, chr_exclude_coords)
+                    subtracted_start, subtracted_end = \
+                        process_new_windows(new_validation_windows,
+                                            starts,
+                                            ends)
+                    if subtracted_start:
                         # skip or split long sequences
-                        new_validation_windows = self.skip_or_split_window(start, end)
-                        start, end = process_new_windows(new_validation_windows, starts, ends)
-                        if start:
+                        new_validation_windows = \
+                            self.skip_or_split_window(subtracted_start,
+                                                      subtracted_end)
+                        split_start, split_end = \
+                            process_new_windows(new_validation_windows,
+                                                starts,
+                                                ends)
+                        if split_start:
                             for world in xrange(self.num_worlds):
-                                validation_windows.append(Window(world, chrom, start, end))
+                                validation_windows.append(Window
+                                    (world, chrom, split_start, split_end)
+                                    )
 
         return windows, validation_windows
 
