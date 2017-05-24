@@ -602,8 +602,9 @@ class Observations(object):
     def locate_windows(self, genome):
         """
         input: Genome instance, include_coords, exclude_ coords, max_frames
+        validation fraction/validation coords (if validation)
 
-        sets: window_coords
+        sets: window_coords, validation_coords (if validation)
         """
         exclude_coords = self.exclude_coords
 
