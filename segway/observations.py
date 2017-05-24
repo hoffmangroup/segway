@@ -484,6 +484,8 @@ class Observations(object):
         self.validation_float_filepaths = []
         self.validation_int_filepaths = []
 
+        self.validation_windows = []
+
     def generate_coords_include(self):
         for chrom, coords_list in self.include_coords.iteritems():
             starts, ends = map(deque, zip(*coords_list))
@@ -580,12 +582,8 @@ class Observations(object):
             for chrom, starts, ends in self.generate_coords_validation():
                 chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
 
-                while True:
-                    try:
-                        start = starts.popleft()
-                    except IndexError:
-                        break
-
+                while len(starts) > 0:
+                    start = starts.popleft()
                     end = ends.popleft()  # should not ever cause an IndexError
 
                     new_validation_windows = subtract_regions(start, end, chr_exclude_coords)
