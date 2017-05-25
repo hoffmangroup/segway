@@ -1653,8 +1653,7 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
-    def make_validation_sum_tab_filename(self, instance_index,
-                                                 dirname):
+    def make_validation_sum_tab_filename(self, instance_index, dirname):
         return self.make_filename(PREFIX_VALIDATION_SUM,
                                   instance_index, EXT_TAB,
                                   dirname=dirname,
