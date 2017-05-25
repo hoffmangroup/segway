@@ -174,7 +174,9 @@ EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 ANNOTATE_TASK_KIND = "viterbi"
 POSTERIOR_TASK_KIND = "posterior"
 TRAIN_TASK_KIND = "train"
+VALIDATE_TASK_VERB = "run"
 VALIDATE_TASK_KIND = "validate"
+CREATE_VALIDATION_SET_WINDOW_TASK_VERB = "create"
 CREATE_VALIDATION_SET_WINDOW_TASK_KIND = "validation-set-window"
 BUNDLE_TRAIN_TASK_KIND = "bundle-train"
 
@@ -2378,7 +2380,7 @@ class Runner(object):
     def queue_create_validation_set_window(self, validation_window,
                                            num_frames=0, **kwargs):
         segway_task_path = find_executable("segway-task")
-        segway_task_verb = "create"
+        segway_task_verb = CREATE_VALIDATION_SET_WINDOW_TASK_VERB
         output_filename = ""
 
         chrom = validation_window.chrom
@@ -2443,7 +2445,7 @@ class Runner(object):
         name = self.make_job_name_validate(instance_index, round_index)
 
         segway_task_path = find_executable("segway-task")
-        segway_task_verb = "run"
+        segway_task_verb = VALIDATE_TASK_VERB
 
         chrom = 0
         window_start = 0
