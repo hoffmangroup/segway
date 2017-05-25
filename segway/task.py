@@ -525,7 +525,9 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
                                  track_indexes, *args):
 
     if do_reverse:
-        raise NotImplementedError
+        raise NotImplementedError("Running Segway with both validation "
+            "and reverse world options simultaneously is currently "
+            "not supported")
 
     (chrom, start, end) = coord
 
@@ -553,7 +555,9 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
 
 def run_validate(coord, resolution, do_reverse, outfilename, *args):
     if do_reverse:
-        raise NotImplementedError
+        raise NotImplementedError("Running Segway with both validation "
+            "and reverse world options simultaneously is currently "
+            "not supported")
 
     validation_output = VALIDATE_PROG.getoutput(*args)
     with open(outfilename, "w") as outfile:
