@@ -532,7 +532,6 @@ def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
     genomedata_names = genomedata_names.split(",")
     track_indexes = map(int, track_indexes.split(","))
 
-    # this should be some VALIDATION_OBS_DIRPATH.......
     float_filepath = path(float_filename)
     int_filepath = path(int_filename)
 
