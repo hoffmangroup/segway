@@ -2412,7 +2412,9 @@ class Runner(object):
             float_filelist_fd.write("%s\n" % float_filepath)
 
         if self.reverse_worlds:
-            raise NotImplementedError
+            raise NotImplementedError("Running Segway with both validation "
+                "and reverse world options simultaneously is currently "
+                "not supported")
         else:
             is_reverse = 0
 
