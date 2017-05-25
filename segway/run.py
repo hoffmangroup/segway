@@ -1685,7 +1685,9 @@ class Runner(object):
     def set_validation_likelihood_filenames(self, instance_index=None,
                                             new=False):
         """
-        None means the final params file, not for any particular thread
+        If no instance_index specified and the number of instances is
+        greater than 1, then this is for the final validation
+        likelihood files, not for any particular thread
         """
         if new or not self.validation_output_filename:
             # create validation output files
@@ -1728,7 +1730,7 @@ class Runner(object):
 
             self.validation_sum_tab_filename = \
                 self.make_validation_sum_tab_filename(instance_index,
-                                                             self.work_dirname)
+                                                      self.work_dirname)
 
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
