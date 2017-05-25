@@ -1451,14 +1451,15 @@ class Runner(object):
     def load_validation_likelihood(self):
         """
         Parses gmtkJT output to obtain each window's probability of evidence 
-        (prob(E)) and calculates the weighted average based on window size.
+        (prob(E)) and sums to obtain the intersection of the partial
+        prob(E)'s (ie prob(E_1 and E_2 and ...))
         Writes parsed gmtkJT output to file tabulating historical prob(E)
         of each window for each round as well as a file tabulating
-        weighted average prob(E) for each round.
+        the full validation set prob(E) for each round.
         Also updates likelihood file such that it contains the latest
-        weighted average prob(E).
+        full validation set prob(E).
 
-        Returns weighted average prob(E).
+        Returns the full validation set prob(E).
         """
         with open(self.validation_output_filename) as infile:
             validation_output = infile.readlines()
@@ -1504,7 +1505,7 @@ class Runner(object):
         with open(self.validation_output_tab_filename, "a") as logfile:
             print >>logfile, full_validation_output
 
-        # log final weighted sum of validation likelihoods for this round
+        # log final validation set likelihood for this round
         with open(self.validation_sum_tab_filename, "a") as logfile:
             logfile.write(str(validation_likelihood) + '\n')
 
