@@ -2716,8 +2716,12 @@ class Runner(object):
             log_likelihood = self.load_log_likelihood()
 
             if self.validate:
+                # load gmtkJT output and find the validation set's likelihood
                 validation_likelihood = self.load_validation_likelihood()
 
+                # if the new validation likelihood is better than our previous best,
+                # choose it as our current winner and update instance's winner files
+                # winning set of results to be passed
                 if validation_likelihood > best_validation_likelihood:
                     copy2(self.validation_output_filename,
                           self.validation_output_winner_filename)
