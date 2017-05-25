@@ -2439,7 +2439,7 @@ class Runner(object):
 
     def queue_validate(self, input_params_filename, instance_index,
                        round_index, num_frames=0, **kwargs):
-        """take params output from bundling and validates on holdout set
+        """take params output from bundling and validates on validation set
         """
 
         cpp_options = self.make_cpp_options(input_params_filename)
@@ -3542,7 +3542,7 @@ def parse_options(argv):
                        " default to be the same as the minibatch fraction.")
 
     group.add_argument("--validation-coords", metavar="FILE",
-                       help="Use genomic coordinates in FILE as a held out"
+                       help="Use genomic coordinates in FILE as a validation"
                        " set (default none)")
 
     group = parser.add_argument_group("Model files")
