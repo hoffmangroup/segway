@@ -1,3 +1,5 @@
+1.4.5:
+
 1.4.4:
 * segway: Add mixture of Gaussians and variance floor functionality to Segway
   (thanks to Max Libbrecht, Oscar Rodriguez, and Rachel Chan)
