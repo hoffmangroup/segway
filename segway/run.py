@@ -89,7 +89,7 @@ MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
 VAR_FLOOR_GMM_DEFAULT = 0.00001
-VALIDATION_FRAC_DEFAULT = 0.0
+VALIDATION_FRAC_DEFAULT = None
 
 ISLAND = True
 
@@ -925,22 +925,14 @@ class Runner(object):
             raise ValueError("Cannot specify validation set in "
                 "more than 1 way")
 
-        if res.validation_fraction < 0:
+        if (res.validation_fraction != VALIDATION_FRAC_DEFAULT and
+           res.validation_fraction < 0):
             raise ValueError("The validation fraction cannot be less than 0")
 
         # if validation fraction nonzero, set validate to True
         if (res.validation_fraction != VALIDATION_FRAC_DEFAULT or
             res.validation_coords_filename):
             res.validate = True
-
-        # if minibatch enabled but validation coordinate AND 
-        # fraction not set, set validate to True and default
-        # the validation_fraction to minibatch_frac
-        if (res.minibatch_fraction != MINIBATCH_DEFAULT and
-           res.validation_fraction == VALIDATION_FRAC_DEFAULT and
-           res.validation_coords_filename is None):
-            res.validate = True
-            res.validation_fraction = res.minibatch_fraction
 
         if res.validate and (res.validation_fraction + 
             res.minibatch_fraction > 1.0):
@@ -3508,8 +3500,8 @@ def parse_options(argv):
                        " to use")
 
     group.add_argument("--include-coords", metavar="FILE",
-                       help="limit to genomic coordinates in FILE"
-                       " (default all)")
+                       help="limit non-validation tasks to genomic"
+                       " coordinates in FILE (default all)")
 
     # exclude goes after all includes
     group.add_argument("--exclude-coords", metavar="FILE",
@@ -3525,10 +3517,7 @@ def parse_options(argv):
                        help="Use a random fraction FRAC positions for each EM"
                        " iteration. Removes the likelihood stopping criterion,"
                        " so training always runs to the number of rounds"
-                       " specified by --max-train-rounds."
-                       " If --minibatch-fraction is used without specifying a"
-                       " validation fraction, the validation fraction will"
-                       " default to be the same as the minibatch fraction.")
+                       " specified by --max-train-rounds.")
 
     group.add_argument("--validation-fraction", type=float, metavar="FRAC",
                        default=VALIDATION_FRAC_DEFAULT,
@@ -3536,10 +3525,7 @@ def parse_options(argv):
                        " to validate the parameters learned by each training"
                        " round. The instance/round with the best likelihood"
                        " as validated by the holdout set will be chosen as"
-                       " as the winner after the specified --max-train-rounds."
-                       " If --minibatch-fraction is used without specifying a"
-                       " validation fraction, the validation fraction will"
-                       " default to be the same as the minibatch fraction.")
+                       " as the winner after the specified --max-train-rounds.")
 
     group.add_argument("--validation-coords", metavar="FILE",
                        help="Use genomic coordinates in FILE as a validation"
