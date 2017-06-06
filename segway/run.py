@@ -2693,7 +2693,8 @@ class Runner(object):
                                 round_index, validation_likelihood,
                                 best_validation_likelihood, kwargs):
 
-        if self.validate and self.recover_dirname:
+        if (self.validate and
+            self.recover_dirname):
             # recover last set of best results
             result = Results(log_likelihood, self.num_segs,
                              validation_likelihood,
