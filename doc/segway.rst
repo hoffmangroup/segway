@@ -214,7 +214,7 @@ will always run to --max-train-rounds (100, by default) if
 --minibatch-fraction is set.
 
 An alternative way to choose the winning set of parameters
-is available through the :option:`--validation-fraction`\=\*frac* and 
+is available through the :option:`--validation-fraction`\=\*frac* or 
 :option:`--validation-coords` options. Specifying a fraction *frac* to 
 :option:`--validation-fraction` will cause Segway to choose a fraction *frac* 
 or more of genomic positions as a held-out validation set. On the other hand, 
