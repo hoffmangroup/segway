@@ -1494,7 +1494,7 @@ class Runner(object):
 
         # log final validation set likelihood for this round
         with open(self.validation_sum_tab_filename, "a") as logfile:
-            logfile.write(str(validation_likelihood) + '\n')
+            logfile.write(str(validation_likelihood) + "\n")
 
         return validation_likelihood
 
