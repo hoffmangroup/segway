@@ -643,13 +643,12 @@ class Observations(object):
                 for world in xrange(self.num_worlds):
                     windows.append(Window(world, chrom, start, end))
 
-        if self.validate:
-            if self.validation_fraction:
-                windows, self.validation_windows = \
-                    self.create_validation_windows_from_fraction(windows)
-            else:
-                self.validation_windows = \
-                    self.create_validation_windows_from_coords(exclude_coords)
+        if self.validation_fraction:
+            windows, self.validation_windows = \
+                self.create_validation_windows_from_fraction(windows)
+        elif self.validation_coords:
+            self.validation_windows = \
+                self.create_validation_windows_from_coords(exclude_coords)
 
         if not windows:
             raise ValueError("Set of training windows is empty")
