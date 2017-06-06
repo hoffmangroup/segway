@@ -3447,7 +3447,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                 with open(job_log_filename, "w") as self.job_log_file:
                     print >>self.job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
 
-                    if self.validate and self.train:
+                    if (self.validate and
+                        self.train):
                         self.create_validation_set()
 
                     if self.train:
