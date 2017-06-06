@@ -89,7 +89,6 @@ MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
 VAR_FLOOR_GMM_DEFAULT = 0.00001
-VALIDATION_FRAC_DEFAULT = None
 
 ISLAND = True
 
@@ -639,7 +638,7 @@ class Runner(object):
         self.validation_coords_filename = None
 
         self.minibatch_fraction = MINIBATCH_DEFAULT
-        self.validation_fraction = VALIDATION_FRAC_DEFAULT
+        self.validation_fraction = None
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
@@ -920,18 +919,15 @@ class Runner(object):
         if res.var_floor and res.var_floor < 0:
             raise ValueError("The variance floor cannot be less than 0")
 
-        if (res.validation_fraction != VALIDATION_FRAC_DEFAULT and
-            res.validation_coords_filename):
+        if (res.validation_fraction and res.validation_coords_filename):
             raise ValueError("Cannot specify validation set in "
                 "more than 1 way")
 
-        if (res.validation_fraction != VALIDATION_FRAC_DEFAULT and
-           res.validation_fraction < 0):
+        if (res.validation_fraction and res.validation_fraction < 0):
             raise ValueError("The validation fraction cannot be less than 0")
 
         # if validation fraction nonzero, set validate to True
-        if (res.validation_fraction != VALIDATION_FRAC_DEFAULT or
-            res.validation_coords_filename):
+        if (res.validation_fraction or res.validation_coords_filename):
             res.validate = True
 
         if res.validation_fraction and (res.validation_fraction + 
@@ -3521,7 +3517,6 @@ def parse_options(argv):
                        " specified by --max-train-rounds.")
 
     group.add_argument("--validation-fraction", type=float, metavar="FRAC",
-                       default=VALIDATION_FRAC_DEFAULT,
                        help="Use a random held out set of size FRAC of the"
                        " included genomic regions to validate the parameters"
                        " learned by each training round. The instance/round"
