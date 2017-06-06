@@ -301,7 +301,7 @@ OFFSET_FILENAMES = 3  # where the filenames begin in Results
 
 GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
 GMTKJT_PATTERN_WINDOW_MATCH_INDEX = 1
-GMTKJT_PATTERN_LIKLIHOOD_MATCH_INDEX = 2
+GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX = 2
 
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 
@@ -1464,7 +1464,7 @@ class Runner(object):
                     validation_match.group(GMTKJT_PATTERN_WINDOW_MATCH_INDEX)
                     ))
                 validation_window_likelihoods.append(float(
-                    validation_match.group(GMTKJT_PATTERN_LIKLIHOOD_MATCH_INDEX)
+                    validation_match.group(GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX)
                     ))
             else:
                 if MSG_SUCCESS not in line:
