@@ -934,7 +934,7 @@ class Runner(object):
             res.validation_coords_filename):
             res.validate = True
 
-        if res.validate and (res.validation_fraction + 
+        if res.validation_fraction and (res.validation_fraction + 
             res.minibatch_fraction > 1.0):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
@@ -1495,7 +1495,7 @@ class Runner(object):
 
         # log full set of validation likelihoods for this round
         with open(self.validation_output_tab_filename, "a") as logfile:
-            print >>logfile, full_validation_output
+            logfile.writelines(repr(full_validation_output) + "\n")
 
         # log final validation set likelihood for this round
         with open(self.validation_sum_tab_filename, "a") as logfile:
