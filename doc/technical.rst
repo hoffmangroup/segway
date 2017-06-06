@@ -208,9 +208,9 @@ workdir instead.
                                                     instance
 |rarr| ``validation.output.winner.``\ \*\ ``.ll``   contains text of the current best validation GMTK output
                                                     for an instance
-|rarr| ``validation.sum.``\ \*\ ``.ll``             contains text of the last validation set likelihood
+|rarr| ``validation.sum.``\ \*\ ``.ll``             contains text of the last validation set log likelihood
                                                     for an instance
-|rarr| ``validation.sum.winner.``\ \*\ ``.ll``      contains text of the current best validation set
+|rarr| ``validation.sum.winner.``\ \*\ ``.ll``      contains text of the current best validation set log 
                                                     likelihood for an instance
 ``log/``                                            diagnostic information
 |rarr| ``details.sh``                               script file that includes the exact
@@ -223,9 +223,9 @@ workdir instead.
 |rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of log likelihood by training
                                                     instance; can be used to examine  how fast
                                                     training converges
-|rarr| ``validation.sum.``\ \*\ ``.tab``            summary of validation set likelihood by
+|rarr| ``validation.sum.``\ \*\ ``.tab``            summary of validation set log likelihood by
                                                     training instance
-|rarr| ``validation.output.``\ \*\ ``.tab``         log of validation likelihood for individual windows
+|rarr| ``validation.output.``\ \*\ ``.tab``         log of validation log likelihood for individual windows
                                                     in the validation set by training instance
 |rarr| ``run.sh``                                   list of commands run by Segway, not
                                                     including wrappers
