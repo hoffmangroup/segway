@@ -3500,8 +3500,9 @@ def parse_options(argv):
                        " to use")
 
     group.add_argument("--include-coords", metavar="FILE",
-                       help="limit non-validation tasks to genomic"
-                       " coordinates in FILE (default all)")
+                       help="limit to genomic coordinates in"
+                       " FILE (default all) (Note: does not apply to"
+                       " --validation-coords)")
 
     # exclude goes after all includes
     group.add_argument("--exclude-coords", metavar="FILE",
@@ -3521,11 +3522,12 @@ def parse_options(argv):
 
     group.add_argument("--validation-fraction", type=float, metavar="FRAC",
                        default=VALIDATION_FRAC_DEFAULT,
-                       help="Use a random held out set of size FRAC positions"
-                       " to validate the parameters learned by each training"
-                       " round. The instance/round with the best likelihood"
-                       " as validated by the holdout set will be chosen as"
-                       " as the winner after the specified --max-train-rounds.")
+                       help="Use a random held out set of size FRAC of the"
+                       " included genomic regions to validate the parameters"
+                       " learned by each training round. The instance/round"
+                       " with the best likelihood as validated by the holdout"
+                       " set will be chosen as the winner after the specified"
+                       " --max-train-rounds.")
 
     group.add_argument("--validation-coords", metavar="FILE",
                        help="Use genomic coordinates in FILE as a validation"
