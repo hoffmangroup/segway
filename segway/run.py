@@ -1436,16 +1436,16 @@ class Runner(object):
 
         return log_likelihood
 
-    def load_validation_likelihood(self):
+    def load_validation_log_likelihood(self):
         """
-        Parses gmtkJT output to obtain each window's probability of evidence 
-        (prob(E)) and sums to obtain the intersection of the partial
+        Parses gmtkJT output to obtain each window's log probability of evidence 
+        log(prob(E)) and sums to obtain the log of the intersection of the partial
         prob(E)'s (ie prob(E_1 and E_2 and ...))
-        Writes parsed gmtkJT output to file tabulating historical prob(E)
+        Writes parsed gmtkJT output to file tabulating historical log(prob(E))
         of each window for each round as well as a file tabulating
-        the full validation set prob(E) for each round.
+        the full validation set log(prob(E)) for each round.
         Also updates likelihood file such that it contains the latest
-        full validation set prob(E).
+        full validation set log(prob(E)).
 
         Returns the full validation set prob(E).
         """
@@ -2711,7 +2711,7 @@ class Runner(object):
 
             if self.validate:
                 # load gmtkJT output and find the validation set's likelihood
-                validation_likelihood = self.load_validation_likelihood()
+                validation_likelihood = self.load_validation_log_likelihood()
 
                 # if the new validation likelihood is better than our previous best,
                 # choose it as our current winner and update instance's winner files
