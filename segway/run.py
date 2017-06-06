@@ -1438,15 +1438,11 @@ class Runner(object):
     def load_validation_log_likelihood(self):
         """
         Parses gmtkJT output to obtain each window's log probability of evidence 
-        log(prob(E)) and sums to obtain the log of the intersection of the partial
-        prob(E)'s (ie prob(E_1 and E_2 and ...))
-        Writes parsed gmtkJT output to file tabulating historical log(prob(E))
-        of each window for each round as well as a file tabulating
-        the full validation set log(prob(E)) for each round.
-        Also updates likelihood file such that it contains the latest
-        full validation set log(prob(E)).
+        log(prob(E)).
 
-        Returns the full validation set prob(E).
+        Raises error if it is found that the validation task was unsucccessful.
+        
+        Returns the validation window indices and corresponding likelihoods
         """
         with open(self.validation_output_filename) as infile:
             validation_output = infile.readlines()
@@ -1469,8 +1465,17 @@ class Runner(object):
                 if MSG_SUCCESS not in line:
                     raise RuntimeError("Validation not successful: " + line)
 
-        full_validation_output = []
+        return validation_window_indices,validation_window_likelihoods
 
+
+    def get_full_validation_output(self, validation_window_indices,
+                                   validation_window_likelihoods):
+        """
+        Takes as input the validation window indices and corresponding likelihoods
+        and returns an array of tuples where each entry is the validation window
+        index, size, and log likelihood.
+        """
+        full_validation_output = []
         for validation_window_index, validation_window_likelihood \
                 in zip(validation_window_indices,
                        validation_window_likelihoods):
@@ -1484,19 +1489,17 @@ class Runner(object):
                 validation_window_likelihood
                 ))
 
-        validation_likelihood = sum(validation_window_likelihoods)
-        with open(self.validation_sum_filename, "w") as logfile:
-            logfile.write(str(validation_likelihood))
+        return full_validation_output
 
-        # log full set of validation likelihoods for this round
-        with open(self.validation_output_tab_filename, "a") as logfile:
-            logfile.writelines(repr(full_validation_output) + "\n")
+    def calculate_validation_log_likelihood(self, validation_window_likelihoods):
+        """
+        Takes as input an array of validation window likelihoods
+        and sums to obtain the log of the intersection of the partial
+        prob(E)'s (ie prob(E_1 and E_2 and ...))
 
-        # log final validation set likelihood for this round
-        with open(self.validation_sum_tab_filename, "a") as logfile:
-            logfile.write(str(validation_likelihood) + "\n")
-
-        return validation_likelihood
+        Returns the full validation set log(prob(E)).
+        """
+        return sum(validation_window_likelihoods)
 
     def make_filename(self, *exts, **kwargs):
         """
@@ -2710,7 +2713,28 @@ class Runner(object):
 
             if self.validate:
                 # load gmtkJT output and find the validation set's likelihood
-                validation_likelihood = self.load_validation_log_likelihood()
+                validation_window_indices, validation_window_likelihoods = \
+                    self.load_validation_log_likelihood()
+
+                full_validation_output = \
+                    self.get_full_validation_output(validation_window_indices,
+                                                    validation_window_likelihoods)
+
+                # log full set of validation likelihoods for this round
+                with open(self.validation_output_tab_filename, "a") as logfile:
+                    logfile.writelines(repr(full_validation_output) + "\n")
+
+                validation_likelihood = \
+                    self.calculate_validation_log_likelihood(
+                        validation_window_likelihoods)
+
+                # log latest validation set likelihood for this instance
+                with open(self.validation_sum_filename, "w") as logfile:
+                    logfile.write(str(validation_likelihood))
+
+                # log final validation set likelihood for this round
+                with open(self.validation_sum_tab_filename, "a") as logfile:
+                    logfile.write(str(validation_likelihood) + "\n")
 
                 # if the new validation likelihood is better than our previous best,
                 # choose it as our current winner and update instance's winner files
