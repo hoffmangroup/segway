@@ -926,7 +926,6 @@ class Runner(object):
         if (res.validation_fraction and res.validation_fraction < 0):
             raise ValueError("The validation fraction cannot be less than 0")
 
-        # if validation fraction nonzero, set validate to True
         if (res.validation_fraction or res.validation_coords_filename):
             res.validate = True
 
