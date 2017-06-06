@@ -213,6 +213,23 @@ stopping criterion is no longer valid with minibatch training, so training
 will always run to --max-train-rounds (100, by default) if 
 --minibatch-fraction is set.
 
+An alternative way to choose the winning set of parameters
+is available through the :option:`--validation-fraction`\=\*frac* and 
+:option:`--validation-coords` options. Specifying a fraction *frac* to 
+:option:`--validation-fraction` will cause Segway to choose a fraction *frac* 
+or more of genomic positions as a held-out validation set. On the other hand, 
+:option:`--validation-coords`\=\*file* allows one to specify genomic 
+coordinates in a BED-format file, to be used as a validation set. When 
+using either of these options, Segway will evaluate the model after each 
+training iteration on the validation set and will choose the winning set 
+of parameters based on whichever set gives the best validation set likelihood 
+across all instances.
+
+.. note::
+
+    :option:`--exclude-coords` is applied to :option:`--validation-coords` but
+    :option:`--include-coords` is not.
+
 Resolution
 ----------
 

@@ -204,6 +204,14 @@ workdir instead.
 |rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
                                                     instance. Segway uses this to decide when to
                                                     stop training
+|rarr| ``validation.output.``\ \*\ ``.ll``          contains text of the last validation output for an
+                                                    instance
+|rarr| ``validation.output.winner.``\ \*\ ``.ll``   contains text of the current best validation GMTK output
+                                                    for an instance
+|rarr| ``validation.sum.``\ \*\ ``.ll``             contains text of the last validation set likelihood
+                                                    for an instance
+|rarr| ``validation.sum.winner.``\ \*\ ``.ll``      contains text of the current best validation set
+                                                    likelihood for an instance
 ``log/``                                            diagnostic information
 |rarr| ``details.sh``                               script file that includes the exact
                                                     command-lines queued by Segway, with wrapper scripts
@@ -215,6 +223,10 @@ workdir instead.
 |rarr| ``likelihood.``\ \*\ ``.tab``                tab-delimited summary of log likelihood by training
                                                     instance; can be used to examine  how fast
                                                     training converges
+|rarr| ``validation.sum.``\ \*\ ``.tab``            summary of validation set likelihood by
+                                                    training instance
+|rarr| ``validation.output.``\ \*\ ``.tab``         log of validation likelihood for individual windows
+                                                    in the validation set by training instance
 |rarr| ``run.sh``                                   list of commands run by Segway, not
                                                     including wrappers
                                                     that create and clean up temporary files such as

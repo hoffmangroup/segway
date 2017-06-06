@@ -1,4 +1,7 @@
 1.4.5:
+* segway: Add ability to use validation set to choose winner for training
+  (activate using --validation-coords or --validation-fraction options)
+  (thanks to Rachel Chan)
 
 1.4.4:
 * segway: Add mixture of Gaussians and variance floor functionality to Segway
