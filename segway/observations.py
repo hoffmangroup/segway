@@ -644,7 +644,6 @@ class Observations(object):
                     windows.append(Window(world, chrom, start, end))
 
         if self.validate:
-            print self.validation_fraction
             if self.validation_fraction:
                 windows, self.validation_windows = \
                     self.create_validation_windows_from_fraction(windows)
