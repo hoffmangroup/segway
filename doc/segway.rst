@@ -217,7 +217,7 @@ An alternative way to choose the winning set of parameters
 is available through the :option:`--validation-fraction`\=\*frac* or 
 :option:`--validation-coords` options. Specifying a fraction *frac* to 
 :option:`--validation-fraction` will cause Segway to choose a fraction *frac* 
-or more of genomic positions as a held-out validation set. On the other hand, 
+or more of genomic positions as a held-out validation set. 
 :option:`--validation-coords`\=\*file* allows one to specify genomic 
 coordinates in a BED-format file, to be used as a validation set. When 
 using either of these options, Segway will evaluate the model after each 
