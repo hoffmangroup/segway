@@ -599,44 +599,31 @@ class Observations(object):
             chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
 
             while len(starts) > 0:
-                starts, ends, validation_windows = \
-                    self.add_validation_windows(chrom,
-                                                starts,
-                                                ends,
-                                                validation_windows,
-                                                chr_exclude_coords)
+                start = starts.popleft()
+                end = ends.popleft()  # should not ever cause an IndexError
+
+                new_validation_windows = \
+                    subtract_regions(start, end, chr_exclude_coords)
+                subtracted_start, subtracted_end = \
+                    add_starts_ends(new_validation_windows,
+                                        starts,
+                                        ends)
+                if subtracted_start:
+                    # skip or split long sequences
+                    new_validation_windows = \
+                        self.skip_or_split_window(subtracted_start,
+                                                  subtracted_end)
+                    split_start, split_end = \
+                        add_starts_ends(new_validation_windows,
+                                            starts,
+                                            ends)
+                    if split_start:
+                        for world in xrange(self.num_worlds):
+                            validation_windows.append(Window(
+                                world, chrom, split_start, split_end)
+                                )
 
         return validation_windows
-
-    def add_validation_windows(self, chrom, starts, ends, validation_windows, chr_exclude_coords):
-        """
-        Takes as input the current chromosome, lists of starts, ends, 
-        the current list of validation windows, and the exclude coordinates.
-        Attempts to apply exclude coordinates 
-        and splits/skips long sequences. Returns to the main loop if successful. 
-        However, if the current window does not require further processing,
-        it is added to the list of validation windows.
-        """
-        start = starts.popleft()
-        end = ends.popleft()  # should not ever cause an IndexError
-
-        new_validation_windows = subtract_regions(start, end, chr_exclude_coords)
-        subtracted_start, subtracted_end = add_starts_ends(new_validation_windows,
-                                                           starts, ends)
-        if subtracted_start:
-            # skip or split long sequences
-            new_validation_windows =  self.skip_or_split_window(subtracted_start,
-                                                                subtracted_end)
-            split_start, split_end = add_starts_ends(new_validation_windows,
-                                                     starts, ends)
-            if split_start:
-                for world in xrange(self.num_worlds):
-                    validation_windows.append(Window(world,
-                                                     chrom,
-                                                     split_start,
-                                                     split_end))
-
-        return starts, ends, validation_windows
 
     def locate_windows(self, genome):
         """
