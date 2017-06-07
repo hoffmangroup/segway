@@ -912,29 +912,36 @@ class Runner(object):
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
 
-        if res.identify and res.verbosity > 0:
+        if (res.identify and
+            res.verbosity > 0):
             warn("Running Segway in identify mode with non-zero verbosity"
                  " is currently not supported and may result in errors.")
 
-        if res.var_floor and res.var_floor < 0:
+        if (res.var_floor and
+            res.var_floor < 0):
             raise ValueError("The variance floor cannot be less than 0")
 
-        if (res.validation_fraction and res.validation_coords_filename):
+        if (res.validation_fraction and
+            res.validation_coords_filename):
             raise ValueError("Cannot specify validation set in "
                 "more than 1 way")
 
-        if (res.validation_fraction and res.validation_fraction < 0):
+        if (res.validation_fraction and
+            res.validation_fraction < 0):
             raise ValueError("The validation fraction cannot be less than 0")
 
-        if (res.validation_fraction or res.validation_coords_filename):
+        if (res.validation_fraction or
+            res.validation_coords_filename):
             res.validate = True
 
-        if res.validation_fraction and (res.validation_fraction + 
-            res.minibatch_fraction > 1.0):
+        if (res.validation_fraction and
+            (res.validation_fraction + 
+            res.minibatch_fraction > 1.0)):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
 
-        if res.validate and not res.train:
+        if (res.validate and
+            not res.train):
             raise NotImplementedError("Using --validation-fraction"
                 " or --validation-coords with tasks other than train"
                 " is not supported")
