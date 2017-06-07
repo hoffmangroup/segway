@@ -2410,10 +2410,10 @@ class Runner(object):
         int_filepath = self.validation_int_filepaths[validation_window_index]
 
         with open(self.validation_int_filelistpath, "a") as int_filelist_fd:
-            int_filelist_fd.write("%s\n" % int_filepath)
+            print >>int_filelist_fd, int_filepath
 
         with open(self.validation_float_filelistpath, "a") as float_filelist_fd:
-            float_filelist_fd.write("%s\n" % float_filepath)
+            print >>float_filelist_fd, float_filepath
 
         if self.reverse_worlds:
             raise NotImplementedError("Running Segway with both validation "
