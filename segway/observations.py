@@ -449,17 +449,31 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     int_data.tofile(int_filename)
 
 
-def process_new_windows(new_windows, starts, ends):
+def add_starts_ends(new_windows, starts, ends):
+    """
+    If there are no new windows, return None, None
+
+    If there is more than one new window, modify the
+    starts and ends in place and return None, None
+
+    If there is only one new window, return a tuple of
+    (start, end) for that window.
+
+    """
     if not new_windows:  # nothing left
         return None, None
     elif len(new_windows) > 1:
         new_starts, new_ends = zip(*new_windows)
-        update_starts(starts, ends, new_starts, new_ends)
+        # reversed because extend left extends deque in reversed order
+        starts.extendleft(reversed(new_starts))
+        ends.extendleft(reversed(new_ends))
         return None, None
 
     return new_windows[0]
 
 def generate_coords_from_dict(coords_dict):
+    # use a deque to allow fast insertion/removal at the 
+    # beginning and end of the sequence
     for chrom, coords_list in coords_dict.iteritems():
         starts, ends = map(deque, zip(*coords_list))
         yield chrom, starts, ends
@@ -551,7 +565,10 @@ class Observations(object):
     def create_validation_windows_from_fraction(self, windows):
         """
         Takes a subset of the training windows, using the specified
-        validation fract, to be used as the validation windows.
+        validation fraction, to be used as the validation windows.
+
+        Note: modifies the input parameter 'windows' and uses this
+        as the training windows.
 
         Returns training windows, validation windows
         """
@@ -560,7 +577,8 @@ class Observations(object):
         cur_bases = 0
         self.random_state.shuffle(windows)
 
-        # remove windows until total number of bases chosen is at least
+        # Remove windows from training set and add them to validation set
+        # until total number of bases chosen is at least
         # as large as that required by the validation fraction
         while (float(cur_bases) / total_bases) < self.validation_fraction:
             window = windows.pop()
@@ -587,7 +605,7 @@ class Observations(object):
                 new_validation_windows = \
                     subtract_regions(start, end, chr_exclude_coords)
                 subtracted_start, subtracted_end = \
-                    process_new_windows(new_validation_windows,
+                    add_starts_ends(new_validation_windows,
                                         starts,
                                         ends)
                 if subtracted_start:
@@ -596,13 +614,13 @@ class Observations(object):
                         self.skip_or_split_window(subtracted_start,
                                                   subtracted_end)
                     split_start, split_end = \
-                        process_new_windows(new_validation_windows,
+                        add_starts_ends(new_validation_windows,
                                             starts,
                                             ends)
                     if split_start:
                         for world in xrange(self.num_worlds):
-                            validation_windows.append(Window
-                                (world, chrom, split_start, split_end)
+                            validation_windows.append(Window(
+                                world, chrom, split_start, split_end)
                                 )
 
         return validation_windows
@@ -630,13 +648,13 @@ class Observations(object):
                 end = ends.popleft()  # should not ever cause an IndexError
 
                 new_windows = subtract_regions(start, end, chr_exclude_coords)
-                start, end = process_new_windows(new_windows, starts, ends)
+                start, end = add_starts_ends(new_windows, starts, ends)
                 if start is None:
                     continue
 
                 # skip or split long sequences
                 new_windows = self.skip_or_split_window(start, end)
-                start, end = process_new_windows(new_windows, starts, ends)
+                start, end = add_starts_ends(new_windows, starts, ends)
                 if start is None:
                     continue
 

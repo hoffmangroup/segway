@@ -170,13 +170,15 @@ TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 
 # Tasks
+# 'verb' refers to the action being run, and 'kind' refers
+# to a noun describing the task
 ANNOTATE_TASK_KIND = "viterbi"
 POSTERIOR_TASK_KIND = "posterior"
 TRAIN_TASK_KIND = "train"
 VALIDATE_TASK_VERB = "run"
 VALIDATE_TASK_KIND = "validate"
-CREATE_VALIDATION_SET_WINDOW_TASK_VERB = "create"
-CREATE_VALIDATION_SET_WINDOW_TASK_KIND = "validation-set-window"
+SAVE_WINDOW_TASK_VERB = "save"
+SAVE_WINDOW_TASK_KIND = "window"
 BUNDLE_TRAIN_TASK_KIND = "bundle-train"
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
@@ -923,8 +925,8 @@ class Runner(object):
 
         if (res.validation_fraction and
             res.validation_coords_filename):
-            raise ValueError("Cannot specify validation set in "
-                "more than 1 way")
+            raise ValueError("Cannot specify validation sets using both"
+                " fraction and explicit coordinates")
 
         if (res.validation_fraction and
             res.validation_fraction < 0):
@@ -1731,12 +1733,16 @@ class Runner(object):
 
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
+        # This is called every time Segway requires an output_dirpath
+        # so no need to create the directory if it already exists
         if not path(res).exists():
             self.make_dir(res)
         return res
 
     def make_job_script_dirpath(self, instance_index):
         res = self.work_dirpath / SUBDIRNAME_JOB_SCRIPT / str(instance_index)
+        # This is called every time Segway requires a job script dirpath
+        # so no need to create the directory if it already exists
         if not path(res).exists():
             self.make_dir(res)
         return res
@@ -2376,10 +2382,10 @@ class Runner(object):
 
         return res
 
-    def queue_create_validation_set_window(self, validation_window,
+    def queue_save_validation_set_window(self, validation_window,
                                            num_frames=0, **kwargs):
         segway_task_path = find_executable("segway-task")
-        segway_task_verb = CREATE_VALIDATION_SET_WINDOW_TASK_VERB
+        segway_task_verb = SAVE_WINDOW_TASK_VERB
         output_filename = ""
 
         chrom = validation_window.chrom
@@ -2388,7 +2394,7 @@ class Runner(object):
         name = "create_validation_set_%s_%s_%s" % (
             chrom, window_start, window_end)
 
-        task_kind = CREATE_VALIDATION_SET_WINDOW_TASK_KIND
+        task_kind = SAVE_WINDOW_TASK_KIND
 
         track_indexes = self.world_track_indexes[validation_window.world]
         genomedata_names = self.world_genomedata_names[validation_window.world]
@@ -2473,6 +2479,9 @@ class Runner(object):
 
         kwargs["of1"] = self.validation_float_filelistpath
         kwargs["of2"] = self.validation_int_filelistpath
+
+        # delete gmtkEMtrain arguments that are not required for validation
+        # using gmtkJT
         del kwargs["lldp"]
         del kwargs["maxEmIters"]
         del kwargs["objsNotToTrain"]
@@ -2868,14 +2877,14 @@ class Runner(object):
             # always overwrite params.params
             copy2(last_params_filename, self.make_params_filename())
 
-    def create_validation_set(self):
+    def save_validation_set(self):
         with Session() as session:
             self.session = session
             self.instance_index = "validation"
             res = RestartableJobDict(self.session, self.job_log_file)
             for validation_window in self.validation_windows:
                 restartable_job = \
-                    self.queue_create_validation_set_window(validation_window)
+                    self.queue_save_validation_set_window(validation_window)
                 res.queue(restartable_job)
             res.wait()
         self.session = None
@@ -3456,7 +3465,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
                     if (self.validate and
                         self.train):
-                        self.create_validation_set()
+                        self.save_validation_set()
 
                     if self.train:
                         self.run_train()

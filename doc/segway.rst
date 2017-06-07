@@ -218,7 +218,7 @@ is available through the :option:`--validation-fraction`\=\*frac* or
 :option:`--validation-coords` options. Specifying a fraction *frac* to 
 :option:`--validation-fraction` will cause Segway to choose a fraction *frac* 
 or more of genomic positions as a held-out validation set. 
-:option:`--validation-coords`\=\*file* allows one to specify genomic 
+:option:`--validation-coords`\=\*file* allows one to explicitly specify genomic 
 coordinates in a BED-format file, to be used as a validation set. When 
 using either of these options, Segway will evaluate the model after each 
 training iteration on the validation set and will choose the winning set 
@@ -228,7 +228,10 @@ across all instances.
 .. note::
 
     :option:`--exclude-coords` is applied to :option:`--validation-coords` but
-    :option:`--include-coords` is not.
+    :option:`--include-coords` is not. This allows the user to easily specify
+    regions of the genome that should not be considered by Segway overall, while 
+    also allowing them to specify a set of validation coordinates in a 
+    straightforward manner.
 
 Resolution
 ----------

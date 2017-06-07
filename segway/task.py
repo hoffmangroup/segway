@@ -519,15 +519,10 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
                     pass
 
 
-def create_validation_set_window(coord, resolution, do_reverse, outfile_name,
+def save_window(coord, resolution, do_reverse, outfile_name,
                                  genomedata_names, float_filename,
                                  int_filename, distribution,
                                  track_indexes, *args):
-
-    if do_reverse:
-        raise NotImplementedError("Running Segway with both validation "
-            "and reverse world options simultaneously is currently "
-            "not supported")
 
     (chrom, start, end) = coord
 
@@ -571,7 +566,7 @@ TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("run", "train"): run_train,
          ("run", "bundle-train"): run_bundle_train,
          ("run", "validate"): run_validate,
-         ("create", "validation-set-window"): create_validation_set_window,
+         ("save", "window"): save_window,
          }
 
 
