@@ -519,7 +519,7 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
                     pass
 
 
-def save_window(coord, resolution, do_reverse, outfile_name,
+def save_gmtk_observation_files(coord, resolution, do_reverse, outfile_name,
                                  genomedata_names, float_filename,
                                  int_filename, distribution,
                                  track_indexes, *args):
@@ -566,7 +566,7 @@ TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("run", "train"): run_train,
          ("run", "bundle-train"): run_bundle_train,
          ("run", "validate"): run_validate,
-         ("save", "window"): save_window,
+         ("save", "gmtk-observation-files"): save_gmtk_observation_files,
          }
 
 

@@ -179,7 +179,7 @@ TRAIN_TASK_KIND = "train"
 VALIDATE_TASK_VERB = "run"
 VALIDATE_TASK_KIND = "validate"
 SAVE_WINDOW_TASK_VERB = "save"
-SAVE_WINDOW_TASK_KIND = "window"
+SAVE_WINDOW_TASK_KIND = "gmtk-observation-files"
 BUNDLE_TRAIN_TASK_KIND = "bundle-train"
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
