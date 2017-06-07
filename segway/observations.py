@@ -600,14 +600,18 @@ class Observations(object):
 
             while len(starts) > 0:
                 starts, ends, validation_windows = \
-                    add_validation_windows(starts, ends, validation_windows)
+                    add_validation_windows(starts,
+                                           ends,
+                                           validation_windows,
+                                           chr_exclude_coords)
 
         return validation_windows
 
     def add_validation_windows(starts, ends, validation_windows):
         """
-        Takes as input lists of starts, ends, and the current 
-        list of validation windows. Attempts to apply exclude coordinates 
+        Takes as input lists of starts, ends, the current 
+        list of validation windows, and the exclude coordinates.
+        Attempts to apply exclude coordinates 
         and splits/skips long sequences. Returns to the main loop if successful. 
         However, if the current window does not require further processing,
         it is added to the list of validation windows.
