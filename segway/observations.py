@@ -607,7 +607,8 @@ class Observations(object):
 
         return validation_windows
 
-    def add_validation_windows(starts, ends, validation_windows):
+    def add_validation_windows(starts, ends, validation_windows,
+                               chr_exclude_coords):
         """
         Takes as input lists of starts, ends, the current 
         list of validation windows, and the exclude coordinates.
