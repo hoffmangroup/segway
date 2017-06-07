@@ -600,16 +600,15 @@ class Observations(object):
 
             while len(starts) > 0:
                 starts, ends, validation_windows = \
-                    add_validation_windows(chrom,
-                                           starts,
-                                           ends,
-                                           validation_windows,
-                                           chr_exclude_coords)
+                    self.add_validation_windows(chrom,
+                                                starts,
+                                                ends,
+                                                validation_windows,
+                                                chr_exclude_coords)
 
         return validation_windows
 
-    def add_validation_windows(chrom, starts, ends, validation_windows,
-                               chr_exclude_coords):
+    def add_validation_windows(self, chrom, starts, ends, validation_windows, chr_exclude_coords):
         """
         Takes as input the current chromosome, lists of starts, ends, 
         the current list of validation windows, and the exclude coordinates.
