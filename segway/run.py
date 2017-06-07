@@ -32,6 +32,7 @@ from genomedata import Genome
 from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
 from numpy.random import RandomState
+from operator import attrgetter
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -2997,7 +2998,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # finds the min by info_criterion (maximize log_likelihood)
         if self.validate:
             max_params = max(instance_params,
-                             key=lambda k: k.validation_likelihood)
+                             key=attrgetter('validation_likelihood'))
         else:
             max_params = max(instance_params)
 
