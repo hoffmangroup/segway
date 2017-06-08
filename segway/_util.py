@@ -59,6 +59,11 @@ PREFIX_INPUT = "input"
 PREFIX_LIKELIHOOD = "likelihood"
 PREFIX_PARAMS = "params"
 
+PREFIX_VALIDATION_SUM_WINNER = "validation.sum.winner"
+PREFIX_VALIDATION_SUM = "validation.sum"
+PREFIX_VALIDATION_OUTPUT_WINNER = "validation.output.winner"
+PREFIX_VALIDATION_OUTPUT = "validation.output"
+
 SUBDIRNAME_LOG = "log"
 SUBDIRNAME_PARAMS = "params"
 
@@ -92,6 +97,7 @@ OptionBuilder_GMTK = (Mixin_UseFullProgPath +
 TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
+VALIDATE_PROG = OptionBuilder_GMTK("gmtkJT")
 
 BED_SCORE = "1000"
 BED_STRAND = "."

@@ -32,6 +32,7 @@ from genomedata import Genome
 from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
 from numpy.random import RandomState
+from operator import attrgetter
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import path
@@ -47,6 +48,7 @@ from .input_master import InputMasterSaver
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
+from .task import MSG_SUCCESS
 from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     DISTRIBUTION_GAMMA, DISTRIBUTION_ASINH_NORMAL,
                     EXT_BED, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS,
@@ -56,12 +58,17 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     make_prefix_fmt, MB, memoized_property,
                     OFFSET_START, OFFSET_END, OFFSET_STEP,
                     OptionBuilder_GMTK, POSTERIOR_PROG,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, SEG_TABLE_WIDTH,
+                    PREFIX_LIKELIHOOD, PREFIX_PARAMS,
+                    PREFIX_VALIDATION_OUTPUT,
+                    PREFIX_VALIDATION_SUM,
+                    PREFIX_VALIDATION_OUTPUT_WINNER,
+                    PREFIX_VALIDATION_SUM_WINNER,
+                    SEG_TABLE_WIDTH,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
-                    VITERBI_PROG)
+                    VALIDATE_PROG, VITERBI_PROG)
 from .version import __version__
 
 # set once per file run
@@ -164,9 +171,15 @@ TRIANGULATE_PROG = OptionBuilder_GMTK("gmtkTriangulate")
 EM_TRAIN_PROG = OptionBuilder_GMTK("gmtkEMtrain")
 
 # Tasks
+# 'verb' refers to the action being run, and 'kind' refers
+# to a noun describing the task
 ANNOTATE_TASK_KIND = "viterbi"
 POSTERIOR_TASK_KIND = "posterior"
 TRAIN_TASK_KIND = "train"
+VALIDATE_TASK_VERB = "run"
+VALIDATE_TASK_KIND = "validate"
+SAVE_WINDOW_TASK_VERB = "save"
+SAVE_WINDOW_TASK_KIND = "gmtk-observation-files"
 BUNDLE_TRAIN_TASK_KIND = "bundle-train"
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
@@ -197,6 +210,7 @@ PREFIX_JOB_LOG = "jobs"
 PREFIX_JOB_NAME_TRAIN = "emt"
 PREFIX_JOB_NAME_VITERBI = "vit"
 PREFIX_JOB_NAME_POSTERIOR = "jt"
+PREFIX_JOB_NAME_VALIDATE = "validate"
 PREFIX_JOB_NAMES = dict(identify=PREFIX_JOB_NAME_VITERBI,
                         posterior=PREFIX_JOB_NAME_POSTERIOR)
 
@@ -222,6 +236,7 @@ SUBDIRNAME_AUX = "auxiliary"
 SUBDIRNAME_JOB_SCRIPT = "cmdline"
 SUBDIRNAME_LIKELIHOOD = "likelihood"
 SUBDIRNAME_OBS = "observations"
+SUBDIRNAME_VALIDATION = "validation"
 SUBDIRNAME_POSTERIOR = "posterior"
 SUBDIRNAME_VITERBI = "viterbi"
 
@@ -257,7 +272,8 @@ RES_DONT_TRAIN = "dont_train.list"
 RES_SEG_TABLE = "seg_table.tab"
 
 TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
-                   "log_likelihood_filename"]
+                   "log_likelihood_filename", "validation_output_filename",
+                   "validation_sum_filename"]
 LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 COMMENT_POSTERIOR_TRIANGULATION = \
@@ -278,9 +294,17 @@ THREAD_START_SLEEP_TIME = 62  # XXX: this should become an option
 REVERSE_GPR = "^0:-1:0"
 
 Results = namedtuple("Results", ["log_likelihood", "num_segs",
+                                 "validation_likelihood",
                                  "input_master_filename", "params_filename",
-                                 "log_likelihood_filename"])
-OFFSET_FILENAMES = 2  # where the filenames begin in Results
+                                 "log_likelihood_filename",
+                                 "validation_output_filename",
+                                 "validation_sum_filename"])
+
+OFFSET_FILENAMES = 3  # where the filenames begin in Results
+
+GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+GMTKJT_PATTERN_WINDOW_MATCH_INDEX = 1
+GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX = 2
 
 PROGS = dict(identify=VITERBI_PROG, posterior=POSTERIOR_PROG)
 
@@ -601,12 +625,23 @@ class Runner(object):
         self.log_likelihood_filename = None
         self.log_likelihood_tab_filename = None
 
+        self.validation_output_filename = None
+        self.validation_output_winner_filename = None
+        self.validation_output_tab_filename = None
+
+        self.validation_sum_filename = None
+        self.validation_sum_winner_filename = None
+        self.validation_sum_tab_filename = None
+
         self.obs_dirname = None
+        self.validation_obs_dirname = None
 
         self.include_coords_filename = None
         self.exclude_coords_filename = None
+        self.validation_coords_filename = None
 
         self.minibatch_fraction = MINIBATCH_DEFAULT
+        self.validation_fraction = None
 
         self.posterior_clique_indices = POSTERIOR_CLIQUE_INDICES.copy()
 
@@ -632,6 +667,7 @@ class Runner(object):
         # data
         # a "window" is what GMTK calls a segment
         self.windows = None
+        self.validation_windows = None
         self.mins = None
         self.track_specs = []
 
@@ -659,6 +695,7 @@ class Runner(object):
         self.train = False  # EM train
         self.posterior = False
         self.identify = False  # viterbi
+        self.validate = False
         self.dry_run = False
         self.verbosity = VERBOSITY
 
@@ -672,7 +709,7 @@ class Runner(object):
         for task in tasks:
             if task == "train":
                 self.train = True
-            elif (task == "identify" or 
+            elif (task == "identify" or
                   task == "annotate"):
                 self.identify = True
             elif task == "posterior":
@@ -695,6 +732,8 @@ class Runner(object):
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
                         ("minibatch_fraction",),
+                        ("validation_fraction",),
+                        ("validation_coords", "validation_coords_filename"),
                         ("num_instances",),
                         ("verbosity",),
                         ("split_sequences", "max_split_sequence_length"),
@@ -876,13 +915,39 @@ class Runner(object):
             res.check_world_fmt("bedgraph_filename")
             res.check_world_fmt("bigbed_filename")
 
-        if res.identify and res.verbosity > 0:
+        if (res.identify and
+            res.verbosity > 0):
             warn("Running Segway in identify mode with non-zero verbosity"
                  " is currently not supported and may result in errors.")
 
-        if res.var_floor and res.var_floor < 0:
+        if (res.var_floor and
+            res.var_floor < 0):
             raise ValueError("The variance floor cannot be less than 0")
 
+        if (res.validation_fraction and
+            res.validation_coords_filename):
+            raise ValueError("Cannot specify validation sets using both"
+                " fraction and explicit coordinates")
+
+        if (res.validation_fraction and
+            res.validation_fraction < 0):
+            raise ValueError("The validation fraction cannot be less than 0")
+
+        if (res.validation_fraction or
+            res.validation_coords_filename):
+            res.validate = True
+
+        if (res.validation_fraction and
+            (res.validation_fraction + 
+            res.minibatch_fraction > 1.0)):
+            raise ValueError("The sum of the validation and "
+                "minibatch fractions cannot be greater than 1")
+
+        if (res.validate and
+            not res.train):
+            raise NotImplementedError("Using --validation-fraction"
+                " or --validation-coords with tasks other than train"
+                " is not supported")
         return res
 
     @memoized_property
@@ -922,6 +987,10 @@ class Runner(object):
     @memoized_property
     def exclude_coords(self):
         return load_coords(self.exclude_coords_filename)
+
+    @memoized_property
+    def validation_coords(self):
+        return load_coords(self.validation_coords_filename)
 
     @memoized_property
     def seg_table(self):
@@ -995,6 +1064,18 @@ class Runner(object):
         return res
 
     @memoized_property
+    def validation_obs_dirpath(self):
+        res = self.work_dirpath / SUBDIRNAME_OBS / SUBDIRNAME_VALIDATION
+        self.validation_obs_dirname = res
+        try:
+            self.make_dir(res)
+        except OSError, err:
+            if not (err.errno == EEXIST and res.isdir()):
+                raise
+
+        return res
+
+    @memoized_property
     def obs_dirpath(self):
         obs_dirname = self.obs_dirname
 
@@ -1022,6 +1103,14 @@ class Runner(object):
     @memoized_property
     def int_filelistpath(self):
         return self.make_obs_filelistpath(EXT_INT)
+
+    @memoized_property
+    def validation_float_filelistpath(self):
+        return self.make_validation_obs_filelistpath(EXT_FLOAT)
+
+    @memoized_property
+    def validation_int_filelistpath(self):
+        return self.make_validation_obs_filelistpath(EXT_INT)
 
     @memoized_property
     def float_tabfilepath(self):
@@ -1151,15 +1240,12 @@ class Runner(object):
 
         return res
 
-    @memoized_property
     def output_dirpath(self):
         return self.make_output_dirpath("o", self.instance_index)
 
-    @memoized_property
     def error_dirpath(self):
         return self.make_output_dirpath("e", self.instance_index)
 
-    @memoized_property
     def job_script_dirpath(self):
         return self.make_job_script_dirpath(self.instance_index)
 
@@ -1202,6 +1288,10 @@ class Runner(object):
     @memoized_property
     def train_prog(self):
         return self.prog_factory(EM_TRAIN_PROG)
+
+    @memoized_property
+    def validate_prog(self):
+        return self.prog_factory(VALIDATE_PROG)
 
     @memoized_property
     def seg_countdowns_initial(self):
@@ -1355,6 +1445,72 @@ class Runner(object):
 
         return log_likelihood
 
+    def load_validation_log_likelihood(self):
+        """
+        Parses gmtkJT output to obtain each window's log probability of evidence 
+        log(prob(E)).
+
+        Raises error if it is found that the validation task was unsucccessful.
+        
+        Returns the validation window indices and corresponding likelihoods
+        """
+        with open(self.validation_output_filename) as infile:
+            validation_output = infile.readlines()
+
+        validation_window_indices = []
+        validation_window_likelihoods = []
+
+        for line in validation_output:
+            # returns a regex group where first match is validation
+            # window index, second match is validation window likelihood
+            validation_match = re.search(GMTKJT_OUTPUT_PATTERN, line)
+            if validation_match:
+                validation_window_indices.append(int(
+                    validation_match.group(GMTKJT_PATTERN_WINDOW_MATCH_INDEX)
+                    ))
+                validation_window_likelihoods.append(float(
+                    validation_match.group(GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX)
+                    ))
+            else:
+                if MSG_SUCCESS not in line:
+                    raise RuntimeError("Validation not successful: " + line)
+
+        return validation_window_indices,validation_window_likelihoods
+
+
+    def get_full_validation_output(self, validation_window_indices,
+                                   validation_window_likelihoods):
+        """
+        Takes as input the validation window indices and corresponding likelihoods
+        and returns an array of tuples where each entry is the validation window
+        index, size, and log likelihood.
+        """
+        full_validation_output = []
+        for validation_window_index, validation_window_likelihood \
+                in zip(validation_window_indices,
+                       validation_window_likelihoods):
+            validation_window = \
+                self.validation_windows[validation_window_index]
+            validation_window_size = len(validation_window)
+
+            full_validation_output.append((
+                validation_window_index,
+                validation_window_size,
+                validation_window_likelihood
+                ))
+
+        return full_validation_output
+
+    def calculate_validation_log_likelihood(self, validation_window_likelihoods):
+        """
+        Takes as input an array of validation window likelihoods
+        and sums to obtain the log of the intersection of the partial
+        prob(E)'s (ie prob(E_1 and E_2 and ...))
+
+        Returns the full validation set log(prob(E)).
+        """
+        return sum(validation_window_likelihoods)
+
     def make_filename(self, *exts, **kwargs):
         """
         makes a filename by joining together exts
@@ -1498,6 +1654,18 @@ class Runner(object):
                                   dirname=dirname,
                                   subdirname=SUBDIRNAME_LOG)
 
+    def make_validation_sum_tab_filename(self, instance_index, dirname):
+        return self.make_filename(PREFIX_VALIDATION_SUM,
+                                  instance_index, EXT_TAB,
+                                  dirname=dirname,
+                                  subdirname=SUBDIRNAME_LOG)
+
+    def make_validation_output_tab_filename(self, instance_index,
+                                                 dirname):
+        return self.make_filename(PREFIX_VALIDATION_OUTPUT, instance_index,
+                                  EXT_TAB, dirname=dirname,
+                                  subdirname=SUBDIRNAME_LOG)
+
     def set_log_likelihood_filenames(self, instance_index=None, new=False):
         """
         None means the final params file, not for any particular thread
@@ -1514,16 +1682,70 @@ class Runner(object):
                 self.make_log_likelihood_tab_filename(instance_index,
                                                       self.work_dirname)
 
+    def set_validation_likelihood_filenames(self, instance_index=None,
+                                            new=False):
+        """
+        If no instance_index specified and the number of instances is
+        greater than 1, then this is for the final validation
+        likelihood files, not for any particular thread
+        """
+        if new or not self.validation_output_filename:
+            # create validation output files
+            validation_output_filename = \
+                self.make_filename(PREFIX_VALIDATION_OUTPUT,
+                                   instance_index, EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.validation_output_filename = \
+                validation_output_filename
+
+            validation_output_winner_filename = \
+                self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
+                                   instance_index, EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.validation_output_winner_filename = \
+                validation_output_winner_filename
+
+            self.validation_output_tab_filename = \
+                self.make_validation_output_tab_filename(
+                    instance_index, self.work_dirname)
+
+            # create validation sum files
+            validation_sum_filename = \
+                self.make_filename(PREFIX_VALIDATION_SUM,
+                                   instance_index, EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.validation_sum_filename = \
+                validation_sum_filename
+
+            validation_sum_winner_filename = \
+                self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
+                                   instance_index, EXT_LIKELIHOOD,
+                                   subdirname=SUBDIRNAME_LIKELIHOOD)
+
+            self.validation_sum_winner_filename = \
+                validation_sum_winner_filename
+
+            self.validation_sum_tab_filename = \
+                self.make_validation_sum_tab_filename(instance_index,
+                                                      self.work_dirname)
+
     def make_output_dirpath(self, dirname, instance_index):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
-        self.make_dir(res)
-
+        # This is called every time Segway requires an output_dirpath
+        # so no need to create the directory if it already exists
+        if not path(res).exists():
+            self.make_dir(res)
         return res
 
     def make_job_script_dirpath(self, instance_index):
         res = self.work_dirpath / SUBDIRNAME_JOB_SCRIPT / str(instance_index)
-        self.make_dir(res)
-
+        # This is called every time Segway requires a job script dirpath
+        # so no need to create the directory if it already exists
+        if not path(res).exists():
+            self.make_dir(res)
         return res
 
     def make_dir(self, dirname, clobber=None):
@@ -1557,6 +1779,9 @@ class Runner(object):
 
     def make_obs_filelistpath(self, ext):
         return make_filelistpath(self.obs_dirpath, ext)
+
+    def make_validation_obs_filelistpath(self, ext):
+        return make_filelistpath(self.validation_obs_dirpath, ext)
 
     def save_resource(self, resname, subdirname=""):
         orig_filename = data_filename(resname)
@@ -1801,16 +2026,26 @@ class Runner(object):
             observations.locate_windows(genome)
 
         self.windows = observations.windows
+        self.validation_windows = observations.validation_windows
 
         # XXX: does this need to be done before save()?
         self.subset_metadata()
         observations.create_filepaths(temp=True)
+        observations.create_validation_filepaths()
 
         self.float_filepaths = observations.float_filepaths
         self.int_filepaths = observations.int_filepaths
 
+        self.validation_float_filepaths = \
+            observations.validation_float_filepaths
+        self.validation_int_filepaths = \
+            observations.validation_int_filepaths
+
         if self.train:
             self.set_log_likelihood_filenames()
+
+            if self.validate:
+                self.set_validation_likelihood_filenames()
 
         self.save_include()
         self.set_params_filename()
@@ -1845,6 +2080,11 @@ class Runner(object):
         return "%s%d.%d.%s.%s.%s" % (PREFIX_JOB_NAME_TRAIN, instance_index,
                                      round_index, window_index,
                                      self.work_dirpath.name, self.uuid)
+
+    def make_job_name_validate(self, instance_index, round_index):
+        return "%s%d.%d.%s.%s" % (PREFIX_JOB_NAME_VALIDATE, instance_index,
+                                  round_index, self.work_dirpath.name,
+                                  self.uuid)
 
     def make_job_name_identify(self, prefix, window_index):
         return "%s%d.%s.%s" % (prefix, window_index, self.work_dirpath.name,
@@ -1937,7 +2177,7 @@ class Runner(object):
             args = gmtk_cmdline
 
         shell_job_name = extsep.join([job_name, EXT_SH])
-        job_script_filename = self.job_script_dirpath / shell_job_name
+        job_script_filename = self.job_script_dirpath() / shell_job_name
 
         job_script_fd = os_open(job_script_filename,
                                 JOB_SCRIPT_FILE_OPEN_FLAGS,
@@ -1971,8 +2211,8 @@ class Runner(object):
         job_tmpl.jobEnvironment = remove_bash_functions(environment)
 
         if output_filename is None:
-            output_filename = self.output_dirpath / job_name
-        error_filename = self.error_dirpath / job_name
+            output_filename = self.output_dirpath() / job_name
+        error_filename = self.error_dirpath() / job_name
 
         job_tmpl.blockEmail = True
 
@@ -2143,6 +2383,119 @@ class Runner(object):
 
         return res
 
+    def queue_save_validation_set_window(self, validation_window,
+                                           num_frames=0, **kwargs):
+        segway_task_path = find_executable("segway-task")
+        segway_task_verb = SAVE_WINDOW_TASK_VERB
+        output_filename = ""
+
+        chrom = validation_window.chrom
+        window_start = validation_window.start
+        window_end = validation_window.end
+        name = "create_validation_set_%s_%s_%s" % (
+            chrom, window_start, window_end)
+
+        task_kind = SAVE_WINDOW_TASK_KIND
+
+        track_indexes = self.world_track_indexes[validation_window.world]
+        genomedata_names = self.world_genomedata_names[validation_window.world]
+
+        track_indexes_text = ",".join(map(str, track_indexes))
+        genomedata_names_text = ",".join(genomedata_names)
+
+        validation_window_index = \
+            self.validation_windows.index(validation_window)
+        float_filepath = \
+            self.validation_float_filepaths[validation_window_index]
+        int_filepath = self.validation_int_filepaths[validation_window_index]
+
+        with open(self.validation_int_filelistpath, "a") as int_filelist_fd:
+            print >>int_filelist_fd, int_filepath
+
+        with open(self.validation_float_filelistpath, "a") as float_filelist_fd:
+            print >>float_filelist_fd, float_filepath
+
+        if self.reverse_worlds:
+            raise NotImplementedError("Running Segway with both validation "
+                "and reverse world options simultaneously is currently "
+                "not supported")
+        else:
+            is_reverse = 0
+
+        prefix_args = [segway_task_path,
+                       segway_task_verb,
+                       task_kind,
+                       output_filename,  # output filename
+                       chrom, window_start, window_end,
+                       self.resolution,
+                       is_reverse,  # end requirements for base segway-task
+                       genomedata_names_text,
+                       float_filepath,
+                       int_filepath,
+                       self.distribution,
+                       track_indexes_text,
+                       self.validation_windows
+                       ]
+
+        return self.queue_task(self.train_prog, kwargs, name, num_frames,
+                               prefix_args=prefix_args
+                               )
+
+    def queue_validate(self, input_params_filename, instance_index,
+                       round_index, num_frames=0, **kwargs):
+        """take params output from bundling and validates on validation set
+        """
+
+        cpp_options = self.make_cpp_options(input_params_filename)
+
+        kwargs["inputMasterFile"] = self.input_master_filename
+
+        name = self.make_job_name_validate(instance_index, round_index)
+
+        segway_task_path = find_executable("segway-task")
+        segway_task_verb = VALIDATE_TASK_VERB
+
+        chrom = 0
+        window_start = 0
+        window_end = 0
+
+        task_kind = VALIDATE_TASK_KIND
+
+        if self.reverse_worlds:
+            raise NotImplementedError
+        else:
+            is_reverse = 0
+
+        prefix_args = [segway_task_path,
+                       segway_task_verb,
+                       task_kind,
+                       self.validation_output_filename,
+                       chrom, window_start, window_end,
+                       self.resolution,
+                       is_reverse  # end requirements for base segway-task
+                       ]
+
+        kwargs = dict(cppCommandOptions=cpp_options,
+                      probE=True, cliqueTableNormalize=0.0, **kwargs)
+
+        kwargs["of1"] = self.validation_float_filelistpath
+        kwargs["of2"] = self.validation_int_filelistpath
+
+        # delete gmtkEMtrain arguments that are not required for validation
+        # using gmtkJT
+        del kwargs["lldp"]
+        del kwargs["maxEmIters"]
+        del kwargs["objsNotToTrain"]
+
+        restartable_job = self.queue_task(self.validate_prog,
+                                          kwargs, name, num_frames,
+                                          prefix_args=prefix_args
+                                          )
+
+        res = RestartableJobDict(self.session, self.job_log_file)
+        res.queue(restartable_job)
+        return res
+
     def get_posterior_clique_print_ranges(self):
         res = {}
 
@@ -2256,8 +2609,8 @@ class Runner(object):
                             TRAIN_WINDOWS_BASES_INDEX]
 
             train_window_indices_shuffled = \
-            self.random_state.choice(range(num_train_windows),
-                                                num_train_windows, replace=False)
+                self.random_state.choice(range(num_train_windows),
+                                         num_train_windows, replace=False)
 
             total_bases = sum(
                 train_window[1] for train_window in train_windows_all
@@ -2288,6 +2641,12 @@ class Runner(object):
                                     **kwargs)
         restartable_jobs.wait()
 
+        if self.validate:
+            restartable_jobs = \
+                self.queue_validate(curr_params_filename, instance_index,
+                                    round_index, **kwargs)
+            restartable_jobs.wait()
+
         self.last_params_filename = curr_params_filename
 
     def run_train_instance(self):
@@ -2307,9 +2666,12 @@ class Runner(object):
 
         self.set_log_likelihood_filenames(instance_index, new)
         self.set_params_filename(instance_index, new)
+        if self.validate:
+            self.set_validation_likelihood_filenames(instance_index, new)
 
         # get previous (or initial) values
-        last_log_likelihood, log_likelihood, round_index = \
+        last_log_likelihood, log_likelihood, round_index, \
+            validation_likelihood, best_validation_likelihood = \
             self.make_instance_initial_results()
 
         if round_index == 0:
@@ -2335,14 +2697,30 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return Results(None, None, None, None, None)
+            return Results(None, None, None, None, None, None, None)
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
-                                            round_index, kwargs)
+                                            round_index,
+                                            validation_likelihood,
+                                            best_validation_likelihood,
+                                            kwargs)
 
     def progress_train_instance(self, last_log_likelihood, log_likelihood,
-                                round_index, kwargs):
+                                round_index, validation_likelihood,
+                                best_validation_likelihood, kwargs):
+
+        if (self.validate and
+            self.recover_dirname):
+            # recover last set of best results
+            result = Results(log_likelihood, self.num_segs,
+                             validation_likelihood,
+                             self.input_master_filename,
+                             self.best_params_filename,
+                             self.log_likelihood_filename,
+                             self.validation_output_winner_filename,
+                             self.validation_sum_winner_filename)
+
         while (round_index < self.max_em_iters and
                ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
                 is_training_progressing(last_log_likelihood, log_likelihood))):
@@ -2350,12 +2728,64 @@ class Runner(object):
 
             last_log_likelihood = log_likelihood
             log_likelihood = self.load_log_likelihood()
+
+            if self.validate:
+                # load gmtkJT output and find the validation set's likelihood
+                validation_window_indices, validation_window_likelihoods = \
+                    self.load_validation_log_likelihood()
+
+                full_validation_output = \
+                    self.get_full_validation_output(validation_window_indices,
+                                                    validation_window_likelihoods)
+
+                # log full set of validation likelihoods for this round
+                with open(self.validation_output_tab_filename, "a") as logfile:
+                    logfile.writelines(repr(full_validation_output) + "\n")
+
+                validation_likelihood = \
+                    self.calculate_validation_log_likelihood(
+                        validation_window_likelihoods)
+
+                # log latest validation set likelihood for this instance
+                with open(self.validation_sum_filename, "w") as logfile:
+                    logfile.write(str(validation_likelihood))
+
+                # log final validation set likelihood for this round
+                with open(self.validation_sum_tab_filename, "a") as logfile:
+                    logfile.write(str(validation_likelihood) + "\n")
+
+                # if the new validation likelihood is better than our previous best,
+                # choose it as our current winner and update instance's winner files
+                # winning set of results to be passed
+                if validation_likelihood > best_validation_likelihood:
+                    copy2(self.validation_output_filename,
+                          self.validation_output_winner_filename)
+
+                    copy2(self.validation_sum_filename,
+                          self.validation_sum_winner_filename)
+
+                    result = Results(log_likelihood, self.num_segs,
+                                     validation_likelihood,
+                                     self.input_master_filename,
+                                     self.last_params_filename,
+                                     self.log_likelihood_filename,
+                                     self.validation_output_winner_filename,
+                                     self.validation_sum_winner_filename)
+                    best_validation_likelihood = validation_likelihood
+
             round_index += 1
 
+        if not self.validate:
+            result = Results(log_likelihood, self.num_segs,
+                             validation_likelihood,
+                             self.input_master_filename,
+                             self.last_params_filename,
+                             self.log_likelihood_filename,
+                             self.validation_output_filename,
+                             self.validation_sum_filename)
+
         # log_likelihood, num_segs and a list of src_filenames to save
-        return Results(log_likelihood, self.num_segs,
-                       self.input_master_filename, self.last_params_filename,
-                       self.log_likelihood_filename)
+        return result
 
     def save_train_options(self):
         filename = self.make_filename(TRAIN_FILEBASENAME)
@@ -2425,7 +2855,9 @@ class Runner(object):
             input_master_filename = None
 
         return [input_master_filename, self.params_filename,
-                self.log_likelihood_filename]
+                self.log_likelihood_filename,
+                self.validation_output_filename,
+                self.validation_sum_filename]
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
@@ -2439,11 +2871,25 @@ class Runner(object):
         elif not self.dry_run:
             # only one instance
             assert len(instance_params) == 1
+            # for validate, this is best, not last
             last_params_filename = instance_params[0].params_filename
             copy2(last_params_filename, self.params_filename)
 
             # always overwrite params.params
             copy2(last_params_filename, self.make_params_filename())
+
+    def save_validation_set(self):
+        with Session() as session:
+            self.session = session
+            self.instance_index = "validation"
+            res = RestartableJobDict(self.session, self.job_log_file)
+            for validation_window in self.validation_windows:
+                restartable_job = \
+                    self.queue_save_validation_set_window(validation_window)
+                res.queue(restartable_job)
+            res.wait()
+        self.session = None
+        self.instance_index = None
 
     def run_train(self):
         dst_filenames = self.setup_train()
@@ -2475,11 +2921,14 @@ class Runner(object):
         self.jt_info_filename
         self.include_coords
         self.exclude_coords
+        self.validation_coords
         self.minibatch_fraction
         self.card_seg_countdown
         self.obs_dirpath
         self.float_filelistpath
         self.int_filelistpath
+        self.validation_float_filelistpath
+        self.validation_int_filelistpath
         self.float_tabfilepath
         self.gmtk_include_filename_relative
         self.means
@@ -2491,6 +2940,7 @@ class Runner(object):
         self.use_dinucleotide
         self.num_int_cols
         self.train_prog
+        self.validate_prog
         self.supervision_label_range_size
 
         threads = []
@@ -2546,7 +2996,11 @@ to find the winning instance anyway.""" % thread.instance_index)
             return
 
         # finds the min by info_criterion (maximize log_likelihood)
-        max_params = max(instance_params)
+        if self.validate:
+            max_params = max(instance_params,
+                             key=attrgetter('validation_likelihood'))
+        else:
+            max_params = max(instance_params)
 
         self.num_segs = max_params.num_segs
         self.set_triangulation_filename()
@@ -2581,7 +3035,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         path(old_filename).copy2(new_filename)
         return new_filename
 
-    def recover_train_instance(self, last_log_likelihood, log_likelihood):
+    def recover_train_instance(self, last_log_likelihood, log_likelihood,
+                               validation_likelihood, best_validation_likelihood):
         instance_index = self.instance_index
         recover_dirname = self.recover_dirname
 
@@ -2601,6 +3056,89 @@ to find the winning instance anyway.""" % thread.instance_index)
                 path(self.make_log_likelihood_tab_filename(None,
                                                            recover_dirname))
 
+        if self.validate:
+            # recover validation sum tabfile
+            recover_validation_sum_tab_filepath = \
+                path(self.make_validation_sum_tab_filename(instance_index,
+                                                           recover_dirname))
+            if not recover_validation_sum_tab_filepath.isfile():
+                recover_validation_sum_tab_filepath = \
+                    path(self.make_validation_sum_tab_filename(None,
+                                                           recover_dirname))
+            copy2(recover_validation_sum_tab_filepath,
+                  self.validation_sum_tab_filename)
+
+            # recover validation output tabfile
+            recover_validation_output_tab_filepath = \
+                path(self.make_validation_output_tab_filename(instance_index,
+                                                           recover_dirname))
+            if not recover_validation_output_tab_filepath.isfile():
+                recover_validation_output_tab_filepath = \
+                    path(self.make_validation_output_tab_filename(None,
+                                                           recover_dirname))
+            copy2(recover_validation_output_tab_filepath,
+                  self.validation_output_tab_filename)
+
+            # recover last validation sum
+            recover_validation_sum_filename = \
+                path(self.make_filename(PREFIX_VALIDATION_SUM,
+                                       instance_index, EXT_LIKELIHOOD,
+                                       subdirname=SUBDIRNAME_LIKELIHOOD,
+                                       dirname=recover_dirname))
+            if not recover_validation_sum_filename.isfile():
+                recover_validation_sum_filename = \
+                    path(self.make_filename(PREFIX_VALIDATION_SUM,
+                                            None, EXT_LIKELIHOOD,
+                                            subdirname=SUBDIRNAME_LIKELIHOOD,
+                                            dirname=recover_dirname))
+            copy2(recover_validation_sum_filename,
+                  self.validation_sum_filename)
+
+            # recover last validation output
+            recover_validation_output_filename = \
+                path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
+                                        instance_index, EXT_LIKELIHOOD,
+                                        subdirname=SUBDIRNAME_LIKELIHOOD,
+                                        dirname=recover_dirname))
+            if not recover_validation_output_filename.isfile():
+                recover_validation_output_filename = \
+                    path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
+                                            None, EXT_LIKELIHOOD,
+                                            subdirname=SUBDIRNAME_LIKELIHOOD,
+                                            dirname=recover_dirname))
+            copy2(recover_validation_output_filename,
+                  self.validation_output_filename)
+
+            # recover validation sum winner
+            recover_validation_sum_winner_filename = \
+                path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
+                                        instance_index, EXT_LIKELIHOOD,
+                                        subdirname=SUBDIRNAME_LIKELIHOOD,
+                                        dirname=recover_dirname))
+            if not recover_validation_sum_winner_filename.isfile():
+                recover_validation_sum_winner_filename = \
+                    path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
+                                            None, EXT_LIKELIHOOD,
+                                            subdirname=SUBDIRNAME_LIKELIHOOD,
+                                            dirname=recover_dirname))
+            copy2(recover_validation_sum_winner_filename,
+                  self.validation_sum_winner_filename)
+
+            # recover validation output winner
+            recover_validation_output_winner_filename = \
+                path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
+                                        instance_index, EXT_LIKELIHOOD,
+                                        subdirname=SUBDIRNAME_LIKELIHOOD,
+                                        dirname=recover_dirname))
+            if not recover_validation_output_winner_filename.isfile():
+                recover_validation_output_winner_filename = \
+                    path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
+                                            None, EXT_LIKELIHOOD,
+                                            subdirname=SUBDIRNAME_LIKELIHOOD,
+                                            dirname=recover_dirname))
+            copy2(recover_validation_output_winner_filename,
+                  self.validation_output_winner_filename)
+
         with open(recover_log_likelihood_tab_filepath) \
                 as log_likelihood_tab_file:
             log_likelihoods = [float(line.rstrip())
@@ -2615,6 +3153,16 @@ to find the winning instance anyway.""" % thread.instance_index)
         log_likelihood_tab_filename = self.log_likelihood_tab_filename
         recover_log_likelihood_tab_filepath.copy2(log_likelihood_tab_filename)
 
+        if self.validate:
+            with open(recover_validation_sum_tab_filepath) \
+                as validation_sum_tab_file:
+                validation_sums = [float(line.rstrip())
+                                   for line in validation_sum_tab_file.readlines()]
+            validation_likelihood = validation_sums[-1]
+            best_validation_likelihood = max(validation_sums)
+            best_validation_index = validation_sums.index(best_validation_likelihood)
+
+
         old_params_filename = self.make_params_filename(instance_index,
                                                         recover_dirname)
         new_params_filename = self.params_filename
@@ -2625,10 +3173,14 @@ to find the winning instance anyway.""" % thread.instance_index)
                                                str(round_index))
 
             path(old_curr_params_filename).copy2(new_curr_params_filename)
+            if self.validate:
+                if round_index == best_validation_index:
+                    self.best_params_filename = new_curr_params_filename
 
         self.last_params_filename = new_curr_params_filename
 
-        return last_log_likelihood, log_likelihood, final_round_index
+        return last_log_likelihood, log_likelihood, final_round_index, \
+            validation_likelihood, best_validation_likelihood
 
     def make_instance_initial_results(self):
         """
@@ -2640,12 +3192,17 @@ to find the winning instance anyway.""" % thread.instance_index)
         last_log_likelihood = -inf
         log_likelihood = -inf
         final_round_index = 0
+        validation_likelihood = -inf
+        best_validation_likelihood = -inf
 
         if self.recover_dirpath:
             return self.recover_train_instance(last_log_likelihood,
-                                               log_likelihood)
+                                               log_likelihood,
+                                               validation_likelihood,
+                                               best_validation_likelihood)
 
-        return last_log_likelihood, log_likelihood, final_round_index
+        return last_log_likelihood, log_likelihood, final_round_index, \
+            validation_likelihood, best_validation_likelihood
 
     def recover_viterbi_window(self, window_index):
         """
@@ -2907,6 +3464,10 @@ to find the winning instance anyway.""" % thread.instance_index)
                 with open(job_log_filename, "w") as self.job_log_file:
                     print >>self.job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
 
+                    if (self.validate and
+                        self.train):
+                        self.save_validation_set()
+
                     if self.train:
                         self.run_train()
 
@@ -2977,8 +3538,9 @@ def parse_options(argv):
                        " to use")
 
     group.add_argument("--include-coords", metavar="FILE",
-                       help="limit to genomic coordinates in FILE"
-                       " (default all)")
+                       help="limit to genomic coordinates in"
+                       " FILE (default all) (Note: does not apply to"
+                       " --validation-coords)")
 
     # exclude goes after all includes
     group.add_argument("--exclude-coords", metavar="FILE",
@@ -2994,7 +3556,19 @@ def parse_options(argv):
                        help="Use a random fraction FRAC positions for each EM"
                        " iteration. Removes the likelihood stopping criterion,"
                        " so training always runs to the number of rounds"
-                       " specified by --max-train-rounds")
+                       " specified by --max-train-rounds.")
+
+    group.add_argument("--validation-fraction", type=float, metavar="FRAC",
+                       help="Use a random held out set of size FRAC of the"
+                       " included genomic regions to validate the parameters"
+                       " learned by each training round. The instance/round"
+                       " with the best likelihood as validated by the holdout"
+                       " set will be chosen as the winner after the specified"
+                       " --max-train-rounds.")
+
+    group.add_argument("--validation-coords", metavar="FILE",
+                       help="Use genomic coordinates in FILE as a validation"
+                       " set (default none)")
 
     group = parser.add_argument_group("Model files")
     group.add_argument("-i", "--input-master", metavar="FILE",

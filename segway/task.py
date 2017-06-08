@@ -25,7 +25,7 @@ from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array,
                     find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    VITERBI_PROG)
+                    VALIDATE_PROG, VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -519,12 +519,54 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
                     pass
 
 
+def save_gmtk_observation_files(coord, resolution, do_reverse, outfile_name,
+                                 genomedata_names, float_filename,
+                                 int_filename, distribution,
+                                 track_indexes, *args):
+
+    (chrom, start, end) = coord
+
+    genomedata_names = genomedata_names.split(",")
+    track_indexes = map(int, track_indexes.split(","))
+
+    float_filepath = path(float_filename)
+    int_filepath = path(int_filename)
+
+    filepaths = [float_filepath, int_filepath]
+    args = list(args)
+    int_filelistfd = replace_args_filelistname(args, filepaths, EXT_INT)
+    float_filelistfd = replace_args_filelistname(args, filepaths,
+                                                 EXT_FLOAT)
+
+    print_to_fd(float_filelistfd, float_filename)
+    print_to_fd(int_filelistfd, int_filename)
+
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
+
+    _save_window(float_filename, int_filename, continuous_cells,
+                 resolution, distribution)
+
+
+def run_validate(coord, resolution, do_reverse, outfilename, *args):
+    if do_reverse:
+        raise NotImplementedError("Running Segway with both validation "
+            "and reverse world options simultaneously is currently "
+            "not supported")
+
+    validation_output = VALIDATE_PROG.getoutput(*args)
+    with open(outfilename, "w") as outfile:
+        outfile.write(validation_output)
+
+
 TASKS = {("run", "viterbi"): run_viterbi_save_bed,
          ("load", "viterbi"): load_viterbi_save_bed,
          ("run", "posterior"): run_posterior_save_bed,
          ("load", "posterior"): load_posterior_save_bed,
          ("run", "train"): run_train,
          ("run", "bundle-train"): run_bundle_train,
+         ("run", "validate"): run_validate,
+         ("save", "gmtk-observation-files"): save_gmtk_observation_files,
          }
 
 

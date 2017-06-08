@@ -348,7 +348,7 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     # Get supervision regions that overlap with the start and end coords
     supercontig_coords_labels = \
         intersect_regions(start, end, supervision_coords,
-                              supervision_labels)
+                          supervision_labels)
 
     for label_start, label_end, label_index in supercontig_coords_labels:
         # adjust so that zero means no label
@@ -449,26 +449,49 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     int_data.tofile(int_filename)
 
 
-def process_new_windows(new_windows, starts, ends):
+def add_starts_ends(new_windows, starts, ends):
+    """
+    If there are no new windows, return None, None
+
+    If there is more than one new window, modify the
+    starts and ends in place and return None, None
+
+    If there is only one new window, return a tuple of
+    (start, end) for that window.
+
+    """
     if not new_windows:  # nothing left
         return None, None
     elif len(new_windows) > 1:
         new_starts, new_ends = zip(*new_windows)
-        update_starts(starts, ends, new_starts, new_ends)
+        # reversed because extend left extends deque in reversed order
+        starts.extendleft(reversed(new_starts))
+        ends.extendleft(reversed(new_ends))
         return None, None
 
     return new_windows[0]
 
+def generate_coords_from_dict(coords_dict):
+    # use a deque to allow fast insertion/removal at the 
+    # beginning and end of the sequence
+    for chrom, coords_list in coords_dict.iteritems():
+        starts, ends = map(deque, zip(*coords_list))
+        yield chrom, starts, ends
 
 class Observations(object):
     copy_attrs = ["include_coords", "exclude_coords", "max_frames",
                   "float_filelistpath", "int_filelistpath",
-                  "float_tabfilepath", "obs_dirpath", "uuid", "resolution",
-                  "distribution", "train", "identify", "supervision_type",
+                  "validation_float_filelistpath",
+                  "validation_int_filelistpath",
+                  "float_tabfilepath", "validation_obs_dirpath",
+                  "obs_dirpath", "uuid", "resolution",
+                  "distribution", "train", "identify", "random_state",
+                  "supervision_type",
                   "supervision_coords", "supervision_labels",
                   "use_dinucleotide", "world_track_indexes",
                   "world_genomedata_names", "clobber",
-                  "num_worlds"]
+                  "num_worlds", "validation_fraction", "validate",
+                  "validation_coords"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)
@@ -476,10 +499,10 @@ class Observations(object):
         self.float_filepaths = []
         self.int_filepaths = []
 
-    def generate_coords_include(self):
-        for chrom, coords_list in self.include_coords.iteritems():
-            starts, ends = map(deque, zip(*coords_list))
-            yield chrom, starts, ends
+        self.validation_float_filepaths = []
+        self.validation_int_filepaths = []
+
+        self.validation_windows = []
 
     def generate_coords_all(self, genome):
         for chromosome in genome:
@@ -505,7 +528,7 @@ class Observations(object):
           starts and ends are deques
         """
         if self.include_coords:
-            return self.generate_coords_include()
+            return generate_coords_from_dict(self.include_coords)
         else:
             return self.generate_coords_all(genome)
 
@@ -539,11 +562,75 @@ class Observations(object):
 
         return [[start, end]]
 
+    def create_validation_windows_from_fraction(self, windows):
+        """
+        Takes a subset of the training windows, using the specified
+        validation fraction, to be used as the validation windows.
+
+        Note: modifies the input parameter 'windows' and uses this
+        as the training windows.
+
+        Returns training windows, validation windows
+        """
+        validation_windows = []
+        total_bases = sum(len(window) for window in windows)
+        cur_bases = 0
+        self.random_state.shuffle(windows)
+
+        # Remove windows from training set and add them to validation set
+        # until total number of bases chosen is at least
+        # as large as that required by the validation fraction
+        while (float(cur_bases) / total_bases) < self.validation_fraction:
+            window = windows.pop()
+            validation_windows.append(window)
+            cur_bases += len(window)
+
+        return windows, validation_windows
+
+    def create_validation_windows_from_coords(self, exclude_coords):
+        """
+        Creates set of validation windows using the specified
+        validation coordinates.
+        
+        Returns validation windows
+        """
+        validation_windows = []
+        for chrom, starts, ends in generate_coords_from_dict(self.validation_coords):
+            chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
+
+            while len(starts) > 0:
+                start = starts.popleft()
+                end = ends.popleft()  # should not ever cause an IndexError
+
+                new_validation_windows = \
+                    subtract_regions(start, end, chr_exclude_coords)
+                subtracted_start, subtracted_end = \
+                    add_starts_ends(new_validation_windows,
+                                        starts,
+                                        ends)
+                if subtracted_start:
+                    # skip or split long sequences
+                    new_validation_windows = \
+                        self.skip_or_split_window(subtracted_start,
+                                                  subtracted_end)
+                    split_start, split_end = \
+                        add_starts_ends(new_validation_windows,
+                                            starts,
+                                            ends)
+                    if split_start:
+                        for world in xrange(self.num_worlds):
+                            validation_windows.append(Window(
+                                world, chrom, split_start, split_end)
+                                )
+
+        return validation_windows
+
     def locate_windows(self, genome):
         """
         input: Genome instance, include_coords, exclude_ coords, max_frames
+        validation fraction/validation coords (if validation)
 
-        sets: window_coords
+        sets: window_coords, validation_coords (if validation)
         """
         exclude_coords = self.exclude_coords
 
@@ -561,20 +648,32 @@ class Observations(object):
                 end = ends.popleft()  # should not ever cause an IndexError
 
                 new_windows = subtract_regions(start, end, chr_exclude_coords)
-                start, end = process_new_windows(new_windows, starts, ends)
+                start, end = add_starts_ends(new_windows, starts, ends)
                 if start is None:
                     continue
 
                 # skip or split long sequences
                 new_windows = self.skip_or_split_window(start, end)
-                start, end = process_new_windows(new_windows, starts, ends)
+                start, end = add_starts_ends(new_windows, starts, ends)
                 if start is None:
                     continue
 
                 for world in xrange(self.num_worlds):
                     windows.append(Window(world, chrom, start, end))
 
+        if self.validation_fraction:
+            windows, self.validation_windows = \
+                self.create_validation_windows_from_fraction(windows)
+        elif self.validation_coords:
+            self.validation_windows = \
+                self.create_validation_windows_from_coords(exclude_coords)
+
+        if not windows:
+            raise ValueError("Set of training windows is empty")
+
+        # remaining windows can be passed into training now
         self.windows = windows
+
 
     def save_window(self, float_filename, int_filename, float_data,
                     seq_data=None, supervision_data=None):
@@ -585,6 +684,16 @@ class Observations(object):
     @staticmethod
     def make_filepath(dirpath, prefix, suffix):
         return dirpath / (prefix + suffix)
+
+    def make_validation_filepaths(self, chrom, window_index):
+        prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_WINDOWS))
+        prefix = prefix_feature_tmpl % window_index
+
+        dirpath = self.validation_obs_dirpath
+
+        make_filepath_custom = partial(self.make_filepath, dirpath, prefix)
+
+        return (make_filepath_custom(EXT_FLOAT), make_filepath_custom(EXT_INT))
 
     def make_filepaths(self, chrom, window_index, temp=False):
         prefix_feature_tmpl = extjoin(chrom, make_prefix_fmt(MAX_WINDOWS))
@@ -622,6 +731,15 @@ class Observations(object):
             self.float_filepaths.append(float_filepath)
             self.int_filepaths.append(int_filepath)
 
+    def create_validation_filepaths(self):
+        """ Creates a list of observations full filepaths for each 
+        validation window."""
+
+        for window_index, window in enumerate(self.validation_windows):
+            float_filepath, int_filepath = self.make_validation_filepaths(
+                                            window.chrom, window_index)
+            self.validation_float_filepaths.append(float_filepath)
+            self.validation_int_filepaths.append(int_filepath)
 
     def make_seq_cells(self, chromosome, start, end):
         if self.use_dinucleotide:
@@ -649,7 +767,6 @@ class Observations(object):
                    str(end)]
             float_tabwriter.writerow(row)
             print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
-
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
