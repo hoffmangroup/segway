@@ -1,3 +1,5 @@
+2.0.1:
+
 2.0:
 * segway: Add ability to use validation set to choose winner for training
   (activate using --validation-coords or --validation-fraction options)
