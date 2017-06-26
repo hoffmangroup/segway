@@ -1,4 +1,6 @@
 2.0.1:
+* segway: add a new validation-coords and minibatch testcase (thanks
+  to Rachel Chan)
 
 2.0:
 * segway: Add ability to use validation set to choose winner for training
