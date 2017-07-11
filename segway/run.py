@@ -301,6 +301,7 @@ Results = namedtuple("Results", ["log_likelihood", "num_segs",
                                  "validation_sum_filename"])
 
 OFFSET_FILENAMES = 3  # where the filenames begin in Results
+OFFSET_VALIDATION_FILENAMES = 6  # where the validation filenames begin
 
 GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
 GMTKJT_PATTERN_WINDOW_MATCH_INDEX = 1
@@ -2999,17 +3000,19 @@ to find the winning instance anyway.""" % thread.instance_index)
         if self.validate:
             max_params = max(instance_params,
                              key=attrgetter('validation_likelihood'))
+            check_filenames = max_params[OFFSET_FILENAMES:]
         else:
             max_params = max(instance_params)
+            check_filenames = \
+                max_params[OFFSET_FILENAMES:OFFSET_VALIDATION_FILENAMES]
 
         self.num_segs = max_params.num_segs
         self.set_triangulation_filename()
 
-        src_filenames = max_params[OFFSET_FILENAMES:]
-
-        if None in src_filenames:
+        if None in check_filenames:
             raise ValueError("all training instances failed")
 
+        src_filenames = max_params[OFFSET_FILENAMES:]
         assert LEN_TRAIN_ATTRNAMES == len(src_filenames) == len(dst_filenames)
 
         zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
