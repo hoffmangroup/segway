@@ -28,10 +28,10 @@ set -x
 
 # seed from python -c "import random; print random.randrange(2**32)"
 SEGWAY_RAND_SEED=203078386 segway --num-labels=4 --max-train-rounds=2 \
-    --include-coords="../include-coords.txt" \
+    --include-coords="../include-coords.bed" \
     --minibatch-fraction=0.1 \
     --split-sequences=25000 \
-    --validation-coords="../validation-coords.txt" \
+    --validation-coords="../validation-coords.bed" \
     "$cluster_arg" \
     train ../test.genomedata traindir
 
