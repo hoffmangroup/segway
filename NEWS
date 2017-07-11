@@ -1,4 +1,6 @@
 2.0.1:
+* segway: fix training results not being parsed properly due to validation
+  defaults
 
 2.0:
 * segway: Add ability to use validation set to choose winner for training
