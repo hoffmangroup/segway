@@ -1,3 +1,5 @@
+2.0.2:
+
 2.0.1:
 * segway: fix training results not being parsed properly due to validation
   defaults
