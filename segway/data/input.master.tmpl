@@ -8,8 +8,6 @@ $dt_spec
 $name_collection_spec
 $dirichlet_spec
 
-$dpmf_spec
-
 DETERMINISTIC_CPT_IN_FILE inline
 #if CARD_SUPERVISIONLABEL == -1
 5
@@ -54,15 +52,20 @@ map_supervisionLabel_seg_alwaysTrue
 $dense_cpt_spec
 $mean_spec
 $covar_spec
+$dpmf_spec
+
+$mc_spec
+$mx_spec
 
 #else
 
 DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
 MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
 COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+DMPF_IN_FILE INPUT_PARAMS_FILENAME ascii
+MC_IN_FILE INPUT_PARAMS_FILENAME ascii
+MX_IN_FILE INPUT_PARAMS_FILENAME ascii
 
 #endif
 
 $real_mat_spec
-$mc_spec
-$mx_spec
