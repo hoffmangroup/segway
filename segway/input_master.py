@@ -451,7 +451,6 @@ class DenseCPTParamSpec(TableParamSpec):
 
 class DirichletTabParamSpec(TableParamSpec):
     type_name = "DIRICHLET_TAB"
-    object_tmpl = "num_mix_components_${seg}_${subseg}_${track}"
     copy_attrs = TableParamSpec.copy_attrs \
         + ["len_seg_strength", "num_bases", "card_seg_countdown",
            "num_mix_components"]
@@ -488,15 +487,7 @@ class DirichletTabParamSpec(TableParamSpec):
             yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
                                    dirichlet_table)
         dirichlet_table = self.make_components_table()
-
-        substitute = Template(self.object_tmpl).substitute
-        for mapping in self.generate_tmpl_mappings():
-            seg_index = mapping["seg_index"]
-            subseg_index = mapping["subseg_index"]
-            mapping["track"] = mapping["track"]
-
-            yield self.make_table_spec(substitute(mapping), dirichlet_table)
-
+        yield self.make_table_spec("num_mix_components", dirichlet_table)
 
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
@@ -743,7 +734,7 @@ class DPMFParamSpec(DenseCPTParamSpec):
         """
 
         object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
-                      "DirichletTable dirichlet_num_mix_components_${seg}_${subseg}_${track} ${weights}"
+                      "DirichletTable dirichlet_num_mix_components ${weights}"
         weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
         substitute = Template(object_tmpl).substitute
         data = self.make_data()
