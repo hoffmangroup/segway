@@ -476,9 +476,9 @@ class DirichletTabParamSpec(TableParamSpec):
 
         return pseudocounts
     
-    def make_components_table(self):
+    def make_components_table(self, card_mix_components):
         return array([GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT]*
-            self.num_mix_components)
+            card_mix_components)
 
     def generate_objects(self):
         # XXX: these called functions have confusing/duplicative names
@@ -486,8 +486,9 @@ class DirichletTabParamSpec(TableParamSpec):
             dirichlet_table = self.make_dirichlet_table()
             yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
                                    dirichlet_table)
-        dirichlet_table = self.make_components_table()
-        yield self.make_table_spec("num_mix_components", dirichlet_table)
+        for card_mix_components in range(1, self.num_mix_components+1):
+            dirichlet_table = self.make_components_table(card_mix_components)
+            yield self.make_table_spec("num_mix_components_%s" % card_mix_components, dirichlet_table)
 
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
@@ -734,7 +735,7 @@ class DPMFParamSpec(DenseCPTParamSpec):
         """
 
         object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
-                      "DirichletTable dirichlet_num_mix_components ${weights}"
+                      "DirichletTable dirichlet_num_mix_components_%s ${weights}" % self.num_mix_components
         weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
         substitute = Template(object_tmpl).substitute
         data = self.make_data()
