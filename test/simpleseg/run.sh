@@ -27,8 +27,6 @@ set -x
 SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \
-    --validation-fraction=0.01 \
-    --split-sequences=5000 \
     train "../simpleseg.genomedata" traindir
 
 segway "$cluster_arg" --include-coords="../include-coords.bed" \
