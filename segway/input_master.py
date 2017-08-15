@@ -498,8 +498,6 @@ class DirichletTabParamSpec(TableParamSpec):
             yield self.make_table_spec(substitute(mapping), dirichlet_table)
 
 
-class CovarParamSpec(ParamSpec):
-    type_name = "COVAR"
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
     header_tmpl = "collection_seg_${track} ${fullnum_subsegs}"
