@@ -2341,8 +2341,7 @@ class Runner(object):
             kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
                                  **kwargs)
 
-            # -dirichletPriors T only on the first window
-            kwargs_window["dirichletPriors"] = True #(window_index == 0)
+            kwargs_window["dirichletPriors"] = True
 
             if self.is_in_reversed_world(window_index):
                 kwargs_window["gpr"] = REVERSE_GPR
@@ -2484,7 +2483,6 @@ class Runner(object):
 
         kwargs["of1"] = self.validation_float_filelistpath
         kwargs["of2"] = self.validation_int_filelistpath
-        #kwargs["dirichletPriors"] = True
 
         # delete gmtkEMtrain arguments that are not required for validation
         # using gmtkJT
