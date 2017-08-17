@@ -450,6 +450,8 @@ class DenseCPTParamSpec(TableParamSpec):
 
 
 class DirichletTabParamSpec(TableParamSpec):
+    # NOTE: this is depreciated as we no longer use a uniform Dirichlet
+    # table and instead use a Dirichlet constant value
     type_name = "DIRICHLET_TAB"
     copy_attrs = TableParamSpec.copy_attrs \
         + ["len_seg_strength", "num_bases", "card_seg_countdown",
@@ -734,7 +736,7 @@ class DPMFParamSpec(DenseCPTParamSpec):
         """
 
         object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
-                      "DirichletTable dirichlet_num_mix_components ${weights}"
+                      "DirichletConst %s ${weights}" % GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
         weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
         substitute = Template(object_tmpl).substitute
         data = self.make_data()
@@ -774,9 +776,6 @@ class InputMasterSaver(Saver):
         include_filename = self.gmtk_include_filename_relative
 
         dt_spec = DTParamSpec(self)
-
-        dirichlet_spec = DirichletTabParamSpec(self)
-        
 
         dense_cpt_spec = DenseCPTParamSpec(self)
 
