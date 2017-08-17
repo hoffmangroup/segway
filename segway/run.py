@@ -2250,7 +2250,6 @@ class Runner(object):
         """
 
         kwargs["inputMasterFile"] = self.input_master_filename
-        kwargs["dirichletPriors"] = True
 
         name = self.make_job_name_train(instance_index, round_index,
                                         window_index)
@@ -2341,7 +2340,8 @@ class Runner(object):
             kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
                                  **kwargs)
 
-            kwargs_window["dirichletPriors"] = True
+            # -dirichletPriors T only on the first window
+            kwargs_window["dirichletPriors"] =  (window_index == 0)
 
             if self.is_in_reversed_world(window_index):
                 kwargs_window["gpr"] = REVERSE_GPR
@@ -2375,8 +2375,6 @@ class Runner(object):
                       loadAccRange=acc_range,
                       loadAccFile=acc_filename,
                       **kwargs)
-
-        kwargs["dirichletPriors"] = True
 
         restartable_job = self.queue_train(instance_index, round_index,
                                            NAME_BUNDLE_PLACEHOLDER, **kwargs)
