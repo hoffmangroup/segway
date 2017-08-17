@@ -2341,7 +2341,7 @@ class Runner(object):
                                  **kwargs)
 
             # -dirichletPriors T only on the first window
-            kwargs_window["dirichletPriors"] =  (window_index == 0)
+            kwargs_window["dirichletPriors"] = (window_index == 0)
 
             if self.is_in_reversed_world(window_index):
                 kwargs_window["gpr"] = REVERSE_GPR
