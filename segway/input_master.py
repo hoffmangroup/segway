@@ -450,7 +450,8 @@ class DenseCPTParamSpec(TableParamSpec):
 
 
 # NOTE: this class is depreciated as we no longer use a uniform Dirichlet
-# table and instead use a Dirichlet constant value
+# table in the DPMF parameter specification, and instead use a Dirichlet
+# constant value
 class DirichletTabParamSpec(TableParamSpec):
     type_name = "DIRICHLET_TAB"
     copy_attrs = TableParamSpec.copy_attrs \
