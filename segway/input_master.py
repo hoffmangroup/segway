@@ -449,9 +449,9 @@ class DenseCPTParamSpec(TableParamSpec):
             yield self.make_dense_cpt_seg_dinucleotide_spec()
 
 
+# NOTE: this class is depreciated as we no longer use a uniform Dirichlet
+# table and instead use a Dirichlet constant value
 class DirichletTabParamSpec(TableParamSpec):
-    # NOTE: this is depreciated as we no longer use a uniform Dirichlet
-    # table and instead use a Dirichlet constant value
     type_name = "DIRICHLET_TAB"
     copy_attrs = TableParamSpec.copy_attrs \
         + ["len_seg_strength", "num_bases", "card_seg_countdown",
