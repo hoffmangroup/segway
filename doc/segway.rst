@@ -199,9 +199,9 @@ direction connection between the data in different windows during any
 inference process--the windows are treated independently.
 
 An alternative way to speed up training is to use the
-:option:`--minibatch-fraction`\=\*frac* option, which will cause Segway to use
+:option:`--minibatch-fraction`\=\ *frac* option, which will cause Segway to use
 a fraction *frac* or more of genomic positions, chosen randomly at each
-training iteration.  The :option:`--exclude-coords`\=\*file* and
+training iteration.  The :option:`--exclude-coords`\=\ *file* and
 :option:`--include-coords`\=\ *file* options still apply when using minibatch.
 The fraction will only apply to the resulting chosen coordinates.  For example,
 using ``--minibatch-fraction=0.01`` will use a different random one percent of
@@ -216,11 +216,11 @@ training, so training will always run to --max-train-rounds (100, by default)
 if --minibatch-fraction is set.
 
 An alternative way to choose the winning set of parameters
-is available through the :option:`--validation-fraction`\=\*frac* or 
+is available through the :option:`--validation-fraction`\=\ *frac* or 
 :option:`--validation-coords` options. Specifying a fraction *frac* to 
 :option:`--validation-fraction` will cause Segway to choose a fraction *frac* 
 or more of genomic positions as a held-out validation set. 
-:option:`--validation-coords`\=\*file* allows one to explicitly specify genomic 
+:option:`--validation-coords`\=\ *file* allows one to explicitly specify genomic 
 coordinates in a BED-format file, to be used as a validation set. When 
 using either of these options, Segway will evaluate the model after each 
 training iteration on the validation set and will choose the winning set 
