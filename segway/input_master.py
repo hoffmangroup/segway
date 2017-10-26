@@ -167,6 +167,14 @@ class ParamSpec(object):
     def make_subsegnames(self):
         return format_indexed_strs("subseg", self.num_subsegs)
 
+    def get_template_component_suffix(self, component_number):
+        """Returns the subsitution for the component suffix in the GMTK model
+        template. Empty if there is only 1 components"""
+        if self.num_mix_components == 1:
+            return ""
+        else:
+            return "_component{}".format(component_number)
+
     def generate_tmpl_mappings(self):
         # need segnames because in the tied covariance case, the
         # segnames are replaced by "any" (see .make_covar_spec()),
@@ -527,7 +535,7 @@ class NameCollectionParamSpec(ParamSpec):
 
 class MeanParamSpec(ParamSpec):
     type_name = "MEAN"
-    object_tmpl = "mean_${seg}_${subseg}_${track}_component${component} 1 ${datum}"
+    object_tmpl = "mean_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
     jitter_std_bound = 0.2
 
     copy_attrs = ParamSpec.copy_attrs + ["means", "num_mix_components", "random_state", "vars"]
@@ -569,14 +577,16 @@ class MeanParamSpec(ParamSpec):
                     subseg_index = mapping["subseg_index"]
                     mapping["datum"] = data[seg_index, subseg_index, track_index]
                     mapping["track"] = mapping["track"]
-                    mapping["component"] = component
+                    mapping["component_suffix"] = \
+                        self.get_template_component_suffix(component)
+
                     mapping["datum"] = mapping["datum"]
                     yield substitute(mapping)
 
 
 class CovarParamSpec(ParamSpec):
     type_name = "COVAR"
-    object_tmpl = "covar_${seg}_${subseg}_${track}_component${component} 1 ${datum}"
+    object_tmpl = "covar_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
 
     copy_attrs = ParamSpec.copy_attrs + ["num_mix_components", "vars"]
 
@@ -600,13 +610,15 @@ class CovarParamSpec(ParamSpec):
                     subseg_index = mapping["subseg_index"]
                     mapping["datum"] = data[seg_index, subseg_index, track_index]
                     mapping["track"] = mapping["track"]
-                    mapping["component"] = component
+                    mapping["component_suffix"] = \
+                        self.get_template_component_suffix(component)
+
                     mapping["datum"] = mapping["datum"]
                     yield substitute(mapping)
     
 
 class TiedCovarParamSpec(CovarParamSpec):
-    object_tmpl = "covar_${track}_component${component} 1 ${datum}"
+    object_tmpl = "covar_${track}${component_suffix} 1 ${datum}"
 
     def make_segnames(self):
         return ["any"]
@@ -672,8 +684,8 @@ class NormMCParamSpec(MCParamSpec):
     else:
         # dimensionality component_type name mean covar
         object_tmpl = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-            " mc_${distribution}_${seg}_${subseg}_${track}_component${component}" \
-            " mean_${seg}_${subseg}_${track}_component${component} covar_${track}_component${component}"
+            " mc_${distribution}_${seg}_${subseg}_${track}${component_suffix}" \
+            " mean_${seg}_${subseg}_${track}${component_suffix} covar_${track}${component_suffix}"
 
     def generate_objects(self):
         """
@@ -687,7 +699,9 @@ class NormMCParamSpec(MCParamSpec):
                 if self.distribution == DISTRIBUTION_GAMMA:
                     mapping["min_track"] = self.get_track_lt_min(track_index)
                 mapping["track"] = mapping["track"]
-                mapping["component"] = component
+                mapping["component_suffix"] = \
+                    self.get_template_component_suffix(component)
+
                 yield substitute(mapping)
 
 
@@ -707,7 +721,8 @@ class MXParamSpec(ParamSpec):
         """
         object_tmpl = "1 mx_${seg}_${subseg}_${track} ${num_mix_components} dpmf_${seg}_${subseg}_${track}"
         for component in xrange(self.num_mix_components):
-            add = " mc_${distribution}_${seg}_${subseg}_${track}_component%s" % component
+            add = " mc_${distribution}_${seg}_${subseg}_${track}%s" % (
+                self.get_template_component_suffix(component))
             object_tmpl += add
         substitute = Template(object_tmpl).substitute
 
