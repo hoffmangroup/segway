@@ -39,29 +39,29 @@ segCountDown_seg_segTransition
 % means
 8 
 0 
-mean_seg0_subseg0_testtrack1_component0 1 0.0000000000e+00 
+mean_seg0_subseg0_testtrack1 1 0.0000000000e+00 
 1 
-mean_seg0_subseg0_testtrack2_component0 1 8.8135606050e-01 
+mean_seg0_subseg0_testtrack2 1 8.8135606050e-01 
 2 
-mean_seg0_subseg1_testtrack1_component0 1 8.8135606050e-01 
+mean_seg0_subseg1_testtrack1 1 8.8135606050e-01 
 3 
-mean_seg0_subseg1_testtrack2_component0 1 8.8135606050e-01 
+mean_seg0_subseg1_testtrack2 1 8.8135606050e-01 
 4 
-mean_seg1_subseg0_testtrack1_component0 1 8.8135606050e-01 
+mean_seg1_subseg0_testtrack1 1 8.8135606050e-01 
 5 
-mean_seg1_subseg0_testtrack2_component0 1 0.0000000000e+00 
+mean_seg1_subseg0_testtrack2 1 0.0000000000e+00 
 6 
-mean_seg1_subseg1_testtrack1_component0 1 0.0000000000e+00 
+mean_seg1_subseg1_testtrack1 1 0.0000000000e+00 
 7 
-mean_seg1_subseg1_testtrack2_component0 1 0.0000000000e+00 
+mean_seg1_subseg1_testtrack2 1 0.0000000000e+00 
 
 
 % diagonal covariance matrices
 2 
 0 
-covar_testtrack1_component0 1 1.8114948034e-05 
+covar_testtrack1 1 1.8114948034e-05 
 1 
-covar_testtrack2_component0 1 1.8114948034e-05 
+covar_testtrack2 1 1.8114948034e-05 
 
 
 % dense PMFs
