@@ -169,7 +169,7 @@ class ParamSpec(object):
 
     def get_template_component_suffix(self, component_number):
         """Returns the subsitution for the component suffix in the GMTK model
-        template. Empty if there is only 1 components"""
+        template. Empty if there is only one component"""
         if self.num_mix_components == 1:
             return ""
         else:
