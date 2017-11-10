@@ -2051,6 +2051,18 @@ class Runner(object):
         self.save_include()
         self.set_params_filename()
         self.save_structure()
+        
+    def save_window_list(self):
+        """Saves the current list of windows to a BED file where the name field
+        is the window index that Segway has assigned"""
+        window_bed_filename = self.make_filename(PREFIX_WINDOW, EXT_BED)
+        with open(window_bed_filename, "w") as window_bed_file:
+            for i, window in enumerate(self.windows):
+                window_bed_file.write("{}\t{}\t{}\t{}\n".format(window.chrom,
+                                                                window.start,
+                                                                window.end,
+                                                                i))
+
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -3456,6 +3468,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             )
 
         self.save_gmtk_input()
+        self.save_window_list()
 
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:

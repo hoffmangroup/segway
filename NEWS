@@ -1,4 +1,6 @@
 2.0.2:
+* segway: add window.bed output to cross reference window index to chromomsome
+  region
 
 2.0.1:
 * segway: fix training results not being parsed properly due to validation
