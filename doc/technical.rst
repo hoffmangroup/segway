@@ -256,6 +256,7 @@ workdir instead.
 |rarr| ``segway.str.``\ \*\ ``.``\ \*\ ``.trifile`` triangulation file
 ``viterbi/``                                        intermediate BED files created during distributed Viterbi decoding,
                                                     which get merged into ``segway.bed.gz``
+``window.bed``                                      a BED file containing chromosome regions and the indicies Segway assigns to them
 =================================================== =====================================================
 
 Job names
