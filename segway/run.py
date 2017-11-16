@@ -9,6 +9,7 @@ run: main Segway implementation
 
 from collections import defaultdict, namedtuple
 from copy import copy
+import csv
 from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
@@ -51,6 +52,7 @@ from .structure import StructureSaver
 from .task import MSG_SUCCESS
 from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     DISTRIBUTION_GAMMA, DISTRIBUTION_ASINH_NORMAL,
+                    DELIMITER_BED,
                     EXT_BED, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS,
                     EXT_TAB, extjoin, extjoin_not_none, GB,
                     ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
@@ -2055,14 +2057,14 @@ class Runner(object):
     def save_window_list(self):
         """Saves the current list of windows to a BED file where the name field
         is the window index that Segway has assigned"""
-        window_bed_filename = self.make_filename(PREFIX_WINDOW, EXT_BED)
-        with open(window_bed_filename, "w") as window_bed_file:
-            for i, window in enumerate(self.windows):
-                window_bed_file.write("{}\t{}\t{}\t{}\n".format(window.chrom,
-                                                                window.start,
-                                                                window.end,
-                                                                i))
 
+        window_bed_filename = self.make_filename(PREFIX_WINDOW, EXT_BED)
+
+        with open(window_bed_filename, "w") as window_bed_file:
+            bed_writer = csv.writer(window_bed_file, delimiter=DELIMITER_BED)
+            for index, window in enumerate(self.windows):
+                bed_writer.writerow((window.chrom, window.start, window.end,
+                                     index))
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
