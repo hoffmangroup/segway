@@ -22,6 +22,9 @@ TEST_ROOT="$(pwd)"
 # Clear existing archives created by previous failures
 rm */*-changes.tar.gz || true
 
+# Run unit tests
+python unit_tests.py
+
 exit_status=0
 # Avoid creating a new subshell to get an error exit status by putting the
 # search commands for "run.sh" in a process substitution (file descriptor)

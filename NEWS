@@ -1,4 +1,5 @@
 2.0.2:
+* segway: fix window selection when using multiple genomedata archives
 * segway: add window.bed output to cross reference window index to chromomsome
   region
 
