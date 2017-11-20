@@ -533,7 +533,7 @@ class Observations(object):
 
     def generate_coords_all(self, genomes):
         """Generates a tuple of (chromosome, starts, ends) for each chromosome
-        across all genomes"""
+        across all genomes where the starts and ends are deques"""
 
         # Get all chromosome names across all genomes
         chromosome_names = set()
