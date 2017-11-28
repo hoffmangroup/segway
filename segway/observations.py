@@ -13,6 +13,7 @@ from collections import deque
 from contextlib import closing
 from functools import partial
 from itertools import izip, repeat
+from operator import itemgetter
 from os import extsep
 import sys
 from tempfile import gettempdir
@@ -60,6 +61,35 @@ def convert_windows(attrs, name):
     edges_array = getattr(attrs, name) + supercontig_start
 
     return edges_array.tolist()
+
+
+def merge_windows(windows):
+    """Takes a sorted list of start/end tuples and returns a list of tuples of
+    merged together if any overlap"""
+
+    res = []
+
+    # Get first region
+    merge_start, merge_end = windows[0]
+
+    # For all remaining regions
+    for window_start, window_end in windows[1:]:
+        # If the next region does not overlap the current one under
+        # consideration
+        if window_start - merge_end > 0:
+            # Add our current merged region to the merged list
+            res.append((merge_start, merge_end))
+            # Set the current region under consideration to the current window
+            merge_start, merge_end = window_start, window_end
+        # Otherwise the regions overlap
+        else:
+            if window_end > merge_end:
+                merge_end = window_end
+
+    # Append the last region under consideration to the merge list
+    res.append((merge_start, merge_end))
+    # Return the list of merged windows
+    return res
 
 
 def update_starts(starts, ends, new_starts, new_ends):
@@ -504,22 +534,45 @@ class Observations(object):
 
         self.validation_windows = []
 
-    def generate_coords_all(self, genome):
-        for chromosome in genome:
-            starts = deque()
-            ends = deque()
+    def generate_coords_all(self, genomes):
+        """Generates a tuple of (chromosome, starts, ends) for each chromosome
+        across all genomes where the starts and ends are deques"""
 
-            for supercontig, continuous in chromosome.itercontinuous():
-                if continuous is not None:
-                    attrs = supercontig.attrs
+        # Get all chromosome names across all genomes
+        chromosome_names = set()
+        for genome in genomes:
+            chromosome_names = chromosome_names.union([chromosome.name for
+                                                       chromosome in genome])
 
-                    starts.extend(convert_windows(attrs, "chunk_starts"))
-                    ends.extend(convert_windows(attrs, "chunk_ends"))
+        # For each chromsome (in sorted order)
+        for chromosome_name in sorted(list(chromosome_names)):
+            chromosome_windows = []  # list of (start, end) tuples
 
-            if starts:
-                yield chromosome.name, starts, ends
+            # Get all genome-mapped regions across all genomes
+            for genome in genomes:
+                # For each supercontig
+                for supercontig, continuous in chromosome.itercontinuous():
+                    # If the the supercontig is not empty
+                    if continuous is not None:
+                        attrs = supercontig.attrs
 
-    def generate_coords(self, genome):
+                        starts = convert_windows(attrs, "chunk_starts")
+                        ends = convert_windows(attrs, "chunk_ends")
+
+                        chromosome_windows.extend(zip(starts, ends))
+
+            # If at least 1 window exists
+            if chromosome_windows:
+                # Sort regions (by start)
+                chromosome_windows.sort(key=itemgetter(0))
+                # Merge regions
+                merged_chromsome_windows = merge_windows(chromosome_windows)
+                # Convert start and end regions to deques
+                starts, ends = map(deque, zip(*merged_chromsome_windows))
+                # Yield the chromsome name and start/end region deques
+                yield chromosome_name, starts, ends
+
+    def generate_coords(self, genomes):
         """
         returns iterable of included coords, either explicitly
         specified, or all
@@ -530,7 +583,7 @@ class Observations(object):
         if self.include_coords:
             return generate_coords_from_dict(self.include_coords)
         else:
-            return self.generate_coords_all(genome)
+            return self.generate_coords_all(genomes)
 
     def skip_or_split_window(self, start, end):
         """
@@ -625,9 +678,9 @@ class Observations(object):
 
         return validation_windows
 
-    def locate_windows(self, genome):
+    def locate_windows(self, genomes):
         """
-        input: Genome instance, include_coords, exclude_ coords, max_frames
+        input: Genome instances, include_coords, exclude_ coords, max_frames
         validation fraction/validation coords (if validation)
 
         sets: window_coords, validation_coords (if validation)
@@ -636,7 +689,7 @@ class Observations(object):
 
         windows = []
 
-        for chrom, starts, ends in self.generate_coords(genome):
+        for chrom, starts, ends in self.generate_coords(genomes):
             chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
 
             while True:
