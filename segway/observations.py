@@ -66,16 +66,19 @@ def convert_windows(attrs, name):
 def merge_windows(windows):
     """Takes a sorted list of start/end tuples and returns a list of tuples of
     merged together if any overlap"""
-    merged_windows = []
+
+    res = []
+
     # Get first region
     merge_start, merge_end = windows[0]
+
     # For all remaining regions
     for window_start, window_end in windows[1:]:
-        # If the new region does not overlap the current one under
+        # If the next region does not overlap the current one under
         # consideration
         if window_start - merge_end > 0:
             # Add our current merged region to the merged list
-            merged_windows.append((merge_start, merge_end))
+            res.append((merge_start, merge_end))
             # Set the current region under consideration to the current window
             merge_start, merge_end = window_start, window_end
         # Otherwise the regions overlap
@@ -84,9 +87,9 @@ def merge_windows(windows):
                 merge_end = window_end
 
     # Append the last region under consideration to the merge list
-    merged_windows.append((merge_start, merge_end))
+    res.append((merge_start, merge_end))
     # Return the list of merged windows
-    return merged_windows
+    return res
 
 
 def update_starts(starts, ends, new_starts, new_ends):
@@ -543,8 +546,9 @@ class Observations(object):
 
         # For each chromsome (in sorted order)
         for chromosome_name in sorted(list(chromosome_names)):
-            # Get all genome-mapped regions across all genomes
             chromosome_windows = []  # list of (start, end) tuples
+
+            # Get all genome-mapped regions across all genomes
             for genome in genomes:
                 # For each supercontig
                 for supercontig, continuous in chromosome.itercontinuous():

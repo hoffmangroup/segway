@@ -2025,13 +2025,14 @@ class Runner(object):
         observations = Observations(self)
 
         # Use all genomedata archives for locating windows
-        genomes = [Genome(genomedata_name) for genomedata_name in
-                   self.genomedata_names]
+        try:
+            genomes = [Genome(genomedata_name) for genomedata_name in
+                       self.genomedata_names]
 
-        observations.locate_windows(genomes)
-
-        for genome in genomes:
-            genome.close()
+            observations.locate_windows(genomes)
+        finally:
+            for genome in genomes:
+                genome.close()
 
         self.windows = observations.windows
         self.validation_windows = observations.validation_windows
