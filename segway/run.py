@@ -2067,7 +2067,8 @@ class Runner(object):
         window_bed_filename = self.make_filename(PREFIX_WINDOW, EXT_BED)
 
         with open(window_bed_filename, "w") as window_bed_file:
-            bed_writer = csv.writer(window_bed_file, delimiter=DELIMITER_BED)
+            bed_writer = csv.writer(window_bed_file, delimiter=DELIMITER_BED,
+                    lineterminator="\n")  #NB: csv defaults to dos newlines
             for index, window in enumerate(self.windows):
                 bed_writer.writerow((window.chrom, window.start, window.end,
                                      index))
