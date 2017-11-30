@@ -550,6 +550,8 @@ class Observations(object):
 
             # Get all genome-mapped regions across all genomes
             for genome in genomes:
+                chromosome = genome[chromosome_name]
+
                 # For each supercontig
                 for supercontig, continuous in chromosome.itercontinuous():
                     # If the the supercontig is not empty
