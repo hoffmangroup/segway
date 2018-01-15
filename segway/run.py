@@ -2009,13 +2009,16 @@ class Runner(object):
 
     def check_ext_chromosomes(self, ext_chromosomes):
         """Return a string containing the chromosomes defined in an
-        external file and not defined in the genomedata archives"""
+        external file and not defined in the genomedata archives
+
+        ext_chromosomes (Set)
+        """
 
         # Load chromosomes from a genomedata_archive
         with Genome(self.genomedata_names[0]) as ref_archive:
             ref_chromosomes = {chrom.name for chrom in ref_archive}
 
-        invalid_chromosomes = set(ext_chromosomes) - ref_chromosomes
+        invalid_chromosomes = ext_chromosomes - ref_chromosomes
         return ", ".join(invalid_chromosomes)
 
     def is_tracknames_unique(self):
@@ -3488,10 +3491,15 @@ to find the winning instance anyway.""" % thread.instance_index)
             )
 
         # Check if external chromosomes (--include-coords, ...) are
-        # compatible
-        ext_chromosomes = \
-            self.include_coords.keys() + \
-            self.validation_coords.keys()
+        # compatible with the genomedata archives
+
+        # Collect chromosomes from coord files
+        ext_chromosomes = set()
+        coord_files = [self.include_coords, self.validation_coords]
+
+        for coord_file in coord_files:
+            if coord_file:
+                ext_chromosomes.update(coord_file.keys())
 
         invalid_chromosomes = self.check_ext_chromosomes(ext_chromosomes)
         if invalid_chromosomes:
