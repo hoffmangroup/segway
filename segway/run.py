@@ -941,7 +941,7 @@ class Runner(object):
             res.validate = True
 
         if (res.validation_fraction and
-            (res.validation_fraction + 
+            (res.validation_fraction +
             res.minibatch_fraction > 1.0)):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
@@ -1454,7 +1454,7 @@ class Runner(object):
         log(prob(E)).
 
         Raises error if it is found that the validation task was unsucccessful.
-        
+
         Returns the validation window indices and corresponding likelihoods
         """
         with open(self.validation_output_filename) as infile:
@@ -2007,6 +2007,19 @@ class Runner(object):
         else:
             return True
 
+    def check_ext_chromosomes(self, ext_chromosomes):
+        # Check if the chromosomes defined in external files are compatible
+        # with the genomedata archives
+        # ext_chromosomes: List
+        # Return a string with all the invalid chromosomes
+
+        # Load chromosomes from a genomedata_archive
+        with Genome(self.genomedata_names[0]) as ref_archive:
+            ref_chromosomes = {chrom.name for chrom in ref_archive}
+
+        invalid_chromosomes = set(ext_chromosomes) - ref_chromosomes
+        return ", ".join(invalid_chromosomes)
+
     def is_tracknames_unique(self):
         """ Checks if there exists more than one track with the same name.
 
@@ -2059,7 +2072,7 @@ class Runner(object):
         self.save_include()
         self.set_params_filename()
         self.save_structure()
-        
+
     def save_window_list(self):
         """Saves the current list of windows to a BED file where the name field
         is the window index that Segway has assigned"""
@@ -3476,6 +3489,21 @@ to find the winning instance anyway.""" % thread.instance_index)
                 "and ends"
             )
 
+        # Check if external chromosomes (--include-coords, ...) are
+        # compatible
+        external_chromosomes = \
+            self.include_coords.keys() + \
+            self.validation_coords.keys()
+
+        invalid_chromosomes = self.check_ext_chromosomes(external_chromosomes)
+        if invalid_chromosomes:
+            raise ValueError(
+                "Chromosomes defined in external files "
+                "(include, validation, ...) are not "
+                "compatible with the genomedata archives: {}"
+                .format(invalid_chromosomes)
+            )
+
         self.save_gmtk_input()
         self.save_window_list()
 
@@ -3651,7 +3679,7 @@ def parse_options(argv):
     group.add_argument("--mixture-components", type=int,
                          default=NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT,
                          help="Number of Gaussian mixture "
-                         "components (default %d)" 
+                         "components (default %d)"
                          % NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT)
 
     group.add_argument("--num-instances", type=int,
