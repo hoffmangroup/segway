@@ -2008,10 +2008,8 @@ class Runner(object):
             return True
 
     def check_ext_chromosomes(self, ext_chromosomes):
-        # Check if the chromosomes defined in external files are compatible
-        # with the genomedata archives
-        # ext_chromosomes: List
-        # Return a string with all the invalid chromosomes
+        """Return a string containing the chromosomes defined in an
+        external file and not defined in the genomedata archives"""
 
         # Load chromosomes from a genomedata_archive
         with Genome(self.genomedata_names[0]) as ref_archive:
@@ -3491,11 +3489,11 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         # Check if external chromosomes (--include-coords, ...) are
         # compatible
-        external_chromosomes = \
+        ext_chromosomes = \
             self.include_coords.keys() + \
             self.validation_coords.keys()
 
-        invalid_chromosomes = self.check_ext_chromosomes(external_chromosomes)
+        invalid_chromosomes = self.check_ext_chromosomes(ext_chromosomes)
         if invalid_chromosomes:
             raise ValueError(
                 "Chromosomes defined in external files "
