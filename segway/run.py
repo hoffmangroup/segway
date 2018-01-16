@@ -2007,9 +2007,14 @@ class Runner(object):
         else:
             return True
 
-    def check_ext_chromosomes(self, ext_chromosomes):
-        """Return a string containing the chromosomes defined in an
-        external file and not defined in the genomedata archives
+    def is_chromsome_names_exist(self, ext_chromosomes):
+        """Return a string containing the chromosomes
+        from `ext_chromosomes` that are not defined
+        in the genomedata archives
+
+        This method assumes that all the genomedata archives
+        contain the same chromosomes. If not sure, it can
+        be verified with the method check_genomedata_archives()
 
         ext_chromosomes (Set)
         """
@@ -3501,7 +3506,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             if coord_file:
                 ext_chromosomes.update(coord_file.keys())
 
-        invalid_chromosomes = self.check_ext_chromosomes(ext_chromosomes)
+        invalid_chromosomes = self.is_chromsome_names_exist(ext_chromosomes)
         if invalid_chromosomes:
             raise ValueError(
                 "Chromosomes defined in external files "
