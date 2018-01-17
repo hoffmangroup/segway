@@ -265,7 +265,7 @@ def walk_continuous_supercontigs(h5file):
 # XXX: duplicates bed.py?
 def load_coords(filename):
     """
-    returns: defaultdict
+    returns: defaultdict or None
       keys: chrom
       values: array with one dimension 2 and the other number of coords
       default: array([])

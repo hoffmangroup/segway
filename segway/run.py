@@ -2007,7 +2007,7 @@ class Runner(object):
         else:
             return True
 
-    def is_chromsome_names_exist(self, ext_chromosomes):
+    def is_chromsome_names_exist(self, check_chromosomes):
         """Return a string containing the chromosomes
         from `ext_chromosomes` that are not defined
         in the genomedata archives
@@ -2023,7 +2023,7 @@ class Runner(object):
         with Genome(self.genomedata_names[0]) as ref_archive:
             ref_chromosomes = {chrom.name for chrom in ref_archive}
 
-        invalid_chromosomes = ext_chromosomes - ref_chromosomes
+        invalid_chromosomes = check_chromosomes - ref_chromosomes
         return ", ".join(invalid_chromosomes)
 
     def is_tracknames_unique(self):
@@ -3499,19 +3499,18 @@ to find the winning instance anyway.""" % thread.instance_index)
         # compatible with the genomedata archives
 
         # Collect chromosomes from coord files
-        ext_chromosomes = set()
-        coord_files = [self.include_coords, self.validation_coords]
+        check_chromosomes = set()
+        if self.include_coords:
+            check_chromosomes.update(self.include_coords.keys())
 
-        for coord_file in coord_files:
-            if coord_file:
-                ext_chromosomes.update(coord_file.keys())
+        if self.validation_coords:
+            check_chromosomes.update(self.validation_coords.keys())
 
-        invalid_chromosomes = self.is_chromsome_names_exist(ext_chromosomes)
+        invalid_chromosomes = self.is_chromsome_names_exist(check_chromosomes)
         if invalid_chromosomes:
             raise ValueError(
-                "Chromosomes defined in external files "
-                "(include, validation, ...) are not "
-                "compatible with the genomedata archives: {}"
+                "Chromosomes defined in include or validation files "
+                "are not compatible with the genomedata archives: {}"
                 .format(invalid_chromosomes)
             )
 
