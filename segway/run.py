@@ -2009,7 +2009,7 @@ class Runner(object):
 
     def is_chromsome_names_exist(self, check_chromosomes):
         """Return a string containing the chromosomes
-        from `ext_chromosomes` that are not defined
+        from `check_chromosomes` that are not defined
         in the genomedata archives
 
         This method assumes that all the genomedata archives

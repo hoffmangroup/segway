@@ -1,5 +1,6 @@
 2.0.2:
-* segway: check include and validation coords before running a task
+* segway: check include and validation chromosome names before running a task
+  (thanks to Mickael Mendez)
 * segway: fix window selection when using multiple genomedata archives
 * segway: add window.bed output to cross reference window index to chromomsome
   region
