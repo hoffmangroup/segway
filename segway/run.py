@@ -2016,7 +2016,7 @@ class Runner(object):
         contain the same chromosomes. If not sure, it can
         be verified with the method check_genomedata_archives()
 
-        ext_chromosomes (Set)
+        check_chromosomes (Set)
         """
 
         # Load chromosomes from a genomedata_archive
