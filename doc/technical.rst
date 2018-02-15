@@ -108,15 +108,15 @@ script containing the GMTK commands and arguments for job
 Summary reports
 ---------------
 
-The ``jobs.tab`` file contains a tab-delimited file with each job
-Segway dispatched in a different row, reporting on job identifier
-(``jobid``), job name (``jobname``), GMTK program (``prog``), number
-of segment labels (``num_segs``), number of frames (``num_frames``),
-maximum memory usage (``maxvmem``), CPU time (``cpu``) and exit/error
-status (``exit_status``). Jobs are written as they are completed. The
-exit status is useful for determining whether the job succeeded
-(status 0) or failed (any other value, which is sometimes numeric, and
-sometimes text, depending on the clustering system used).
+The ``jobs.instance.tab`` file contains a tab-delimited file with each job
+Segway dispatched for this instance in a different row, reporting on job
+identifier (``jobid``), job name (``jobname``), GMTK program (``prog``), number
+of segment labels (``num_segs``), number of frames (``num_frames``), maximum
+memory usage (``maxvmem``), CPU time (``cpu``) and exit/error status
+(``exit_status``). Jobs are written as they are completed. The exit status is
+useful for determining whether the job succeeded (status 0) or failed (any
+other value, which is sometimes numeric, and sometimes text, depending on the
+clustering system used).
 
 The ``likelihood.*.tab`` files each track the progression of
 likelihood during a single instance of EM training. The file has a
@@ -215,7 +215,7 @@ workdir instead.
 ``log/``                                            diagnostic information
 |rarr| ``details.sh``                               script file that includes the exact
                                                     command-lines queued by Segway, with wrapper scripts
-|rarr| ``jobs.tab``                                 tab-delimeted summary of jobs queued,
+|rarr| ``jobs.instance.tab``                        tab-delimeted summary of jobs queued per instance,
                                                     including resource informatoin and exit status
 |rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
 |rarr| ``jt_info.posterior.txt``                    log file used by GMTK when creating a junction tree
