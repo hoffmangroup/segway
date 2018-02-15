@@ -8,6 +8,7 @@ run: main Segway implementation
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from collections import defaultdict, namedtuple
+from contextlib import contextmanager
 from copy import copy
 import csv
 from datetime import datetime
@@ -207,7 +208,9 @@ PREFIX_POSTERIOR = "posterior%s"
 PREFIX_VITERBI = "viterbi"
 PREFIX_WINDOW = "window"
 PREFIX_JT_INFO = "jt_info"
-PREFIX_JOB_LOG = "jobs"
+
+# "job.{instance_name}.tab"
+PREFIX_JOB_LOG = "jobs.{}"
 
 PREFIX_JOB_NAME_TRAIN = "emt"
 PREFIX_JOB_NAME_VITERBI = "vit"
@@ -478,7 +481,8 @@ class TrainThread(Thread):
         self.runner.session = self.session
         self.runner.num_segs = self.num_segs
         self.runner.instance_index = self.instance_index
-        self.result = self.runner.run_train_instance()
+        with self.runner.open_job_log_file() as self.runner.job_log_file:
+            self.result = self.runner.run_train_instance()
 
 
 def maybe_quote_arg(text):
@@ -1251,6 +1255,26 @@ class Runner(object):
 
     def job_script_dirpath(self):
         return self.make_job_script_dirpath(self.instance_index)
+
+    @contextmanager
+    def open_job_log_file(self):
+        """Create a job log file for a given instance."""
+        # NB: Let exceptions raise on their own
+        # Attempt to open the job log file
+        job_log_filename = self.make_filename(PREFIX_JOB_LOG.format(
+                                              self.instance_index),
+                                              EXT_TAB,
+                                              subdirname=SUBDIRNAME_LOG)
+
+        job_log_file = open(job_log_filename, "w")
+
+        # Print job log header
+        print >>job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
+
+        yield job_log_file
+
+        job_log_file.close()
+
 
     @memoized_property
     def use_dinucleotide(self):
@@ -2904,12 +2928,13 @@ class Runner(object):
         with Session() as session:
             self.session = session
             self.instance_index = "validation"
-            res = RestartableJobDict(self.session, self.job_log_file)
-            for validation_window in self.validation_windows:
-                restartable_job = \
-                    self.queue_save_validation_set_window(validation_window)
-                res.queue(restartable_job)
-            res.wait()
+            with self.open_job_log_file() as self.job_log_file:
+                res = RestartableJobDict(self.session, self.job_log_file)
+                for validation_window in self.validation_windows:
+                    restartable_job = \
+                        self.queue_save_validation_set_window(validation_window)
+                    res.queue(restartable_job)
+                res.wait()
         self.session = None
         self.instance_index = None
 
@@ -2928,7 +2953,8 @@ class Runner(object):
         with Session() as session:
             self.session = session
             self.instance_index = 0
-            res = [self.run_train_instance()]
+            with self.open_job_log_file() as self.job_log_file:
+                res = [self.run_train_instance()]
 
         self.session = None
 
@@ -3403,23 +3429,24 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         with Session() as session:
             self.session = session
-            restartable_jobs = RestartableJobDict(session, self.job_log_file)
+            with self.open_job_log_file() as self.job_log_file:
+                restartable_jobs = RestartableJobDict(session, self.job_log_file)
 
-            for window_index, window_len in self.window_lens_sorted():
-                for task in tasks:
-                    if (task == "identify" and
-                       self.recover_viterbi_window(window_index)):
-                        # XXX: should be able to recover posterior also
-                        continue
+                for window_index, window_len in self.window_lens_sorted():
+                    for task in tasks:
+                        if (task == "identify" and
+                        self.recover_viterbi_window(window_index)):
+                            # XXX: should be able to recover posterior also
+                            continue
 
-                    self.queue_identify(restartable_jobs, window_index,
-                                        PREFIX_JOB_NAMES[task], PROGS[task],
-                                        kwargs[task], filenames[task])
+                        self.queue_identify(restartable_jobs, window_index,
+                                            PREFIX_JOB_NAMES[task], PROGS[task],
+                                            kwargs[task], filenames[task])
 
-            if self.dry_run:
-                return
+                if self.dry_run:
+                    return
 
-            restartable_jobs.wait()
+                restartable_jobs.wait()
 
         self.save_identify_posterior()
 
@@ -3461,8 +3488,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         cmdline_short_filename = \
             self.make_script_filename(PREFIX_CMDLINE_SHORT)
         cmdline_long_filename = self.make_script_filename(PREFIX_CMDLINE_LONG)
-        job_log_filename = self.make_filename(PREFIX_JOB_LOG, EXT_TAB,
-                                              subdirname=SUBDIRNAME_LOG)
 
         self.make_subdirs(SUBDIRNAMES_EITHER)
 
@@ -3486,39 +3511,36 @@ to find the winning instance anyway.""" % thread.instance_index)
 
                 self.run_triangulate()
 
-                with open(job_log_filename, "w") as self.job_log_file:
-                    print >>self.job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
+                if (self.validate and
+                    self.train):
+                    self.save_validation_set()
 
-                    if (self.validate and
-                        self.train):
-                        self.save_validation_set()
+                if self.train:
+                    self.run_train()
 
-                    if self.train:
-                        self.run_train()
+                if self.identify or self.posterior:
+                    if self.supervision_filename:
+                        raise NotImplementedError  # XXX
 
-                    if self.identify or self.posterior:
-                        if self.supervision_filename:
-                            raise NotImplementedError  # XXX
+                    if not self.dry_run:
+                        # resave now that num_segs is determined,
+                        # in case you tested multiple num_segs
+                        self.save_include()
 
-                        if not self.dry_run:
-                            # resave now that num_segs is determined,
-                            # in case you tested multiple num_segs
-                            self.save_include()
+                    if self.posterior:
+                        if self.recover_dirname:
+                            raise NotImplementedError(
+                                "Recovery is not yet supported for the "
+                                "posterior task"
+                            )
 
-                        if self.posterior:
-                            if self.recover_dirname:
-                                raise NotImplementedError(
-                                    "Recovery is not yet supported for the "
-                                    "posterior task"
-                                )
+                        if self.num_worlds != 1:
+                            raise NotImplementedError(
+                                "Tied tracks are not yet supported for "
+                                "the posterior task"
+                            )
 
-                            if self.num_worlds != 1:
-                                raise NotImplementedError(
-                                    "Tied tracks are not yet supported for "
-                                    "the posterior task"
-                                )
-
-                        self.run_identify_posterior()
+                    self.run_identify_posterior()
 
     def __call__(self, *args, **kwargs):
         # XXX: register atexit for cleanup_resources
