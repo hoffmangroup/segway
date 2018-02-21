@@ -2,6 +2,7 @@
 * segway: fix window selection when using multiple genomedata archives
 * segway: add window.bed output to cross reference window index to chromomsome
   region
+* segway: add instance specific job log files to avoid log overwrites
 
 2.0.1:
 * segway: fix training results not being parsed properly due to validation
