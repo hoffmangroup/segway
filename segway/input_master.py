@@ -12,8 +12,8 @@ from math import frexp, ldexp
 from string import Template
 
 from genomedata._util import fill_array
-from numpy import (array, empty, float32, outer, sqrt, tile, vectorize, where,
-                   zeros)
+from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
+                   vectorize, where, zeros)
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
@@ -22,6 +22,19 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED, USE_MFSDG)
+
+# NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
+# scalars and vectors in the parameter output. By default in newer (> 1.14)
+# versions printed output "giv[es] the shortest unique representation".
+# See Numpy 1.14 release notes: https://docs.scipy.org/doc/numpy/release.html
+# Under heading 'Many changes to array printing, disableable with the new
+# "legacy" printing mode'
+try:
+    # If it is a possibility, use the older printing style
+    set_printoptions(legacy='1.13')
+except TypeError:
+    # Otherwise ignore the attempt
+    pass
 
 if USE_MFSDG:
     # because tying not implemented yet
