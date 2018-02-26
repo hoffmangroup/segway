@@ -475,7 +475,8 @@ def run_train(coord, resolution, do_reverse, outfilename,
                      resolution, distribution,
                      supervision_data=supervision_cells)
 
-        TRAIN_PROG.getoutput(*args)
+        TRAIN_PROG.run(*args)
+
     # After the training round is finished
     finally:
         # Remove all temporarily created files

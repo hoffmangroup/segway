@@ -3,6 +3,7 @@
 * segway: add window.bed output to cross reference window index to chromomsome
   region
 * segway: add instance specific job log files to avoid log overwrites
+* segway: fix regression of stdout not being captured from training jobs
 
 2.0.1:
 * segway: fix training results not being parsed properly due to validation
