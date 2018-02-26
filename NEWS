@@ -4,6 +4,8 @@
   region
 * segway: add instance specific job log files to avoid log overwrites
 * segway: fix regression of stdout not being captured from training jobs
+* segway: update support for versions of numpy > 1.14 by adding legacy scalar
+  and vector text printing
 
 2.0.1:
 * segway: fix training results not being parsed properly due to validation
