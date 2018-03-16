@@ -2743,7 +2743,7 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return Results(None, None, None, None, None, None, None)
+            return Results(None, None, None, None, None, None, None, None)
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
