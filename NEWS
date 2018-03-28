@@ -1,4 +1,5 @@
 2.0.3:
+* segway: fix fatal TypeError during --dry-run
 
 2.0.2:
 * segway: fix window selection when using multiple genomedata archives
