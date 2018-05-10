@@ -16,10 +16,10 @@ pipelines:
           - pip list
           - gmtkPrint -version
           - python --version
-          - cd test && ./run_tests.py
+          - cd test && ./test_all.sh
           - alias python="python3"
           - python --version
-          - ./run_tests.py
+          - ./test_all.sh
 #        artifacts:
 #          - 
 #    - parallel:
