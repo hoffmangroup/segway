@@ -35,7 +35,7 @@ from tables import Filters, NoSuchNodeError, open_file
 # these are loaded by other modules indirectly
 # ignore PyFlakes warnings here
 
-PKG_DATA = ".".join([__name__, "data"])
+PKG_DATA = ".".join(["segway", "data"])
 
 SEGWAY_ENCODING = "ascii"
 

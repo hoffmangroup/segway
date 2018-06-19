@@ -11,6 +11,7 @@ from segway import __version__
 
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
+import sys
 import subprocess
 from six.moves import map, zip
 

@@ -56,45 +56,45 @@ P_PARTITION 10 segCountDown 0 seg 0 presence__testtrack1 0 testtrack1 0 presence
 
 % ---
 % --- C partition information: variables and their neighbors
-% frameIndex(1) : segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% segCountDown(1) : frameIndex(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% seg(1) : frameIndex(1), segCountDown(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% presence__testtrack1(1) : frameIndex(1), segCountDown(1), seg(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% testtrack1(1) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% presence__testtrack2(1) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% testtrack2(1) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% ruler(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), segCountDown(2), segTransition(2), seg(2),
-% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segTransition(2), seg(2),
-% segTransition(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), seg(2),
-% seg(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2),
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[12]%)) : (%[^\n]+%)
 % --- C partition definition
-C_PARTITION 11 frameIndex 1 segCountDown 1 seg 1 presence__testtrack1 1 testtrack1 1 presence__testtrack2 1 testtrack2 1 ruler 2 segCountDown 2 segTransition 2 seg 2 
+C_PARTITION 11 (%(?=.*\bframeIndex 1\b)(?=.*\bsegCountDown 1\b)(?=.*\bseg 1\b)(?=.*\bpresence\_\_testtrack1 1\b)(?=.*\btesttrack1 1\b)(?=.*\bpresence\_\_testtrack2 1\b)(?=.*\btesttrack2 1\b)(?=.*\bruler 2\b)(?=.*\bsegCountDown 2\b)(?=.*\bsegTransition 2\b)(?=.*\bseg 2\b).*%) 
 
 % ---
 % --- E partition information: variables and their neighbors
-% frameIndex(2) : segCountDown(2), seg(2), presence__testtrack1(2), testtrack1(2), presence__testtrack2(2), testtrack2(2),
-% segCountDown(2) : frameIndex(2), seg(2), presence__testtrack1(2), testtrack1(2), presence__testtrack2(2), testtrack2(2),
-% seg(2) : frameIndex(2), segCountDown(2), presence__testtrack1(2), testtrack1(2), presence__testtrack2(2), testtrack2(2),
-% presence__testtrack1(2) : frameIndex(2), segCountDown(2), seg(2), testtrack1(2), presence__testtrack2(2), testtrack2(2),
-% testtrack1(2) : frameIndex(2), segCountDown(2), seg(2), presence__testtrack1(2), presence__testtrack2(2), testtrack2(2),
-% presence__testtrack2(2) : frameIndex(2), segCountDown(2), seg(2), presence__testtrack1(2), testtrack1(2), testtrack2(2),
-% testtrack2(2) : frameIndex(2), segCountDown(2), seg(2), presence__testtrack1(2), testtrack1(2), presence__testtrack2(2),
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
 % --- E partition definition
-E_PARTITION 7 frameIndex 2 segCountDown 2 seg 2 presence__testtrack1 2 testtrack1 2 presence__testtrack2 2 testtrack2 2 
+E_PARTITION 7 (%(?=.*\bframeIndex 2\b)(?=.*\bsegCountDown 2\b)(?=.*\bseg 2\b)(?=.*\bpresence__testtrack1 2\b)(?=.*\btesttrack1 2\b)(?=.*\bpresence__testtrack2 2\b)(?=.*\btesttrack2 2\b).*%) 
 
 % ---
 % --- PC information : variables and their neighbors
-% segCountDown(1) : frameIndex(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% seg(1) : frameIndex(1), segCountDown(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% (%[A-Za-z0-9_]+%)((%[1]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[1]%)) : (%[^\n]+%)
 % --- PC interface definition
-PC_PARTITION 2 segCountDown 1 seg 1 
+PC_PARTITION 2 (%(?=.*\bsegCountDown 1\b)(?=.*\bseg 1\b).*%)
 
 % ---
 % --- CE information : variables and their neighbors
-% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segTransition(2), seg(2),
-% seg(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1(1), testtrack1(1), presence__testtrack2(1), testtrack2(1), ruler(2), segCountDown(2), segTransition(2),
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
+% (%[A-Za-z0-9_]+%)((%[2]%)) : (%[^\n]+%)
 % --- CE interface definition
-CE_PARTITION 2 segCountDown 2 seg 2 
+CE_PARTITION 2 (%(?=.*\bsegCountDown 2\b)(?=.*\bseg 2\b).*%) 
 
 % ---
 % ---- P Partitions Cliques and their weights
@@ -121,38 +121,38 @@ CE_PARTITION 2 segCountDown 2 seg 2
 % ---- 1 total max-cliques 
 % ---- Triangulation came from method: 1-completed
 % 0 : 11  2.283301
-%    frameIndex(1)
-%    segCountDown(1)
-%    seg(1)
-%    presence__testtrack1(1)
-%    testtrack1(1)
-%    presence__testtrack2(1)
-%    testtrack2(1)
-%    ruler(2)
-%    segCountDown(2)
-%    segTransition(2)
-%    seg(2)
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
+%    (%[A-Za-z0-9_]+%)((%[12]%))
 % Maximum clique state space = 1e2.283301, total state space = 1e2.283301
 1-completed 
 1 
-0 11 frameIndex 1 segCountDown 1 seg 1 presence__testtrack1 1 testtrack1 1 presence__testtrack2 1 testtrack2 1 ruler 2 segCountDown 2 segTransition 2 seg 2 
+0 11 (%(?=.*\bframeIndex 1\b)(?=.*\bsegCountDown 1\b)(?=.*\bseg 1\b)(?=.*\bpresence__testtrack1 1\b)(?=.*\btesttrack1 1\b)(?=.*\bpresence__testtrack2 1\b)(?=.*\btesttrack2 1\b)(?=.*\bruler 2\b)(?=.*\bsegCountDown 2\b)(?=.*\bsegTransition 2\b)(?=.*\bseg 2\b).*%) 
 
 % ---
 % ---- E Partitions Cliques and their weights
 % ---- 1 total max-cliques 
 % ---- Triangulation came from method: 1-completed
 % 0 : 7  0.903090
-%    frameIndex(2)
-%    segCountDown(2)
-%    seg(2)
-%    presence__testtrack1(2)
-%    testtrack1(2)
-%    presence__testtrack2(2)
-%    testtrack2(2)
+%    (%[A-Za-z0-9_]+%)((%[2]%))
+%    (%[A-Za-z0-9_]+%)((%[2]%))
+%    (%[A-Za-z0-9_]+%)((%[2]%))
+%    (%[A-Za-z0-9_]+%)((%[2]%))
+%    (%[A-Za-z0-9_]+%)((%[2]%))
+%    (%[A-Za-z0-9_]+%)((%[2]%))
+%    (%[A-Za-z0-9_]+%)((%[2]%))
 % Maximum clique state space = 1e0.903090, total state space = 1e0.903090
 1-completed 
 1 
-0 7 frameIndex 2 segCountDown 2 seg 2 presence__testtrack1 2 testtrack1 2 presence__testtrack2 2 testtrack2 2 
+0 7 (%(?=.*\bframeIndex 2\b)(?=.*\bsegCountDown 2\b)(?=.*\bseg 2\b)(?=.*\bpresence__testtrack1 2\b)(?=.*\btesttrack1 2\b)(?=.*\bpresence__testtrack2 2\b)(?=.*\btesttrack2 2\b).*%) 
 
 
 % ----

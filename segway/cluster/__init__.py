@@ -288,7 +288,7 @@ class RestartableJobDict(dict):
 
     def wait(self):
         session = self.session
-        jobids = self.keys()
+        jobids = list(self.keys())
 
         while jobids:
             # check each job individually
@@ -317,4 +317,4 @@ class RestartableJobDict(dict):
                 # by the 'jobid' does not exist. see versions prior to
                 # SVN r425 for code
 
-            jobids = self.keys()
+            jobids = list(self.keys())

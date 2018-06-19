@@ -55,10 +55,11 @@ def make_regex(text):
     make regex, escaping things that aren't with (% %)
     """
     #Finds if the text given is bytes from a file, or str from filename
+    string = True
     try:
         text = text.encode(SEGWAY_ENCODING)
     except:
-        string = True
+        string = False
         pass
     spans = [match.span() for match in re_unescape.finditer(text)]
 

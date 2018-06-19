@@ -1468,12 +1468,12 @@ class Runner(object):
 
     def load_log_likelihood(self):
         with open(self.log_likelihood_filename) as infile:
-            log_likelihood = float(infile.read().strip())
+            log_likelihood = infile.read().strip()
 
         with open(self.log_likelihood_tab_filename, "a") as logfile:
-            print(str(round(log_likelihood, 7)), file=logfile)
+            print(log_likelihood, file=logfile)
 
-        return log_likelihood
+        return float(log_likelihood)
 
     def load_validation_log_likelihood(self):
         """
