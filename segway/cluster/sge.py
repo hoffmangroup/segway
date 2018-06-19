@@ -1,7 +1,6 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division
 
-from __future__ import absolute_import
 __version__ = "$Revision$"
 
 # Copyright 2009, 2011, 2012 Michael M. Hoffman <michael.hoffman@utoronto.ca>

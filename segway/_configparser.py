@@ -1,8 +1,7 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
+from __future__ import absolute_import, division, with_statement
 
-from __future__ import absolute_import
-import six
+from six import string_types
 __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -18,7 +17,7 @@ class OneSectionRawConfigParser(RawConfigParser):
     for UNIX configuration files which lake a section header
     """
     def read(self, filenames):
-        if not isinstance(filenames, six.string_types):
+        if not isinstance(filenames, string_types):
             raise NotImplementedError
 
         with open(filenames) as infile:

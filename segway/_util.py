@@ -3,9 +3,9 @@ from __future__ import division, with_statement
 
 from __future__ import absolute_import
 from __future__ import print_function
-import six
-from six.moves import map
-from six.moves import zip
+from six import viewitems
+from six.moves import map, zip
+
 __version__ = "$Revision$"
 
 # Copyright 2008-2009, 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -89,8 +89,8 @@ OFFSET_STEP = 2
 
 data_filename = partial(resource_filename, PKG_DATA)
 def data_string(resource):
-    dataString = partial(resource_string, PKG_DATA)
-    return dataString(resource).decode()
+    byte_string = partial(resource_string, PKG_DATA)
+    return byte_string(resource).decode(SEGWAY_ENCODING)
 
 NUM_COLORS = 8
 SCHEME = colorbrewer.Dark2[NUM_COLORS]
@@ -294,7 +294,7 @@ def load_coords(filename):
             coords[chrom].append((start, end))
 
     return defaultdict(array_factory, ((chrom, array(coords_list))
-                       for chrom, coords_list in six.iteritems(coords)))
+                       for chrom, coords_list in viewitems(coords)))
 
 
 def get_chrom_coords(coords, chrom):
@@ -414,7 +414,7 @@ def parse_posterior(iterable, output_label):
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
     # ignores non-matching lines
     for line in iterable:
-        m_posterior_entry = re_posterior_entry.match(line.rstrip().decode())
+        m_posterior_entry = re_posterior_entry.match(line.rstrip().decode(SEGWAY_ENCODING))
 
         if m_posterior_entry:
             group = m_posterior_entry.group

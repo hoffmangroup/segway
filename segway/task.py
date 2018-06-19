@@ -1,10 +1,6 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
-from __future__ import print_function
-from __future__ import absolute_import
-from six.moves import map
-from six.moves import range
-from six.moves import zip
+from __future__ import absolute_import, division, print_function, with_statement
+from six.moves import map, range, zip
 
 """
 task: wraps a GMTK subtask to reduce size of output
@@ -30,7 +26,7 @@ from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array,
                     find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    VALIDATE_PROG, VITERBI_PROG)
+                    SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -168,7 +164,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
     label_colors = [get_label_color(extract_superlabel(seg_label)) for
                     seg_label in labels]
 
-    zipper = list(zip(start_pos[:-1], start_pos[1:], labels, label_colors))
+    zipper = zip(start_pos[:-1], start_pos[1:], labels, label_colors)
 
     # this is easily concatenated since it has no context
     for seg_start, seg_end, seg_label, label_color in zipper:
@@ -235,7 +231,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     probs_rounded = probs_rounded.astype(int)
 
     # print array columns as text to each outfile
-    zipper = list(zip(outfilenames, probs_rounded.T, label_print_range))
+    zipper = zip(outfilenames, probs_rounded.T, label_print_range)
     for outfilename, probs_rounded_label, label_index in zipper:
         # run-length encoding on the probs_rounded_label
 
@@ -411,7 +407,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                 if err.errno == ENOENT:
                     pass
 
-    lines = [line.decode() for line in output.splitlines()]
+    lines = [line.decode(SEGWAY_ENCODING) for line in output.splitlines()]
 
     return parse_viterbi_save_bed(coord, resolution, do_reverse,
                                   lines, outfilename, num_labels, output_label)

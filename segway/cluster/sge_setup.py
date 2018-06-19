@@ -1,13 +1,11 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
-from __future__ import print_function
-import six
+from __future__ import absolute_import, division, print_function, with_statement
+from six import viewitems
 
 """
 sge_setup: setup mem_requested on each node
 """
 
-from __future__ import absolute_import
 __version__ = "$Revision$"
 
 # Copyright 2010, 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -76,7 +74,7 @@ def get_mem_totals():
 def modify_complex_values_mem_requested():
     mem_totals = get_mem_totals()
 
-    for hostname, mem_total in six.iteritems(mem_totals):
+    for hostname, mem_total in viewitems(mem_totals):
         QCONF_PROG("-mattr", "exechost", "complex_values",
                    "mem_requested=%s" % mem_total, hostname)
 

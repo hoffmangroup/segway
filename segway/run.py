@@ -1,11 +1,7 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
-from __future__ import print_function
-from __future__ import absolute_import
-import six
-from six.moves import zip
-from six.moves import map
-from six.moves import range
+from __future__ import absolute_import, division, print_function, with_statement
+from six import viewitems, viewvalues
+from six.moves import map, range, zip
 
 """
 run: main Segway implementation
@@ -549,7 +545,7 @@ def remove_bash_functions(environment):
     # All bash functions in an exported environment after the shellshock
     # patch start with "BASH_FUNC"
     return dict(((key, value)
-                for key, value in six.iteritems(environment)
+                for key, value in viewitems(environment)
                 if not key.startswith("BASH_FUNC")))
 
 
@@ -1463,7 +1459,7 @@ class Runner(object):
             self.segtransition_weight_scale
 
         res = " ".join(CPP_DIRECTIVE_FMT % item
-                       for item in six.iteritems(directives))
+                       for item in viewitems(directives))
 
         if res:
             return res
@@ -1958,7 +1954,7 @@ class Runner(object):
 
         max_supervision_label = max(max(labels)
                                     for labels
-                                    in six.itervalues(supervision_labels))
+                                    in viewvalues(supervision_labels))
 
         self.supervision_coords = supervision_coords
         self.supervision_labels = supervision_labels
@@ -2019,7 +2015,7 @@ class Runner(object):
                             # If this chromosome doesn't exist in the reference
                             # genomedata archive
                             if chromosome.name not in \
-                               list(sbjct_coords.keys()):
+                               sbjct_coords.keys():
                                 # Return false
                                 return False
                             # If the start and end coords don't match for this
@@ -2552,7 +2548,7 @@ class Runner(object):
     def get_posterior_clique_print_ranges(self):
         res = {}
 
-        for clique, clique_index in six.iteritems(self.posterior_clique_indices):
+        for clique, clique_index in viewitems(self.posterior_clique_indices):
             range_str = "%d:%d" % (clique_index, clique_index)
             res[clique + "CliquePrintRange"] = range_str
 
@@ -2685,7 +2681,6 @@ class Runner(object):
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
                                       round_index, train_windows, **kwargs)
-
         restartable_jobs.wait()
 
         restartable_jobs = \
@@ -2848,7 +2843,7 @@ class Runner(object):
             writer = ListWriter(tabfile)
             writer.writerow(TRAIN_FIELDNAMES)
 
-            for name, typ in sorted(six.iteritems(TRAIN_OPTION_TYPES)):
+            for name, typ in sorted(viewitems(TRAIN_OPTION_TYPES)):
                 value = getattr(self, name)
                 if isinstance(typ, list):
                     for item in value:
@@ -2948,7 +2943,9 @@ class Runner(object):
 
     def run_train(self):
         dst_filenames = self.setup_train()
+
         run_train_func = self.get_thread_run_func()
+
         # this is where the actual training takes place
         instance_params = run_train_func(self.num_segs_range)
 

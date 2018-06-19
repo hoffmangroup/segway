@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
+from __future__ import absolute_import, division, print_function, with_statement
 
-from __future__ import absolute_import
-from __future__ import print_function
-import six
+from six import string_types
 __version__ = "$Revision$"
 
 # Copyright 2009, 2011-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -142,7 +140,7 @@ class RestartableJob(object):
         assert res
 
         res_req = job_tmpl_factory.res_req
-        if not isinstance(res_req, six.string_types):
+        if not isinstance(res_req, string_types):
             res_req = " ".join(res_req)
 
         jobname = job_template.jobName
@@ -290,7 +288,7 @@ class RestartableJobDict(dict):
 
     def wait(self):
         session = self.session
-        jobids = list(self.keys())
+        jobids = self.keys()
 
         while jobids:
             # check each job individually
@@ -319,4 +317,4 @@ class RestartableJobDict(dict):
                 # by the 'jobid' does not exist. see versions prior to
                 # SVN r425 for code
 
-            jobids = list(self.keys())
+            jobids = self.keys()

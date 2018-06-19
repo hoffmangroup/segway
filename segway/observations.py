@@ -1,12 +1,9 @@
 #!/usr/bin/env python
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
+from __future__ import absolute_import, division, print_function
+
 __version__ = "$Revision$"
-import six
-from six.moves import zip
-from six.moves import map
-from six.moves import range
+from six import viewitems
+from six.moves import map, range, zip
 
 """observations.py: prepare and save GMTK observations
 """
@@ -514,7 +511,7 @@ def add_starts_ends(new_windows, starts, ends):
 def generate_coords_from_dict(coords_dict):
     # use a deque to allow fast insertion/removal at the 
     # beginning and end of the sequence
-    for chrom, coords_list in six.iteritems(coords_dict):
+    for chrom, coords_list in viewitems(coords_dict):
         starts, ends = list(map(deque, zip(*coords_list)))
         yield chrom, starts, ends
 

@@ -1,8 +1,6 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
-from __future__ import print_function
-from __future__ import absolute_import
-import six
+from __future__ import absolute_import, division, with_statement, print_function
+from six import iterkeys, reraise, viewitems
 from six.moves import map
 
 """
@@ -87,7 +85,7 @@ class Tee(object):
             # Don't rely on sys.exc_info() still containing
             # the right information. Another exception may
             # have been raised and caught by an exit method
-            six.reraise(exc[0], exc[1], exc[2])
+            reraise(exc[0], exc[1], exc[2])
 
     def write(self, *args, **kwargs):
         for item in self._items:
@@ -163,7 +161,7 @@ def update_trackline(trackline, updates):
         if "visibility=dense" in word:
             trackline[word_index] = "visibility=full"
 
-    for key, value in six.iteritems(updates):
+    for key, value in viewitems(updates):
         start = key + "="
         for word_index, word in enumerate(trackline):
             if word.startswith(start):
@@ -232,7 +230,7 @@ class Segmentation(defaultdict):
 
     @memoized_property
     def labels_sorted(self):
-        return uniquify(self.ordering + sorted(six.iterkeys(self.colors)))
+        return uniquify(self.ordering + sorted(iterkeys(self.colors)))
 
     def update_trackline(self, updates):
         update_trackline(self.trackline, updates)
@@ -267,7 +265,7 @@ class Segmentation(defaultdict):
                 #         print >>temp_file, "blah"
                 #     print temp_file.name
                 with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB) as sizes_file:
-                    for chrom, end in six.iteritems(ends):
+                    for chrom, end in viewitems(ends):
                         print("\t".join([chrom, str(end)]), file=sizes_file)
 
                     sizes_file.flush()
@@ -293,7 +291,7 @@ class Segmentation(defaultdict):
 
         self.write_trackline(outfile)
 
-        for chrom, chromosome in sorted(six.iteritems(self)):
+        for chrom, chromosome in sorted(viewitems(self)):
             for run in chromosome:
                 segments = array(run)
 

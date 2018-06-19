@@ -11,13 +11,15 @@ from segway import __version__
 
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-import sys
 import subprocess
-from six.moves import map
-from six.moves import zip
+from six.moves import map, zip
 
-# required for OrderedDict
-#assert (2, 6) <= sys.version_info <= (3, 0)
+
+if (sys.version_info[0] == 2 and sys.version_info[1] < 7) or \
+   (sys.version_info[0] == 3 and sys.version_info[1] < 4):
+    print("Segway requires Python version 2.7 or 3.4 or later")
+    sys.exit(1)
+
 
 from setuptools import find_packages, setup
 
@@ -42,7 +44,8 @@ classifiers = ["Natural Language :: English",
                "Topic :: Scientific/Engineering :: Bio-Informatics",
                "Operating System :: Unix",
                "Programming Language :: Python",
-               "Programming Language :: Python :: 2.7"]
+               "Programming Language :: Python :: 2.7",
+               "Programming Language :: Python :: 3"]
 
 entry_points = """
 [console_scripts]
@@ -124,7 +127,7 @@ def check_gmtk_version():
 
     # Get the version number to compare with the minimum version
     current_version = list(map(int, current_version_string.split(".")))
-    version_zip = list(zip(current_version, MINIMUM_GMTK_VERSION))
+    version_zip = zip(current_version, MINIMUM_GMTK_VERSION)
     for current_version_number, minimum_version_number in version_zip:
         # If the version number (from most to least significant digit) is
         # ever less than the minimum

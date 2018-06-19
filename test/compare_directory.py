@@ -1,8 +1,6 @@
 #!/usr/bin/env python
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
-import six
+from __future__ import absolute_import, division, print_function
+from six import viewitems, viewkeys
 from six.moves import zip
 
 """compare_directory.py: compare two directories, using regexes
@@ -52,12 +50,16 @@ def get_dir_filenames(dirname):
 re_unescape = re_compile(b"\(%.*?%\)")
 
 
-def make_regex(text, string = False):
+def make_regex(text):
     """
     make regex, escaping things that aren't with (% %)
     """
-    if string:
+    #Finds if the text given is bytes from a file, or str from filename
+    try:
         text = text.encode(SEGWAY_ENCODING)
+    except:
+        string = True
+        pass
     spans = [match.span() for match in re_unescape.finditer(text)]
 
     res = [b"^"]
@@ -122,10 +124,9 @@ def compare_directory(template_dirname, query_dirname):
 
     template_filenames = get_dir_filenames(template_dirname)
     for template_filename_relative, template_filename in template_filenames:
-        re_template_filename_relative = make_regex(template_filename_relative, 
-                                                   True)
+        re_template_filename_relative = make_regex(template_filename_relative)
 
-        query_filenames_items = six.iteritems(query_filenames)
+        query_filenames_items = viewitems(query_filenames)
         for query_filename_relative, query_filename in query_filenames_items:
             if re_template_filename_relative.match(query_filename_relative):
                 del query_filenames[query_filename_relative]
@@ -141,7 +142,7 @@ def compare_directory(template_dirname, query_dirname):
         else:
             counter.error("query directory missing %s" % template_filename)
 
-    for query_filename_relative in six.iterkeys(query_filenames):
+    for query_filename_relative in viewkeys(query_filenames):
         counter.error("template directory missing %s"
                       % query_filename_relative)
 
