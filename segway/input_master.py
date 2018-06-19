@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 from __future__ import division
+from __future__ import absolute_import
+from six.moves import map
+from six.moves import range
 
 """input_master.py: write input master files
 """
@@ -112,7 +115,7 @@ def make_zero_diagonal_table(length):
     res = fill_array(prob_self_other, (length, length))
 
     # set diagonal
-    range_cpt = xrange(length)
+    range_cpt = range(length)
     res[range_cpt, range_cpt] = prob_self_self
 
     return res
@@ -120,7 +123,7 @@ def make_zero_diagonal_table(length):
 
 def format_indexed_strs(fmt, num):
     full_fmt = fmt + "%d"
-    return [full_fmt % index for index in xrange(num)]
+    return [full_fmt % index for index in range(num)]
 
 
 def jitter_cell(cell, random_state):
@@ -260,7 +263,7 @@ class DTParamSpec(ParamSpec):
         seg_countdowns_initial = self.seg_countdowns_initial
 
         header = ([str(num_segs)] +
-                  [str(num_seg) for num_seg in xrange(num_segs - 1)] +
+                  [str(num_seg) for num_seg in range(num_segs - 1)] +
                   ["default"])
 
         lines = [" ".join(header)]
@@ -449,7 +452,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
     def make_dense_cpt_seg_dinucleotide_spec(self):
         table = [self.make_dinucleotide_table_row()
-                 for seg_index in xrange(self.num_segs)]
+                 for seg_index in range(self.num_segs)]
 
         return self.make_table_spec("seg_dinucleotide", table)
 
@@ -533,10 +536,10 @@ class NameCollectionParamSpec(ParamSpec):
                            fullnum_subsegs=fullnum_subsegs)
 
             rows = [substitute_header(mapping)]
-            for seg_index in xrange(num_segs):
+            for seg_index in range(num_segs):
                 seg = "seg%d" % seg_index
 
-                for subseg_index in xrange(num_subsegs):
+                for subseg_index in range(num_subsegs):
                     subseg = "subseg%d" % subseg_index
                     mapping = dict(seg=seg, subseg=subseg,
                                    track=head_trackname)
@@ -577,6 +580,7 @@ class MeanParamSpec(ParamSpec):
         returns: iterable of strs containing gmtk parameter objects starting
         with names
         """
+
         substitute = Template(self.object_tmpl).substitute
 
         for component in range(self.num_mix_components):
@@ -706,7 +710,7 @@ class NormMCParamSpec(MCParamSpec):
         with names
         """
         substitute = Template(self.object_tmpl).substitute
-        for component in xrange(self.num_mix_components):
+        for component in range(self.num_mix_components):
             for mapping in self.generate_tmpl_mappings():
                 track_index = mapping["track_index"]
                 if self.distribution == DISTRIBUTION_GAMMA:
@@ -733,7 +737,7 @@ class MXParamSpec(ParamSpec):
         with names
         """
         object_tmpl = "1 mx_${seg}_${subseg}_${track} ${num_mix_components} dpmf_${seg}_${subseg}_${track}"
-        for component in xrange(self.num_mix_components):
+        for component in range(self.num_mix_components):
             add = " mc_${distribution}_${seg}_${subseg}_${track}%s" % (
                 self.get_template_component_suffix(component))
             object_tmpl += add

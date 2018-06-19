@@ -7,35 +7,26 @@ image: mjmm13/segway-test-build:latest
 
 pipelines:
   default:
-    - step:
-        caches:
-          - pip
-        name: Build
-        script: # Modify the commands below to build your repository.
-          - pip install .
-          - pip list
-          - gmtkPrint -version
-          - python --version
-          - cd test && ./test_all.sh
-          - alias python="python3"
-          - python --version
-          - ./test_all.sh
-#        artifacts:
-#          - 
-#    - parallel:
-#        - step:
-#            caches:
-#              - pip
-#            name: Python2
-#            script:
-#              - python --version
-#              - cd test && ./run_tests.py
-#        - step:
-#            caches:
-#              - pip
-#            name: Python3
-#            script:
-#              - alias python="python3"
-#              - python --version
-#             - cd test && ./run_tests.py
-#
+    - parallel:
+        - step:
+            caches:
+              - pip
+            name: Python2
+            script:
+              - pip install .
+              - python --version
+              - gmtkPrint --version
+              - pip list 
+              - cd test && ./run_tests.py
+        - step:
+            caches:
+              - pip
+            name: Python3
+            script:
+              - alias python="python3"
+              - pip3 install .
+              - python --version
+              - gmtkPrint --version
+              - pip3 list
+              - cd test && python run_tests.py
+

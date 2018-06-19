@@ -6,18 +6,18 @@ Segway is a tool for easy pattern discovery and identification in
 functional genomics data.
 """
 
+from __future__ import absolute_import
 from segway import __version__
 
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 import sys
 import subprocess
+from six.moves import map
+from six.moves import zip
 
 # required for OrderedDict
-assert (2, 6) <= sys.version_info <= (3, 0)
-
-from ez_setup import use_setuptools
-use_setuptools()
+#assert (2, 6) <= sys.version_info <= (3, 0)
 
 from setuptools import find_packages, setup
 
@@ -59,7 +59,7 @@ segway-winner = segway.winner:main
 # genomedata>1.3.1 for Chromosome.__getitem__[..., array] support
 
 install_requires = ["genomedata>1.3.1", "textinput", "optbuild>0.1.10",
-                    "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
+                    "optplus>0.1.0", "tables>2.0.4", "numpy", "path.py>=11",
                     "colorbrewer", "drmaa>=0.4a3"]
 
 
@@ -116,14 +116,15 @@ def check_gmtk_version():
         version_word_index = -1
 
     # Get the first line of output
-    first_output_line = output_lines[0]
+    first_output_line = output_lines[0].decode()
+    print(first_output_line)
 
     # Get the version string from the proper word on the line
     current_version_string = first_output_line.split()[version_word_index]
 
     # Get the version number to compare with the minimum version
-    current_version = map(int, current_version_string.split("."))
-    version_zip = zip(current_version, MINIMUM_GMTK_VERSION)
+    current_version = list(map(int, current_version_string.split(".")))
+    version_zip = list(zip(current_version, MINIMUM_GMTK_VERSION))
     for current_version_number, minimum_version_number in version_zip:
         # If the version number (from most to least significant digit) is
         # ever less than the minimum

@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
+import six
+from six.moves import zip
 
 """compare_directory.py: compare two directories, using regexes
 
@@ -14,22 +18,22 @@ from re import compile as re_compile, escape
 import sys
 import tarfile
 
-from path import path
+from path import Path
 
-from segway._util import maybe_gzip_open
+from segway._util import maybe_gzip_open, SEGWAY_ENCODING
 from segway.version import __version__
 
 def get_dir_filenames(dirname):
-    if (not path(dirname).exists()):
+    if (not Path(dirname).exists()):
         raise IOError("Directory %s not found" % dirname)
     for dirbasename, dirnames, filenames in walk(dirname):
-        dirbasepath = path(dirbasename)
+        dirbasepath = Path(dirbasename)
         relative_dirbasename = dirbasename.partition(dirname)[2]
 
         if relative_dirbasename.startswith("/"):
             relative_dirbasename = relative_dirbasename[1:]
 
-        relative_dirpath = path(relative_dirbasename)
+        relative_dirpath = Path(relative_dirbasename)
 
         try:
             dirnames.remove(".svn")
@@ -45,24 +49,28 @@ def get_dir_filenames(dirname):
             yield filename_relative, filename_absolute
 
 # regular expression unescape
-re_unescape = re_compile(r"\(%.*?%\)")
+re_unescape = re_compile(b"\(%.*?%\)")
 
 
-def make_regex(text):
+def make_regex(text, string = False):
     """
     make regex, escaping things that aren't with (% %)
     """
+    if string:
+        text = text.encode(SEGWAY_ENCODING)
     spans = [match.span() for match in re_unescape.finditer(text)]
 
-    res = ["^"]
+    res = [b"^"]
     last_end = 0
     for start, end in spans:
         res.append(escape(text[last_end:start]))
         res.append(text[start + 2:end - 2])  # eliminate (% and %)
         last_end = end
-    res.extend([escape(text[last_end:]), "$"])
-
-    return re_compile("".join(res))
+    res.extend([escape(text[last_end:]), b"$"])
+    
+    if string:
+        return re_compile(b"".join(res).decode(SEGWAY_ENCODING))
+    return re_compile(b"".join(res))
 
 
 def compare_file(template_filename, query_filename):
@@ -73,19 +81,22 @@ def compare_file(template_filename, query_filename):
     # If the files are different find and report the differences based on
     # embedded regex criteria
     res = True
-    with maybe_gzip_open(template_filename) as template_file:
-        with maybe_gzip_open(query_filename) as query_file:
+    with maybe_gzip_open(template_filename, mode = "rb") as template_file:
+        with maybe_gzip_open(query_filename, mode = "rb") as query_file:
             for line_number, lines in enumerate(
                     zip(template_file, query_file),
                     start=1):
                 re_template = make_regex(lines[0])
-                match = re_template.match(lines[1])
+                try:
+                    match = re_template.match(lines[1])
+                except UnicodeDecodeError:
+                    raise Exception(query_filename)
                 if not match:
                     res = False
-                    print "Line %d differences for %s" % (
+                    print("Line %d differences for %s" % (
                         line_number,
-                        template_filename)
-                    print "Different line:\n%s" % (lines[1])
+                        template_filename))
+                    print("Different line:\n%s" % (lines[1]))
 
     return res
 
@@ -97,7 +108,7 @@ class TestCounter(object):
 
     def error(self, msg):
         self.num_error += 1
-        print >>sys.stderr, " %s" % msg
+        print(" %s" % msg, file=sys.stderr)
 
     def success(self):
         self.num_success += 1
@@ -111,9 +122,10 @@ def compare_directory(template_dirname, query_dirname):
 
     template_filenames = get_dir_filenames(template_dirname)
     for template_filename_relative, template_filename in template_filenames:
-        re_template_filename_relative = make_regex(template_filename_relative)
+        re_template_filename_relative = make_regex(template_filename_relative, 
+                                                   True)
 
-        query_filenames_items = query_filenames.iteritems()
+        query_filenames_items = six.iteritems(query_filenames)
         for query_filename_relative, query_filename in query_filenames_items:
             if re_template_filename_relative.match(query_filename_relative):
                 del query_filenames[query_filename_relative]
@@ -129,7 +141,7 @@ def compare_directory(template_dirname, query_dirname):
         else:
             counter.error("query directory missing %s" % template_filename)
 
-    for query_filename_relative in query_filenames.iterkeys():
+    for query_filename_relative in six.iterkeys(query_filenames):
         counter.error("template directory missing %s"
                       % query_filename_relative)
 
@@ -137,25 +149,25 @@ def compare_directory(template_dirname, query_dirname):
         msg = "PASS: %s and %s: %d files match" % (template_dirname,
                                                    query_dirname,
                                                    counter.num_success)
-        print >>sys.stderr, msg
+        print(msg, file=sys.stderr)
         return 0
     else:
         msg = "FAIL: %s and %s: %d files match;" \
               " %d files mismatch" % (template_dirname, query_dirname,
                                       counter.num_success, counter.num_error)
 
-        base_directory_name = (path(template_dirname)
+        base_directory_name = (Path(template_dirname)
                                .abspath().dirname().basename())
         tar_filename = base_directory_name + "-changes.tar.gz"
 
         with tarfile.open(tar_filename, "w:gz") as tar:
-            print "Archiving in {}:".format(tar_filename)
+            print("Archiving in {}:".format(tar_filename))
             for template_filename, query_filename in different_files_list:
                 tar.add(template_filename)
                 tar.add(query_filename)
-                print template_filename, query_filename
+                print(template_filename, query_filename)
 
-        print >>sys.stderr, msg
+        print(msg, file=sys.stderr)
         return 1
 
 

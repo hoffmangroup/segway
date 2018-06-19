@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 from __future__ import division
+from __future__ import print_function
+from six.moves import range
 
 """output.py: output savers: IdentifySaver, PosteriorSaver
 """
@@ -21,8 +23,8 @@ def make_bed_attr(key, value):
     return "%s=%s" % (key, value)
 
 def make_bed_attrs(mapping):
-    res = " ".join(make_bed_attr(key, value)
-                   for key, value in mapping.iteritems())
+    res = " ".join(make_bed_attr(key, mapping[key])
+                   for key in sorted(mapping))
 
     return "track %s" % res
 
@@ -36,10 +38,10 @@ def concatenate_window_segmentations(window_filenames, header, outfilename):
     last_start = None
     last_vals = (None, None, None) # (chrom, coord, seg)
 
-    with maybe_gzip_open(outfilename, "w") as outfile:
+    with maybe_gzip_open(outfilename, "wt") as outfile:
         # XXX: add in browser track line (see SVN revisions
         # previous to 195)
-        print >>outfile, header
+        print(header, file=outfile)
 
         for window_index, window_filename in enumerate(window_filenames):
 
@@ -169,21 +171,21 @@ class PosteriorSaver(OutputSaver):
     def __call__(self, world):
         # Save posterior code bed file
         posterior_code_filename = self.make_filename(self.bed_filename, world)
-        posterior_code_filenames = map(lambda posterior_tmpl: posterior_tmpl % "_code", self.posterior_filenames)
+        posterior_code_filenames = [posterior_tmpl % "_code" for posterior_tmpl in self.posterior_filenames]
         header = self.make_bed_header()
         concatenate_window_segmentations(posterior_code_filenames, header, posterior_code_filename)
 
         # Save posterior bedgraph files
         posterior_bedgraph_tmpl = self.make_filename(self.bedgraph_filename, world)
         if self.output_label == "subseg":
-            label_print_range = xrange(self.num_segs * self.num_subsegs)
+            label_print_range = range(self.num_segs * self.num_subsegs)
         elif self.output_label == "full":
             label_print_range = ("%d.%d" % divmod(label, self.num_subsegs)
-                                 for label in xrange(self.num_segs *
+                                 for label in range(self.num_segs *
                                                      self.num_subsegs))
         else:
-            label_print_range = xrange(self.num_segs)
+            label_print_range = range(self.num_segs)
         for num_seg in label_print_range:
-            posterior_filenames = map(lambda posterior_tmpl: posterior_tmpl % num_seg, self.posterior_filenames)
+            posterior_filenames = [posterior_tmpl % num_seg for posterior_tmpl in self.posterior_filenames]
             header = self.make_bedgraph_header(num_seg)
             concatenate_window_segmentations(posterior_filenames, header, posterior_bedgraph_tmpl % num_seg)

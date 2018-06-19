@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 from __future__ import division, with_statement
 
+from __future__ import absolute_import
+import six
 __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from ConfigParser import RawConfigParser
+from six.moves.configparser import RawConfigParser
 from cStringIO import StringIO
 import sys
 
@@ -16,7 +18,7 @@ class OneSectionRawConfigParser(RawConfigParser):
     for UNIX configuration files which lake a section header
     """
     def read(self, filenames):
-        if not isinstance(filenames, basestring):
+        if not isinstance(filenames, six.string_types):
             raise NotImplementedError
 
         with open(filenames) as infile:

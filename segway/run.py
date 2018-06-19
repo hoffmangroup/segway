@@ -1,5 +1,11 @@
 #!/usr/bin/env python
 from __future__ import division, with_statement
+from __future__ import print_function
+from __future__ import absolute_import
+import six
+from six.moves import zip
+from six.moves import map
+from six.moves import range
 
 """
 run: main Segway implementation
@@ -15,18 +21,18 @@ from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
-from itertools import count, izip, product
+from itertools import count, product
 from math import ceil, ldexp
 from os import (environ, extsep, fdopen, open as os_open, O_WRONLY, O_CREAT,
                 O_SYNC, O_TRUNC)
 import re
 from shutil import copy2
 import stat
-from string import letters
+from string import ascii_letters
 import sys
 from threading import Event, Lock, Thread
 from time import sleep
-from urllib import quote
+from six.moves.urllib.parse import quote
 from uuid import uuid1
 from warnings import warn
 
@@ -37,7 +43,7 @@ from numpy.random import RandomState
 from operator import attrgetter
 from optplus import str2slice_or_int
 from optbuild import AddableMixin
-from path import path
+from path import Path
 import pipes
 from pkg_resources import Requirement, working_set
 from tabdelim import DictReader, ListWriter
@@ -288,7 +294,7 @@ RESOLUTION = 1
 
 SEGTRANSITION_WEIGHT_SCALE = 1.0
 
-DIRPATH_WORK_DIR_HELP = path("WORKDIR")
+DIRPATH_WORK_DIR_HELP = Path("WORKDIR")
 DIRPATH_AUX = DIRPATH_WORK_DIR_HELP / SUBDIRNAME_AUX
 DIRPATH_PARAMS = DIRPATH_WORK_DIR_HELP / SUBDIRNAME_PARAMS
 
@@ -328,7 +334,7 @@ def quote_trackname(text):
     res = res.replace("%", "_")
 
     # add stub to deal with non-alphabetic first characters
-    if res[0] not in letters:
+    if res[0] not in ascii_letters:
         # __ should never appear in strings quoted as before
         res = "x__" + res
 
@@ -361,17 +367,17 @@ def rewrite_strip_comments(infile, outfile):
             outline = (yield inline)
 
             if isinstance(outline, NewLine):
-                print >>outfile, inline
+                print(inline, file=outfile)
             elif outline is None:
                 outline = inline
 
-        print >>outfile, outline
+        print(outline, file=outfile)
 
         while isinstance(outline, NoAdvance):
             outline = (yield)
 
             if outline is not None:
-                print >>outfile, outline
+                print(outline, file=outfile)
 
 
 def consume_until(iterable, text):
@@ -397,7 +403,7 @@ def slice2range(s):
     if step is None:
         step = 1
 
-    return xrange(start, stop, step)
+    return range(start, stop, step)
 
 
 def file_or_string_to_string_list(file_or_string):
@@ -420,7 +426,7 @@ def is_training_progressing(last_ll, curr_ll,
 
 
 def set_cwd_job_tmpl(job_tmpl):
-    job_tmpl.workingDirectory = path.getcwd()
+    job_tmpl.workingDirectory = Path.getcwd()
 
 
 def rewrite_cliques(rewriter, frame, output_label):
@@ -428,15 +434,15 @@ def rewrite_cliques(rewriter, frame, output_label):
     returns the index of the added clique
     """
     # method
-    rewriter.next()
+    next(rewriter)
 
     # number of cliques
-    orig_num_cliques = int(rewriter.next())
+    orig_num_cliques = int(next(rewriter))
     rewriter.send(NoAdvance(orig_num_cliques + 1))
 
     # original cliques
-    for clique_index in xrange(orig_num_cliques):
-        rewriter.next()
+    for clique_index in range(orig_num_cliques):
+        next(rewriter)
 
     # new clique
     if output_label != "seg":
@@ -523,7 +529,7 @@ def _log_cmdline(logfile, cmdline):
         # NOTE: move to shlex.quote() when moving to python 3.3
         quoted_cmdline_list.append(pipes.quote(str(cmdarg)))
     quoted_cmdline = ' '.join(quoted_cmdline_list)
-    print >>logfile, quoted_cmdline
+    print(quoted_cmdline, file=logfile)
 
 
 def check_overlapping_supervision_labels(start, end, chrom, coords):
@@ -543,7 +549,7 @@ def remove_bash_functions(environment):
     # All bash functions in an exported environment after the shellshock
     # patch start with "BASH_FUNC"
     return dict(((key, value)
-                for key, value in environment.iteritems()
+                for key, value in six.iteritems(environment)
                 if not key.startswith("BASH_FUNC")))
 
 
@@ -790,7 +796,7 @@ class Runner(object):
 
             try:
                 res.load_train_options(train_dir_name)
-            except IOError, err:
+            except IOError as err:
                 # train.tab use is optional
                 if err.errno != ENOENT:
                     raise
@@ -878,7 +884,7 @@ class Runner(object):
         res.user_native_spec = sum([opt.split(" ")
                                     for opt in options.cluster_opt], [])
 
-        mem_usage_list = map(float, options.mem_usage.split(","))
+        mem_usage_list = list(map(float, options.mem_usage.split(",")))
 
         # XXX: should do a ceil first?
         # use int64 in case run.py is run on a 32-bit machine to control
@@ -976,13 +982,13 @@ class Runner(object):
 
     @memoized_property
     def work_dirpath(self):
-        return path(self.work_dirname)
+        return Path(self.work_dirname)
 
     @memoized_property
     def recover_dirpath(self):
         recover_dirname = self.recover_dirname
         if recover_dirname:
-            return path(recover_dirname)
+            return Path(recover_dirname)
 
         # recover_dirname is None or ""
         return None
@@ -1076,7 +1082,7 @@ class Runner(object):
         self.validation_obs_dirname = res
         try:
             self.make_dir(res)
-        except OSError, err:
+        except OSError as err:
             if not (err.errno == EEXIST and res.isdir()):
                 raise
 
@@ -1087,7 +1093,7 @@ class Runner(object):
         obs_dirname = self.obs_dirname
 
         if obs_dirname:
-            res = path(obs_dirname)
+            res = Path(obs_dirname)
         else:
             res = self.work_dirpath / SUBDIRNAME_OBS
             self.obs_dirname = res
@@ -1175,7 +1181,7 @@ class Runner(object):
         viterbi_filename_fmt = (PREFIX_VITERBI + make_prefix_fmt(num_windows) +
                                 EXT_BED)
         return [viterbi_dirpath / viterbi_filename_fmt % index
-                for index in xrange(num_windows)]
+                for index in range(num_windows)]
 
     @memoized_property
     def viterbi_filenames(self):
@@ -1193,7 +1199,7 @@ class Runner(object):
     @memoized_property
     def posterior_filenames(self):
         self.make_subdir(SUBDIRNAME_POSTERIOR)
-        return map(self.make_posterior_filename, xrange(self.num_windows))
+        return list(map(self.make_posterior_filename, range(self.num_windows)))
 
     @memoized_property
     def recover_posterior_filenames(self):
@@ -1230,7 +1236,7 @@ class Runner(object):
         # generates. probably need to key on tokens rather than lines
         with open(infilename) as infile:
             with open(res, "w") as outfile:
-                print >>outfile, COMMENT_POSTERIOR_TRIANGULATION
+                print(COMMENT_POSTERIOR_TRIANGULATION, file=outfile)
                 rewriter = rewrite_strip_comments(infile, outfile)
 
                 consume_until(rewriter, "@@@!!!TRIFILE_END_OF_ID_STRING!!!@@@")
@@ -1269,7 +1275,7 @@ class Runner(object):
         job_log_file = open(job_log_filename, "w")
 
         # Print job log header
-        print >>job_log_file, "\t".join(JOB_LOG_FIELDNAMES)
+        print("\t".join(JOB_LOG_FIELDNAMES), file=job_log_file)
 
         yield job_log_file
 
@@ -1439,24 +1445,25 @@ class Runner(object):
                          output_params_filename=None):
         directives = {}
 
-        if input_params_filename:
-            directives["INPUT_PARAMS_FILENAME"] = input_params_filename
+        directives["CARD_SEG"] = self.num_segs
 
         if output_params_filename:
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
+
+        if input_params_filename:
+            directives["INPUT_PARAMS_FILENAME"] = input_params_filename
 
         # prevent supervised variable from being inherited from train task
         if self.identify:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
 
-        directives["CARD_SEG"] = self.num_segs
-        directives["CARD_SUBSEG"] = self.num_subsegs
         directives["CARD_FRAMEINDEX"] = self.max_frames
+        directives["CARD_SUBSEG"] = self.num_subsegs
         directives["SEGTRANSITION_WEIGHT_SCALE"] = \
             self.segtransition_weight_scale
 
         res = " ".join(CPP_DIRECTIVE_FMT % item
-                       for item in directives.iteritems())
+                       for item in six.iteritems(directives))
 
         if res:
             return res
@@ -1468,7 +1475,7 @@ class Runner(object):
             log_likelihood = float(infile.read().strip())
 
         with open(self.log_likelihood_tab_filename, "a") as logfile:
-            print >>logfile, str(log_likelihood)
+            print(str(round(log_likelihood, 7)), file=logfile)
 
         return log_likelihood
 
@@ -1549,7 +1556,7 @@ class Runner(object):
         filebasename = extjoin_not_none(*exts)
 
         # add subdirname if it exists
-        return path(kwargs.get("dirname", self.work_dirname)) \
+        return Path(kwargs.get("dirname", self.work_dirname)) \
             / kwargs.get("subdirname", "") \
             / filebasename
 
@@ -1623,7 +1630,7 @@ class Runner(object):
             self.float_filelistpath = None
 
     def get_last_params_filename(self, params_filename):
-        if params_filename is not None and path(params_filename).exists():
+        if params_filename is not None and Path(params_filename).exists():
             return params_filename
 
         # otherwise, None is returned by default. if it doesn't exist,
@@ -1661,7 +1668,7 @@ class Runner(object):
         # make new filenames when new is set, or params_filename is
         # not set, or the file already exists and we are training
         if (new or not params_filename or
-           (self.train and path(params_filename).exists())):
+           (self.train and Path(params_filename).exists())):
             params_filename = self.make_params_filename(instance_index)
 
         return params_filename, last_params_filename
@@ -1763,7 +1770,7 @@ class Runner(object):
         res = self.work_dirpath / "output" / dirname / str(instance_index)
         # This is called every time Segway requires an output_dirpath
         # so no need to create the directory if it already exists
-        if not path(res).exists():
+        if not Path(res).exists():
             self.make_dir(res)
         return res
 
@@ -1771,7 +1778,7 @@ class Runner(object):
         res = self.work_dirpath / SUBDIRNAME_JOB_SCRIPT / str(instance_index)
         # This is called every time Segway requires a job script dirpath
         # so no need to create the directory if it already exists
-        if not path(res).exists():
+        if not Path(res).exists():
             self.make_dir(res)
         return res
 
@@ -1779,18 +1786,18 @@ class Runner(object):
         if clobber is None:
             clobber = self.clobber
 
-        dirpath = path(dirname)
+        dirpath = Path(dirname)
 
         if clobber:
             # just always try to delete it
             try:
                 dirpath.rmtree()
-            except OSError, err:
+            except OSError as err:
                 if err.errno != ENOENT:
                     raise
         try:
             dirpath.makedirs()
-        except OSError, err:
+        except OSError as err:
             # if the error is because directory exists, but it's
             # empty, then do nothing
             if (err.errno != EEXIST or not dirpath.isdir() or
@@ -1813,7 +1820,7 @@ class Runner(object):
     def save_resource(self, resname, subdirname=""):
         orig_filename = data_filename(resname)
 
-        orig_filepath = path(orig_filename)
+        orig_filepath = Path(orig_filename)
         dirpath = self.work_dirpath / subdirname
 
         orig_filepath.copy(dirpath)
@@ -1951,7 +1958,7 @@ class Runner(object):
 
         max_supervision_label = max(max(labels)
                                     for labels
-                                    in supervision_labels.itervalues())
+                                    in six.itervalues(supervision_labels))
 
         self.supervision_coords = supervision_coords
         self.supervision_labels = supervision_labels
@@ -2012,7 +2019,7 @@ class Runner(object):
                             # If this chromosome doesn't exist in the reference
                             # genomedata archive
                             if chromosome.name not in \
-                               sbjct_coords.keys():
+                               list(sbjct_coords.keys()):
                                 # Return false
                                 return False
                             # If the start and end coords don't match for this
@@ -2185,7 +2192,7 @@ class Runner(object):
         window_lens = self.window_lens
 
         # XXX: use key=itemgetter(2) and enumerate instead of this silliness
-        zipper = sorted(izip(window_lens, count()), reverse=reverse)
+        zipper = sorted(zip(window_lens, count()), reverse=reverse)
 
         # XXX: use itertools instead of a generator
         for window_len, window_index in zipper:
@@ -2213,6 +2220,7 @@ class Runner(object):
     def queue_task(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         """ Returns a restartable job object to run segway-task """
+
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         if prefix_args:
@@ -2229,7 +2237,7 @@ class Runner(object):
                                 JOB_SCRIPT_FILE_OPEN_FLAGS,
                                 JOB_SCRIPT_FILE_PERMISSIONS)
         with fdopen(job_script_fd, "w") as job_script_file:
-            print >>job_script_file, "#!/usr/bin/env bash"
+            print("#!/usr/bin/env bash", file=job_script_file)
             # this doesn't include use of segway-wrapper, which takes the
             # memory usage as an argument, and may be run multiple times
             self.log_cmdline(gmtk_cmdline, args, job_script_file)
@@ -2267,7 +2275,6 @@ class Runner(object):
         set_cwd_job_tmpl(job_tmpl)
 
         tmp_usage = self.calc_tmp_usage(num_frames, prog)
-
         job_tmpl_factory = JobTemplateFactory(job_tmpl,
                                               tmp_usage,
                                               self.mem_usage_progression,
@@ -2456,10 +2463,10 @@ class Runner(object):
         int_filepath = self.validation_int_filepaths[validation_window_index]
 
         with open(self.validation_int_filelistpath, "a") as int_filelist_fd:
-            print >>int_filelist_fd, int_filepath
+            print(int_filepath, file=int_filelist_fd)
 
         with open(self.validation_float_filelistpath, "a") as float_filelist_fd:
-            print >>float_filelist_fd, float_filepath
+            print(float_filepath, file=float_filelist_fd)
 
         if self.reverse_worlds:
             raise NotImplementedError("Running Segway with both validation "
@@ -2545,7 +2552,7 @@ class Runner(object):
     def get_posterior_clique_print_ranges(self):
         res = {}
 
-        for clique, clique_index in self.posterior_clique_indices.iteritems():
+        for clique, clique_index in six.iteritems(self.posterior_clique_indices):
             range_str = "%d:%d" % (clique_index, clique_index)
             res[clique + "CliquePrintRange"] = range_str
 
@@ -2562,7 +2569,7 @@ class Runner(object):
            not self.triangulation_filename):
             self.triangulation_filename_is_new = True
 
-            structure_filebasename = path(self.structure_filename).name
+            structure_filebasename = Path(self.structure_filename).name
             triangulation_filebasename = \
                 extjoin(structure_filebasename, str(num_segs),
                         str(num_subsegs), EXT_TRIFILE)
@@ -2655,7 +2662,7 @@ class Runner(object):
                             TRAIN_WINDOWS_BASES_INDEX]
 
             train_window_indices_shuffled = \
-                self.random_state.choice(range(num_train_windows),
+                self.random_state.choice(list(range(num_train_windows)),
                                          num_train_windows, replace=False)
 
             total_bases = sum(
@@ -2678,6 +2685,7 @@ class Runner(object):
         restartable_jobs = \
             self.queue_train_parallel(last_params_filename, instance_index,
                                       round_index, train_windows, **kwargs)
+
         restartable_jobs.wait()
 
         restartable_jobs = \
@@ -2840,7 +2848,7 @@ class Runner(object):
             writer = ListWriter(tabfile)
             writer.writerow(TRAIN_FIELDNAMES)
 
-            for name, typ in sorted(TRAIN_OPTION_TYPES.iteritems()):
+            for name, typ in sorted(six.iteritems(TRAIN_OPTION_TYPES)):
                 value = getattr(self, name)
                 if isinstance(typ, list):
                     for item in value:
@@ -2852,7 +2860,7 @@ class Runner(object):
         """
         load options from training and convert to appropriate type
         """
-        filename = path(traindirname) / TRAIN_FILEBASENAME
+        filename = Path(traindirname) / TRAIN_FILEBASENAME
 
         with open(filename) as tabfile:
             reader = DictReader(tabfile)
@@ -2940,9 +2948,7 @@ class Runner(object):
 
     def run_train(self):
         dst_filenames = self.setup_train()
-
         run_train_func = self.get_thread_run_func()
-
         # this is where the actual training takes place
         instance_params = run_train_func(self.num_segs_range)
 
@@ -2954,6 +2960,7 @@ class Runner(object):
             self.session = session
             self.instance_index = 0
             with self.open_job_log_file() as self.job_log_file:
+                print (1)
                 res = [self.run_train_instance()]
 
         self.session = None
@@ -2961,7 +2968,7 @@ class Runner(object):
         return res
 
     def run_train_multithread(self, num_segs_range):
-        seg_instance_indexes = xrange(self.num_instances)
+        seg_instance_indexes = range(self.num_instances)
         enumerator = enumerate(product(num_segs_range, seg_instance_indexes))
 
         # ensure memoization before threading
@@ -3082,7 +3089,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         new_filename = make_default_filename(resource, self.params_dirpath,
                                              instance_index)
 
-        path(old_filename).copy2(new_filename)
+        Path(old_filename).copy2(new_filename)
         return new_filename
 
     def recover_train_instance(self, last_log_likelihood, log_likelihood,
@@ -3094,7 +3101,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.recover_filename(InputMasterSaver.resource_name)
 
         recover_log_likelihood_tab_filepath = \
-            path(self.make_log_likelihood_tab_filename(instance_index,
+            Path(self.make_log_likelihood_tab_filename(instance_index,
                                                        recover_dirname))
 
         if not recover_log_likelihood_tab_filepath.isfile():
@@ -3103,41 +3110,41 @@ to find the winning instance anyway.""" % thread.instance_index)
             # would not generate any tab file with an instance labeled suffix.
             # Read the tab file that does not have a labeled number suffix.
             recover_log_likelihood_tab_filepath = \
-                path(self.make_log_likelihood_tab_filename(None,
+                Path(self.make_log_likelihood_tab_filename(None,
                                                            recover_dirname))
 
         if self.validate:
             # recover validation sum tabfile
             recover_validation_sum_tab_filepath = \
-                path(self.make_validation_sum_tab_filename(instance_index,
+                Path(self.make_validation_sum_tab_filename(instance_index,
                                                            recover_dirname))
             if not recover_validation_sum_tab_filepath.isfile():
                 recover_validation_sum_tab_filepath = \
-                    path(self.make_validation_sum_tab_filename(None,
+                    Path(self.make_validation_sum_tab_filename(None,
                                                            recover_dirname))
             copy2(recover_validation_sum_tab_filepath,
                   self.validation_sum_tab_filename)
 
             # recover validation output tabfile
             recover_validation_output_tab_filepath = \
-                path(self.make_validation_output_tab_filename(instance_index,
+                Path(self.make_validation_output_tab_filename(instance_index,
                                                            recover_dirname))
             if not recover_validation_output_tab_filepath.isfile():
                 recover_validation_output_tab_filepath = \
-                    path(self.make_validation_output_tab_filename(None,
+                    Path(self.make_validation_output_tab_filename(None,
                                                            recover_dirname))
             copy2(recover_validation_output_tab_filepath,
                   self.validation_output_tab_filename)
 
             # recover last validation sum
             recover_validation_sum_filename = \
-                path(self.make_filename(PREFIX_VALIDATION_SUM,
+                Path(self.make_filename(PREFIX_VALIDATION_SUM,
                                        instance_index, EXT_LIKELIHOOD,
                                        subdirname=SUBDIRNAME_LIKELIHOOD,
                                        dirname=recover_dirname))
             if not recover_validation_sum_filename.isfile():
                 recover_validation_sum_filename = \
-                    path(self.make_filename(PREFIX_VALIDATION_SUM,
+                    Path(self.make_filename(PREFIX_VALIDATION_SUM,
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
@@ -3146,13 +3153,13 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             # recover last validation output
             recover_validation_output_filename = \
-                path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
+                Path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
             if not recover_validation_output_filename.isfile():
                 recover_validation_output_filename = \
-                    path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
+                    Path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
@@ -3161,13 +3168,13 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             # recover validation sum winner
             recover_validation_sum_winner_filename = \
-                path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
+                Path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
             if not recover_validation_sum_winner_filename.isfile():
                 recover_validation_sum_winner_filename = \
-                    path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
+                    Path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
@@ -3176,13 +3183,13 @@ to find the winning instance anyway.""" % thread.instance_index)
 
             # recover validation output winner
             recover_validation_output_winner_filename = \
-                path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
+                Path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
             if not recover_validation_output_winner_filename.isfile():
                 recover_validation_output_winner_filename = \
-                    path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
+                    Path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
@@ -3216,13 +3223,13 @@ to find the winning instance anyway.""" % thread.instance_index)
         old_params_filename = self.make_params_filename(instance_index,
                                                         recover_dirname)
         new_params_filename = self.params_filename
-        for round_index in xrange(final_round_index):
+        for round_index in range(final_round_index):
             old_curr_params_filename = extjoin(old_params_filename,
                                                str(round_index))
             new_curr_params_filename = extjoin(new_params_filename,
                                                str(round_index))
 
-            path(old_curr_params_filename).copy2(new_curr_params_filename)
+            Path(old_curr_params_filename).copy2(new_curr_params_filename)
             if self.validate:
                 if round_index == best_validation_index:
                     self.best_params_filename = new_curr_params_filename
@@ -3267,7 +3274,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         try:
             with open(recover_filename) as oldfile:
                 lines = oldfile.readlines()
-        except IOError, err:
+        except IOError as err:
             if err.errno == ENOENT:
                 return False
             else:
@@ -3289,9 +3296,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         # copy the old filename to where the job's output would have
         # landed
-        path(recover_filename).copy2(self.viterbi_filenames[window_index])
+        Path(recover_filename).copy2(self.viterbi_filenames[window_index])
 
-        print >>sys.stderr, "window %d already complete" % window_index
+        print("window %d already complete" % window_index, file=sys.stderr)
 
         return True
 
@@ -3330,7 +3337,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # For each unique genomedata archive in this world
         for genomedata_name in ordered_unique_world_genomedata_names:
             # For every track in this world
-            tracks_from_world = zip(*self.track_groups)[window.world]
+            tracks_from_world = list(zip(*self.track_groups))[window.world]
             track_list = [track.index for track in tracks_from_world
                           if track.genomedata_name == genomedata_name]
             # Build a comma separated string
@@ -3388,7 +3395,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.save_input_master()
 
     def save_identify_posterior(self):
-        for world in xrange(self.num_worlds):
+        for world in range(self.num_worlds):
             if self.identify:
                 IdentifySaver(self)(world)
 
@@ -3461,10 +3468,10 @@ to find the winning instance anyway.""" % thread.instance_index)
         cmdline_top_filename = self.make_script_filename(PREFIX_CMDLINE_TOP)
 
         with open(cmdline_top_filename, "w") as cmdline_top_file:
-            print >>cmdline_top_file, run_msg
-            print >>cmdline_top_file
-            print >>cmdline_top_file, "cd %s" % maybe_quote_arg(path.getcwd())
-            print >>cmdline_top_file, cmdline2text()
+            print(run_msg, file=cmdline_top_file)
+            print(file=cmdline_top_file)
+            print("cd %s" % maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
+            print(cmdline2text(), file=cmdline_top_file)
 
         return run_msg
 
@@ -3506,8 +3513,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:
-                print >>self.cmdline_short_file, run_msg
-                print >>self.cmdline_long_file, run_msg
+                print(run_msg, file=self.cmdline_short_file)
+                print(run_msg, file=self.cmdline_long_file)
 
                 self.run_triangulate()
 
@@ -3546,7 +3553,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # XXX: register atexit for cleanup_resources
 
         work_dirname = self.work_dirname
-        if not path(work_dirname).isdir():
+        if not Path(work_dirname).isdir():
             self.make_dir(work_dirname, self.clobber)
 
         self.run(*args, **kwargs)

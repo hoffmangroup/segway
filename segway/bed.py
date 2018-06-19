@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 from __future__ import division
 
+from __future__ import absolute_import
+from six.moves import zip
 __version__ = "$Revision$"
 
 # Copyright 2008-2012 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -15,7 +17,7 @@ FIELDNAMES = ["chrom", "chromStart", "chromEnd", # required
 
 class Datum(object):
     def __init__(self, words):
-        self.__dict__ = dict(zip(FIELDNAMES, words))
+        self.__dict__ = dict(list(zip(FIELDNAMES, words)))
         self._words = tuple(words)
 
     def __repr__(self):
@@ -61,7 +63,7 @@ def parse_bed4(line):
 
 re_trackline_split = re.compile(r"(?:[^ =]+=([\"'])[^\1]+?\1(?= |$)|[^ ]+)")
 def get_trackline_and_reader(iterator, datum_cls=Datum):
-    line = iterator.next()
+    line = next(iterator)
 
     if line.startswith("track"):
         # retrieves group 1 of re_trackline_split match, which is the whole item

@@ -4,11 +4,12 @@ from __future__ import division
 """gethelp.py: get help from a command-line script
 """
 
+from __future__ import absolute_import
 __version__ = "$Revision$"
 
 ## Copyright 2011 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from ConfigParser import RawConfigParser
+from six.moves.configparser import RawConfigParser
 from cStringIO import StringIO
 import sys
 

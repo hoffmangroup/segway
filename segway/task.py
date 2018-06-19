@@ -1,5 +1,10 @@
 #!/usr/bin/env python
 from __future__ import division, with_statement
+from __future__ import print_function
+from __future__ import absolute_import
+from six.moves import map
+from six.moves import range
+from six.moves import zip
 
 """
 task: wraps a GMTK subtask to reduce size of output
@@ -17,7 +22,7 @@ from tempfile import gettempdir, mkstemp
 from genomedata import Genome
 from numpy import argmax, array, empty, where, diff, r_, zeros
 import optbuild
-from path import path
+from path import Path
 
 from .observations import (make_continuous_cells, make_supervision_cells,
                            _save_window)
@@ -34,7 +39,7 @@ SCORE_MAX = 1000
 
 SEG_INVALID = -1
 
-TEMP_DIRPATH = path(gettempdir())
+TEMP_DIRPATH = Path(gettempdir())
 
 EXT_OPTIONS = {}
 EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
@@ -49,8 +54,10 @@ DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
 
+
+
 def make_track_indexes(text):
-    return array(map(int, text.split(",")))
+    return array(list(map(int, text.split(","))))
 
 
 def divide_posterior_array(posterior_code, num_frames, num_sublabels):
@@ -63,7 +70,7 @@ def divide_posterior_array(posterior_code, num_frames, num_sublabels):
     as during the viterbi task.
     """
     res = zeros((2, num_frames), DTYPE_IDENTIFY)
-    for frame_index in xrange(num_frames):
+    for frame_index in range(num_frames):
         total_label = posterior_code[frame_index]
         label, sublabel = divmod(total_label, num_sublabels)
         res[:, frame_index] = array([label, sublabel])
@@ -77,13 +84,13 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     lines = iter(lines)
 
     # Segment 0, after Island[...]
-    assert lines.next().startswith("Segment ")
+    assert next(lines).startswith("Segment ")
 
     # ========
-    assert lines.next().startswith("========")
+    assert next(lines).startswith("========")
 
     # Segment 0, number of frames = 1001, viteri-score = -6998.363710
-    line = lines.next()
+    line = next(lines)
     assert line.startswith("Segment ")
 
     num_frames_text = line.split(", ")[1].partition(" = ")
@@ -93,7 +100,7 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     num_frames = int(num_frames_text[2])
 
     # Printing random variables from (P,C,E)=(1,999,0) partitions
-    line = lines.next()
+    line = next(lines)
     assert line.startswith("Printing random variables from")
     seg_dict = {'seg': 0, 'subseg': 1}
     # if output_label == "subseg" or "full", need to catch
@@ -161,7 +168,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
     label_colors = [get_label_color(extract_superlabel(seg_label)) for
                     seg_label in labels]
 
-    zipper = zip(start_pos[:-1], start_pos[1:], labels, label_colors)
+    zipper = list(zip(start_pos[:-1], start_pos[1:], labels, label_colors))
 
     # this is easily concatenated since it has no context
     for seg_start, seg_end, seg_label, label_color in zipper:
@@ -174,7 +181,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
         row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
                chrom_start, chrom_end, item_rgb][:num_cols]
 
-        print >>outfile, "\t".join(row)
+        print("\t".join(row), file=outfile)
 
     # assert that the whole region is mapped
     # seg_end here means the last seg_end in the loop
@@ -208,14 +215,14 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     save_bed(bed_filename, start_pos, labels, coord, resolution,
              int(num_labels))
     if output_label == "subseg":
-        label_print_range = xrange(num_labels * num_sublabels)
+        label_print_range = range(num_labels * num_sublabels)
         label_names = label_print_range
     elif output_label == "full":
-        label_print_range = xrange(num_labels * num_sublabels)
+        label_print_range = range(num_labels * num_sublabels)
         label_names = ("%d.%d" % divmod(label, num_sublabels)
                        for label in label_print_range)
     else:
-        label_print_range = xrange(num_labels)
+        label_print_range = range(num_labels)
         label_names = label_print_range
 
     # Write label-wise posterior bedgraph files
@@ -228,7 +235,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     probs_rounded = probs_rounded.astype(int)
 
     # print array columns as text to each outfile
-    zipper = zip(outfilenames, probs_rounded.T, label_print_range)
+    zipper = list(zip(outfilenames, probs_rounded.T, label_print_range))
     for outfilename, probs_rounded_label, label_index in zipper:
         # run-length encoding on the probs_rounded_label
 
@@ -242,7 +249,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
                 value = str(probs_rounded_label[bed_start - start])
 
                 row = [chrom, chrom_start, chrom_end, value]
-                print >>outfile, "\t".join(row)
+                print("\t".join(row), file=outfile)
 
 
 def load_posterior_save_bed(coord, resolution, do_reverse,
@@ -279,7 +286,7 @@ def replace_args_filelistname(args, temp_filepaths, ext):
     replace the filelistnames in arguments with temporary filenames
     """
     fd, filelistname = mkstemp(suffix=extsep + EXT_LIST, prefix=ext + extsep)
-    filelistpath = path(filelistname)
+    filelistpath = Path(filelistname)
 
     # side-effect on args, temp_filepaths
     option = EXT_OPTIONS[ext]
@@ -294,7 +301,7 @@ def replace_args_filelistname(args, temp_filepaths, ext):
 
 def print_to_fd(fd, line):
     with fdopen(fd, "w") as outfile:
-        print >>outfile, line
+        print(line, file=outfile)
 
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
@@ -341,7 +348,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
             # don't raise a nested exception if the file was never created
             try:
                 filepath.remove()
-            except OSError, err:
+            except OSError as err:
                 if err.errno == ENOENT:
                     pass
 
@@ -400,11 +407,11 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
             # don't raise a nested exception if the file was never created
             try:
                 filepath.remove()
-            except OSError, err:
+            except OSError as err:
                 if err.errno == ENOENT:
                     pass
 
-    lines = output.splitlines()
+    lines = [line.decode() for line in output.splitlines()]
 
     return parse_viterbi_save_bed(coord, resolution, do_reverse,
                                   lines, outfilename, num_labels, output_label)
@@ -418,7 +425,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
 
     # Create and save the train window
     genomedata_names = genomedata_names.split(",")
-    track_indexes = map(int, track_indexes.split(","))
+    track_indexes = list(map(int, track_indexes.split(",")))
 
     (chrom, start, end) = coord
 
@@ -484,7 +491,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
             # don't raise a nested exception if the file was never created
             try:
                 filepath.remove()
-            except OSError, err:
+            except OSError as err:
                 if err.errno == ENOENT:
                     pass
 
@@ -515,7 +522,7 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
             # Don't raise a nested exception if the file was never created
             try:
                 filepath.remove()
-            except OSError, err:
+            except OSError as err:
                 if err.errno == ENOENT:
                     pass
 
@@ -528,10 +535,10 @@ def save_gmtk_observation_files(coord, resolution, do_reverse, outfile_name,
     (chrom, start, end) = coord
 
     genomedata_names = genomedata_names.split(",")
-    track_indexes = map(int, track_indexes.split(","))
+    track_indexes = list(map(int, track_indexes.split(",")))
 
-    float_filepath = path(float_filename)
-    int_filepath = path(int_filename)
+    float_filepath = Path(float_filename)
+    int_filepath = Path(int_filename)
 
     filepaths = [float_filepath, int_filepath]
     args = list(args)
@@ -584,7 +591,7 @@ def task(verb, kind, outfilename, chrom, start, end, resolution,
 
 def main(args=sys.argv[1:]):
     if len(args) < 7:
-        print >>sys.stderr, USAGE
+        print(USAGE, file=sys.stderr)
         sys.exit(2)
 
     # Try running the task

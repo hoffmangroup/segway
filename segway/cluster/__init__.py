@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 from __future__ import division, with_statement
 
+from __future__ import absolute_import
+from __future__ import print_function
+import six
 __version__ = "$Revision$"
 
 # Copyright 2009, 2011-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -133,14 +136,13 @@ class RestartableJob(object):
             global_mem_usage[mem_usage_key] = trial_index
 
         self.trial_index = trial_index
-
         job_template = job_tmpl_factory(trial_index)
         res = self.session.runJob(job_template)
 
         assert res
 
         res_req = job_tmpl_factory.res_req
-        if not isinstance(res_req, basestring):
+        if not isinstance(res_req, six.string_types):
             res_req = " ".join(res_req)
 
         jobname = job_template.jobName
@@ -151,7 +153,7 @@ class RestartableJob(object):
         else:
             job_location = "queued"
 
-        print >>sys.stderr, "%s %s: %s (%s)" % (job_location, res, jobname, res_req)
+        print("%s %s: %s (%s)" % (job_location, res, jobname, res_req), file=sys.stderr)
 
         return res
 
@@ -278,7 +280,7 @@ class RestartableJobDict(dict):
         cpu = resource_usage["cpu"]
         row = [jobid, jobname, prog, str(num_segs), str(num_frames),
                maxvmem, cpu, str(exit_status)]
-        print >>self.job_log_file, "\t".join(row)
+        print("\t".join(row), file=self.job_log_file)
         self.job_log_file.flush()  # allow reading file now
 
         if exit_status == 0:
@@ -288,7 +290,7 @@ class RestartableJobDict(dict):
 
     def wait(self):
         session = self.session
-        jobids = self.keys()
+        jobids = list(self.keys())
 
         while jobids:
             # check each job individually
@@ -317,4 +319,4 @@ class RestartableJobDict(dict):
                 # by the 'jobid' does not exist. see versions prior to
                 # SVN r425 for code
 
-            jobids = self.keys()
+            jobids = list(self.keys())
