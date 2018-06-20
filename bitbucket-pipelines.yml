@@ -28,4 +28,4 @@ pipelines:
               - python --version
               - gmtkPrint -version
               - pip3 list
-              - cd test && python run_tests.py
+              - cd test && ./test_all.sh
