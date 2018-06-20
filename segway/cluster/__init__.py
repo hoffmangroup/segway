@@ -278,23 +278,24 @@ class RestartableJobDict(dict):
         cpu = resource_usage["cpu"]
         row = [jobid, jobname, prog, str(num_segs), str(num_frames),
                maxvmem, cpu, str(exit_status)]
-        print("\t".join(row), file=self.job_log_file)
-        self.job_log_file.flush()  # allow reading file now
 
         if exit_status == 0:
             # job will not be resubmitted, so free the job template
             restartable_job.free_job_template()
         del self[jobid]
+        return row
 
     def wait(self):
         session = self.session
         jobids = list(self.keys())
+        log_rows = []
 
         while jobids:
             # check each job individually
             for jobid in jobids:
                 # XXX: should be an improved
                 # RestartableJobDict.calc_sleep_time()
+
                 sleep(MIN_JOB_WAIT_SLEEP_TIME)
 
                 try:
@@ -303,7 +304,7 @@ class RestartableJobDict(dict):
                     # job isn't done yet
                     continue
 
-                self.process_job(jobid, job_info)
+                log_rows.append(self.process_job(jobid, job_info))
                 self.queue_unqueued_jobs()
 
                 # XXX: should be able to check
@@ -318,3 +319,7 @@ class RestartableJobDict(dict):
                 # SVN r425 for code
 
             jobids = list(self.keys())
+
+        for row in sorted(log_rows):
+            print("\t".join(row), file=self.job_log_file)
+            self.job_log_file.flush()  # allow reading file now
