@@ -15,12 +15,10 @@ import sys
 import subprocess
 from six.moves import map, zip
 
-
 if (sys.version_info[0] == 2 and sys.version_info[1] < 7) or \
    (sys.version_info[0] == 3 and sys.version_info[1] < 4):
     print("Segway requires Python version 2.7 or 3.4 or later")
     sys.exit(1)
-
 
 from setuptools import find_packages, setup
 

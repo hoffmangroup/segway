@@ -2216,7 +2216,6 @@ class Runner(object):
     def queue_task(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, prefix_args=[]):
         """ Returns a restartable job object to run segway-task """
-
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
         if prefix_args:
@@ -2271,6 +2270,7 @@ class Runner(object):
         set_cwd_job_tmpl(job_tmpl)
 
         tmp_usage = self.calc_tmp_usage(num_frames, prog)
+
         job_tmpl_factory = JobTemplateFactory(job_tmpl,
                                               tmp_usage,
                                               self.mem_usage_progression,
@@ -2957,7 +2957,6 @@ class Runner(object):
             self.session = session
             self.instance_index = 0
             with self.open_job_log_file() as self.job_log_file:
-                print (1)
                 res = [self.run_train_instance()]
 
         self.session = None

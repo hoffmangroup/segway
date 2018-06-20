@@ -1,14 +1,13 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function
 
-__version__ = "$Revision$"
 from six import viewitems
 from six.moves import map, range, zip
 
 """observations.py: prepare and save GMTK observations
 """
 
-
+__version__ = "$Revision$"
 
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 try:

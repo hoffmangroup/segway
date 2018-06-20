@@ -19,7 +19,6 @@ ENV C_INCLUDE_PATH /usr/include/hdf5/serial
 ENV LD_LIBRARY_PATH /usr/lib/x86_64-linux-gnu/hdf5/serial
 ENV HDF5_DIR /usr/lib/x86_64-linux-gnu/hdf5/serial
 
-
 # Install GMTK
 # Downloads location: http://melodi.ee.washington.edu/cgi-bin/gmtk-download.pl
 # Ubuntu 18.04 defaults to a more recent c++ version; need to specify c++11 with CXXFLAGS
@@ -45,4 +44,3 @@ RUN pip install --upgrade \
 
 # Install segway
 # RUN pip install segway
-

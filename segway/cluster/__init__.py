@@ -134,6 +134,7 @@ class RestartableJob(object):
             global_mem_usage[mem_usage_key] = trial_index
 
         self.trial_index = trial_index
+
         job_template = job_tmpl_factory(trial_index)
         res = self.session.runJob(job_template)
 
@@ -295,7 +296,6 @@ class RestartableJobDict(dict):
             for jobid in jobids:
                 # XXX: should be an improved
                 # RestartableJobDict.calc_sleep_time()
-
                 sleep(MIN_JOB_WAIT_SLEEP_TIME)
 
                 try:
