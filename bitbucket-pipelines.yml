@@ -17,7 +17,7 @@ pipelines:
               - python --version
               - gmtkPrint -version
               - pip list 
-              - cd test && ./run_tests.py
+              - cd test && ./test_all.sh
         - step:
             caches:
               - pip
