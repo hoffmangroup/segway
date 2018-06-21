@@ -54,13 +54,7 @@ def make_regex(text):
     """
     make regex, escaping things that aren't with (% %)
     """
-    #Finds if the text given is bytes from a file, or str from filename
-    string = True
-    try:
-        text = text.encode(SEGWAY_ENCODING)
-    except:
-        string = False
-        pass
+
     spans = [match.span() for match in re_unescape.finditer(text)]
 
     res = [b"^"]
@@ -71,8 +65,6 @@ def make_regex(text):
         last_end = end
     res.extend([escape(text[last_end:]), b"$"])
     
-    if string:
-        return re_compile(b"".join(res).decode(SEGWAY_ENCODING))
     return re_compile(b"".join(res))
 
 
@@ -129,7 +121,7 @@ def compare_directory(template_dirname, query_dirname):
 
         query_filenames_items = viewitems(query_filenames)
         for query_filename_relative, query_filename in query_filenames_items:
-            if re_template_filename_relative.match(query_filename_relative):
+            if re_template_filename_relative.match(query_filename_relative.encode(SEGWAY_ENCODING)):
                 del query_filenames[query_filename_relative]
                 if compare_file(template_filename, query_filename):
                     counter.success()
