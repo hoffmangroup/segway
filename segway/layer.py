@@ -158,7 +158,7 @@ def update_trackline(trackline, updates):
         trackline = TRACKLINE_DEFAULT[:]
 
     for word_index, word in enumerate(trackline):
-        if "visibility=dense" in word:
+        if word.strip() == "visibility=dense":
             trackline[word_index] = "visibility=full"
 
     for key, value in viewitems(updates):
