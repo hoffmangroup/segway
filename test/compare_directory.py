@@ -54,7 +54,6 @@ def make_regex(text):
     """
     make regex, escaping things that aren't with (% %)
     """
-
     spans = [match.span() for match in re_unescape.finditer(text)]
 
     res = [b"^"]
@@ -82,10 +81,7 @@ def compare_file(template_filename, query_filename):
                     zip(template_file, query_file),
                     start=1):
                 re_template = make_regex(lines[0])
-                try:
-                    match = re_template.match(lines[1])
-                except UnicodeDecodeError:
-                    raise Exception(query_filename)
+                match = re_template.match(lines[1])
                 if not match:
                     res = False
                     print("Line %d differences for %s" % (
