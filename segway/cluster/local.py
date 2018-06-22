@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division
 
 """local.py: local mode instead of using cluster
 """
 
-from __future__ import absolute_import
 __version__ = "$Revision$"
 
 ## Copyright 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>

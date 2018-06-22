@@ -113,7 +113,7 @@ def compare_directory(template_dirname, query_dirname):
 
     template_filenames = get_dir_filenames(template_dirname)
     for template_filename_relative, template_filename in template_filenames:
-        re_template_filename_relative = make_regex(template_filename_relative)
+        re_template_filename_relative = make_regex(template_filename_relative.encode(SEGWAY_ENCODING))
 
         query_filenames_items = viewitems(query_filenames)
         for query_filename_relative, query_filename in query_filenames_items:
