@@ -1441,20 +1441,20 @@ class Runner(object):
                          output_params_filename=None):
         directives = {}
 
-        directives["CARD_SEG"] = self.num_segs
+        if input_params_filename:
+            directives["INPUT_PARAMS_FILENAME"] = input_params_filename
 
         if output_params_filename:
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
 
-        if input_params_filename:
-            directives["INPUT_PARAMS_FILENAME"] = input_params_filename
 
         # prevent supervised variable from being inherited from train task
         if self.identify:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
 
-        directives["CARD_FRAMEINDEX"] = self.max_frames
+        directives["CARD_SEG"] = self.num_segs
         directives["CARD_SUBSEG"] = self.num_subsegs
+        directives["CARD_FRAMEINDEX"] = self.max_frames
         directives["SEGTRANSITION_WEIGHT_SCALE"] = \
             self.segtransition_weight_scale
 

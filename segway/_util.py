@@ -87,8 +87,7 @@ OFFSET_STEP = 2
 
 data_filename = partial(resource_filename, PKG_DATA)
 def data_string(resource):
-    byte_string = partial(resource_string, PKG_DATA)
-    return byte_string(resource).decode(SEGWAY_ENCODING)
+    return resource_string(PKG_DATA, resource).decode(SEGWAY_ENCODING)
 
 NUM_COLORS = 8
 SCHEME = colorbrewer.Dark2[NUM_COLORS]
