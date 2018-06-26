@@ -13,7 +13,7 @@ __version__ = "$Revision$"
 try:
     from cStringIO import StringIO
 except ImportError:
-    #""This module has been moved into io in Python 3
+    #"StringIO" has been moved into package io in Python 3
     from io import StringIO
 from collections import deque
 from contextlib import closing
