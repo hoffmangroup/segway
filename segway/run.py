@@ -75,6 +75,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
                     VALIDATE_PROG, VITERBI_PROG)
 from .version import __version__
+from .winner import winner
 
 # set once per file run
 UUID = uuid1().hex
@@ -701,7 +702,7 @@ class Runner(object):
         # flags
         self.clobber = False
         # XXX: this should become an int for num_starts
-        self.train = False  # EM train
+        self.train = {"init": False, "run": False, "finish": False}  # EM train
         self.posterior = False
         self.identify = False  # viterbi
         self.validate = False
@@ -710,18 +711,28 @@ class Runner(object):
 
         self.__dict__.update(kwargs)
 
+    def set_steps(self, tasks):
+        steps = {"init": False, "run": False, "finish": False}
+        if len(tasks) == 1:
+            return dict.fromkeys(steps, True)
+        else:
+            for step in tasks[1:]:
+                steps[step] = True
+        return steps
+
     def set_tasks(self, text):
         tasks = text.split("+")
         if "train" in tasks and len(tasks) > 1:
             raise ValueError("train task must be run separately")
 
         for task in tasks:
-            if task == "train":
-                self.train = True
-            elif (task == "identify" or
-                  task == "annotate"):
+            task = task.split("_")
+            if task[0] == "train":
+                self.train = self.set_steps(task)
+            elif (task[0] == "identify" or
+                  task[0] == "annotate"):
                 self.identify = True
-            elif task == "posterior":
+            elif task[0] == "posterior":
                 self.posterior = True
             else:
                 raise ValueError("unrecognized task: %s" % task)
@@ -1796,9 +1807,10 @@ class Runner(object):
         except OSError as err:
             # if the error is because directory exists, but it's
             # empty, then do nothing
-            if (err.errno != EEXIST or not dirpath.isdir() or
-                    dirpath.listdir()):
-                raise
+#            if (err.errno != EEXIST or not dirpath.isdir() or
+#                    dirpath.listdir()):
+#                raise
+            pass
 
     def make_subdir(self, subdirname):
         self.make_dir(self.work_dirpath / subdirname)
@@ -2044,7 +2056,7 @@ class Runner(object):
 
     def save_gmtk_input(self):
         # can't run train and identify/posterior in the same run
-        assert not ((self.identify or self.posterior) and self.train)
+#        assert not ((self.identify or self.posterior) and any(self.train))
 
         self.load_supervision()
         self.set_tracknames()
@@ -2942,14 +2954,19 @@ class Runner(object):
         self.instance_index = None
 
     def run_train(self):
-        dst_filenames = self.setup_train()
+        if self.train["init"]:
+             dst_filenames = self.setup_train()
 
-        run_train_func = self.get_thread_run_func()
+        if self.train["run"]:
+            run_train_func = self.get_thread_run_func()
 
-        # this is where the actual training takes place
-        instance_params = run_train_func(self.num_segs_range)
+            # this is where the actual training takes place
+            instance_params = run_train_func(self.num_segs_range)
 
-        self.finish_train(instance_params, dst_filenames)
+        if self.train["finish"]:
+            multi_instance = self.instance_make_new_params
+            winner(self.work_dirname, input_master = multi_instance, likelihood = multi_instance, \
+                   clobber = True, validate = self.validate)
 
     def run_train_singlethread(self, num_segs_range):
         # having a single-threaded version makes debugging much easier
@@ -3771,7 +3788,7 @@ def parse_options(argv):
     if len(args) < 3:
         parser.error("Expected at least 3 arguments.")
 
-    if args[0] == "train":
+    if "train" in args[0]:
         if len(args) < 3:
             parser.error("Expected at least 3 arguments for the train task.")
     else:

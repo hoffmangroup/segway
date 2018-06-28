@@ -15,9 +15,9 @@ import sys
 
 from path import Path
 
-from ._util import (extjoin, EXT_MASTER, EXT_PARAMS, EXT_TAB, PREFIX_INPUT,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS, SUBDIRNAME_LOG,
-                    SUBDIRNAME_PARAMS)
+from ._util import (extjoin, EXT_MASTER, EXT_PARAMS, EXT_TAB,
+                    PREFIX_INPUT, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
+                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS)
 
 PAT_LIKELIHOOD = extjoin(PREFIX_LIKELIHOOD, "*", EXT_TAB)
 
@@ -35,24 +35,28 @@ def get_likelihood_index(filepath):
     """
     return re_likelihood.match(filepath.name).group(1)
 
-
-def load_likelihood(filename):
+def load_likelihood(filename, validate = False):
+    best_line = -1e+20
     with open(filename) as infile:
-        # get last line
-        for line in infile:
-            pass
+        # if validate find best line, else return last 
+        for index, line in enumerate(infile):
+            if float(line) > best_line and validate:
+                best_line = float(line)
+                best_index = index
+    if validate:
+        return best_index, best_line
+    return [str(index), float(line)]
 
-    return float(line)
-
-
-def enumerate_likelihoods(dirpath):
+def enumerate_likelihoods(dirpath, validate):
     log_dirpath = dirpath / SUBDIRNAME_LOG
+    if not log_dirpath.files(PAT_LIKELIHOOD):
+        yield [None] + load_likelihood(log_dirpath / extjoin(PREFIX_LIKELIHOOD, EXT_TAB), validate)
     for filepath in log_dirpath.files(PAT_LIKELIHOOD):
-        yield get_likelihood_index(filepath), load_likelihood(filepath)
+        yield [get_likelihood_index(filepath)] + load_likelihood(filepath, validate)
 
 
-def get_winning_instance(dirpath):
-    return sorted(enumerate_likelihoods(dirpath), key=itemgetter(1, 0))[-1][0]
+def get_winning_instance(dirpath, validate):
+    return sorted(enumerate_likelihoods(dirpath, validate), key=itemgetter(2, 0, 1))[-1][0:-1]
 
 
 def enumerate_params_filenames(dirpath, instance):
@@ -63,15 +67,19 @@ def enumerate_params_filenames(dirpath, instance):
 
 
 def get_last_params_filename(dirpath, instance):
-    return sorted(enumerate_params_filenames(dirpath, instance))[-1][-1]
+    if not instance[0]:
+        instance[0] = "0"
+    return dirpath / extjoin(PREFIX_PARAMS, instance[0], EXT_PARAMS, instance[1])
 
 
 def get_input_master_filename(dirpath, instance):
     return dirpath / extjoin(PREFIX_INPUT, instance, EXT_MASTER)
 
+def get_log_likelihood_filename(dirpath, instance):
+    return dirpath / extjoin(PREFIX_LIKELIHOOD, instance, EXT_TAB)
 
-def print_and_copy(flag, getter, dirpath, instance, final_basename, copy,
-                   clobber):
+
+def print_and_copy(flag, getter, dirpath, instance, final_basename, clobber):
     if flag:
         srcpath = getter(dirpath, instance)
         print(srcpath)
@@ -82,16 +90,19 @@ def print_and_copy(flag, getter, dirpath, instance, final_basename, copy,
             srcpath.copy2(dstpath)
 
 
-def winner(dirname, params=True, input_master=True, copy=False, clobber=False):
+def winner(dirname, params=True, input_master=True, likelihood = False, 
+           clobber=False, validate = False):
     dirpath = Path(dirname)
-    winning_instance = get_winning_instance(dirpath)
+    winning_instance = get_winning_instance(dirpath, validate)
 
     params_dirpath = dirpath / SUBDIRNAME_PARAMS
+    log_dirpath = dirpath / SUBDIRNAME_LOG
     print_and_copy(input_master, get_input_master_filename, params_dirpath,
-                   winning_instance, "input.master", copy, clobber)
+                   winning_instance[0], "input.master", clobber)
     print_and_copy(params, get_last_params_filename, params_dirpath,
-                   winning_instance, "params.params", copy, clobber)
-
+                   winning_instance, "params.params", clobber)
+    print_and_copy(likelihood, get_log_likelihood_filename, log_dirpath,
+                   winning_instance[0], "likelihood.tab", clobber)
 
 def parse_options(args):
     from optparse import OptionParser
