@@ -786,7 +786,7 @@ class Runner(object):
         res.set_tasks(task_str)
 
         # If we're running the training task
-        if res.train:
+        if any(res.train.values()):
             # The genomedata archives are all arguments execept the final
             # train directory
             res.genomedata_names = args[1:-1]
@@ -2056,7 +2056,8 @@ class Runner(object):
 
     def save_gmtk_input(self):
         # can't run train and identify/posterior in the same run
-#        assert not ((self.identify or self.posterior) and any(self.train))
+        assert not ((self.identify or self.posterior) and \
+                   any(self.train.values()))
 
         self.load_supervision()
         self.set_tracknames()
@@ -2887,17 +2888,29 @@ class Runner(object):
         if self.params_filename is not None:
             self.params_filenames = [self.params_filename]
 
+    def setup_shared(self):
+        self.make_subdirs(SUBDIRNAMES_EITHER)
+
+        self.save_gmtk_input()
+        self.save_window_list()
+
+        self.run_triangulate()
+
     def setup_train(self):
         """
         return value: dst_filenames
         """
         assert self.num_instances >= 1
 
+        self.setup_shared()
+        self.make_subdirs(SUBDIRNAMES_TRAIN)
+
         # save the destination file for input_master as we will be
         # generating new input masters for each start
 
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
+
         input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(self.input_master_filename,
                                    self.params_dirpath, self.clobber)
@@ -3402,6 +3415,7 @@ to find the winning instance anyway.""" % thread.instance_index)
     def setup_identify_posterior(self):
         self.instance_index = "identify"
 
+        self.setup_shared()
         # setup files
         if not self.input_master_filename:
             warn("Input master not specified. Generating.")
@@ -3509,11 +3523,6 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.make_script_filename(PREFIX_CMDLINE_SHORT)
         cmdline_long_filename = self.make_script_filename(PREFIX_CMDLINE_LONG)
 
-        self.make_subdirs(SUBDIRNAMES_EITHER)
-
-        if self.train:
-            self.make_subdirs(SUBDIRNAMES_TRAIN)
-
         # Check if the genomedata archives are compatable with each other
         if not self.check_genomedata_archives():
             raise ValueError(
@@ -3521,21 +3530,16 @@ to find the winning instance anyway.""" % thread.instance_index)
                 "and ends"
             )
 
-        self.save_gmtk_input()
-        self.save_window_list()
-
         with open(cmdline_short_filename, "w") as self.cmdline_short_file:
             with open(cmdline_long_filename, "w") as self.cmdline_long_file:
                 print(run_msg, file=self.cmdline_short_file)
                 print(run_msg, file=self.cmdline_long_file)
 
-                self.run_triangulate()
-
                 if (self.validate and
-                    self.train):
+                    self.train["init"]):
                     self.save_validation_set()
 
-                if self.train:
+                if any(self.train.values()):
                     self.run_train()
 
                 if self.identify or self.posterior:
