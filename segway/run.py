@@ -73,7 +73,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
-                    VALIDATE_PROG, VITERBI_PROG)
+                    VALIDATE_PROG, VITERBI_PROG, Window)
 from .version import __version__
 from .winner import winner
 
@@ -2122,7 +2122,7 @@ class Runner(object):
         with open(window_bed_filename, "r") as window_bed_file:
             for line in window_bed_file.readlines():
                 line = line.split(DELIMITER_BED)
-                self.windows.append(Window(line[3], line[0], line[1], line[2]))
+                self.windows.append(Window(line[3], line[0], int(line[1]), int(line[2])))
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
