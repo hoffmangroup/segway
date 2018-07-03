@@ -2075,6 +2075,8 @@ class Runner(object):
                 genome.close()
 
         self.windows = observations.windows
+        import pdb
+        pdb.set_trace()
         self.validation_windows = observations.validation_windows
 
         # XXX: does this need to be done before save()?
@@ -2971,6 +2973,8 @@ class Runner(object):
              dst_filenames = self.setup_train()
 
         if self.train["run"]:
+            if not self.train["init"]:
+                self.load_train_options(self.work_dirpath)
             run_train_func = self.get_thread_run_func()
 
             # this is where the actual training takes place
