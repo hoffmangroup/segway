@@ -2115,6 +2115,15 @@ class Runner(object):
                 bed_writer.writerow((window.chrom, window.start, window.end,
                                      index))
 
+    def load_windows(self):
+        window_bed_filename = self.make_filename(PREFIX_WINDOW, EXT_BED)
+        self.windows = []
+
+        with open(window_bed_filename, "r") as window_bed_file:
+            for line in window_bed_file.readlines():
+                line = line.split(DELIMITER_BED)
+                self.windows.append(Window(line[3], line[0], line[1], line[2]))
+
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
             copy2(src_filename, dst_filename)
@@ -2975,6 +2984,7 @@ class Runner(object):
         if self.train["run"]:
             if not self.train["init"]:
                 self.load_train_options(self.work_dirpath)
+                self.load_windows()
             run_train_func = self.get_thread_run_func()
 
             # this is where the actual training takes place
