@@ -54,6 +54,7 @@ ORD_t = ord("t")
 
 DIM_TRACK = 1  # Dimension in numpy array for track data
 
+
 class NoData(object):
     """
     sentinel for not adding an extra field to coords, so that one can
