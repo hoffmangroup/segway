@@ -54,7 +54,6 @@ ORD_t = ord("t")
 
 DIM_TRACK = 1  # Dimension in numpy array for track data
 
-
 class NoData(object):
     """
     sentinel for not adding an extra field to coords, so that one can
@@ -439,6 +438,8 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     int_blocks = []
     if float_data is not None:
         if distribution == DISTRIBUTION_ASINH_NORMAL:
+            import pdb
+            pdb.set_trace()
             float_data = arcsinh(float_data)
 
         if (not USE_MFSDG) or resolution > 1:

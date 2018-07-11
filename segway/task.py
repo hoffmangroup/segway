@@ -425,6 +425,9 @@ def run_train(coord, resolution, do_reverse, outfilename,
 
     (chrom, start, end) = coord
 
+    import pdb
+    pdb.set_trace()
+
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
