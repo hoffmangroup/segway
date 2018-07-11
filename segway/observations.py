@@ -438,8 +438,6 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     int_blocks = []
     if float_data is not None:
         if distribution == DISTRIBUTION_ASINH_NORMAL:
-            import pdb
-            pdb.set_trace()
             float_data = arcsinh(float_data)
 
         if (not USE_MFSDG) or resolution > 1:
