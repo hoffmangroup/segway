@@ -619,7 +619,7 @@ class Observations(object):
             new_starts = start + new_offsets
             new_ends = append(new_starts[1:], end)
 
-            return zip(new_starts, new_ends)
+            return list(zip(new_starts, new_ends))
 
         return [[start, end]]
 
@@ -693,6 +693,7 @@ class Observations(object):
 
         sets: window_coords, validation_coords (if validation)
         """
+
         exclude_coords = self.exclude_coords
 
         windows = []

@@ -558,7 +558,7 @@ def run_validate(coord, resolution, do_reverse, outfilename, *args):
             "and reverse world options simultaneously is currently "
             "not supported")
 
-    validation_output = VALIDATE_PROG.getoutput(*args)
+    validation_output = VALIDATE_PROG.getoutput(*args).decode(SEGWAY_ENCODING)
     with open(outfilename, "w") as outfile:
         outfile.write(validation_output)
 
