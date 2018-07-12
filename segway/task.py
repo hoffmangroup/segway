@@ -9,10 +9,10 @@ task: wraps a GMTK subtask to reduce size of output
 
 from ast import literal_eval
 from errno import ENOENT
-from os import extsep, fdopen, EX_TEMPFAIL
+from os import extsep, fdopen, EX_TEMPFAIL, remove
 import re
 import sys
-from tempfile import gettempdir, mkstemp
+from tempfile import mkstemp
 
 from genomedata import Genome
 from numpy import argmax, array, empty, where, diff, r_, zeros
@@ -34,8 +34,6 @@ SCORE_MAX = 1000
 
 SEG_INVALID = -1
 
-TEMP_DIRPATH = path(gettempdir())
-
 EXT_OPTIONS = {}
 EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
 EXT_OPTIONS[EXT_INT] = "-of2"
@@ -47,6 +45,126 @@ USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
 DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 
 GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
+
+
+def make_secure_temporary_observation_file(chromosome_name, start, end,
+                                           suffix):
+    """Returns a tuple of an open file object and full filepath of an a
+    observation file with the given suffix
+
+    Assumes callee will close file
+    """
+    # Set a common prefix for the observation files
+    OBSERVATIONS_NAME_PREFIX_STRING = "{}.{}.{}.".format(chromosome_name,
+                                                         start, end)
+    fd, filename = mkstemp(suffix=extsep + suffix,
+                           prefix=OBSERVATIONS_NAME_PREFIX_STRING)
+
+    return fdopen(fd, "w"), filename
+
+
+def create_temporary_gmtk_observations(chromosome_name, start, end,
+                                       continuous_cells, resolution,
+                                       distribution, supervision_data):
+    """Returns a tuple (float_obs, int_obs) of temporary filepaths for the
+    int/float observation filenames unique to this process"""
+    # Create secure temporary observation files
+    # NB: obeys a given TMPDIR environment and is opened with O_EXCL
+    int_observations_file, int_observations_filename = \
+        make_secure_temporary_observation_file(chromosome_name, start, end,
+                                               EXT_INT)
+    float_observations_file, float_observations_filename = \
+        make_secure_temporary_observation_file(chromosome_name, start, end,
+                                               EXT_FLOAT)
+
+    # NB: numpy's tofile (which is used) can take an open python file object
+    _save_window(float_observations_file, int_observations_file,
+                 continuous_cells, resolution, distribution,
+                 supervision_data)
+
+    # NB: These can throw IOError exceptions which we will allow
+    int_observations_file.close()
+    float_observations_file.close()
+
+    return float_observations_filename, int_observations_filename
+
+
+def create_temporary_gmtk_observation_lists(float_observations_filename,
+                                            int_observations_filename):
+    """Create an observation file list containing the respective observation
+    file name.
+
+    Returns a tuple (float_obs_list, int_obs_list) of temporary filepaths
+    for the int/float observation lists (files) unique to this process
+    """
+    # Create secure temporary observation files
+    float_observation_list_fd, float_observation_list_filename = \
+        mkstemp(prefix=EXT_FLOAT + extsep, suffix=extsep + EXT_LIST)
+    int_observation_list_fd, int_observation_list_filename = \
+        mkstemp(prefix=EXT_INT + extsep, suffix=extsep + EXT_LIST)
+
+    # Write out the observation filename to their respective observation list
+    # NB: For gmtk observation list files, there may be more than one
+    # observation file. In this case we only ever insert one
+    # NB: print_to_fd uses a context manager which implicity closes the
+    # os-level file descriptor
+    print_to_fd(float_observation_list_fd, float_observations_filename)
+    print_to_fd(int_observation_list_fd, int_observations_filename)
+
+    return float_observation_list_filename, int_observation_list_filename
+
+
+def modify_gmtk_argument(args, option, value):
+    """Attempts to modify the gmtk command line arguments (gmtk_args)
+    with a given gmtk_option to gmtk_value"""
+    try:
+        args[args.index(option) + 1] = value
+    except ValueError:
+        pass  # not going to add this filename to the command line
+
+
+def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
+                              continuous_cells, resolution, distribution,
+                              supervision_data=None):
+    """Returns a list of filepaths to observation files created for gmtk
+    and modifies the necessary arguments (args) for running gmtk"""
+
+    # Create the gmtk observation files
+    float_observations_filename, int_observations_filename = \
+        create_temporary_gmtk_observations(chromosome_name, start, end,
+                                           continuous_cells, resolution,
+                                           distribution, supervision_data)
+
+    # Create the gmtk observation file lists
+    float_observation_list_filename, int_observation_list_filename = \
+        create_temporary_gmtk_observation_lists(float_observations_filename,
+                                                int_observations_filename)
+
+    # Modify the given gmtk arguments to use the temporary observation lists
+    modify_gmtk_argument(gmtk_args, EXT_OPTIONS[EXT_FLOAT],
+                         float_observation_list_filename)
+    modify_gmtk_argument(gmtk_args, EXT_OPTIONS[EXT_INT],
+                         int_observation_list_filename)
+    # Modify the given gmtk arguments so only the first (and only) file in the
+    # observation lists are used
+    modify_gmtk_argument(gmtk_args, GMTK_TRRNG_OPTION_STRING, "0")
+
+    # Return the list of filenames created
+    return [float_observations_filename, int_observations_filename,
+            float_observation_list_filename, int_observation_list_filename]
+
+
+def remove_all_files(file_list):
+    """Removes all files (if they exist) from the given file list"""
+    # For each file name
+    for filename in file_list:
+        # Attempt to remove the file
+        try:
+            remove(filename)
+        # don't raise a nested exception if the file was never created
+        except OSError, err:
+            if err.errno == ENOENT:
+                pass
 
 
 def make_track_indexes(text):
@@ -299,8 +417,8 @@ def print_to_fd(fd, line):
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                            num_labels, num_sublabels, output_label,
-                           genomedata_names, float_filename, int_filename,
-                           distribution, track_indexes_text, *args):
+                           genomedata_names, distribution, track_indexes_text,
+                           *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
     args = list(args)
@@ -310,40 +428,21 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     (chrom, start, end) = coord
     track_indexes = make_track_indexes(track_indexes_text)
 
-    float_filepath = TEMP_DIRPATH / float_filename
-    int_filepath = TEMP_DIRPATH / int_filename
-    temp_filepaths = [float_filepath, int_filepath]
-
-    # XXX: should do something to ensure of1 matches with int, of2 with float
-    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
-                                                 EXT_FLOAT)
-    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
-
     with Genome(genomedata_names) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
     try:
-        print_to_fd(float_filelistfd, float_filename)
-        print_to_fd(int_filelistfd, int_filename)
-
-        _save_window(float_filename, int_filename, continuous_cells,
-                     resolution, distribution)
-
+        temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
+                                                   continuous_cells,
+                                                   resolution, distribution)
         # XXXopt: does this actually free the memory? or do we need to
         # use a subprocess to do the loading?
-
         # remove from memory
         del continuous_cells
 
         output = POSTERIOR_PROG.getoutput(*args)
     finally:
-        for filepath in temp_filepaths:
-            # don't raise a nested exception if the file was never created
-            try:
-                filepath.remove()
-            except OSError, err:
-                if err.errno == ENOENT:
-                    pass
+        remove_all_files(temp_filenames)
 
     lines = output.splitlines()
     return read_posterior_save_bed(coord, resolution, do_reverse, outfilename,
@@ -353,24 +452,14 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                          num_labels, num_sublabels, output_label,
-                         genomedata_names, float_filename, int_filename,
-                         distribution, track_indexes_text, *args):
+                         genomedata_names, distribution, track_indexes_text,
+                         *args):
     # convert from tuple
     args = list(args)
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
 
     (chrom, start, end) = coord
-
-    float_filepath = TEMP_DIRPATH / float_filename
-    int_filepath = TEMP_DIRPATH / int_filename
-
-    temp_filepaths = [float_filepath, int_filepath]
-
-    # XXX: should do something to ensure of1 matches with int, of2 with float
-    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
-    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
-                                                 EXT_FLOAT)
 
     # Create a list of a list of tracks ordered based on genomedata archive
     # specified order (delimited with a ';')
@@ -383,12 +472,9 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                                              chrom, start, end)
 
     try:
-        print_to_fd(float_filelistfd, float_filename)
-        print_to_fd(int_filelistfd, int_filename)
-
-        _save_window(float_filename, int_filename, continuous_cells,
-                     resolution, distribution)
-
+        temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
+                                                   continuous_cells,
+                                                   resolution, distribution)
         # XXXopt: does this work? or do we need to use a subprocess to
         # do the loading?
         # remove from memory
@@ -396,13 +482,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
         output = VITERBI_PROG.getoutput(*args)
     finally:
-        for filepath in temp_filepaths:
-            # don't raise a nested exception if the file was never created
-            try:
-                filepath.remove()
-            except OSError, err:
-                if err.errno == ENOENT:
-                    pass
+        remove_all_files(temp_filenames)
 
     lines = output.splitlines()
 
@@ -411,7 +491,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
 
 def run_train(coord, resolution, do_reverse, outfilename,
-              genomedata_names, float_filename, int_filename, distribution,
+              genomedata_names, distribution,
               track_indexes,
               is_semisupervised, supervision_coords, supervision_labels,
               *args):
@@ -421,6 +501,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
     track_indexes = map(int, track_indexes.split(","))
 
     (chrom, start, end) = coord
+    gmtk_args = list(args)
 
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
@@ -447,83 +528,44 @@ def run_train(coord, resolution, do_reverse, outfilename,
         # Otherwise ignore supervision
         supervision_cells = None
 
-    # Create observation file temporary paths
-    float_filepath = TEMP_DIRPATH / float_filename
-    int_filepath = TEMP_DIRPATH / int_filename
-
-    temp_filepaths = [float_filepath, int_filepath]
-
-    args = list(args)  # convert from tuple
-
-    # Replace GMTK observation arguments with new temporary file paths
-    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
-    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
-                                                 EXT_FLOAT)
-    # Set the range of observations to train over to only the first file in the
-    # temporarily generated list
-    args[args.index(GMTK_TRRNG_OPTION_STRING) + 1] = "0"
-
+    temp_filenames = []
     try:
-        print_to_fd(float_filelistfd, float_filename)
-        print_to_fd(int_filelistfd, int_filename)
-
-        # XXX: Add seq_data for dinucleotide (not impl)
-        # XXX: Add exception handling on IOError?
-        # Would have to parse error message?
-        # e.g. Disk full vs No such file or directory
-        _save_window(float_filename, int_filename, continuous_cells,
-                     resolution, distribution,
-                     supervision_data=supervision_cells)
-
-        TRAIN_PROG.run(*args)
-
+        temp_filenames = prepare_gmtk_observations(gmtk_args, chrom, start,
+                                                   end, continuous_cells,
+                                                   resolution, distribution,
+                                                   supervision_cells)
+        TRAIN_PROG.run(*gmtk_args)
     # After the training round is finished
     finally:
         # Remove all temporarily created files
-        for filepath in temp_filepaths:
-            # don't raise a nested exception if the file was never created
-            try:
-                filepath.remove()
-            except OSError, err:
-                if err.errno == ENOENT:
-                    pass
+        remove_all_files(temp_filenames)
 
 
 def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
-    # Create a list of temporary filenames
-    temp_filepaths = []
     args = list(args)
 
-    # Replace the GMTK observation list argument file with a temporarily
-    # created one and append the filename to the list of temporary files
-    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
-    float_filelistfd = replace_args_filelistname(args, temp_filepaths,
-                                                 EXT_FLOAT)
-
-    # Try to write out a dummy observation filename to each observation file
-    # list
     try:
-        print_to_fd(float_filelistfd, DUMMY_OBSERVATION_FILENAME)
-        print_to_fd(int_filelistfd, DUMMY_OBSERVATION_FILENAME)
+        # Create dummy observation lists
+        dummy_float_list, dummy_int_list = \
+            create_temporary_gmtk_observation_lists(DUMMY_OBSERVATION_FILENAME,
+                                                    DUMMY_OBSERVATION_FILENAME)
+        # Modify the given gmtk arguments to use the temporary dummy
+        # observation lists
+        modify_gmtk_argument(args, EXT_OPTIONS[EXT_FLOAT], dummy_float_list)
+        modify_gmtk_argument(args, EXT_OPTIONS[EXT_INT], dummy_int_list)
 
         # Run EM bundling
         TRAIN_PROG.getoutput(*args)
     # After the EM bundling is finished
     finally:
-        # Delete list of temporary files
-        for filepath in temp_filepaths:
-            # Don't raise a nested exception if the file was never created
-            try:
-                filepath.remove()
-            except OSError, err:
-                if err.errno == ENOENT:
-                    pass
+        # remove_all_files([dummy_float_list, dummy_int_list])
+        pass
 
 
 def save_gmtk_observation_files(coord, resolution, do_reverse, outfile_name,
-                                 genomedata_names, float_filename,
-                                 int_filename, distribution,
-                                 track_indexes, *args):
+                                genomedata_names, float_filename,
+                                int_filename, distribution,
+                                track_indexes, *args):
 
     (chrom, start, end) = coord
 
@@ -551,9 +593,9 @@ def save_gmtk_observation_files(coord, resolution, do_reverse, outfile_name,
 
 def run_validate(coord, resolution, do_reverse, outfilename, *args):
     if do_reverse:
-        raise NotImplementedError("Running Segway with both validation "
-            "and reverse world options simultaneously is currently "
-            "not supported")
+        raise NotImplementedError("Running Segway with both validation and "
+                                  "reverse world options simultaneously is "
+                                  "currently not supported")
 
     validation_output = VALIDATE_PROG.getoutput(*args)
     with open(outfilename, "w") as outfile:
