@@ -6,7 +6,7 @@ import unittest
 from numpy import empty
 
 from segway.observations import merge_windows
-from segway.task import modify_gmtk_argument, prepare_gmtk_observations
+from segway.task import prepare_gmtk_observations
 from segway._util import EXT_INT, EXT_FLOAT
 
 

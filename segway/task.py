@@ -49,11 +49,9 @@ GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
 @contextmanager
 def mkstemp_observation(chromosome_name, start, end, suffix):
-    """A context manager that provides a tuple of an open file object and full
-    filepath of an a observation file with the given suffix
+    """A context manager that provides a tuple of a file object and full
+    filepath of an a observation file with the given suffix"""
 
-    Assumes callee will close file
-    """
     # Set a common prefix for the observation files
     prefix = "{}.{}.{}.".format(chromosome_name, start, end)
     fd, filename = mkstemp(suffix=extsep + suffix, prefix=prefix)
@@ -69,6 +67,7 @@ def save_temporary_observations(chromosome_name, start, end, continuous_cells,
                                 resolution, distribution, supervision_data):
     """Returns a tuple (float_obs, int_obs) of temporary filepaths for the
     int/float observation filenames unique to this process"""
+
     # Create secure temporary observation files
     with mkstemp_observation(chromosome_name, start, end, EXT_FLOAT) as \
             (float_observations_file, float_observations_filename), \
@@ -92,6 +91,7 @@ def save_temp_observation_filelists(float_observations_filename,
     Returns a tuple (float_obs_list, int_obs_list) of temporary filepaths
     for the int/float observation lists (files) unique to this process
     """
+
     # Create secure temporary observation files
     float_observation_list_fd, float_observation_list_filename = \
         mkstemp(prefix=EXT_FLOAT + extsep, suffix=extsep + EXT_LIST)
@@ -112,6 +112,7 @@ def save_temp_observation_filelists(float_observations_filename,
 def replace_subsequent_value(input_list, query, new):
     """Attempts to modify the given input list with no exception so that the
     value following the query is modified to the new value """
+
     try:
         new_index = input_list.index(query) + 1
         input_list[new_index] = new
