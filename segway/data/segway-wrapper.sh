@@ -23,13 +23,6 @@ fi
 on_exit ()
 {
     rm -rf "$TMPDIR"
-
-    # delete any arguments that begin with $submit_tmpdir
-    for arg in "$@"; do
-        if [[ "$arg" == "$submit_tmpdir"* ]]; then
-            rm -rf "$TMPDIR" 2>/dev/null || true
-        fi
-    done
 }
 
 trap on_exit EXIT
