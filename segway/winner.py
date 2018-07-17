@@ -92,6 +92,8 @@ def print_and_copy(flag, getter, dirpath, instance, final_basename, clobber):
 
 def winner(dirname, params=True, input_master=True, likelihood = False, 
            clobber=False, validate = False):
+    import pdb
+    pdb.set_trace()
     dirpath = Path(dirname)
     winning_instance = get_winning_instance(dirpath, validate)
 

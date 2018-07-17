@@ -280,6 +280,9 @@ class RestartableJobDict(dict):
         row = [jobid, jobname, prog, str(num_segs), str(num_frames),
                maxvmem, cpu, str(exit_status)]
 
+        print(*row, file=self.job_log_file, sep = "\t")
+        self.job_log_file.flush()  # allow reading file now
+
         if exit_status == 0:
             # job will not be resubmitted, so free the job template
             restartable_job.free_job_template()
@@ -289,7 +292,6 @@ class RestartableJobDict(dict):
     def wait(self):
         session = self.session
         jobids = list(self.keys())
-        log_rows = []
 
         while jobids:
             # check each job individually
@@ -304,7 +306,7 @@ class RestartableJobDict(dict):
                     # job isn't done yet
                     continue
 
-                log_rows.append(self.process_job(jobid, job_info))
+                self.process_job(jobid, job_info)
                 self.queue_unqueued_jobs()
 
                 # XXX: should be able to check
@@ -319,7 +321,3 @@ class RestartableJobDict(dict):
                 # SVN r425 for code
 
             jobids = list(self.keys())
-
-        for row in sorted(log_rows):
-            print("\t".join(row), file=self.job_log_file)
-            self.job_log_file.flush()  # allow reading file now
