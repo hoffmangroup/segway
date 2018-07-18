@@ -270,10 +270,10 @@ TRAIN_FIELDNAMES = ["name", "value"]
 TRAIN_OPTION_TYPES = \
     dict(input_master_filename=str, structure_filename=str,
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
-         distribution=str, len_seg_strength=float, num_instances=int, 
-         segtransition_weight_scale=float, ruler_scale=int, resolution=int,
-         num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
-         reverse_worlds=[int], num_mix_components=int)
+         include_coords_filename=str, distribution=str, len_seg_strength=float, 
+         num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
+         resolution=int, num_segs=int, num_subsegs=int, output_label=str,
+         track_specs=[str], reverse_worlds=[int], num_mix_components=int)
 
 
 TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
@@ -755,8 +755,8 @@ class Runner(object):
         self.clobber = False
         # XXX: this should become an int for num_starts
         self.train = RunningSteps(["not_running"])  # EM train
-        self.posterior = False
-        self.identify = False  # viterbi
+        self.posterior = RunningSteps(["not_running"])
+        self.identify = RunningSteps(["not_running"])  # viterbi
         self.validate = False
         self.dry_run = False
         self.verbosity = VERBOSITY
@@ -769,14 +769,14 @@ class Runner(object):
             raise ValueError("train task must be run separately")
 
         for task in tasks:
-            task = task.split("_")
+            task = task.split("-")
             if task[0] == "train":
                 self.train = RunningSteps(task[1:])
             elif (task[0] == "identify" or
                   task[0] == "annotate"):
-                self.identify = True
+                self.identify = RunningSteps(task[1:])
             elif task[0] == "posterior":
-                self.posterior = True
+                self.posterior = RunningSteps(task[1:])
             else:
                 raise ValueError("unrecognized task: %s" % task)
 
@@ -1504,7 +1504,7 @@ class Runner(object):
 
 
         # prevent supervised variable from being inherited from train task
-        if self.identify:
+        if self.identify.running():
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
 
         directives["CARD_SEG"] = self.num_segs
@@ -2099,7 +2099,7 @@ class Runner(object):
 
     def save_gmtk_input(self):
         # can't run train and identify/posterior in the same run
-        assert not ((self.identify or self.posterior) and \
+        assert not ((self.identify.running() or self.posterior.running()) and \
                      self.train.running())
 
         self.load_supervision()
@@ -3505,8 +3505,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def setup_identify_posterior(self):
         self.instance_index = "identify"
+        import pdb
 
-        self.setup_shared()
         self.load_train_options(self.train_dir_name)
         # setup files
         if not self.input_master_filename:
@@ -3515,14 +3515,17 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def save_identify_posterior(self):
         for world in range(self.num_worlds):
-            if self.identify:
+            if self.identify.finish:
                 IdentifySaver(self)(world)
 
-            if self.posterior:
+            if self.posterior.finish:
                 PosteriorSaver(self)(world)
 
     def run_identify_posterior(self):
-        self.setup_identify_posterior()
+        self.instance_index = "identify"
+        if self.identify.init or self.posterior.init:
+            self.setup_shared()
+            
 
         filenames = dict(identify=self.viterbi_filenames,
                          posterior=self.posterior_filenames)
@@ -3548,9 +3551,9 @@ to find the winning instance anyway.""" % thread.instance_index)
                        **self.get_posterior_clique_print_ranges())}
 
         tasks = []
-        if self.identify:
+        if self.identify.run:
             tasks.append("identify")
-        if self.posterior:
+        if self.posterior.run:
             tasks.append("posterior")
 
         with Session() as session:
@@ -3586,7 +3589,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         cmdline_top_filename = self.make_script_filename(PREFIX_CMDLINE_TOP)
 
-        with open(cmdline_top_filename, "w") as cmdline_top_file:
+        with open(cmdline_top_filename, "a") as cmdline_top_file:
             print(run_msg, file=cmdline_top_file)
             print(file=cmdline_top_file)
             print("cd %s" % maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
@@ -3622,8 +3625,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                 "and ends"
             )
 
-        with open(cmdline_short_filename, "w") as self.cmdline_short_file:
-            with open(cmdline_long_filename, "w") as self.cmdline_long_file:
+        with open(cmdline_short_filename, "a") as self.cmdline_short_file:
+            with open(cmdline_long_filename, "a") as self.cmdline_long_file:
                 print(run_msg, file=self.cmdline_short_file)
                 print(run_msg, file=self.cmdline_long_file)
 
@@ -3634,7 +3637,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                 if self.train.running():
                     self.run_train()
 
-                if self.identify or self.posterior:
+                if self.identify.running() or self.posterior.running():
                     if self.supervision_filename:
                         raise NotImplementedError  # XXX
 
@@ -3881,9 +3884,6 @@ def parse_options(argv):
 
     # Separate arguments from options
     args = options.args  # is a non-iterable Namespace object
-
-    if len(args) < 3:
-        parser.error("Expected at least 3 arguments.")
 
     if "train" in args[0]:
         if len(args) < 3:
