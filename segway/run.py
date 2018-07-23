@@ -508,6 +508,8 @@ class TrainThread(Thread):
         self.session = session
         self.num_segs = num_segs
         self.instance_index = instance_index
+        self.input_master_filename = make_default_filename( \
+            InputMasterSaver().resource_name, self.params_dirname, instance_index)
 
         Thread.__init__(self)
 
@@ -1932,9 +1934,11 @@ class Runner(object):
 
     def save_input_master(self, instance_index=None, new=False,
                           input_master_filename = None):
+        import pdb
+        pdb.set_trace()
         if new:
             input_master_filename = None
-        elif not input_master_filename:
+        else:
             input_master_filename = self.input_master_filename
 
         self.input_master_filename, input_master_filename_is_new = \
@@ -2807,9 +2811,7 @@ class Runner(object):
 
         if round_index == 0:
             # if round > 0, this is set by self.recover_train_instance()
-            input_master_dir = Path(self.work_dirpath) / self.params_dirpath
-            input_master_filename = input_master_dir / extjoin("input", str(instance_index), "master")
-            self.save_input_master(instance_index, False, input_master_filename)
+            self.save_input_master(instance_index)
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
