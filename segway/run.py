@@ -208,6 +208,7 @@ PREFIX_CMDLINE_TOP = "segway"
 PREFIX_TRAIN = "train"
 PREFIX_TRAIN_RESULTS = "train_results"
 PREFIX_POSTERIOR = "posterior%s"
+PREFIX_IDENTIFY = "identify"
 
 PREFIX_VITERBI = "viterbi"
 PREFIX_WINDOW = "window"
@@ -239,6 +240,7 @@ BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
 BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ)
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
+IDENTIFY_FILEBASENAME = extjoin(PREFIX_IDENTIFY, EXT_TAB)
 
 SUBDIRNAME_ACC = "accumulators"
 SUBDIRNAME_AUX = "auxiliary"
@@ -275,13 +277,15 @@ TRAIN_OPTION_TYPES = \
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int)
 
-
 TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
                           validation_likelihood = float, 
                           input_master_filename = str, params_filename = str,
                           log_likelihood_filename = str,
                           validation_output_filename = str,
                           validation_sum_filename = str)
+
+IDENTIFY_OPTION_TYPES = \
+    	dict(include_coords_filename=str, exclude_coords_filename=str)
 
 class Results():
     log_likelihood = None
@@ -508,8 +512,8 @@ class TrainThread(Thread):
         self.session = session
         self.num_segs = num_segs
         self.instance_index = instance_index
-        self.input_master_filename = make_default_filename( \
-            InputMasterSaver().resource_name, self.params_dirname, instance_index)
+        self.input_master_filename = make_default_filename \
+            (InputMasterSaver().resource_name, self.params_dirname, instance_index)
 
         Thread.__init__(self)
 
@@ -846,6 +850,10 @@ class Runner(object):
             train_dir_name = args[-2]
             res.train_dir_name = train_dir_name
             res.work_dirname = args[-1]
+
+            # Save the include and exclude coords files before they're overwritten
+            # by the train options
+            res.save_tabfile(res, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
 
             try:
                 res.load_train_options(train_dir_name)
@@ -1934,8 +1942,6 @@ class Runner(object):
 
     def save_input_master(self, instance_index=None, new=False,
                           input_master_filename = None):
-        import pdb
-        pdb.set_trace()
         if new:
             input_master_filename = None
         else:
@@ -3098,8 +3104,9 @@ class Runner(object):
             # this is where the actual training takes place
             instance_params = run_train_func(self.num_segs_range)
             for index, instance_param in enumerate(instance_params):
+                result_filename = extjoin(PREFIX_TRAIN_RESULTS, str(index), EXT_TAB)
                 self.save_tabfile(instance_param, TRAIN_RESULT_TYPES,
-                                  extjoin(PREFIX_TRAIN_RESULTS, str(index), EXT_TAB))
+                                  result_filename)
 
         elif self.train.finish:
             instance_params = self.load_train_results()
@@ -3511,16 +3518,6 @@ to find the winning instance anyway.""" % thread.instance_index)
     def is_in_reversed_world(self, window_index):
         return self.windows[window_index].world in self.reverse_worlds
 
-    def setup_identify_posterior(self):
-        self.instance_index = "identify"
-        import pdb
-
-        self.load_train_options(self.train_dir_name)
-        # setup files
-        if not self.input_master_filename:
-            warn("Input master not specified. Generating.")
-            self.save_input_master()
-
     def save_identify_posterior(self):
         for world in range(self.num_worlds):
             if self.identify.finish:
@@ -3531,6 +3528,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def run_identify_posterior(self):
         self.instance_index = "identify"
+        self.load_train_options(self.work_dirname)
         if self.identify.init or self.posterior.init:
             self.setup_shared()
         else:
@@ -3702,8 +3700,47 @@ def parse_options(argv):
 
     parser.add_argument("--version", action="version", version=version)
 
+    group = parser.add_argument_group("Technical variables")
+    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
+                       metavar="PROGRESSION",
+                       help="try each float in PROGRESSION as the number "
+                       "of gibibytes of memory to allocate in turn "
+                       "(default %s)" % MEM_USAGE_PROGRESSION)
+
+    group.add_argument("-S", "--split-sequences", metavar="SIZE",
+                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
+                       help="split up sequences that are larger than SIZE "
+                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
+
+    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
+                       metavar="NUM",
+                       help="show messages with verbosity NUM"
+                       " (default %d)" % VERBOSITY)
+
+    group.add_argument("--cluster-opt", action="append", default=[],
+                       metavar="OPT",
+                       help="specify an option to be passed to the "
+                       "cluster manager")
+
+    group = parser.add_argument_group("Flags")
+    group.add_argument("-c", "--clobber", action="store_true",
+                       help="delete any preexisting files and assumes any "
+                       "model files specified in options as output to be "
+                       "overwritten")
+    group.add_argument("-n", "--dry-run", action="store_true",
+                       help="write all files, but do not run any"
+                       " executables")
+
+    commands = parser.add_subparsers()
+    train = commands.add_parser("train", help = "Train the model")
+    identify = commands.add_parser("identify", help = "Annotate the genome with"
+                                              "the model from training")
+    posterior = commands.add_parser("posterior", 
+                                    help = "Determine posterior probabilities "
+                                    "of the annotations produced")
+
     # with OptionGroup(parser, "Data selection") as group:
-    group = parser.add_argument_group("Data selection")
+    group = train.add_argument_group("Data selection")
     group.add_argument("-t", "--track", action="append", default=[],
                        metavar="TRACK", help="append TRACK to list of tracks"
                        " to use (default all)")
@@ -3855,37 +3892,6 @@ def parse_options(argv):
                          "from falling below the floor value). If not using a "
                          "mixture of Gaussians, default unused, else default %f"
                          % VAR_FLOOR_GMM_DEFAULT)
-
-    group = parser.add_argument_group("Technical variables")
-    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
-                       metavar="PROGRESSION",
-                       help="try each float in PROGRESSION as the number "
-                       "of gibibytes of memory to allocate in turn "
-                       "(default %s)" % MEM_USAGE_PROGRESSION)
-
-    group.add_argument("-S", "--split-sequences", metavar="SIZE",
-                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
-                       help="split up sequences that are larger than SIZE "
-                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
-
-    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
-                       metavar="NUM",
-                       help="show messages with verbosity NUM"
-                       " (default %d)" % VERBOSITY)
-
-    group.add_argument("--cluster-opt", action="append", default=[],
-                       metavar="OPT",
-                       help="specify an option to be passed to the "
-                       "cluster manager")
-
-    group = parser.add_argument_group("Flags")
-    group.add_argument("-c", "--clobber", action="store_true",
-                       help="delete any preexisting files and assumes any "
-                       "model files specified in options as output to be "
-                       "overwritten")
-    group.add_argument("-n", "--dry-run", action="store_true",
-                       help="write all files, but do not run any"
-                       " executables")
 
     # Positional arguments
     parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
