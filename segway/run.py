@@ -1930,10 +1930,11 @@ class Runner(object):
         subset_metadata_attr("sums_squares")
         subset_metadata_attr("num_datapoints")
 
-    def save_input_master(self, instance_index=None, new=False):
+    def save_input_master(self, instance_index=None, new=False,
+                          input_master_filename = None):
         if new:
             input_master_filename = None
-        else:
+        elif not input_master_filename:
             input_master_filename = self.input_master_filename
 
         self.input_master_filename, input_master_filename_is_new = \
@@ -2806,7 +2807,9 @@ class Runner(object):
 
         if round_index == 0:
             # if round > 0, this is set by self.recover_train_instance()
-            self.save_input_master(instance_index, new)
+            input_master_dir = Path(self.work_dirpath) / self.params_dirpath
+            input_master_filename = input_master_dir / extjoin("input", str(instance_index), "master")
+            self.save_input_master(instance_index, False, input_master_filename)
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
@@ -2978,7 +2981,6 @@ class Runner(object):
 
         self.save_gmtk_input()
         self.save_window_list()
-
         self.run_triangulate()
 
     def setup_train(self):
@@ -3002,12 +3004,16 @@ class Runner(object):
 
         self.input_master_filename = input_master_filename
 
-        # should I make new parameters in each instance?
-        if not self.instance_make_new_params:
-            self.save_input_master()
-
         # save file locations to tab-delimited file
         self.save_tabfile(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
+
+        # Make new input master for each instance
+        if not self.instance_make_new_params:
+            self.save_input_master()
+        else:
+            for index in range(self.num_instances):
+                self.save_input_master(index, True)
+
 
         if not input_master_filename_is_new:
             # do not overwrite existing file
@@ -3525,6 +3531,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         self.instance_index = "identify"
         if self.identify.init or self.posterior.init:
             self.setup_shared()
+        else:
+            self.set_triangulation_filename()
             
 
         filenames = dict(identify=self.viterbi_filenames,
