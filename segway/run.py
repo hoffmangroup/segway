@@ -2977,7 +2977,7 @@ class Runner(object):
     def load_train_results(self):
         pattern = extjoin(PREFIX_TRAIN_RESULTS, "*", EXT_TAB)
         instance_params = []
-        for filename in Path(self.work_dirpath).files(pattern):
+        for filename in Path(self.results_dirpath).files(pattern):
             results = Results()
             with open(filename) as resultfile:
                 for line in resultfile.readlines()[1:]:
@@ -3111,7 +3111,7 @@ class Runner(object):
             # write results from each instance to their own file
             for index, instance_param in enumerate(instance_params):
                 result_filename = make_default_filename \
-                    (TRAIN_RESULTS_TMPL, self.results_dirpath, index)
+                    (TRAIN_RESULTS_TMPL, SUBDIRNAME_RESULTS, index)
                 self.save_tabfile(instance_param, TRAIN_RESULT_TYPES,
                                   result_filename)
 
@@ -3899,17 +3899,6 @@ def parse_options(argv):
 
     # Separate arguments from options
     args = options.args  # is a non-iterable Namespace object
-
-    if len(args) < 3:
-        parser.error("Expected at least 3 arguments.")
-
-    if args[0] == "train":
-        if len(args) < 3:
-            parser.error("Expected at least 3 arguments for the train task.")
-    else:
-        if len(args) < 4:
-            parser.error("Expected at least 4 arguments for the identify "
-                         "task.")
 
     return options, args
 
