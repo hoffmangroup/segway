@@ -852,10 +852,6 @@ class Runner(object):
             res.train_dir_name = train_dir_name
             res.work_dirname = args[-1]
 
-            # Save the include and exclude coords files before they're overwritten
-            # by the train options
-            res.save_tabfile(res, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
-
             try:
                 res.load_train_options(train_dir_name)
             except IOError as err:
@@ -2963,6 +2959,11 @@ class Runner(object):
                 name = row["name"]
                 value = row["value"]
 
+                # Don't override options shared by identify and train
+                if name in IDENTIFY_OPTION_TYPES.keys() and \
+                    (self.identify.running() or self.posterior.running()):
+                    continue
+
                 typ = TRAIN_OPTION_TYPES[name]
                 if isinstance(typ, list):
                     assert len(typ) == 1
@@ -2982,12 +2983,35 @@ class Runner(object):
             with open(filename) as resultfile:
                 for line in resultfile.readlines()[1:]:
                     values = line.strip("\n").split("\t")
-                    item_typ = TRAIN_RESULT_TYPES[values[0]]
-                    setattr(results, values[0], item_typ(values[1]))
+                    name = values[0]
+                    value = values[1]
+                    item_typ = TRAIN_RESULT_TYPES[name]
+                    setattr(results, name, item_typ(value))
 
             instance_params.append(results)
 
         return instance_params
+
+    def load_identify_options(self, traindirname):
+        """
+        load options from training and convert to appropriate type
+        """
+        filename = Path(traindirname) / IDENTIFY_FILEBASENAME
+
+        with open(filename) as tabfile:
+            reader = DictReader(tabfile)
+
+            for row in reader:
+                name = row["name"]
+                value = row["value"]
+
+                typ = TRAIN_OPTION_TYPES[name]
+                if isinstance(typ, list):
+                    assert len(typ) == 1
+                    item_typ = typ[0]
+                    getattr(self, name).append(item_typ(value))
+                else:
+                    setattr(self, name, typ(value))
 
     def setup_shared(self):
         self.make_subdirs(SUBDIRNAMES_EITHER)
@@ -3535,11 +3559,13 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def run_identify_posterior(self):
         self.instance_index = "identify"
-        self.load_train_options(self.work_dirname)
+
         if self.identify.init or self.posterior.init:
             self.setup_shared()
+            self.save_tabfile(self, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
         else:
             self.set_triangulation_filename()
+            self.load_identify_options()
             
 
         filenames = dict(identify=self.viterbi_filenames,
