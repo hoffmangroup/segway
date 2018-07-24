@@ -3707,47 +3707,8 @@ def parse_options(argv):
 
     parser.add_argument("--version", action="version", version=version)
 
-    group = parser.add_argument_group("Technical variables")
-    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
-                       metavar="PROGRESSION",
-                       help="try each float in PROGRESSION as the number "
-                       "of gibibytes of memory to allocate in turn "
-                       "(default %s)" % MEM_USAGE_PROGRESSION)
-
-    group.add_argument("-S", "--split-sequences", metavar="SIZE",
-                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
-                       help="split up sequences that are larger than SIZE "
-                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
-
-    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
-                       metavar="NUM",
-                       help="show messages with verbosity NUM"
-                       " (default %d)" % VERBOSITY)
-
-    group.add_argument("--cluster-opt", action="append", default=[],
-                       metavar="OPT",
-                       help="specify an option to be passed to the "
-                       "cluster manager")
-
-    group = parser.add_argument_group("Flags")
-    group.add_argument("-c", "--clobber", action="store_true",
-                       help="delete any preexisting files and assumes any "
-                       "model files specified in options as output to be "
-                       "overwritten")
-    group.add_argument("-n", "--dry-run", action="store_true",
-                       help="write all files, but do not run any"
-                       " executables")
-
-    commands = parser.add_subparsers()
-    train = commands.add_parser("train", help = "Train the model")
-    identify = commands.add_parser("identify", help = "Annotate the genome with"
-                                              "the model from training")
-    posterior = commands.add_parser("posterior", 
-                                    help = "Determine posterior probabilities "
-                                    "of the annotations produced")
-
     # with OptionGroup(parser, "Data selection") as group:
-    group = train.add_argument_group("Data selection")
+    group = parser.add_argument_group("Data selection")
     group.add_argument("-t", "--track", action="append", default=[],
                        metavar="TRACK", help="append TRACK to list of tracks"
                        " to use (default all)")
@@ -3900,6 +3861,37 @@ def parse_options(argv):
                          "mixture of Gaussians, default unused, else default %f"
                          % VAR_FLOOR_GMM_DEFAULT)
 
+    group = parser.add_argument_group("Technical variables")
+    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
+                       metavar="PROGRESSION",
+                       help="try each float in PROGRESSION as the number "
+                       "of gibibytes of memory to allocate in turn "
+                       "(default %s)" % MEM_USAGE_PROGRESSION)
+
+    group.add_argument("-S", "--split-sequences", metavar="SIZE",
+                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
+                       help="split up sequences that are larger than SIZE "
+                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
+
+    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
+                       metavar="NUM",
+                       help="show messages with verbosity NUM"
+                       " (default %d)" % VERBOSITY)
+
+    group.add_argument("--cluster-opt", action="append", default=[],
+                       metavar="OPT",
+                       help="specify an option to be passed to the "
+                       "cluster manager")
+
+    group = parser.add_argument_group("Flags")
+    group.add_argument("-c", "--clobber", action="store_true",
+                       help="delete any preexisting files and assumes any "
+                       "model files specified in options as output to be "
+                       "overwritten")
+    group.add_argument("-n", "--dry-run", action="store_true",
+                       help="write all files, but do not run any"
+                       " executables")
+
     # Positional arguments
     parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
 
@@ -3908,7 +3900,10 @@ def parse_options(argv):
     # Separate arguments from options
     args = options.args  # is a non-iterable Namespace object
 
-    if "train" in args[0]:
+    if len(args) < 3:
+        parser.error("Expected at least 3 arguments.")
+
+    if args[0] == "train":
         if len(args) < 3:
             parser.error("Expected at least 3 arguments for the train task.")
     else:
