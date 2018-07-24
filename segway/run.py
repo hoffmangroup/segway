@@ -69,7 +69,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     PREFIX_VALIDATION_OUTPUT_WINNER,
                     PREFIX_VALIDATION_SUM_WINNER,
                     SEG_TABLE_WIDTH,
-                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
+                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_RESULTS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
@@ -240,6 +240,7 @@ BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
 BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ)
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
+TRAIN_RESULTS_TMPL = extjoin(PREFIX_TRAIN_RESULTS, EXT_TAB, "tmpl")
 IDENTIFY_FILEBASENAME = extjoin(PREFIX_IDENTIFY, EXT_TAB)
 
 SUBDIRNAME_ACC = "accumulators"
@@ -253,7 +254,7 @@ SUBDIRNAME_VITERBI = "viterbi"
 
 SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
-                     SUBDIRNAME_PARAMS]
+                     SUBDIRNAME_PARAMS, SUBDIRNAME_RESULTS]
 
 # job script file permissions: owner has read/write/execute
 # permissions, group/others have read/execute permissions
@@ -1269,6 +1270,10 @@ class Runner(object):
     @memoized_property
     def params_dirpath(self):
         return self.work_dirpath / SUBDIRNAME_PARAMS
+
+    @memoized_property
+    def results_dirpath(self):
+        return self.work_dirpath / SUBDIRNAME_RESULTS
 
     @memoized_property
     def recover_params_dirpath(self):
@@ -3044,7 +3049,7 @@ class Runner(object):
 
         # Copy the best best training instance for each training instance
         for instance in instance_params:
-            # Remove instance number from param filename
+            # Remove instance number from end of param filename
             instance_param_filename = instance.params_filename.split(".")[0:-1]
             copy2(instance.params_filename,extjoin(*instance_param_filename))
 
@@ -3103,8 +3108,10 @@ class Runner(object):
 
             # this is where the actual training takes place
             instance_params = run_train_func(self.num_segs_range)
+            # write results from each instance to their own file
             for index, instance_param in enumerate(instance_params):
-                result_filename = extjoin(PREFIX_TRAIN_RESULTS, str(index), EXT_TAB)
+                result_filename = make_default_filename \
+                    (TRAIN_RESULTS_TMPL, self.results_dirpath, index)
                 self.save_tabfile(instance_param, TRAIN_RESULT_TYPES,
                                   result_filename)
 
