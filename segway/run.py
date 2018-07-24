@@ -3005,7 +3005,7 @@ class Runner(object):
                 name = row["name"]
                 value = row["value"]
 
-                typ = TRAIN_OPTION_TYPES[name]
+                typ = IDENTIFY_OPTION_TYPES[name]
                 if isinstance(typ, list):
                     assert len(typ) == 1
                     item_typ = typ[0]
@@ -3565,8 +3565,8 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.save_tabfile(self, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
         else:
             self.set_triangulation_filename()
-            self.load_identify_options()
-            
+            self.load_identify_options(self.work_dirname)
+            self.save_gmtk_input()
 
         filenames = dict(identify=self.viterbi_filenames,
                          posterior=self.posterior_filenames)
