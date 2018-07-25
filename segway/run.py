@@ -276,7 +276,8 @@ TRAIN_OPTION_TYPES = \
          include_coords_filename=str, distribution=str, len_seg_strength=float, 
          num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
-         track_specs=[str], reverse_worlds=[int], num_mix_components=int)
+         track_specs=[str], reverse_worlds=[int], num_mix_components=int,
+         supervision_filename=str)
 
 TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
                           validation_likelihood = float, 
@@ -651,11 +652,11 @@ class RunningSteps(object):
         self.run = True
         self.finish = True
         
-    def __init__(self, steps):
-        if not steps:
+    def __init__(self, step):
+        if not step:
             self.set_all()
-        for step in steps:
-            setattr(self, step, True)
+        else:
+            setattr(self, step[0], True)
 
 class Runner(object):
     """
@@ -772,20 +773,15 @@ class Runner(object):
 
     def set_tasks(self, text):
         tasks = text.split("+")
-        if "train" in tasks and len(tasks) > 1:
-            raise ValueError("train task must be run separately")
 
         for task in tasks:
             task = task.split("-")
-            if task[0] == "train":
-                self.train = RunningSteps(task[1:])
-            elif (task[0] == "identify" or
-                  task[0] == "annotate"):
-                self.identify = RunningSteps(task[1:])
-            elif task[0] == "posterior":
-                self.posterior = RunningSteps(task[1:])
-            else:
-                raise ValueError("unrecognized task: %s" % task)
+            task_name = task[0]
+            step = task[1:]
+            if "round" in step:
+                self.recover_dirname = self.work_dirname
+                self.max_train_rounds = 1
+            setattr(self, task_name, RunningSteps(step))
 
     def set_option(self, name, value):
         # want to actually set the Runner option when optparse option
@@ -828,36 +824,33 @@ class Runner(object):
                         ("track", "track_specs")]
 
     @classmethod
-    def fromargs(cls, args):
+    def fromargs(cls, command, args):
         """Parses the arguments (not options) that were given to segway"""
         res = cls()
 
-        task_str = args[0]
-        res.set_tasks(task_str)
+        res.work_dirname = args[-1]
+        res.set_tasks(command)
 
         # If we're running the training task
         if res.train.running():
             # The genomedata archives are all arguments execept the final
             # train directory
-            res.genomedata_names = args[1:-1]
-            res.work_dirname = args[-1]
-            # Check that there is at least 3 arguments
-            assert len(args) >= 3
+            res.genomedata_names = args[0:-1]
+            # Check that there is at least 2 arguments
+            assert len(args) >= 2
         # Otherwise
         else:
             # The genomedata archives except the final train directory and
             # posterior/identify working directory
-            res.genomedata_names = args[1:-2]
+            res.genomedata_names = args[0:-2]
             train_dir_name = args[-2]
-            res.train_dir_name = train_dir_name
-            res.work_dirname = args[-1]
-
             try:
                 res.load_train_options(train_dir_name)
             except IOError as err:
                 # train.tab use is optional
                 if err.errno != ENOENT:
                     raise
+            assert len(args) >= 3
 
         return res
 
@@ -899,21 +892,21 @@ class Runner(object):
 
 
     @classmethod
-    def fromoptions(cls, args, options):
+    def fromoptions(cls, command, args, options):
         """This is the usual way a Runner is created.
 
         Calls Runner.fromargs() first.
         """
-        res = cls.fromargs(args)
+        res = cls.fromargs(command, args)
         res.from_environment()
 
         # If the observations directory has been specified
-        if options.observations:
+#        if options.observations:
             # Stop segway and show a "not implemented error" with description
-            raise NotImplementedError(
-                "'--observations' option not used: "
-                "Segway only creates observations in a temporary directory"
-            )
+#            raise NotImplementedError(
+#                "'--observations' option not used: "
+#                "Segway only creates observations in a temporary directory"
+#            )
 
         # Preprocess options
         # Convert any track files into a list of tracks
@@ -935,8 +928,11 @@ class Runner(object):
             except ValueError:
                 src, = option_to_attr
                 dst = src
-
-            res.set_option(dst, getattr(options, src))
+            try:
+                res.set_option(dst, getattr(options, src))
+            except AttributeError:
+                # Option didn't apply to this task
+                pass
 
         # multiple lists to one
         res.user_native_spec = sum([opt.split(" ")
@@ -3729,12 +3725,65 @@ def parse_options(argv):
     http://dx.doi.org/10.1038/nmeth.1937"""
 
     parser = ArgumentParser(description=description, usage=usage,
-                            epilog=citation)
+                            epilog=citation, add_help=False)
 
     parser.add_argument("--version", action="version", version=version)
 
+    # set global options first
+    group = parser.add_argument_group("Technical variables")
+    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
+                       metavar="PROGRESSION",
+                       help="try each float in PROGRESSION as the number "
+                       "of gibibytes of memory to allocate in turn "
+                       "(default %s)" % MEM_USAGE_PROGRESSION)
+
+    group.add_argument("-S", "--split-sequences", metavar="SIZE",
+                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
+                       help="split up sequences that are larger than SIZE "
+                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
+
+    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
+                       metavar="NUM",
+                       help="show messages with verbosity NUM"
+                       " (default %d)" % VERBOSITY)
+
+    group.add_argument("--cluster-opt", action="append", default=[],
+                       metavar="OPT",
+                       help="specify an option to be passed to the "
+                       "cluster manager")
+
+    group = parser.add_argument_group("Flags")
+    group.add_argument("-c", "--clobber", action="store_true",
+                       help="delete any preexisting files and assumes any "
+                       "model files specified in options as output to be "
+                       "overwritten")
+    group.add_argument("-n", "--dry-run", action="store_true",
+                       help="write all files, but do not run any"
+                       " executables")
+
+    # Positional arguments
+    parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
+
+    tasks = parser.add_subparsers(help="Segway Tasks", dest = "command")
+
+    # define steps for each of the three main tasks
+    train_init = tasks.add_parser("train-init", add_help=False)
+    train_run = tasks.add_parser("train-run", add_help=False)
+    train_finish = tasks.add_parser("train-finish", add_help=False)
+    train_run_round = tasks.add_parser("train-run-round", add_help=False)
+
+    identify_init = tasks.add_parser("identify-init", add_help=False)
+    identify_run = tasks.add_parser("identify-run", add_help=False)
+    identify_finish = tasks.add_parser("identify-finish", add_help=False)
+
+    # posterior and identify take the same options
+    posterior_init = tasks.add_parser("posterior-init", parents = [identify_init])
+    posterior_run = tasks.add_parser("posterior-run", parents = [identify_run])
+    posterior_finish = tasks.add_parser("posterior-finish", parents = [identify_finish])
+
+    # next two groups of options belong in train-init
     # with OptionGroup(parser, "Data selection") as group:
-    group = parser.add_argument_group("Data selection")
+    group = train_init.add_argument_group("Data selection")
     group.add_argument("-t", "--track", action="append", default=[],
                        metavar="TRACK", help="append TRACK to list of tracks"
                        " to use (default all)")
@@ -3778,7 +3827,7 @@ def parse_options(argv):
                        help="Use genomic coordinates in FILE as a validation"
                        " set (default none)")
 
-    group = parser.add_argument_group("Model files")
+    group = train_init.add_argument_group("Model files")
     group.add_argument("-i", "--input-master", metavar="FILE",
                        help="use or create input master in FILE"
                        " (default %s)" %
@@ -3807,25 +3856,7 @@ def parse_options(argv):
                        help="semisupervised segmentation with labels in "
                        "FILE (default none)")
 
-    group = parser.add_argument_group("Intermediate files")
-    group.add_argument("-o", "--observations", metavar="DIR",
-                       help="DEPRECATED - temp files are now used and "
-                       " recommended. Previously would use or create observations in DIR"
-                       " (default %s)" %
-                       (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
-
-    group.add_argument("-r", "--recover", metavar="DIR",
-                       help="continue from interrupted run in DIR")
-
-    group = parser.add_argument_group("Output files")
-    group.add_argument("-b", "--bed", metavar="FILE",
-                       help="create identification BED track in FILE"
-                       " (default WORKDIR/%s)" % BED_FILEBASENAME)
-
-    group.add_argument("--bigBed", metavar="FILE",
-                       help="specify layered bigBed filename")
-
-    group = parser.add_argument_group("Modeling variables")
+    group = train_init.add_argument_group("Modeling variables")
     group.add_argument("-D", "--distribution", choices=DISTRIBUTIONS,
                        metavar="DIST",
                        help="use DIST distribution"
@@ -3856,10 +3887,6 @@ def parse_options(argv):
                        "sublabel (\"subseg\"), or both (\"full\")"
                        "  (default %s)" % OUTPUT_LABEL)
 
-    group.add_argument("--max-train-rounds", type=int, metavar="NUM",
-                       help="each training instance runs a maximum of NUM"
-                       " rounds (default %d)" % MAX_EM_ITERS)
-
     group.add_argument("--ruler-scale", type=int, metavar="SCALE",
                        help="ruler marking every SCALE bp (default the"
                        " resolution multiplied by 10)")
@@ -3887,52 +3914,66 @@ def parse_options(argv):
                          "mixture of Gaussians, default unused, else default %f"
                          % VAR_FLOOR_GMM_DEFAULT)
 
-    group = parser.add_argument_group("Technical variables")
-    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
-                       metavar="PROGRESSION",
-                       help="try each float in PROGRESSION as the number "
-                       "of gibibytes of memory to allocate in turn "
-                       "(default %s)" % MEM_USAGE_PROGRESSION)
+    # Train run is where the train-rounds are calculated
+    group = train_run.add_argument_group("Modeling Variables")
+    group.add_argument("--max-train-rounds", type=int, metavar="NUM",
+                       help="each training instance runs a maximum of NUM"
+                       " rounds (default %d)" % MAX_EM_ITERS)
 
-    group.add_argument("-S", "--split-sequences", metavar="SIZE",
-                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
-                       help="split up sequences that are larger than SIZE "
-                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
+    # Directory would be recovered from train-run
+    group = train_run.add_argument_group("Intermediate files")
+    group.add_argument("-o", "--observations", metavar="DIR",
+                       help="DEPRECATED - temp files are now used and "
+                       " recommended. Previously would use or create observations in DIR"
+                       " (default %s)" %
+                       (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
 
-    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
-                       metavar="NUM",
-                       help="show messages with verbosity NUM"
-                       " (default %d)" % VERBOSITY)
+    group.add_argument("-r", "--recover", metavar="DIR",
+                       help="continue from interrupted run in DIR")
 
-    group.add_argument("--cluster-opt", action="append", default=[],
-                       metavar="OPT",
-                       help="specify an option to be passed to the "
-                       "cluster manager")
+    # select coords to identify in the init step
+    group = identify_init.add_argument_group("Data selection")
+    group.add_argument("--include-coords", metavar="FILE",
+                       help="limit to genomic coordinates in"
+                       " FILE (default all) (Note: does not apply to"
+                       " --validation-coords)")
 
-    group = parser.add_argument_group("Flags")
-    group.add_argument("-c", "--clobber", action="store_true",
-                       help="delete any preexisting files and assumes any "
-                       "model files specified in options as output to be "
-                       "overwritten")
-    group.add_argument("-n", "--dry-run", action="store_true",
-                       help="write all files, but do not run any"
-                       " executables")
+    # exclude goes after all includes
+    group.add_argument("--exclude-coords", metavar="FILE",
+                       help="filter out genomic coordinates in FILE"
+                       " (default none)")
 
-    # Positional arguments
-    parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
+    # output files are produced by identify-finish
+    group = identify_finish.add_argument_group("Output files")
+    group.add_argument("-b", "--bed", metavar="FILE",
+                       help="create identification BED track in FILE"
+                       " (default WORKDIR/%s)" % BED_FILEBASENAME)
+
+    group.add_argument("--bigBed", metavar="FILE",
+                       help="specify layered bigBed filename")
+
+    train = tasks.add_parser("train",
+        parents = [train_init, train_run, train_finish])
+    identify = tasks.add_parser("identify",
+        parents = [identify_init, identify_run, identify_finish])
+    posterior = tasks.add_parser("posterior",
+        parents = [identify_init, identify_run, identify_finish])
+    identify_posterior = tasks.add_parser("identify+posterior", 
+        parents = [identify_init, identify_run, identify_finish])
 
     options = parser.parse_args(argv)
 
-    # Separate arguments from options
+    # Separate arguments and command from options
+    command = options.command
     args = options.args  # is a non-iterable Namespace object
 
-    return options, args
+    return command, options, args
 
 
 def main(argv=sys.argv[1:]):
-    options, args = parse_options(argv)
+    command, options, args = parse_options(argv)
 
-    runner = Runner.fromoptions(args, options)
+    runner = Runner.fromoptions(command, args, options)
 
     return runner()
 
