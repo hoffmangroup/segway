@@ -901,24 +901,24 @@ class Runner(object):
         res.from_environment()
 
         # If the observations directory has been specified
-#        if options.observations:
+        if getattr(options, "observations", None):
             # Stop segway and show a "not implemented error" with description
-#            raise NotImplementedError(
-#                "'--observations' option not used: "
-#                "Segway only creates observations in a temporary directory"
-#            )
+            raise NotImplementedError(
+                "'--observations' option not used: "
+                "Segway only creates observations in a temporary directory"
+            )
 
         # Preprocess options
         # Convert any track files into a list of tracks
         track_specs = []
-        for file_or_string in options.track:
+        for file_or_string in getattr(options, "track", None):
             track_specs.extend(file_or_string_to_string_list(file_or_string))
 
         options.track = track_specs
 
         # Convert labels string into potential slice or an int
         # If num labels was specified
-        if options.num_labels:
+        if getattr(options, "num_labels", None):
             options.num_labels = str2slice_or_int(options.num_labels)
 
         # bulk copy options that need no further processing
