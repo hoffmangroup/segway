@@ -901,25 +901,28 @@ class Runner(object):
         res.from_environment()
 
         # If the observations directory has been specified
-#        if options.observations:
-            # Stop segway and show a "not implemented error" with description
-#            raise NotImplementedError(
-#                "'--observations' option not used: "
-#                "Segway only creates observations in a temporary directory"
-#            )
+        if hasattr(options, "observations"):
+            if options.observations:
+                # Stop segway and show a "not implemented error" with description
+                raise NotImplementedError(
+                    "'--observations' option not used: "
+                    "Segway only creates observations in a temporary directory"
+                )
 
         # Preprocess options
         # Convert any track files into a list of tracks
-        track_specs = []
-        for file_or_string in options.track:
-            track_specs.extend(file_or_string_to_string_list(file_or_string))
+        if hasattr(options, "track"):
+            track_specs = []
+            for file_or_string in options.track:
+                track_specs.extend(file_or_string_to_string_list(file_or_string))
 
-        options.track = track_specs
+            options.track = track_specs
 
         # Convert labels string into potential slice or an int
         # If num labels was specified
-        if options.num_labels:
-            options.num_labels = str2slice_or_int(options.num_labels)
+        if hasattr(options, "num_labels"):
+            if options.num_labels:
+                options.num_labels = str2slice_or_int(options.num_labels)
 
         # bulk copy options that need no further processing
         for option_to_attr in cls.options_to_attrs:
@@ -928,11 +931,8 @@ class Runner(object):
             except ValueError:
                 src, = option_to_attr
                 dst = src
-            try:
+            if hasattr(options, src):
                 res.set_option(dst, getattr(options, src))
-            except AttributeError:
-                # Option didn't apply to this task
-                pass
 
         # multiple lists to one
         res.user_native_spec = sum([opt.split(" ")
@@ -961,9 +961,10 @@ class Runner(object):
         res.max_frames = ceildiv(res.max_split_sequence_length, res.resolution)
 
         # don't change from None if this is false
-        params_filenames = options.trainable_params
-        if params_filenames:
-            res.params_filenames = params_filenames
+        if hasattr(options, "trainable_params"):
+            params_filenames = options.trainable_params
+            if params_filenames:
+                res.params_filenames = params_filenames
 
         # track option processing
         for track_spec in res.track_specs:
@@ -3712,8 +3713,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
 
-    usage = "%(prog)s [OPTION]... TASK GENOMEDATA [GENOMEDATA ...] TRAINDIR " \
-            "[IDENTIFYDIR]"
+    usage = "%(prog)s [GLOBAL_OPTION]... GENOMEDATA [GENOMEDATA ...] TRAINDIR" \
+            " [IDENTIFYDIR] TASK [TASK_OPTIONS]"
 
     version = "%(prog)s {}".format(__version__)
     description = "Semi-automated genome annotation"
@@ -3725,7 +3726,7 @@ def parse_options(argv):
     http://dx.doi.org/10.1038/nmeth.1937"""
 
     parser = ArgumentParser(description=description, usage=usage,
-                            epilog=citation, add_help=False)
+                            epilog=citation)
 
     parser.add_argument("--version", action="version", version=version)
 
@@ -3767,19 +3768,28 @@ def parse_options(argv):
     tasks = parser.add_subparsers(help="Segway Tasks", dest = "command")
 
     # define steps for each of the three main tasks
-    train_init = tasks.add_parser("train-init", add_help=False)
-    train_run = tasks.add_parser("train-run", add_help=False)
-    train_finish = tasks.add_parser("train-finish", add_help=False)
-    train_run_round = tasks.add_parser("train-run-round", add_help=False)
+    train_init = tasks.add_parser("train-init", 
+        help="Create directory structure and input files")
+    train_run = tasks.add_parser("train-run",
+        help="Run train to completion from an initialized directory")
+    train_finish = tasks.add_parser("train-finish",
+        help="Choose the best training instance and copy files")
+    train_run_round = tasks.add_parser("train-run-round",
+        help="Run a single round of training from an initialized directory")
 
-    identify_init = tasks.add_parser("identify-init", add_help=False)
-    identify_run = tasks.add_parser("identify-run", add_help=False)
-    identify_finish = tasks.add_parser("identify-finish", add_help=False)
+    identify_init = tasks.add_parser("identify-init",
+        help="Create directory structure")
+    identify_run = tasks.add_parser("identify-run",
+        help="Run identify task on genome with a trained directory")
+    identify_finish = tasks.add_parser("identify-finish",
+        help="Save identify results to a bed or bigBed file")
 
     # posterior and identify take the same options
-    posterior_init = tasks.add_parser("posterior-init", parents = [identify_init])
-    posterior_run = tasks.add_parser("posterior-run", parents = [identify_run])
-    posterior_finish = tasks.add_parser("posterior-finish", parents = [identify_finish])
+    posterior_init = tasks.add_parser("posterior-init", parents = [identify_init], add_help=False)
+    posterior_run = tasks.add_parser("posterior-run", parents = [identify_run], add_help=False)
+#        help="Run posterior task on genome with a trained directory")
+    posterior_finish = tasks.add_parser("posterior-finish", parents = [identify_finish], add_help=False)
+#        help="Save posterior results to a bed or bigBed file")
 
     # next two groups of options belong in train-init
     # with OptionGroup(parser, "Data selection") as group:
@@ -3953,13 +3963,17 @@ def parse_options(argv):
                        help="specify layered bigBed filename")
 
     train = tasks.add_parser("train",
-        parents = [train_init, train_run, train_finish])
+        parents = [train_init, train_run, train_finish], add_help=False)
+#        help="Run all train steps together")
     identify = tasks.add_parser("identify",
-        parents = [identify_init, identify_run, identify_finish])
+        parents = [identify_init, identify_run, identify_finish], add_help=False)
+#        help="Run all identify steps together")
     posterior = tasks.add_parser("posterior",
-        parents = [identify_init, identify_run, identify_finish])
+        parents = [identify_init, identify_run, identify_finish], add_help=False)
+#        help="Run all posterior steps together")
     identify_posterior = tasks.add_parser("identify+posterior", 
-        parents = [identify_init, identify_run, identify_finish])
+        parents = [identify_init, identify_run, identify_finish], add_help=False)
+#        help="Run identify and posterior in conjunction")
 
     options = parser.parse_args(argv)
 
