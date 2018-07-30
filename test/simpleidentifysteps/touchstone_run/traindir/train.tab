@@ -15,5 +15,6 @@ ruler_scale	10
 seg_table_filename	
 segtransition_weight_scale	1.0
 structure_filename	traindir/segway.str
+supervision_filename	
 track_specs	testtrack1
 track_specs	testtrack2

@@ -911,8 +911,10 @@ class Runner(object):
         # Preprocess options
         # Convert any track files into a list of tracks
         track_specs = []
-        for file_or_string in getattr(options, "track", None):
-            track_specs.extend(file_or_string_to_string_list(file_or_string))
+        tracks = getattr(options, "track", None)
+        if tracks:
+            for file_or_string in tracks:
+                track_specs.extend(file_or_string_to_string_list(file_or_string))
 
         options.track = track_specs
 
@@ -961,7 +963,7 @@ class Runner(object):
         res.max_frames = ceildiv(res.max_split_sequence_length, res.resolution)
 
         # don't change from None if this is false
-        params_filenames = options.trainable_params
+        params_filenames = getattr(options, "trainable_params", None)
         if params_filenames:
             res.params_filenames = params_filenames
 
