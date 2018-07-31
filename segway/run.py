@@ -9,7 +9,7 @@ run: main Segway implementation
 
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from collections import defaultdict, namedtuple, OrderedDict
+from collections import defaultdict, OrderedDict
 from contextlib import contextmanager
 from copy import copy
 import csv
@@ -287,7 +287,8 @@ TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
                           validation_sum_filename = str)
 
 IDENTIFY_OPTION_TYPES = \
-    	dict(include_coords_filename=str, exclude_coords_filename=str)
+    	dict(include_coords_filename=str, exclude_coords_filename=str,
+             seg_table_filename=str, resolution=int, output_label=str)
 
 class Results():
     log_likelihood = None
@@ -950,7 +951,7 @@ class Runner(object):
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
         if (res.resolution != RESOLUTION and
-           not options.ruler_scale):
+            not getattr(options, "ruler_scale", None)):
             # Set the ruler scale to 10x the non-default value
             res.ruler_scale = res.resolution * 10
         # Else if the ruler is not divisible by the resolution
@@ -1432,7 +1433,8 @@ class Runner(object):
 
     @memoized_property
     def supervision_type(self):
-        if self.supervision_filename:
+        # Only supervision used is in training
+        if self.supervision_filename and self.train.running():
             return SUPERVISION_SEMISUPERVISED
         else:
             return SUPERVISION_UNSUPERVISED
@@ -1964,12 +1966,6 @@ class Runner(object):
         # The *semi* part of semi-supervised is that you can do this only at
         # certain positions and leave the rest of the genome unsupervised.
 
-        supervision_type = self.supervision_type
-        if supervision_type == SUPERVISION_UNSUPERVISED:
-            return
-
-        assert supervision_type == SUPERVISION_SEMISUPERVISED
-
         # defaultdict of list of ints
         # key: chrom
         # value: list of ints (label as number)
@@ -2111,8 +2107,8 @@ class Runner(object):
         # can't run train and identify/posterior in the same run
         assert not ((self.identify.running() or self.posterior.running()) and \
                      self.train.running())
-
-        self.load_supervision()
+        if self.supervision_type == SUPERVISION_SEMISUPERVISED:
+            self.load_supervision()
         self.set_tracknames()
 
         observations = Observations(self)
@@ -3677,26 +3673,19 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.run_train()
 
                 if self.identify.running() or self.posterior.running():
-                    if self.supervision_filename:
-                        raise NotImplementedError  # XXX
 
                     if not self.dry_run:
                         # resave now that num_segs is determined,
                         # in case you tested multiple num_segs
                         # self.save_include()
                         pass
+                    self.supervision_filename = None
 
                     if self.posterior:
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
                                 "posterior task"
-                            )
-
-                        if self.num_worlds != 1:
-                            raise NotImplementedError(
-                                "Tied tracks are not yet supported for "
-                                "the posterior task"
                             )
 
                     self.run_identify_posterior()
@@ -3714,8 +3703,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
 
-    usage = "%(prog)s [OPTION]... TASK GENOMEDATA [GENOMEDATA ...] TRAINDIR " \
-            "[IDENTIFYDIR]"
+    usage = "%(prog)s [GLOBAL_OPTION]... GENOMEDATA [GENOMEDATA ...] " \
+            "TRAINDIR [IDENTIFYDIR] TASK [TASK_OPTION]"
 
     version = "%(prog)s {}".format(__version__)
     description = "Semi-automated genome annotation"
@@ -3727,7 +3716,7 @@ def parse_options(argv):
     http://dx.doi.org/10.1038/nmeth.1937"""
 
     parser = ArgumentParser(description=description, usage=usage,
-                            epilog=citation, add_help=False)
+                            epilog=citation)
 
     parser.add_argument("--version", action="version", version=version)
 
@@ -3764,7 +3753,7 @@ def parse_options(argv):
                        " executables")
 
     # Positional arguments
-    parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
+    parser.add_argument("args", nargs="*")  # "+" for at least 1 arg
 
     tasks = parser.add_subparsers(help="Segway Tasks", dest = "command")
 
@@ -3883,12 +3872,6 @@ def parse_options(argv):
                        help="make NUM segment sublabels"
                        " (default %d)" % NUM_SUBSEGS)
 
-    group.add_argument("--output-label", type=str,
-                       help="in the segmentation file, for each coordinate "
-                       'print only its superlabel ("seg"), only its '
-                       "sublabel (\"subseg\"), or both (\"full\")"
-                       "  (default %s)" % OUTPUT_LABEL)
-
     group.add_argument("--ruler-scale", type=int, metavar="SCALE",
                        help="ruler marking every SCALE bp (default the"
                        " resolution multiplied by 10)")
@@ -3943,6 +3926,20 @@ def parse_options(argv):
     # exclude goes after all includes
     group.add_argument("--exclude-coords", metavar="FILE",
                        help="filter out genomic coordinates in FILE"
+                       " (default none)")
+
+    group.add_argument("--output-label", type=str,
+                       help="in the segmentation file, for each coordinate "
+                       'print only its superlabel ("seg"), only its '
+                       "sublabel (\"subseg\"), or both (\"full\")"
+                       "  (default %s)" % OUTPUT_LABEL)
+
+    group.add_argument("--resolution", type=int, metavar="RES",
+                       help="downsample to every RES bp (default %d)" %
+                       RESOLUTION)
+
+    group.add_argument("--seg-table", metavar="FILE",
+                       help="load segment hyperparameters from FILE"
                        " (default none)")
 
     # output files are produced by identify-finish

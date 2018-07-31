@@ -25,12 +25,13 @@ fi
 set -x
 
 SEGWAY_RAND_SEED=4014068903 segway "$cluster_arg" \
+    ../track*.genomedata traindir train\
     --include-coords="../include-coords.bed" \
     --track=testtrack1A,testtrack1B --track=testtrack2A,testtrack2B \
-    --num-labels=4 train ../track*.genomedata traindir
+    --num-labels=4
 
-segway "$cluster_arg" --include-coords="../include-coords.bed" \
-    identify ../track*.genomedata traindir identifydir
+segway "$cluster_arg" ../track*.genomedata traindir identifydir \
+    identify --include-coords="../include-coords.bed" \
 
 cd ..
 

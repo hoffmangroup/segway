@@ -31,10 +31,10 @@ set -x
 #     --tracks-from=../tracks.txt --num-labels=4 \
 #     train ../simpleseg.genomedata traindir
 
-segway "$cluster_arg" --recover=../recover/traindir/ --include-coords=../include-coords.bed --tracks-from=../tracks.txt --max-train-rounds=3 --num-labels=4 train ../simpleseg.genomedata traindir
+segway "$cluster_arg" ../simpleseg.genomedata traindir train --recover=../recover/traindir/ --include-coords=../include-coords.bed --tracks-from=../tracks.txt --max-train-rounds=3 --num-labels=4
 
-segway "$cluster_arg" --include-coords=../include-coords.bed \
-    identify ../simpleseg.genomedata traindir identifydir
+segway "$cluster_arg" ../simpleseg.genomedata traindir identifydir \
+    identify --include-coords=../include-coords.bed
 
 cd ..
 
