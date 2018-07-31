@@ -75,7 +75,6 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
                     VALIDATE_PROG, VITERBI_PROG, Window)
 from .version import __version__
-from .winner import winner
 
 # set once per file run
 UUID = uuid1().hex
