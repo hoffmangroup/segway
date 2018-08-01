@@ -72,8 +72,8 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_RESULTS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
-                    SUPERVISION_SEMISUPERVISED, USE_MFSDG,
-                    VALIDATE_PROG, VITERBI_PROG, Window)
+                    SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED, 
+                    USE_MFSDG, VALIDATE_PROG, VITERBI_PROG)
 from .version import __version__
 
 # set once per file run
@@ -691,7 +691,6 @@ class Runner(object):
         self.params_filenames = []  # list of possible params filenames
         self.recover_dirname = None
         self.work_dirname = None
-        self.train_dir_name = None
         self.log_likelihood_filename = None
         self.log_likelihood_tab_filename = None
 
@@ -1012,11 +1011,6 @@ class Runner(object):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
 
-        if (res.validate and
-            not res.train.running()):
-            raise NotImplementedError("Using --validation-fraction"
-                " or --validation-coords with tasks other than train"
-                " is not supported")
         return res
 
     @memoized_property
@@ -1855,15 +1849,8 @@ class Runner(object):
             except OSError as err:
                 if err.errno != ENOENT:
                     raise
-        try:
+        if not dirpath.isdir():
             dirpath.makedirs()
-        except OSError as err:
-            # if the error is because directory exists, but it's
-            # empty, then do nothing
-#            if (err.errno != EEXIST or not dirpath.isdir() or
-#                    dirpath.listdir()):
-#                raise
-            pass
 
     def make_subdir(self, subdirname):
         self.make_dir(self.work_dirpath / subdirname)
@@ -1940,8 +1927,7 @@ class Runner(object):
         subset_metadata_attr("sums_squares")
         subset_metadata_attr("num_datapoints")
 
-    def save_input_master(self, instance_index=None, new=False,
-                          input_master_filename = None):
+    def save_input_master(self, instance_index=None, new=False):
         if new:
             input_master_filename = None
         else:
@@ -2104,8 +2090,7 @@ class Runner(object):
 
     def save_gmtk_input(self):
         # can't run train and identify/posterior in the same run
-        assert not ((self.identify.running() or self.posterior.running()) and \
-                     self.train.running())
+        assert not self.supervision_type == SUPERVISION_SUPERVISED
         if self.supervision_type == SUPERVISION_SEMISUPERVISED:
             self.load_supervision()
         self.set_tracknames()
@@ -2160,31 +2145,6 @@ class Runner(object):
             for index, window in enumerate(self.windows):
                 bed_writer.writerow((window.chrom, window.start, window.end,
                                      index))
-
-    def load_windows(self):
-        window_bed_filename = self.make_filename(PREFIX_WINDOW, EXT_BED)
-        self.windows = []
-        
-        # Read in the windows from the bed file
-        with open(window_bed_filename, "r") as window_bed_file:
-            for line in window_bed_file.readlines():
-                line = line.split(DELIMITER_BED)
-                self.windows.append(Window(int(line[3]), line[0], int(line[1]), int(line[2])))
-
-        # Use Observations class to generate gmtk filepaths
-        observations = Observations(self)
-        observations.windows = self.windows
-
-        observations.create_filepaths(temp=True)
-        observations.create_validation_filepaths()
-
-        self.float_filepaths = observations.float_filepaths
-        self.int_filepaths = observations.int_filepaths
-
-        self.validation_float_filepaths = \
-            observations.validation_float_filepaths
-        self.validation_int_filepaths = \
-            observations.validation_int_filepaths
 
     def copy_results(self, name, src_filename, dst_filename):
         if dst_filename:
@@ -3031,7 +2991,6 @@ class Runner(object):
         input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(self.input_master_filename,
                                    self.params_dirpath, self.clobber)
-
         self.input_master_filename = input_master_filename
 
         # save file locations to tab-delimited file
@@ -3672,14 +3631,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.run_train()
 
                 if self.identify.running() or self.posterior.running():
-
-                    if not self.dry_run:
-                        # resave now that num_segs is determined,
-                        # in case you tested multiple num_segs
-                        # self.save_include()
-                        pass
-                    self.supervision_filename = None
-
                     if self.posterior:
                         if self.recover_dirname:
                             raise NotImplementedError(
