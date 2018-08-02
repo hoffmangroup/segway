@@ -32,7 +32,7 @@ SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
 
 segway "$cluster_arg" "../simpleresolution.genomedata" traindir identifydir \
     identify --include-coords="../include-coords.bed" \
-    --resolution=2 --seg-table="../seg_table.tab" \
+    --seg-table="../seg_table.tab" \
 
 cd ..
 
