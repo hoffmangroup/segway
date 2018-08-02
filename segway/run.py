@@ -287,7 +287,7 @@ TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
 
 IDENTIFY_OPTION_TYPES = \
     	dict(include_coords_filename=str, exclude_coords_filename=str,
-             seg_table_filename=str, resolution=int, output_label=str)
+             seg_table_filename=str, output_label=str)
 
 class Results():
     log_likelihood = None
@@ -3699,8 +3699,8 @@ def parse_options(argv):
                        "model files specified in options as output to be "
                        "overwritten")
     group.add_argument("-n", "--dry-run", action="store_true",
-                       help="write all files, but do not run any"
-                       " executables")
+                       help="DEPRECATED (use train-init or identify-init) write"
+                       " all files, but do not run any executables")
 
     # Positional arguments
     parser.add_argument("args", nargs="*")  # "+" for at least 1 arg
@@ -3724,7 +3724,7 @@ def parse_options(argv):
 
     # next two groups of options belong in train-init
     # with OptionGroup(parser, "Data selection") as group:
-    group = train_init.add_argument_group("Data selection")
+    group = train_init.add_argument_group("Data selection (Train-init)")
     group.add_argument("-t", "--track", action="append", default=[],
                        metavar="TRACK", help="append TRACK to list of tracks"
                        " to use (default all)")
@@ -3768,7 +3768,7 @@ def parse_options(argv):
                        help="Use genomic coordinates in FILE as a validation"
                        " set (default none)")
 
-    group = train_init.add_argument_group("Model files")
+    group = train_init.add_argument_group("Model files (Train-init)")
     group.add_argument("-i", "--input-master", metavar="FILE",
                        help="use or create input master in FILE"
                        " (default %s)" %
@@ -3797,7 +3797,7 @@ def parse_options(argv):
                        help="semisupervised segmentation with labels in "
                        "FILE (default none)")
 
-    group = train_init.add_argument_group("Modeling variables")
+    group = train_init.add_argument_group("Modeling variables (Train-init)")
     group.add_argument("-D", "--distribution", choices=DISTRIBUTIONS,
                        metavar="DIST",
                        help="use DIST distribution"
@@ -3850,7 +3850,7 @@ def parse_options(argv):
                          % VAR_FLOOR_GMM_DEFAULT)
 
     # Train run is where the train-rounds are calculated
-    group = train_run.add_argument_group("Modeling Variables")
+    group = train_run.add_argument_group("Modeling Variables (Train-run)")
     group.add_argument("--max-train-rounds", type=int, metavar="NUM",
                        help="each training instance runs a maximum of NUM"
                        " rounds (default %d)" % MAX_EM_ITERS)
@@ -3867,7 +3867,7 @@ def parse_options(argv):
                        help="continue from interrupted run in DIR")
 
     # select coords to identify in the init step
-    group = identify_init.add_argument_group("Data selection")
+    group = identify_init.add_argument_group("Data selection (Idenfity-init)")
     group.add_argument("--include-coords", metavar="FILE",
                        help="limit to genomic coordinates in"
                        " FILE (default all) (Note: does not apply to"
@@ -3884,16 +3884,12 @@ def parse_options(argv):
                        "sublabel (\"subseg\"), or both (\"full\")"
                        "  (default %s)" % OUTPUT_LABEL)
 
-    group.add_argument("--resolution", type=int, metavar="RES",
-                       help="downsample to every RES bp (default %d)" %
-                       RESOLUTION)
-
     group.add_argument("--seg-table", metavar="FILE",
                        help="load segment hyperparameters from FILE"
                        " (default none)")
 
     # output files are produced by identify-finish
-    group = identify_finish.add_argument_group("Output files")
+    group = identify_finish.add_argument_group("Output files (Identify-finish)")
     group.add_argument("-b", "--bed", metavar="FILE",
                        help="create identification BED track in FILE"
                        " (default WORKDIR/%s)" % BED_FILEBASENAME)
