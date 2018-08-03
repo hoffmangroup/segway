@@ -779,7 +779,7 @@ class Runner(object):
             step = task[1:]
             if "round" in step:
                 self.recover_dirname = self.work_dirname
-                self.max_train_rounds = 1
+                self.recover_round = True
             setattr(self, task_name, RunningSteps(step))
 
     def set_option(self, name, value):
@@ -3203,7 +3203,6 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         new_filename = make_default_filename(resource, self.params_dirpath,
                                              instance_index)
-
         Path(old_filename).copy2(new_filename)
         return new_filename
 
@@ -3211,9 +3210,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                                validation_likelihood, best_validation_likelihood):
         instance_index = self.instance_index
         recover_dirname = self.recover_dirname
-
-        self.input_master_filename = \
-            self.recover_filename(InputMasterSaver.resource_name)
 
         recover_log_likelihood_tab_filepath = \
             Path(self.make_log_likelihood_tab_filename(instance_index,
@@ -3228,6 +3224,12 @@ to find the winning instance anyway.""" % thread.instance_index)
                 Path(self.make_log_likelihood_tab_filename(None,
                                                            recover_dirname))
 
+        if not self.recover_round:
+            self.input_master_filename = \
+                self.recover_filename(InputMasterSaver.resource_name)
+            log_likelihood_tab_filename = self.log_likelihood_tab_filename
+            recover_log_likelihood_tab_filepath.copy2(log_likelihood_tab_filename)
+
         if self.validate:
             # recover validation sum tabfile
             recover_validation_sum_tab_filepath = \
@@ -3237,8 +3239,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                 recover_validation_sum_tab_filepath = \
                     Path(self.make_validation_sum_tab_filename(None,
                                                            recover_dirname))
-            copy2(recover_validation_sum_tab_filepath,
-                  self.validation_sum_tab_filename)
 
             # recover validation output tabfile
             recover_validation_output_tab_filepath = \
@@ -3248,8 +3248,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                 recover_validation_output_tab_filepath = \
                     Path(self.make_validation_output_tab_filename(None,
                                                            recover_dirname))
-            copy2(recover_validation_output_tab_filepath,
-                  self.validation_output_tab_filename)
 
             # recover last validation sum
             recover_validation_sum_filename = \
@@ -3263,8 +3261,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
-            copy2(recover_validation_sum_filename,
-                  self.validation_sum_filename)
 
             # recover last validation output
             recover_validation_output_filename = \
@@ -3278,8 +3274,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
-            copy2(recover_validation_output_filename,
-                  self.validation_output_filename)
 
             # recover validation sum winner
             recover_validation_sum_winner_filename = \
@@ -3293,8 +3287,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
-            copy2(recover_validation_sum_winner_filename,
-                  self.validation_sum_winner_filename)
 
             # recover validation output winner
             recover_validation_output_winner_filename = \
@@ -3308,22 +3300,35 @@ to find the winning instance anyway.""" % thread.instance_index)
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
-            copy2(recover_validation_output_winner_filename,
-                  self.validation_output_winner_filename)
+            if not self.recover_round:
+                copy2(recover_validation_sum_tab_filepath,
+                      self.validation_sum_tab_filename)
+                copy2(recover_validation_output_tab_filepath,
+                      self.validation_output_tab_filename)
+                copy2(recover_validation_sum_filename,
+                      self.validation_sum_filename)
+                copy2(recover_validation_output_filename,
+                      self.validation_output_filename)
+                copy2(recover_validation_sum_winner_filename,
+                      self.validation_sum_winner_filename)
+                copy2(recover_validation_output_winner_filename,
+                      self.validation_output_winner_filename)
 
-        with open(recover_log_likelihood_tab_filepath) \
-                as log_likelihood_tab_file:
-            log_likelihoods = [float(line.rstrip())
-                               for line in log_likelihood_tab_file.readlines()]
+        if recover_log_likelihood_tab_filepath.isfile():
+            with open(recover_log_likelihood_tab_filepath) \
+                    as log_likelihood_tab_file:
+                log_likelihoods = [float(line.rstrip())
+                                   for line in log_likelihood_tab_file.readlines()]
+        else:
+            log_likelihoods = []
 
         final_round_index = len(log_likelihoods)
+        if final_round_index == 0:
+            log_likelihood = -inf
         if final_round_index > 0:
             log_likelihood = log_likelihoods[-1]
         if final_round_index > 1:
             last_log_likelihood = log_likelihoods[-2]
-
-        log_likelihood_tab_filename = self.log_likelihood_tab_filename
-        recover_log_likelihood_tab_filepath.copy2(log_likelihood_tab_filename)
 
         if self.validate:
             with open(recover_validation_sum_tab_filepath) \
@@ -3344,15 +3349,19 @@ to find the winning instance anyway.""" % thread.instance_index)
             new_curr_params_filename = extjoin(new_params_filename,
                                                str(round_index))
 
-            Path(old_curr_params_filename).copy2(new_curr_params_filename)
+            if not self.recover_round:
+                Path(old_curr_params_filename).copy2(new_curr_params_filename)
             if self.validate:
                 if round_index == best_validation_index:
                     self.best_params_filename = new_curr_params_filename
 
-        self.last_params_filename = new_curr_params_filename
+        if final_round_index:
+            self.last_params_filename = new_curr_params_filename
+        if self.recover_round:
+            self.max_em_iters = final_round_index + 1
 
         return last_log_likelihood, log_likelihood, final_round_index, \
-            validation_likelihood, best_validation_likelihood
+            validation_likelihood, best_validation_likelihood        
 
     def make_instance_initial_results(self):
         """
