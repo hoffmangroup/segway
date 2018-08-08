@@ -1,9 +1,11 @@
 name	value
+clobber	False
 distribution	asinh_norm
 dont_train_filename	traindir/auxiliary/dont_train.list
 include_coords_filename	
 input_master_filename	traindir/params/input.master
 len_seg_strength	0
+minibatch_fraction	-1
 num_instances	1
 num_mix_components	1
 num_segs	4
@@ -16,3 +18,6 @@ seg_table_filename
 segtransition_weight_scale	1.0
 structure_filename	traindir/segway.str
 supervision_filename	
+validation_coords_filename	
+validation_fraction	
+var_floor	

@@ -276,7 +276,9 @@ TRAIN_OPTION_TYPES = \
          num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
-         supervision_filename=str)
+         supervision_filename=str, clobber=bool, minibatch_fraction=float,
+         validation_fraction=float, validation_coords_filename=str,
+         var_floor=float)
 
 TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
                           validation_likelihood = float, 
@@ -290,15 +292,6 @@ IDENTIFY_OPTION_TYPES = \
              seg_table_filename=str, output_label=str)
 
 class Results():
-    log_likelihood = None
-    num_segs = None
-    validation_likelihood = None
-    input_master_filename = None
-    params_filename = None
-    log_likelihood_filename = None
-    validation_output_filename = None
-    validation_sum_filename = None
-
     def get_filenames(self, validation = False):
         if validation:
             return[self.input_master_filename, self.params_filename, 
@@ -509,13 +502,15 @@ class TrainThread(Thread):
     def __init__(self, runner, session, instance_index, num_segs):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
+        import pdb
+        pdb.set_trace()
         self.runner = copy(runner)
 
         self.session = session
         self.num_segs = num_segs
         self.instance_index = instance_index
         self.input_master_filename = make_default_filename \
-            (InputMasterSaver().resource_name, self.params_dirname, instance_index)
+            (InputMasterSaver.resource_name, runner.params_dirpath, instance_index)
 
         Thread.__init__(self)
 
@@ -2911,6 +2906,8 @@ class Runner(object):
             for row in reader:
                 name = row["name"]
                 value = row["value"]
+                if not value:
+                    continue
 
                 # Don't override options shared by identify and train
                 if name in IDENTIFY_OPTION_TYPES.keys() and \
