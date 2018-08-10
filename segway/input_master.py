@@ -15,11 +15,12 @@ from string import Template
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
                    vectorize, where, zeros)
+import sys
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
                     OFFSET_END, OFFSET_START, OFFSET_STEP,
-                    resource_substitute, Saver,
+                    resource_substitute, Saver, SEGWAY_ENCODING,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED, USE_MFSDG)
@@ -91,6 +92,9 @@ def make_spec(name, iterable):
                      for indexed_item in enumerate(items)]
 
     all_lines = header_lines + indexed_items
+
+    if sys.version[0] == "2":
+        all_lines = [line.encode(SEGWAY_ENCODING) for line in all_lines]
 
     return "\n".join(all_lines) + "\n"
 
@@ -551,12 +555,10 @@ class MeanParamSpec(ParamSpec):
     type_name = "MEAN"
     object_tmpl = "mean_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
     jitter_std_bound = 0.2
-    data = 0
 
     copy_attrs = ParamSpec.copy_attrs + ["means", "num_mix_components", "random_state", "vars"]
 
-    def __init__(self, saver):
-        copy_attrs(saver, self, self.copy_attrs)
+    def make_data(self):
         num_segs = self.num_segs
         num_subsegs = self.num_subsegs
         means = self.means  # indexed by track_index
@@ -572,7 +574,7 @@ class MeanParamSpec(ParamSpec):
         noise = self.random_state.uniform(-jitter_std_bound,
                 jitter_std_bound, stds_tiled.shape)
 
-        self.data = means_tiled + (stds_tiled * noise)
+        return means_tiled + (stds_tiled * noise)
 
 
     def generate_objects(self):
@@ -583,7 +585,7 @@ class MeanParamSpec(ParamSpec):
         substitute = Template(self.object_tmpl).substitute
 
         for component in range(self.num_mix_components):
-            data = self.data
+            data = self.make_data()
             for mapping in self.generate_tmpl_mappings():
                 track_index = mapping["track_index"]
                 if self.distribution == DISTRIBUTION_GAMMA:
