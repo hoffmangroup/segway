@@ -268,7 +268,7 @@ TRAIN_FIELDNAMES = ["name", "value"]
 TRAIN_OPTION_TYPES = \
     dict(input_master_filename=str, structure_filename=str,
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
-         distribution=str, len_seg_strength=float,
+         distribution=str, len_seg_strength=float, num_instances=int,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
          num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
          reverse_worlds=[int], num_mix_components=int)
@@ -2918,6 +2918,8 @@ class Runner(object):
         if self.instance_make_new_params:
             self.proc_train_results(instance_params, dst_filenames)
         elif not self.dry_run:
+            import pdb
+            pdb.set_trace()
             # only one instance
             assert len(instance_params) == 1
             # for validate, this is best, not last
@@ -2982,6 +2984,8 @@ class Runner(object):
         self.validation_int_filelistpath
         self.float_tabfilepath
         self.gmtk_include_filename_relative
+        import pdb
+        pdb.set_trace()
         self.means
         self.vars
         self.dont_train_filename
