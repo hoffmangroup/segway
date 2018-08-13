@@ -276,7 +276,7 @@ TRAIN_OPTION_TYPES = \
          num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
-         supervision_filename=str, clobber=bool, minibatch_fraction=float,
+         supervision_filename=str, minibatch_fraction=float,
          validation_fraction=float, validation_coords_filename=str,
          var_floor=float)
 
@@ -502,8 +502,6 @@ class TrainThread(Thread):
     def __init__(self, runner, session, instance_index, num_segs):
         # keeps it from rewriting variables that will be used
         # later or in a different thread
-        import pdb
-        pdb.set_trace()
         self.runner = copy(runner)
 
         self.session = session
@@ -759,6 +757,7 @@ class Runner(object):
         self.train = RunningSteps(["not_running"])  # EM train
         self.posterior = RunningSteps(["not_running"])
         self.identify = RunningSteps(["not_running"])  # viterbi
+        self.recover_round = False
         self.validate = False
         self.dry_run = False
         self.verbosity = VERBOSITY
@@ -2906,9 +2905,9 @@ class Runner(object):
             for row in reader:
                 name = row["name"]
                 value = row["value"]
+
                 if not value:
                     continue
-
                 # Don't override options shared by identify and train
                 if name in IDENTIFY_OPTION_TYPES.keys() and \
                     (self.identify.running() or self.posterior.running()):

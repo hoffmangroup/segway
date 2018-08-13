@@ -4,6 +4,7 @@ dont_train_filename	traindir/auxiliary/dont_train.list
 include_coords_filename	../include-coords.bed
 input_master_filename	traindir/params/input.master
 len_seg_strength	0
+minibatch_fraction	-1
 num_instances	1
 num_mix_components	1
 num_segs	4
@@ -18,3 +19,6 @@ structure_filename	traindir/segway.str
 supervision_filename	
 track_specs	testtrack1A,testtrack1B
 track_specs	testtrack2A,testtrack2B
+validation_coords_filename	
+validation_fraction	
+var_floor	

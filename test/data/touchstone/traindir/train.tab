@@ -1,5 +1,4 @@
 name	value
-clobber	False
 distribution	asinh_norm
 dont_train_filename	traindir/auxiliary/dont_train.list
 include_coords_filename	
