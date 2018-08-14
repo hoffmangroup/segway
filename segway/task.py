@@ -10,6 +10,7 @@ task: wraps a GMTK subtask to reduce size of output
 from ast import literal_eval
 from contextlib import contextmanager
 from errno import ENOENT
+import gc
 from os import extsep, fdopen, EX_TEMPFAIL, remove
 import re
 import sys
@@ -42,7 +43,7 @@ USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
 
 # Dummy observation filename required for gmtk EM bundling. Has no effect but a
 # name is necessary.
-DUMMY_OBSERVATION_FILENAME = "/dev/zero"
+PLACEHOLDER_OBSERVATION_FILENAME = "/dev/zero"
 
 GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
@@ -50,7 +51,8 @@ GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 @contextmanager
 def mkstemp_observation(chromosome_name, start, end, suffix):
     """A context manager that provides a tuple of a file object and full
-    filepath of an a observation file with the given suffix"""
+    filepath of an a observation file with the given suffix.
+    Does not delete the created temporary file after exiting."""
 
     # Set a common prefix for the observation files
     prefix = "{}.{}.{}.".format(chromosome_name, start, end)
@@ -63,8 +65,8 @@ def mkstemp_observation(chromosome_name, start, end, suffix):
     temp_observation_file.close()
 
 
-def save_temporary_observations(chromosome_name, start, end, continuous_cells,
-                                resolution, distribution, supervision_data):
+def save_temp_observations(chromosome_name, start, end, continuous_cells,
+                           resolution, distribution, supervision_data):
     """Returns a tuple (float_obs, int_obs) of temporary filepaths for the
     int/float observation filenames unique to this process"""
 
@@ -132,16 +134,26 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
     """Returns a list of filepaths to observation files created for gmtk
     and modifies the necessary arguments (args) for running gmtk"""
 
-    # Create the gmtk observation files
-    float_observations_filename, int_observations_filename = \
-        save_temporary_observations(chromosome_name, start, end,
-                                    continuous_cells, resolution, distribution,
-                                    supervision_data)
+    try:
+        # Create the gmtk observation files
+        float_observations_filename, int_observations_filename = \
+            save_temp_observations(chromosome_name, start, end,
+                                   continuous_cells, resolution, distribution,
+                                   supervision_data)
 
-    # Create the gmtk observation file lists
-    float_observation_list_filename, int_observation_list_filename = \
-        save_temp_observation_filelists(float_observations_filename,
-                                        int_observations_filename)
+        # Create the gmtk observation file lists
+        float_observation_list_filename, int_observation_list_filename = \
+            save_temp_observation_filelists(float_observations_filename,
+                                            int_observations_filename)
+    # If any exception occurred
+    except:  # NOQA
+        # Attempt to remove any created files
+        force_remove_all_files([float_observations_filename,
+                                int_observations_filename,
+                                float_observation_list_filename,
+                                int_observation_list_filename])
+        # Reraise the exception
+        raise
 
     # Modify the given gmtk arguments to use the temporary observation lists
     replace_subsequent_value(gmtk_args, EXT_OPTIONS[EXT_FLOAT],
@@ -158,27 +170,52 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
 
 
 @contextmanager
-def files_to_remove(file_list):
+def files_to_remove(filenames):
     """Creates a context manager where upon exit, ensures files are removed"""
     yield
 
-    exception_info = None
+    force_remove_all_files(filenames)
+
+
+def force_remove_all_files(filenames):
+    exception_list = []
     # For each file name
-    for filename in file_list:
+    for filename in filenames:
         # Attempt to remove the file
         try:
-            remove(filename)
-        # Ignore exceptions where the file does not exist
-        except OSError, err:
-            # If a different exception was found
-            if err.errno != ENOENT and \
-               exception_info is None:
-                # Store the exception
-                exception_info = sys.exc_info()
+            force_remove_file(filename)
+        # Catch any exception
+        except:  # NOQA
+            # Store the exception
+            # The 2nd element from exc_info is the exception object instance
+            exception_list.append(sys.exc_info()[1])
 
-    # Raise an (OSError) exception if any was found
-    if exception_info:
-        raise exception_info[1]
+    handle_multiple_exceptions(exception_list)
+
+
+def force_remove_file(filename):
+    """Attempts to remove the given filename. Catches and ignores an exception
+    if the file does not exist and raises all other exceptions"""
+    try:
+        remove(filename)
+    # Ignore exceptions where the file does not exist
+    except OSError, err:
+        # If a different exception was found
+        if err.errno != ENOENT:
+            # Reraise
+            raise
+
+
+def handle_multiple_exceptions(exception_list):
+    """Takes an list of exception objects and prints out all information to
+    stderr and raises the first exception (if any exceptions exist)."""
+    # If any exceptions exist
+    if exception_list:
+        # Print out all exceptions and raise the first
+        first_exception = exception_list.pop(0)
+        for exception in exception_list:
+            print >>sys.stderr, exception
+        raise first_exception
 
 
 def make_track_indexes(text):
@@ -430,10 +467,9 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
                                                continuous_cells, resolution,
                                                distribution)
-    # XXXopt: does this actually free the memory? or do we need to
-    # use a subprocess to do the loading?
     # remove from memory
     del continuous_cells
+    gc.collect()
 
     with files_to_remove(temp_filenames):
         output = POSTERIOR_PROG.getoutput(*args)
@@ -468,10 +504,9 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
                                                continuous_cells,
                                                resolution, distribution)
-    # XXXopt: does this work? or do we need to use a subprocess to
-    # do the loading?
     # remove from memory
     del continuous_cells
+    gc.collect()
 
     with files_to_remove(temp_filenames):
         output = VITERBI_PROG.getoutput(*args)
@@ -524,6 +559,9 @@ def run_train(coord, resolution, do_reverse, outfilename,
                                                end, continuous_cells,
                                                resolution, distribution,
                                                supervision_cells)
+    del continuous_cells
+    gc.collect()
+
     with files_to_remove(temp_filenames):
         TRAIN_PROG.run(*gmtk_args)
 
@@ -531,17 +569,18 @@ def run_train(coord, resolution, do_reverse, outfilename,
 def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     args = list(args)
 
-    # Create dummy observation lists
-    dummy_float_list, dummy_int_list = \
-        save_temp_observation_filelists(DUMMY_OBSERVATION_FILENAME,
-                                        DUMMY_OBSERVATION_FILENAME)
-    # Modify the given gmtk arguments to use the temporary dummy
+    # Create placeholder observation lists
+    placeholder_float_list, placeholder_int_list = \
+        save_temp_observation_filelists(PLACEHOLDER_OBSERVATION_FILENAME,
+                                        PLACEHOLDER_OBSERVATION_FILENAME)
+    # Modify the given gmtk arguments to use the temporary placeholder
     # observation lists
-    replace_subsequent_value(args, EXT_OPTIONS[EXT_FLOAT], dummy_float_list)
-    replace_subsequent_value(args, EXT_OPTIONS[EXT_INT], dummy_int_list)
+    replace_subsequent_value(args, EXT_OPTIONS[EXT_FLOAT],
+                             placeholder_float_list)
+    replace_subsequent_value(args, EXT_OPTIONS[EXT_INT], placeholder_int_list)
 
     # Run EM bundling
-    with files_to_remove([dummy_float_list, dummy_int_list]):
+    with files_to_remove([placeholder_float_list, placeholder_int_list]):
         TRAIN_PROG.getoutput(*args)
 
 
