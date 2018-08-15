@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division
 
-from six.moves import zip
 __version__ = "$Revision$"
 
 # Copyright 2008-2012 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -9,6 +8,8 @@ __version__ = "$Revision$"
 from itertools import chain
 import re
 import sys
+
+from six.moves import zip
 
 FIELDNAMES = ["chrom", "chromStart", "chromEnd", # required
               "name", "score", "strand", "thickStart", "thickEnd", "itemRgb",

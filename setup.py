@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import absolute_import
 
 """segway: a way to segment the genome
 
@@ -6,13 +7,12 @@ Segway is a tool for easy pattern discovery and identification in
 functional genomics data.
 """
 
-from __future__ import absolute_import
-from segway import __version__
-
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 import sys
 import subprocess
+
+from segway import __version__
 from six.moves import map, zip
 
 if (sys.version_info[0] == 2 and sys.version_info[1] < 7) or \
@@ -119,7 +119,6 @@ def check_gmtk_version():
 
     # Get the first line of output
     first_output_line = output_lines[0].decode()
-    print(first_output_line)
 
     # Get the version string from the proper word on the line
     current_version_string = first_output_line.split()[version_word_index]

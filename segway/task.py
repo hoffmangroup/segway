@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function, with_statement
-from six.moves import map, range, zip
 
 """
 task: wraps a GMTK subtask to reduce size of output
@@ -19,6 +18,7 @@ from genomedata import Genome
 from numpy import argmax, array, empty, where, diff, r_, zeros
 import optbuild
 from path import Path
+from six.moves import map, range, zip
 
 from .observations import (make_continuous_cells, make_supervision_cells,
                            _save_window)
@@ -48,8 +48,6 @@ USAGE = "args: VERB KIND OUTFILE CHROM START END RESOLUTION REVERSE [ARGS...]"
 DUMMY_OBSERVATION_FILENAME = "/dev/zero"
 
 GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
-
-
 
 
 def make_track_indexes(text):

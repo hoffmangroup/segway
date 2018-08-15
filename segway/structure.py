@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division
-from six.moves import range, zip
 
 """structure.py: write structure file
 """
@@ -10,6 +9,8 @@ __version__ = "$Revision$"
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from itertools import count
+
+from six.moves import range, zip
 
 from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
                     USE_MFSDG)

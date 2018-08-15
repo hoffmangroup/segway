@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function
 
-from six import viewitems
-from six.moves import map, range, zip
-
 """observations.py: prepare and save GMTK observations
 """
 
@@ -29,6 +26,8 @@ from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, invert, isnan, maximum, zeros)
 
 from path import Path
+from six import viewitems
+from six.moves import map, range, zip
 from tabdelim import ListWriter
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
@@ -693,7 +692,6 @@ class Observations(object):
 
         sets: window_coords, validation_coords (if validation)
         """
-
         exclude_coords = self.exclude_coords
 
         windows = []

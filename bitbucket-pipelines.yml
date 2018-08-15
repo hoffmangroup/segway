@@ -13,10 +13,9 @@ pipelines:
               - pip
             name: Python2
             script:
-              - pip install .
+              - python -m pip install .
               - python --version
-              - gmtkPrint -version
-              - pip list 
+              - gmtkPrint -version 
               - cd test && ./test_all.sh
         - step:
             caches:
@@ -24,8 +23,7 @@ pipelines:
             name: Python3
             script:
               - alias python="python3"
-              - pip3 install .
+              - python -m pip install .
               - python --version
               - gmtkPrint -version
-              - pip3 list
               - cd test && ./test_all.sh

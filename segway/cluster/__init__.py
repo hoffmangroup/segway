@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function, with_statement
 
-from six import string_types
 __version__ = "$Revision$"
 
 # Copyright 2009, 2011-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -11,6 +10,8 @@ from heapq import heappop, heappush
 from os import environ, EX_TEMPFAIL
 import sys
 from time import sleep
+
+from six import string_types
 
 DRIVER_NAME_OVERRIDE = environ.get("SEGWAY_CLUSTER")
 
@@ -287,7 +288,6 @@ class RestartableJobDict(dict):
             # job will not be resubmitted, so free the job template
             restartable_job.free_job_template()
         del self[jobid]
-        return row
 
     def wait(self):
         session = self.session

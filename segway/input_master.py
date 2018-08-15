@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division
-from six.moves import map, range
 
 """input_master.py: write input master files
 """
@@ -11,11 +10,12 @@ __version__ = "$Revision$"
 
 from math import frexp, ldexp
 from string import Template
+import sys
 
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
                    vectorize, where, zeros)
-import sys
+from six.moves import map, range
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
@@ -93,6 +93,8 @@ def make_spec(name, iterable):
 
     all_lines = header_lines + indexed_items
 
+    # In Python 2 converts to bytes from unicode to prevent __str__method
+    # from being called twice
     if sys.version[0] == "2":
         all_lines = [line.encode(SEGWAY_ENCODING) for line in all_lines]
 

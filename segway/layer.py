@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, with_statement, print_function
-from six import iterkeys, reraise, viewitems
-from six.moves import map
 
 """
 layer: convert flattened Viterbi BED files to a layered thick/thin bed file
@@ -16,6 +14,8 @@ from tempfile import NamedTemporaryFile
 
 from numpy import array, diff, vstack
 from optbuild import OptionBuilder_ShortOptWithEquals
+from six import iterkeys, reraise, viewitems
+from six.moves import map
 from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native

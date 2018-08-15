@@ -1,17 +1,17 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division
 
 """gethelp.py: get help from a command-line script
 """
 
-from __future__ import absolute_import
 __version__ = "$Revision$"
 
 ## Copyright 2011 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from six.moves.configparser import RawConfigParser
 from cStringIO import StringIO
 import sys
+
+from six.moves.configparser import RawConfigParser
 
 sys.path.insert(0, "..")
 from setup import entry_points

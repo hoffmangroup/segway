@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function, with_statement
 
-from six import viewitems
-from six.moves import map, zip
-
 __version__ = "$Revision$"
 
 # Copyright 2008-2009, 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -26,6 +23,8 @@ from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
 from pkg_resources import resource_filename, resource_string
+from six import viewitems
+from six.moves import map, zip
 from tables import Filters, NoSuchNodeError, open_file
 
 # XXX: check that these are all in use

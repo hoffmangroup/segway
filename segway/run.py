@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function, with_statement
-from six import viewitems, viewvalues
-from six.moves import map, range, zip
 
 """
 run: main Segway implementation
@@ -28,7 +26,6 @@ from string import ascii_letters
 import sys
 from threading import Event, Lock, Thread
 from time import sleep
-from six.moves.urllib.parse import quote
 from uuid import uuid1
 from warnings import warn
 
@@ -42,6 +39,9 @@ from optbuild import AddableMixin
 from path import Path
 import pipes
 from pkg_resources import Requirement, working_set
+from six import viewitems, viewvalues
+from six.moves import map, range, zip
+from six.moves.urllib.parse import quote
 from tabdelim import DictReader, ListWriter
 
 from .bed import parse_bed4, read_native
@@ -2918,8 +2918,6 @@ class Runner(object):
         if self.instance_make_new_params:
             self.proc_train_results(instance_params, dst_filenames)
         elif not self.dry_run:
-            import pdb
-            pdb.set_trace()
             # only one instance
             assert len(instance_params) == 1
             # for validate, this is best, not last
@@ -2984,8 +2982,6 @@ class Runner(object):
         self.validation_int_filelistpath
         self.float_tabfilepath
         self.gmtk_include_filename_relative
-        import pdb
-        pdb.set_trace()
         self.means
         self.vars
         self.dont_train_filename
