@@ -77,9 +77,13 @@ Segway accomplishes four major tasks from a single command-line. It--
      parameters appropriate for this data;
   2. **trains** parameters of the model starting with the initial
      parameters; and
-  3. **identifies** segments in this data with the model.
+  3. **identifies or annotates** segments in this data with the model.
   4. calculates **posterior** probability for each possible segment
      label at each position.
+
+.. note::
+    The verbs "identify" and "annotate" are synonyms when using Segway. They
+    both describe the same task and may be used interchangably.
 
 .. todo: block diagram
 
