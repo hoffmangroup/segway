@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function, with_statement
-from six import viewitems, viewvalues
-from six.moves import map, range, zip
 
 """
 run: main Segway implementation
@@ -28,7 +26,6 @@ from string import ascii_letters
 import sys
 from threading import Event, Lock, Thread
 from time import sleep
-from six.moves.urllib.parse import quote
 from uuid import uuid1
 from warnings import warn
 
@@ -42,6 +39,9 @@ from optbuild import AddableMixin
 from path import Path
 import pipes
 from pkg_resources import Requirement, working_set
+from six import viewitems, viewvalues
+from six.moves import map, range, zip
+from six.moves.urllib.parse import quote
 from tabdelim import DictReader, ListWriter
 
 from .bed import parse_bed4, read_native
@@ -3662,7 +3662,9 @@ def parse_options(argv):
             "TRAINDIR [IDENTIFYDIR] TASK [TASK_OPTION]"
 
     version = "%(prog)s {}".format(__version__)
-    description = "Semi-automated genome annotation"
+    description = """
+    Semi-automated genome annotation.
+    Please see: segway TASK -h, for steps specific to each task"""
 
     citation = """
     Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.  2012.
@@ -3704,32 +3706,26 @@ def parse_options(argv):
                        "model files specified in options as output to be "
                        "overwritten")
     group.add_argument("-n", "--dry-run", action="store_true",
-                       help="DEPRECATED (use train-init or identify-init) write"
-                       " all files, but do not run any executables")
+                       help="write all files, but do not run any executables")
 
     # Positional arguments
-    parser.add_argument("args", nargs="*")  # "+" for at least 1 arg
+    parser.add_argument("args", nargs="*")  # "" for at least 1 arg
 
     tasks = parser.add_subparsers(help="Segway Tasks", dest = "command")
 
     # define steps for each of the three main tasks
-    train_init = tasks.add_parser("train-init", add_help=False)
-    train_run = tasks.add_parser("train-run", add_help=False)
-    train_finish = tasks.add_parser("train-finish", add_help=False)
-    train_run_round = tasks.add_parser("train-run-round", add_help=False)
+    train_init = tasks.add_parser("", add_help=False)
+    train_run = tasks.add_parser("", add_help=False)
+    train_finish = tasks.add_parser("", add_help=False)
+    train_run_round = tasks.add_parser("", add_help=False)
 
-    identify_init = tasks.add_parser("identify-init", add_help=False)
-    identify_run = tasks.add_parser("identify-run", add_help=False)
-    identify_finish = tasks.add_parser("identify-finish", add_help=False)
-
-    # posterior and identify take the same options
-    posterior_init = tasks.add_parser("posterior-init", parents = [identify_init])
-    posterior_run = tasks.add_parser("posterior-run", parents = [identify_run])
-    posterior_finish = tasks.add_parser("posterior-finish", parents = [identify_finish])
+    identify_init = tasks.add_parser("", add_help=False)
+    identify_run = tasks.add_parser("", add_help=False)
+    identify_finish = tasks.add_parser("", add_help=False)
 
     # next two groups of options belong in train-init
     # with OptionGroup(parser, "Data selection") as group:
-    group = train_init.add_argument_group("Data selection (Train-init)")
+    group = train_init.add_argument_group("Data selection (train-init)")
     group.add_argument("-t", "--track", action="append", default=[],
                        metavar="TRACK", help="append TRACK to list of tracks"
                        " to use (default all)")
@@ -3773,7 +3769,7 @@ def parse_options(argv):
                        help="Use genomic coordinates in FILE as a validation"
                        " set (default none)")
 
-    group = train_init.add_argument_group("Model files (Train-init)")
+    group = train_init.add_argument_group("Model files (train-init)")
     group.add_argument("-i", "--input-master", metavar="FILE",
                        help="use or create input master in FILE"
                        " (default %s)" %
@@ -3802,7 +3798,7 @@ def parse_options(argv):
                        help="semisupervised segmentation with labels in "
                        "FILE (default none)")
 
-    group = train_init.add_argument_group("Modeling variables (Train-init)")
+    group = train_init.add_argument_group("Modeling variables (train-init)")
     group.add_argument("-D", "--distribution", choices=DISTRIBUTIONS,
                        metavar="DIST",
                        help="use DIST distribution"
@@ -3855,13 +3851,13 @@ def parse_options(argv):
                          % VAR_FLOOR_GMM_DEFAULT)
 
     # Train run is where the train-rounds are calculated
-    group = train_run.add_argument_group("Modeling Variables (Train-run)")
+    group = train_run.add_argument_group("Modeling Variables (train-run)")
     group.add_argument("--max-train-rounds", type=int, metavar="NUM",
                        help="each training instance runs a maximum of NUM"
                        " rounds (default %d)" % MAX_EM_ITERS)
 
     # Directory would be recovered from train-run
-    group = train_run.add_argument_group("Intermediate files")
+    group = train_run.add_argument_group("Intermediate files (train-run)")
     group.add_argument("-o", "--observations", metavar="DIR",
                        help="DEPRECATED - temp files are now used and "
                        " recommended. Previously would use or create observations in DIR"
@@ -3872,7 +3868,7 @@ def parse_options(argv):
                        help="continue from interrupted run in DIR")
 
     # select coords to identify in the init step
-    group = identify_init.add_argument_group("Data selection (Idenfity-init)")
+    group = identify_init.add_argument_group("Data selection (idenfity-init)")
     group.add_argument("--include-coords", metavar="FILE",
                        help="limit to genomic coordinates in"
                        " FILE (default all) (Note: does not apply to"
@@ -3894,7 +3890,7 @@ def parse_options(argv):
                        " (default none)")
 
     # output files are produced by identify-finish
-    group = identify_finish.add_argument_group("Output files (Identify-finish)")
+    group = identify_finish.add_argument_group("Output files (identify-finish)")
     group.add_argument("-b", "--bed", metavar="FILE",
                        help="create identification BED track in FILE"
                        " (default WORKDIR/%s)" % BED_FILEBASENAME)
@@ -3902,13 +3898,27 @@ def parse_options(argv):
     group.add_argument("--bigBed", metavar="FILE",
                        help="specify layered bigBed filename")
 
-    train = tasks.add_parser("train",
+    tasks.add_parser("train-init", parents = [train_init])
+    tasks.add_parser("train-run", parents = [train_run])
+    tasks.add_parser("train-finish", parents = [train_finish])
+    tasks.add_parser("train-run-round", parents = [train_run_round])
+
+    tasks.add_parser("identify-init", parents = [identify_init])
+    tasks.add_parser("identify-run", parents = [identify_run])
+    tasks.add_parser("identify-finish", parents = [identify_finish])
+
+    # posterior and identify take the same options
+    tasks.add_parser("posterior-init", parents = [identify_init])
+    tasks.add_parser("posterior-run", parents = [identify_run])
+    tasks.add_parser("posterior-finish", parents = [identify_finish])
+
+    tasks.add_parser("train",
         parents = [train_init, train_run, train_finish])
-    identify = tasks.add_parser("identify",
+    tasks.add_parser("identify",
         parents = [identify_init, identify_run, identify_finish])
-    posterior = tasks.add_parser("posterior",
+    tasks.add_parser("posterior",
         parents = [identify_init, identify_run, identify_finish])
-    identify_posterior = tasks.add_parser("identify+posterior", 
+    tasks.add_parser("identify+posterior", 
         parents = [identify_init, identify_run, identify_finish])
 
     options = parser.parse_args(argv)
