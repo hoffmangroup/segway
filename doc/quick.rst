@@ -5,6 +5,13 @@
 Installation and configuration
 ==============================
 
+With Bioconda
+-------------
+    conda install segway
+
+Generic installation
+----------------
+
 1. To install Segway first install `GMTK
    <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.4.tar.gz>`_,
    and install `HDF5 <http://www.hdfgroup.org/downloads/index.html>`_,.

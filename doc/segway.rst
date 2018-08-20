@@ -7,7 +7,16 @@
 Installation
 ============
 
-Segway requires the following prerequisites:
+With the Conda_ environment manager and the additional Bioconda_ channel,
+Segway can be installed with the command::
+
+    conda install segway
+
+.. _Conda: https://conda.io/docs/
+.. _Bioconda: https://bioconda.github.io/
+
+Alternatively without Bioconda, the following prerequisites must be
+installed for Segway:
 
 You need Python 2.7.
 
