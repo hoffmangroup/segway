@@ -3,7 +3,7 @@
 # Only use spaces to indent your .yml configuration.
 # -----
 # You can specify a custom docker image from Docker Hub as your build environment.
-image: mjmm13/segway-test-build:latest
+image: hoffmanlab/segway-test-build:latest
 
 pipelines:
   default:
