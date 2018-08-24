@@ -22,7 +22,6 @@ import re
 import colorbrewer
 from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
                     zeros)
-
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
 from pkg_resources import resource_filename, resource_string
