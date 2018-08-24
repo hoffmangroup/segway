@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, with_statement
 
-from six import string_types
 __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from six.moves.configparser import RawConfigParser
 from cStringIO import StringIO
+from six import string_types
+from six.moves.configparser import RawConfigParser
 import sys
 
 CONFIGPARSER_SECTION = "all"
