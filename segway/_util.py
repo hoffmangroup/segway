@@ -12,14 +12,14 @@ from gzip import open as _gzip_open
 from itertools import repeat
 from math import floor, log10
 from os import extsep
+import re
 from string import Template
 import sys
-import re
+
 
 import colorbrewer
 from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
                     zeros)
-
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
 from pkg_resources import resource_filename, resource_string

@@ -14,7 +14,6 @@ from tempfile import NamedTemporaryFile
 
 from optbuild import OptionBuilder_ShortOptWithSpace
 from six import viewitems
-# from path import path
 
 QCONF_PROG = OptionBuilder_ShortOptWithSpace("qconf")
 QSTAT_PROG = OptionBuilder_ShortOptWithSpace("qstat")
