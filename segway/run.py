@@ -268,7 +268,7 @@ TRAIN_FIELDNAMES = ["name", "value"]
 TRAIN_OPTION_TYPES = \
     dict(input_master_filename=str, structure_filename=str,
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
-         distribution=str, len_seg_strength=float, num_instances=int,
+         distribution=str, len_seg_strength=float,
          segtransition_weight_scale=float, ruler_scale=int, resolution=int,
          num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
          reverse_worlds=[int], num_mix_components=int)
@@ -1271,7 +1271,7 @@ class Runner(object):
         job_log_file = open(job_log_filename, "w")
 
         # Print job log header
-        print("\t".join(JOB_LOG_FIELDNAMES), file=job_log_file)
+        print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
         yield job_log_file
 
@@ -3294,7 +3294,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # landed
         Path(recover_filename).copy2(self.viterbi_filenames[window_index])
 
-        print("window %d already complete" % window_index, file=sys.stderr)
+        print("window", window_index, "already complete", file=sys.stderr)
 
         return True
 
@@ -3466,7 +3466,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         with open(cmdline_top_filename, "w") as cmdline_top_file:
             print(run_msg, file=cmdline_top_file)
             print(file=cmdline_top_file)
-            print("cd %s" % maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
+            print("cd", maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
             print(cmdline2text(), file=cmdline_top_file)
 
         return run_msg

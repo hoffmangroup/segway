@@ -124,7 +124,7 @@ def check_gmtk_version():
     current_version_string = first_output_line.split()[version_word_index]
 
     # Get the version number to compare with the minimum version
-    current_version = list(map(int, current_version_string.split(".")))
+    current_version = map(int, current_version_string.split("."))
     version_zip = zip(current_version, MINIMUM_GMTK_VERSION)
     for current_version_number, minimum_version_number in version_zip:
         # If the version number (from most to least significant digit) is

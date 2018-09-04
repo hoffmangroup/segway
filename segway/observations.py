@@ -509,7 +509,7 @@ def generate_coords_from_dict(coords_dict):
     # use a deque to allow fast insertion/removal at the 
     # beginning and end of the sequence
     for chrom, coords_list in viewitems(coords_dict):
-        starts, ends = list(map(deque, zip(*coords_list)))
+        starts, ends = map(deque, zip(*coords_list))
         yield chrom, starts, ends
 
 class Observations(object):
@@ -574,7 +574,7 @@ class Observations(object):
                 # Merge regions
                 merged_chromsome_windows = merge_windows(chromosome_windows)
                 # Convert start and end regions to deques
-                starts, ends = list(map(deque, zip(*merged_chromsome_windows)))
+                starts, ends = map(deque, zip(*merged_chromsome_windows))
                 # Yield the chromsome name and start/end region deques
                 yield chromosome_name, starts, ends
 
