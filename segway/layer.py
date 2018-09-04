@@ -266,7 +266,7 @@ class Segmentation(defaultdict):
                 #     print temp_file.name
                 with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB) as sizes_file:
                     for chrom, end in viewitems(ends):
-                        print("\t".join([chrom, str(end)]), file=sizes_file)
+                        print(chrom, str(end), sep="\t", file=sizes_file)
 
                     sizes_file.flush()
                     BEDTOBIGBED_PROG(bigbed_infilename, sizes_file.name, bigbed_outfilename)
@@ -280,7 +280,7 @@ class Segmentation(defaultdict):
             final_outfile = outfile._items[0]
         except AttributeError:
             final_outfile = outfile
-        print(" ".join(self.trackline).rstrip(), file=final_outfile)
+        print(*self.trackline.rstrip(), file=final_outfile)
 
     def write(self, outfile):
         ends = {}
@@ -343,7 +343,7 @@ class Segmentation(defaultdict):
                            BED_STRAND, str(start), str(end), color, block_count,
                            block_sizes_str, block_starts_str]
 
-                    print("\t".join(row), file=outfile)
+                    print(*row, sep="\t", file=outfile)
 
         return ends
 

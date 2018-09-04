@@ -53,7 +53,7 @@ GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
 
 def make_track_indexes(text):
-    return array(list(map(int, text.split(","))))
+    return array(map(int, text.split(",")))
 
 
 def divide_posterior_array(posterior_code, num_frames, num_sublabels):
@@ -177,7 +177,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
         row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
                chrom_start, chrom_end, item_rgb][:num_cols]
 
-        print("\t".join(row), file=outfile)
+        print(*row, sep="\t", file=outfile)
 
     # assert that the whole region is mapped
     # seg_end here means the last seg_end in the loop
@@ -245,7 +245,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
                 value = str(probs_rounded_label[bed_start - start])
 
                 row = [chrom, chrom_start, chrom_end, value]
-                print("\t".join(row), file=outfile)
+                print(*row, sep="\t", file=outfile)
 
 
 def load_posterior_save_bed(coord, resolution, do_reverse,
@@ -421,7 +421,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
 
     # Create and save the train window
     genomedata_names = genomedata_names.split(",")
-    track_indexes = list(map(int, track_indexes.split(",")))
+    track_indexes = map(int, track_indexes.split(","))
 
     (chrom, start, end) = coord
 
@@ -531,7 +531,7 @@ def save_gmtk_observation_files(coord, resolution, do_reverse, outfile_name,
     (chrom, start, end) = coord
 
     genomedata_names = genomedata_names.split(",")
-    track_indexes = list(map(int, track_indexes.split(",")))
+    track_indexes = map(int, track_indexes.split(","))
 
     float_filepath = Path(float_filename)
     int_filepath = Path(int_filename)

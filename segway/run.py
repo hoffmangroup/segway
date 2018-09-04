@@ -1323,7 +1323,7 @@ class Runner(object):
         job_log_file = open(job_log_filename, "w")
 
         # Print job log header
-        print("\t".join(JOB_LOG_FIELDNAMES), file=job_log_file)
+        print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
         yield job_log_file
 
@@ -3418,7 +3418,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # landed
         Path(recover_filename).copy2(self.viterbi_filenames[window_index])
 
-        print("window %d already complete" % window_index, file=sys.stderr)
+        print("window", window_index, "already complete", file=sys.stderr)
 
         return True
 
@@ -3590,7 +3590,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         with open(cmdline_top_filename, "a") as cmdline_top_file:
             print(run_msg, file=cmdline_top_file)
             print(file=cmdline_top_file)
-            print("cd %s" % maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
+            print("cd", maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
             print(cmdline2text(), file=cmdline_top_file)
 
         return run_msg

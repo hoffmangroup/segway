@@ -280,7 +280,7 @@ class RestartableJobDict(dict):
         row = [jobid, jobname, prog, str(num_segs), str(num_frames),
                maxvmem, cpu, str(exit_status)]
 
-        print(*row, file=self.job_log_file, sep = "\t")
+        print(*row, sep="\t", file=self.job_log_file)
         self.job_log_file.flush()  # allow reading file now
 
         if exit_status == 0:

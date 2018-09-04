@@ -27,12 +27,14 @@ from path import Path
 from pkg_resources import resource_filename, resource_string
 from tables import Filters, NoSuchNodeError, open_file
 
+from . import __package__
+
 # XXX: check that these are all in use
 
 # these are loaded by other modules indirectly
 # ignore PyFlakes warnings here
 
-PKG_DATA = ".".join(["segway", "data"])
+PKG_DATA = ".".join([__package__, "data"])
 
 SEGWAY_ENCODING = "ascii"
 
@@ -231,7 +233,7 @@ def constant(val):
     """
     constant values for defaultdict
     """
-    return partial(next , repeat(val))
+    return partial(next, repeat(val))
 
 array_factory = constant(array([]))
 
