@@ -7,11 +7,6 @@ from __future__ import absolute_import, division, print_function
 __version__ = "$Revision$"
 
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
-try:
-    from cStringIO import StringIO
-except ImportError:
-    #"StringIO" has been moved into package io in Python 3
-    from io import StringIO
 from collections import deque
 from contextlib import closing
 from functools import partial
@@ -26,7 +21,7 @@ from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, invert, isnan, maximum, zeros)
 from path import Path
 from six import viewitems
-from six.moves import map, range, zip
+from six.moves import map, range, StringIO, zip
 from tabdelim import ListWriter
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,

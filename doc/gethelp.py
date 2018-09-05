@@ -8,9 +8,9 @@ __version__ = "$Revision$"
 
 ## Copyright 2011 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from cStringIO import StringIO
 import sys
 
+from six.moves import StringIO
 from six.moves.configparser import RawConfigParser
 
 sys.path.insert(0, "..")
