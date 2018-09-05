@@ -158,7 +158,7 @@ def update_trackline(trackline, updates):
         trackline = TRACKLINE_DEFAULT[:]
 
     for word_index, word in enumerate(trackline):
-        if word.strip() == "visibility=dense":
+        if word == "visibility=dense":
             trackline[word_index] = "visibility=full"
 
     for key, value in viewitems(updates):
@@ -280,7 +280,7 @@ class Segmentation(defaultdict):
             final_outfile = outfile._items[0]
         except AttributeError:
             final_outfile = outfile
-        print(" ".join(self.trackline).rstrip(), file=final_outfile)
+        print(" ".join(self.trackline), file=final_outfile)
 
     def write(self, outfile):
         ends = {}

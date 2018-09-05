@@ -93,8 +93,8 @@ def make_spec(name, iterable):
 
     all_lines = header_lines + indexed_items
 
-    # In Python 2 converts to bytes from unicode to prevent __str__method
-    # from being called twice
+    # In Python 2, convert from unicode to bytes to prevent 
+    # __str__method from being called twice
     if sys.version[0] == "2":
         all_lines = [line.encode(SEGWAY_ENCODING) for line in all_lines]
 
