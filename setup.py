@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-from __future__ import absolute_import
-
 """segway: a way to segment the genome
 
 Segway is a tool for easy pattern discovery and identification in
@@ -8,6 +6,8 @@ functional genomics data.
 """
 
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+
+from __future__ import absolute_import
 
 import sys
 import subprocess
