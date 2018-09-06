@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
+from __future__ import division, print_function, with_statement
 
 """
 task: wraps a GMTK subtask to reduce size of output
@@ -214,7 +214,7 @@ def handle_multiple_exceptions(exception_list):
         # Print out all exceptions and raise the first
         first_exception = exception_list.pop(0)
         for exception in exception_list:
-            print >>sys.stderr, exception
+            print(exception, file=sys.stderr)
         raise first_exception
 
 
