@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
+from __future__ import absolute_import, division, print_function, with_statement
 
 """winner.py: pick winning paramters when training run is cut short
 """
@@ -13,7 +13,7 @@ from os import extsep
 from re import compile as re_compile, escape
 import sys
 
-from path import path
+from path import Path
 
 from ._util import (extjoin, EXT_MASTER, EXT_PARAMS, EXT_TAB, PREFIX_INPUT,
                     PREFIX_LIKELIHOOD, PREFIX_PARAMS, SUBDIRNAME_LOG,
@@ -74,7 +74,7 @@ def print_and_copy(flag, getter, dirpath, instance, final_basename, copy,
                    clobber):
     if flag:
         srcpath = getter(dirpath, instance)
-        print srcpath
+        print(srcpath)
 
         dstpath = dirpath / final_basename
 
@@ -83,7 +83,7 @@ def print_and_copy(flag, getter, dirpath, instance, final_basename, copy,
 
 
 def winner(dirname, params=True, input_master=True, copy=False, clobber=False):
-    dirpath = path(dirname)
+    dirpath = Path(dirname)
     winning_instance = get_winning_instance(dirpath)
 
     params_dirpath = dirpath / SUBDIRNAME_PARAMS

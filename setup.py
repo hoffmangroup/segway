@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import absolute_import
 
 """segway: a way to segment the genome
 
@@ -6,18 +7,18 @@ Segway is a tool for easy pattern discovery and identification in
 functional genomics data.
 """
 
-from segway import __version__
-
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 import sys
 import subprocess
 
-# required for OrderedDict
-assert (2, 6) <= sys.version_info <= (3, 0)
+from segway import __version__
+from six.moves import map, zip
 
-from ez_setup import use_setuptools
-use_setuptools()
+if (sys.version_info[0] == 2 and sys.version_info[1] < 7) or \
+   (sys.version_info[0] == 3 and sys.version_info[1] < 4):
+    print("Segway requires Python version 2.7 or 3.4 or later")
+    sys.exit(1)
 
 from setuptools import find_packages, setup
 
@@ -42,7 +43,8 @@ classifiers = ["Natural Language :: English",
                "Topic :: Scientific/Engineering :: Bio-Informatics",
                "Operating System :: Unix",
                "Programming Language :: Python",
-               "Programming Language :: Python :: 2.7"]
+               "Programming Language :: Python :: 2.7",
+               "Programming Language :: Python :: 3"]
 
 entry_points = """
 [console_scripts]
@@ -59,7 +61,7 @@ segway-winner = segway.winner:main
 # genomedata>1.3.1 for Chromosome.__getitem__[..., array] support
 
 install_requires = ["genomedata>1.3.1", "textinput", "optbuild>0.1.10",
-                    "optplus>0.1.0", "tables>2.0.4", "numpy", "forked-path",
+                    "optplus>0.1.0", "tables>2.0.4", "numpy", "path.py>=11",
                     "colorbrewer", "drmaa>=0.4a3"]
 
 
@@ -116,7 +118,7 @@ def check_gmtk_version():
         version_word_index = -1
 
     # Get the first line of output
-    first_output_line = output_lines[0]
+    first_output_line = output_lines[0].decode()
 
     # Get the version string from the proper word on the line
     current_version_string = first_output_line.split()[version_word_index]

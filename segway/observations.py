@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 
 """observations.py: prepare and save GMTK observations
 """
@@ -7,12 +7,10 @@ from __future__ import division
 __version__ = "$Revision$"
 
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
-
-from cStringIO import StringIO
 from collections import deque
 from contextlib import closing
 from functools import partial
-from itertools import izip, repeat
+from itertools import repeat
 from operator import itemgetter
 from os import extsep
 import sys
@@ -21,8 +19,9 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, invert, isnan, maximum, zeros)
-
-from path import path
+from path import Path
+from six import viewitems
+from six.moves import map, range, StringIO, zip
 from tabdelim import ListWriter
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
@@ -117,7 +116,7 @@ def intersect_regions(start, end, coords, data=repeat(NoData)):
     # F             ---------
     res = []
 
-    for (include_start, include_end), datum in izip(coords, data):
+    for (include_start, include_end), datum in zip(coords, data):
         if start > include_end or end <= include_start:
             # cases A, B
             continue
@@ -236,11 +235,11 @@ def downsample_add(inarray, resolution):
         remainder = resolution
 
     # loop 0: every index up to remainder
-    for index in xrange(remainder):
+    for index in range(remainder):
         res += inarray[index::resolution]
 
     # loop 1: remainder
-    for index in xrange(remainder, resolution):
+    for index in range(remainder, resolution):
         # don't include the last element of res
         res[:-1] += inarray[index::resolution]
 
@@ -281,7 +280,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
     # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
     resolution_partitioned_input_array = (
             input_array[index:index+resolution]
-            for index in xrange(0, len(input_array), resolution)
+            for index in range(0, len(input_array), resolution)
             )
 
     downsampled_input_array = zeros(calc_downsampled_shape(input_array,
@@ -504,7 +503,7 @@ def add_starts_ends(new_windows, starts, ends):
 def generate_coords_from_dict(coords_dict):
     # use a deque to allow fast insertion/removal at the 
     # beginning and end of the sequence
-    for chrom, coords_list in coords_dict.iteritems():
+    for chrom, coords_list in viewitems(coords_dict):
         starts, ends = map(deque, zip(*coords_list))
         yield chrom, starts, ends
 
@@ -596,7 +595,7 @@ class Observations(object):
         num_frames = ceildiv(num_bases_window, self.resolution)
         if not MIN_FRAMES <= num_frames:
             text = " skipping short sequence of length %d" % num_frames
-            print >>sys.stderr, text
+            print(text, file=sys.stderr)
             return []
 
         if num_frames > max_frames:
@@ -613,7 +612,7 @@ class Observations(object):
             new_starts = start + new_offsets
             new_ends = append(new_starts[1:], end)
 
-            return zip(new_starts, new_ends)
+            return list(zip(new_starts, new_ends))
 
         return [[start, end]]
 
@@ -673,7 +672,7 @@ class Observations(object):
                                             starts,
                                             ends)
                     if split_start:
-                        for world in xrange(self.num_worlds):
+                        for world in range(self.num_worlds):
                             validation_windows.append(Window(
                                 world, chrom, split_start, split_end)
                                 )
@@ -713,7 +712,7 @@ class Observations(object):
                 if start is None:
                     continue
 
-                for world in xrange(self.num_worlds):
+                for world in range(self.num_worlds):
                     windows.append(Window(world, chrom, start, end))
 
         if self.validation_fraction:
@@ -756,7 +755,7 @@ class Observations(object):
 
         if temp:
             prefix = "".join([prefix, self.uuid, extsep])
-            dirpath = path(gettempdir())
+            dirpath = Path(gettempdir())
         else:
             dirpath = self.obs_dirpath
 
@@ -766,8 +765,8 @@ class Observations(object):
 
     def print_filepaths(self, float_filelist, int_filelist, *args, **kwargs):
         float_filepath, int_filepath = self.make_filepaths(*args, **kwargs)
-        print >>float_filelist, float_filepath
-        print >>int_filelist, int_filepath
+        print(float_filepath, file=float_filelist)
+        print(int_filepath, file=int_filelist)
 
         self.float_filepaths.append(float_filepath)
         self.int_filepaths.append(int_filepath)
@@ -821,7 +820,7 @@ class Observations(object):
             row = [float_filepath, str(window_index), chrom, str(start),
                    str(end)]
             float_tabwriter.writerow(row)
-            print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
+            print(" %s (%d, %d)" % (float_filepath, start, end), file=sys.stderr)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
