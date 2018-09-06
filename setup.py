@@ -13,7 +13,6 @@ import sys
 import subprocess
 
 from segway import __version__
-from six.moves import map, zip
 
 if (sys.version_info[0] == 2 and sys.version_info[1] < 7) or \
    (sys.version_info[0] == 3 and sys.version_info[1] < 4):
@@ -62,7 +61,7 @@ segway-winner = segway.winner:main
 
 install_requires = ["genomedata>1.3.1", "textinput", "optbuild>0.1.10",
                     "optplus>0.1.0", "tables>2.0.4", "numpy", "path.py>=11",
-                    "colorbrewer", "drmaa>=0.4a3"]
+                    "colorbrewer", "drmaa>=0.4a3", "six"]
 
 
 def hg_id(mgr, kind):
