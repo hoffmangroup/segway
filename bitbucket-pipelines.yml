@@ -15,6 +15,7 @@ pipelines:
             script:
               - python -m pip install .
               - python --version
+              - pip list
               - gmtkPrint -version 
               - cd test && ./test_all.sh
         - step:
@@ -25,5 +26,6 @@ pipelines:
               - alias python="python3"
               - python -m pip install .
               - python --version
+              - pip list
               - gmtkPrint -version
               - cd test && ./test_all.sh
