@@ -63,7 +63,7 @@ segway-winner = segway.winner:main
 install_requires = ["genomedata>=1.4.2", "autolog>=0.2.0",
                     "textinput>=0.2.0", "optbuild>=0.2.0",
                     "optplus>=0.2.0", "tables>2.0.4", "numpy", "path.py>=11",
-                    "colorbrewer", "drmaa>=0.4a3", "six"]
+                    "colorbrewer>=0.2.0", "drmaa>=0.4a3", "six"]
 
 
 def hg_id(mgr, kind):
