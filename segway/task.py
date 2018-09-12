@@ -309,19 +309,26 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
     (chrom, start, end) = coord
-    track_indexes = make_track_indexes(track_indexes_text)
 
     float_filepath = TEMP_DIRPATH / float_filename
     int_filepath = TEMP_DIRPATH / int_filename
+
     temp_filepaths = [float_filepath, int_filepath]
 
     # XXX: should do something to ensure of1 matches with int, of2 with float
+    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
     float_filelistfd = replace_args_filelistname(args, temp_filepaths,
                                                  EXT_FLOAT)
-    int_filelistfd = replace_args_filelistname(args, temp_filepaths, EXT_INT)
 
-    with Genome(genomedata_names) as genome:
-        continuous_cells = genome[chrom][start:end, track_indexes]
+    # Create a list of a list of tracks ordered based on genomedata archive
+    # specified order (delimited with a ';')
+    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
+                     for genomedata_track_indexes_text
+                     in track_indexes_text.split(';')]
+    genomedata_names = genomedata_names.split(",")
+
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
 
     try:
         print_to_fd(float_filelistfd, float_filename)
@@ -330,9 +337,8 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
         _save_window(float_filename, int_filename, continuous_cells,
                      resolution, distribution)
 
-        # XXXopt: does this actually free the memory? or do we need to
-        # use a subprocess to do the loading?
-
+        # XXXopt: does this work? or do we need to use a subprocess to
+        # do the loading?
         # remove from memory
         del continuous_cells
 
@@ -346,7 +352,8 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                 if err.errno == ENOENT:
                     pass
 
-    lines = output.splitlines()
+    lines = [line.decode(SEGWAY_ENCODING) for line in output.splitlines()]
+
     return read_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                    int(num_labels), lines,
                                    num_sublabels, output_label)
