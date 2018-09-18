@@ -95,6 +95,14 @@ def make_spec(name, iterable):
 
     # In Python 2, convert from unicode to bytes to prevent 
     # __str__method from being called twice
+    # Specifically in the string template standard library provided by Python
+    # 2, there is a call to a string escape sequence + tuple, e.g.:
+    # print(“%s” % (some_string,))
+    # This "some_string" has its own __str__ method called *twice* if if it is
+    # a unicode string in Python 2. Python 3 does not have this issue. This
+    # causes downstream issues since strings are generated often in our case
+    # for random numbers. Calling __str__ twice will often cause re-iterating
+    # the RNG which makes for inconsitent results between Python versions.
     if sys.version[0] == "2":
         all_lines = [line.encode(SEGWAY_ENCODING) for line in all_lines]
 
