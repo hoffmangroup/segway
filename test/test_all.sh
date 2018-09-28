@@ -23,7 +23,7 @@ TEST_ROOT="$(pwd)"
 rm */*-changes.tar.gz || true
 
 # Use a non-default system python if set
-PYTHON_PROG=python${SEGWAY_PYTHON_TEST_VERSION:-""}
+PYTHON_PROG=python${SEGWAY_TEST_PYTHON_VERSION:-""}
 
 # Run unit tests
 $PYTHON_PROG unit_tests.py
