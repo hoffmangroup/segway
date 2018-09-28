@@ -36,4 +36,4 @@ segway "$cluster_arg" --include-coords="../include-coords.bed" \
 
 cd ..
 
-python${SEGWAY_TEST_PYTHON_VERSION} ../compare_directory.py ../simpleresolution/touchstone ../simpleresolution/${testdir#"./"}
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../compare_directory.py ../simpleresolution/touchstone ../simpleresolution/${testdir#"./"}

@@ -27,4 +27,4 @@ set -x
 cp -r ../traindir/ traindir/
 segway-winner traindir/
 
-python${SEGWAY_TEST_PYTHON_VERSION} ../../compare_directory.py ../touchstone .
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../../compare_directory.py ../touchstone .

@@ -19,7 +19,7 @@ if type -P bedToBigBed >/dev/null; then
         < ../segway.bed > segway.layered.bed
     cd ..
 
-    python${SEGWAY_TEST_PYTHON_VERSION} ../compare_directory.py ../segway_layer_bigbed/touchstone \
+    python${SEGWAY_TEST_PYTHON_VERSION:-""} ../compare_directory.py ../segway_layer_bigbed/touchstone \
         ../segway_layer_bigbed/${testdir#"./"}
 
 else

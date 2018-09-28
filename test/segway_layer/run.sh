@@ -17,4 +17,4 @@ segway-layer -m ../mnemonics < ../segway.bed > segway.layered.bed
 
 cd ..
 
-python${SEGWAY_TEST_PYTHON_VERSION} ../compare_directory.py ../segway_layer/touchstone ../segway_layer/${testdir#"./"}
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../compare_directory.py ../segway_layer/touchstone ../segway_layer/${testdir#"./"}

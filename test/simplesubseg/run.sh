@@ -36,6 +36,6 @@ segway "$cluster_arg" --include-coords="../include-coords.bed" --output-label="s
     identify+posterior "../simplesubseg.genomedata" traindir identifydir-seg
 cd ..
 
-python${SEGWAY_TEST_PYTHON_VERSION} ../compare_directory.py \
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../compare_directory.py \
                         ../simplesubseg/touchstone \
                         ../simplesubseg/${testdir#"./"}
