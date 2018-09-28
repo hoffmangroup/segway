@@ -22,8 +22,11 @@ TEST_ROOT="$(pwd)"
 # Clear existing archives created by previous failures
 rm */*-changes.tar.gz || true
 
+# Use a non-default system python if set
+PYTHON_PROG=python${SEGWAY_PYTHON_TEST_VERSION:-""}
+
 # Run unit tests
-python unit_tests.py
+$PYTHON_PROG unit_tests.py
 
 exit_status=0
 # Avoid creating a new subshell to get an error exit status by putting the
