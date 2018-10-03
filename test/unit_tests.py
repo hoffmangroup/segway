@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 from os import remove
 from os.path import isfile, sep
 from tempfile import gettempdir

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division
 
 """input_master.py: write input master files
 """
@@ -10,15 +10,17 @@ __version__ = "$Revision$"
 
 from math import frexp, ldexp
 from string import Template
+import sys
 
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
                    vectorize, where, zeros)
+from six.moves import map, range
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
                     OFFSET_END, OFFSET_START, OFFSET_STEP,
-                    resource_substitute, Saver,
+                    resource_substitute, Saver, SEGWAY_ENCODING,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED, USE_MFSDG)
@@ -91,6 +93,19 @@ def make_spec(name, iterable):
 
     all_lines = header_lines + indexed_items
 
+    # In Python 2, convert from unicode to bytes to prevent 
+    # __str__method from being called twice
+    # Specifically in the string template standard library provided by Python
+    # 2, there is a call to a string escape sequence + tuple, e.g.:
+    # print(“%s” % (some_string,))
+    # This "some_string" has its own __str__ method called *twice* if if it is
+    # a unicode string in Python 2. Python 3 does not have this issue. This
+    # causes downstream issues since strings are generated often in our case
+    # for random numbers. Calling __str__ twice will often cause re-iterating
+    # the RNG which makes for inconsitent results between Python versions.
+    if sys.version[0] == "2":
+        all_lines = [line.encode(SEGWAY_ENCODING) for line in all_lines]
+
     return "\n".join(all_lines) + "\n"
 
 
@@ -112,7 +127,7 @@ def make_zero_diagonal_table(length):
     res = fill_array(prob_self_other, (length, length))
 
     # set diagonal
-    range_cpt = xrange(length)
+    range_cpt = range(length)
     res[range_cpt, range_cpt] = prob_self_self
 
     return res
@@ -120,7 +135,7 @@ def make_zero_diagonal_table(length):
 
 def format_indexed_strs(fmt, num):
     full_fmt = fmt + "%d"
-    return [full_fmt % index for index in xrange(num)]
+    return [full_fmt % index for index in range(num)]
 
 
 def jitter_cell(cell, random_state):
@@ -260,7 +275,7 @@ class DTParamSpec(ParamSpec):
         seg_countdowns_initial = self.seg_countdowns_initial
 
         header = ([str(num_segs)] +
-                  [str(num_seg) for num_seg in xrange(num_segs - 1)] +
+                  [str(num_seg) for num_seg in range(num_segs - 1)] +
                   ["default"])
 
         lines = [" ".join(header)]
@@ -449,7 +464,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
     def make_dense_cpt_seg_dinucleotide_spec(self):
         table = [self.make_dinucleotide_table_row()
-                 for seg_index in xrange(self.num_segs)]
+                 for seg_index in range(self.num_segs)]
 
         return self.make_table_spec("seg_dinucleotide", table)
 
@@ -533,10 +548,10 @@ class NameCollectionParamSpec(ParamSpec):
                            fullnum_subsegs=fullnum_subsegs)
 
             rows = [substitute_header(mapping)]
-            for seg_index in xrange(num_segs):
+            for seg_index in range(num_segs):
                 seg = "seg%d" % seg_index
 
-                for subseg_index in xrange(num_subsegs):
+                for subseg_index in range(num_subsegs):
                     subseg = "subseg%d" % subseg_index
                     mapping = dict(seg=seg, subseg=subseg,
                                    track=head_trackname)
@@ -706,7 +721,7 @@ class NormMCParamSpec(MCParamSpec):
         with names
         """
         substitute = Template(self.object_tmpl).substitute
-        for component in xrange(self.num_mix_components):
+        for component in range(self.num_mix_components):
             for mapping in self.generate_tmpl_mappings():
                 track_index = mapping["track_index"]
                 if self.distribution == DISTRIBUTION_GAMMA:
@@ -733,7 +748,7 @@ class MXParamSpec(ParamSpec):
         with names
         """
         object_tmpl = "1 mx_${seg}_${subseg}_${track} ${num_mix_components} dpmf_${seg}_${subseg}_${track}"
-        for component in xrange(self.num_mix_components):
+        for component in range(self.num_mix_components):
             add = " mc_${distribution}_${seg}_${subseg}_${track}%s" % (
                 self.get_template_component_suffix(component))
             object_tmpl += add

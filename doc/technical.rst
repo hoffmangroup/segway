@@ -12,10 +12,10 @@ its tasks, and it does this in the directory specified by the required
 *workdir* argument. When running training *workdir* is *TRAINDIR*;
 when running identification *workdir* is *IDENTIFYDIR*.
 
-The observation files can be quite large, taking up 8 bytes per track
-per position and cannot be compressed. As a result they are written out to a
-temporary directory on an as-needed basis. This is because otherwise they could take terabytes for
-identifying on the whole human genome with dozens of tracks.
+The observation files can be quite large, taking up 8 bytes per track per
+position and cannot be compressed. As a result they are written out to a
+temporary directory on an as-needed basis. This is because otherwise they could
+take terabytes for identifying on the whole human genome with dozens of tracks.
 
 You will find a full description of all the working files in the
 :ref:`workdir-files` section.
@@ -28,7 +28,10 @@ function, which searches for an appropriate directory as described in
 the documentation for `tempfile.tempdir`
 <https://docs.python.org/2/library/tempfile.html#tempfile.tempdir>. If
 you need to specify that temporary files go into a particular
-directory, set the `TMPDIR` environment variable.
+directory, set the `TMPDIR` environment variable. It is highly recommended that
+you ensure that you temporary directory does not reside on a slow storage
+medium such as a NFS filesystem. Since many temporary files are created and
+deleted this can significantly impact performance.
 
 Distributed computing
 =====================

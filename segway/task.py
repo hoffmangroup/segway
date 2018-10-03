@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division, print_function, with_statement
+from __future__ import absolute_import, division, print_function, with_statement
 
 """
 task: wraps a GMTK subtask to reduce size of output
@@ -19,6 +19,7 @@ from tempfile import mkstemp
 from genomedata import Genome
 from numpy import argmax, array, empty, where, diff, r_, zeros
 import optbuild
+from six.moves import map, range, zip
 
 from .observations import (make_continuous_cells, make_supervision_cells,
                            _save_window)
@@ -26,7 +27,7 @@ from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
                     EXT_INT, EXT_LIST, extract_superlabel, fill_array,
                     find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    VALIDATE_PROG, VITERBI_PROG)
+                    SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -219,7 +220,7 @@ def handle_multiple_exceptions(exception_list):
 
 
 def make_track_indexes(text):
-    return array(map(int, text.split(",")))
+    return array(text.split(","), int)
 
 
 def divide_posterior_array(posterior_code, num_frames, num_sublabels):
@@ -232,7 +233,7 @@ def divide_posterior_array(posterior_code, num_frames, num_sublabels):
     as during the viterbi task.
     """
     res = zeros((2, num_frames), DTYPE_IDENTIFY)
-    for frame_index in xrange(num_frames):
+    for frame_index in range(num_frames):
         total_label = posterior_code[frame_index]
         label, sublabel = divmod(total_label, num_sublabels)
         res[:, frame_index] = array([label, sublabel])
@@ -246,13 +247,13 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     lines = iter(lines)
 
     # Segment 0, after Island[...]
-    assert lines.next().startswith("Segment ")
+    assert next(lines).startswith("Segment ")
 
     # ========
-    assert lines.next().startswith("========")
+    assert next(lines).startswith("========")
 
     # Segment 0, number of frames = 1001, viteri-score = -6998.363710
-    line = lines.next()
+    line = next(lines)
     assert line.startswith("Segment ")
 
     num_frames_text = line.split(", ")[1].partition(" = ")
@@ -262,7 +263,7 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     num_frames = int(num_frames_text[2])
 
     # Printing random variables from (P,C,E)=(1,999,0) partitions
-    line = lines.next()
+    line = next(lines)
     assert line.startswith("Printing random variables from")
     seg_dict = {'seg': 0, 'subseg': 1}
     # if output_label == "subseg" or "full", need to catch
@@ -343,7 +344,7 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
         row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
                chrom_start, chrom_end, item_rgb][:num_cols]
 
-        print >>outfile, "\t".join(row)
+        print(*row, sep="\t", file=outfile)
 
     # assert that the whole region is mapped
     # seg_end here means the last seg_end in the loop
@@ -377,14 +378,14 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     save_bed(bed_filename, start_pos, labels, coord, resolution,
              int(num_labels))
     if output_label == "subseg":
-        label_print_range = xrange(num_labels * num_sublabels)
+        label_print_range = range(num_labels * num_sublabels)
         label_names = label_print_range
     elif output_label == "full":
-        label_print_range = xrange(num_labels * num_sublabels)
+        label_print_range = range(num_labels * num_sublabels)
         label_names = ("%d.%d" % divmod(label, num_sublabels)
                        for label in label_print_range)
     else:
-        label_print_range = xrange(num_labels)
+        label_print_range = range(num_labels)
         label_names = label_print_range
 
     # Write label-wise posterior bedgraph files
@@ -411,7 +412,7 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
                 value = str(probs_rounded_label[bed_start - start])
 
                 row = [chrom, chrom_start, chrom_end, value]
-                print >>outfile, "\t".join(row)
+                print(*row, sep="\t", file=outfile)
 
 
 def load_posterior_save_bed(coord, resolution, do_reverse,
@@ -445,7 +446,7 @@ def load_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
 def print_to_fd(fd, line):
     with fdopen(fd, "w") as outfile:
-        print >>outfile, line
+        print(line, file=outfile)
 
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
@@ -607,7 +608,7 @@ def run_validate(coord, resolution, do_reverse, outfilename, *args):
                                   "reverse world options simultaneously is "
                                   "currently not supported")
 
-    validation_output = VALIDATE_PROG.getoutput(*args)
+    validation_output = VALIDATE_PROG.getoutput(*args).decode(SEGWAY_ENCODING)
     with open(outfilename, "w") as outfile:
         outfile.write(validation_output)
 
@@ -636,7 +637,7 @@ def task(verb, kind, outfilename, chrom, start, end, resolution,
 
 def main(args=sys.argv[1:]):
     if len(args) < 7:
-        print >>sys.stderr, USAGE
+        print(USAGE, file=sys.stderr)
         sys.exit(2)
 
     # Try running the task
