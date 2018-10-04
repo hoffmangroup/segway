@@ -200,7 +200,7 @@ def force_remove_file(filename):
     try:
         remove(filename)
     # Ignore exceptions where the file does not exist
-    except OSError, err:
+    except OSError as err:
         # If a different exception was found
         if err.errno != ENOENT:
             # Reraise
@@ -512,7 +512,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     with files_to_remove(temp_filenames):
         output = VITERBI_PROG.getoutput(*args)
 
-    lines = output.splitlines()
+    lines = [line.decode(SEGWAY_ENCODING) for line in output.splitlines()]
 
     return parse_viterbi_save_bed(coord, resolution, do_reverse,
                                   lines, outfilename, num_labels, output_label)
