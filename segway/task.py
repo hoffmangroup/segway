@@ -79,9 +79,10 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
 
             # numpy's tofile (which is used) can take an open python file
             # object
+            # XXX: Currently seq_data is disabled until dinucleotide is enabled
             _save_window(float_observations_file, int_observations_file,
                          continuous_cells, resolution, distribution,
-                         supervision_data)
+                         seq_data=None, supervision_data=supervision_data)
 
     return float_observations_filename, int_observations_filename
 
