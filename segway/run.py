@@ -2066,12 +2066,8 @@ class Runner(object):
 
         # XXX: does this need to be done before save()?
         self.subset_metadata()
-        observations.create_filepaths(temp=True)
+
         observations.create_validation_filepaths()
-
-        self.float_filepaths = observations.float_filepaths
-        self.int_filepaths = observations.int_filepaths
-
         self.validation_float_filepaths = \
             observations.validation_float_filepaths
         self.validation_int_filepaths = \
@@ -2335,9 +2331,6 @@ class Runner(object):
             track_indexes_text = ",".join(map(str, track_indexes))
             genomedata_names_text = ",".join(genomedata_names)
 
-            float_filepath = self.float_filepaths[window_index]
-            int_filepath = self.int_filepaths[window_index]
-
             is_semisupervised = (self.supervision_type ==
                                  SUPERVISION_SEMISUPERVISED)
 
@@ -2350,8 +2343,6 @@ class Runner(object):
 
             additional_prefix_args = [
                genomedata_names_text,
-               float_filepath,
-               int_filepath,
                self.distribution,
                track_indexes_text,
                is_semisupervised,
@@ -3315,8 +3306,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         is_reverse = str(int(self.is_in_reversed_world(window_index)))
 
         window = self.windows[window_index]
-        float_filepath = self.float_filepaths[window_index]
-        int_filepath = self.int_filepaths[window_index]
 
         # The track indexes should be semi-colon separated for each genomedata
         # archive
@@ -3350,7 +3339,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
-                       genomedata_archives_text, float_filepath, int_filepath,
+                       genomedata_archives_text,
                        self.distribution, track_indexes_text, self.num_mix_components]
 
         output_filename = None

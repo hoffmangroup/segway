@@ -419,7 +419,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
     return continuous_cells
 
 
-def _save_window(float_filename, int_filename, float_data, resolution,
+def _save_window(float_filename_or_file, int_filename_or_file, float_data, resolution,
                  distribution, seq_data=None, supervision_data=None):
     # called by task.py as well as observation.py
 
@@ -457,7 +457,7 @@ def _save_window(float_filename, int_filename, float_data, resolution,
             float_data = downsample_add(float_data, resolution)
             float_data /= num_datapoints_min_1
 
-        float_data.tofile(float_filename)
+        float_data.tofile(float_filename_or_file)
 
     if seq_data is not None:
         assert resolution == 1  # not implemented yet
@@ -475,7 +475,7 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     else:
         int_data = array([], dtype=DTYPE_OBS_INT)
 
-    int_data.tofile(int_filename)
+    int_data.tofile(int_filename_or_file)
 
 
 def add_starts_ends(new_windows, starts, ends):
