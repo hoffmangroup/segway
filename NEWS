@@ -1,3 +1,5 @@
+2.0.4:
+
 2.0.3:
 * segway: fix fatal TypeError during --dry-run
 * segway: fix temporary file creation of observations for multiple instances
