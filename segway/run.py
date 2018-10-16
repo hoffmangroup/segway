@@ -3708,9 +3708,6 @@ def parse_options(argv):
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
 
-    # Positional arguments
-    parser.add_argument("args", nargs="*")  # "" for at least 1 arg
-
     tasks = parser.add_subparsers(help="Segway Tasks", dest = "command")
 
     # define steps for each of the three main tasks
@@ -3920,6 +3917,9 @@ def parse_options(argv):
         parents = [identify_init, identify_run, identify_finish])
     tasks.add_parser("identify+posterior", 
         parents = [identify_init, identify_run, identify_finish])
+
+    # Positional arguments
+    parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
 
     options = parser.parse_args(argv)
 
