@@ -25,15 +25,18 @@ fi
 set -x
 
 SEGWAY_RAND_SEED=2498730688 segway "$cluster_arg" \
-    "../simplesubseg.genomedata" traindir train \
-    --include-coords="../include-coords.bed" --num-labels=2 --num-sublabels=2\
-    --tracks-from="../tracks.txt" --semisupervised="../supervision.txt"
+    train --include-coords="../include-coords.bed" \
+    --num-labels=2 --num-sublabels=2\
+    --tracks-from="../tracks.txt" --semisupervised="../supervision.txt" \
+    "../simplesubseg.genomedata" traindir
 
-segway "$cluster_arg" "../simplesubseg.genomedata" traindir identifydir-full \
-    identify+posterior --include-coords="../include-coords.bed" --output-label="full"
+segway "$cluster_arg" identify+posterior \
+    --include-coords="../include-coords.bed" --output-label="full" \
+    "../simplesubseg.genomedata" traindir identifydir-full
 
-segway "$cluster_arg" "../simplesubseg.genomedata" traindir identifydir-seg \
-    identify+posterior --include-coords="../include-coords.bed" --output-label="seg"
+segway "$cluster_arg" identify+posterior \
+    --include-coords="../include-coords.bed" --output-label="seg" \
+    "../simplesubseg.genomedata" traindir identifydir-seg
      
 cd ..
 

@@ -3658,8 +3658,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
 
-    usage = "%(prog)s [GLOBAL_OPTION]... GENOMEDATA [GENOMEDATA ...] " \
-            "TRAINDIR [IDENTIFYDIR] TASK [TASK_OPTION]"
+    usage = "%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]" \
+            "GENOMEDATA [GENOMEDATA ...] TRAINDIR [IDENTIFYDIR]"
 
     version = "%(prog)s {}".format(__version__)
     description = """
@@ -3895,31 +3895,32 @@ def parse_options(argv):
     group.add_argument("--bigBed", metavar="FILE",
                        help="specify layered bigBed filename")
 
-    tasks.add_parser("train-init", parents = [train_init])
-    tasks.add_parser("train-run", parents = [train_run])
-    tasks.add_parser("train-finish", parents = [train_finish])
-    tasks.add_parser("train-run-round", parents = [train_run_round])
+    args = tasks.add_parser("", add_help=False)
+    # Positional arguments
+    args.add_argument("args", nargs="+")  # "+" for at least 1 arg
 
-    tasks.add_parser("identify-init", parents = [identify_init])
-    tasks.add_parser("identify-run", parents = [identify_run])
-    tasks.add_parser("identify-finish", parents = [identify_finish])
+    tasks.add_parser("train-init", parents = [train_init, args])
+    tasks.add_parser("train-run", parents = [train_run, args])
+    tasks.add_parser("train-finish", parents = [train_finish, args])
+    tasks.add_parser("train-run-round", parents = [train_run_round, args])
+
+    tasks.add_parser("identify-init", parents = [identify_init, args])
+    tasks.add_parser("identify-run", parents = [identify_run, args])
+    tasks.add_parser("identify-finish", parents = [identify_finish, args])
 
     # posterior and identify take the same options
-    tasks.add_parser("posterior-init", parents = [identify_init])
-    tasks.add_parser("posterior-run", parents = [identify_run])
-    tasks.add_parser("posterior-finish", parents = [identify_finish])
+    tasks.add_parser("posterior-init", parents = [identify_init, args])
+    tasks.add_parser("posterior-run", parents = [identify_run, args])
+    tasks.add_parser("posterior-finish", parents = [identify_finish, args])
 
     tasks.add_parser("train",
-        parents = [train_init, train_run, train_finish])
+        parents = [train_init, train_run, train_finish, args])
     tasks.add_parser("identify",
-        parents = [identify_init, identify_run, identify_finish])
+        parents = [identify_init, identify_run, identify_finish, args])
     tasks.add_parser("posterior",
-        parents = [identify_init, identify_run, identify_finish])
+        parents = [identify_init, identify_run, identify_finish, args])
     tasks.add_parser("identify+posterior", 
-        parents = [identify_init, identify_run, identify_finish])
-
-    # Positional arguments
-    parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
+        parents = [identify_init, identify_run, identify_finish, args])
 
     options = parser.parse_args(argv)
 

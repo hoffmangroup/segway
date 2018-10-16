@@ -28,12 +28,12 @@ set -x
 
 # seed from python -c "import random; print random.randrange(2**32)"
 SEGWAY_RAND_SEED=4014068903 segway "$cluster_arg" \
-    "../simpleconcat.genomedata" traindir train \
-    --include-coords="../include-coords.bed" --num-labels=4 \
+    train --include-coords="../include-coords.bed" --num-labels=4 \
     --track=testtrack1A,testtrack1B --track=testtrack2A,testtrack2B \
+    "../simpleconcat.genomedata" traindir
 
-segway "$cluster_arg" "../simpleconcat.genomedata" traindir identifydir \
-    identify  --include-coords="../include-coords.bed"
+segway "$cluster_arg" identify --include-coords="../include-coords.bed" \
+    "../simpleconcat.genomedata" traindir identifydir
 
 cd ..
 

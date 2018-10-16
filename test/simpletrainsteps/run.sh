@@ -25,22 +25,22 @@ fi
 set -x
 
 SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
-    "../simpleseg.genomedata" traindir train-init \
-    --include-coords="../include-coords.bed" \
+    train-init --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \
+    "../simpleseg.genomedata" traindir
     
 ../../compare_directory.py ../touchstone_init ./
 
-segway "$cluster_arg" "../simpleseg.genomedata" traindir train-run
+segway "$cluster_arg" train-run "../simpleseg.genomedata" traindir
 
 ../../compare_directory.py ../touchstone_run ./
     
-segway "$cluster_arg" "../simpleseg.genomedata" traindir train-finish
+segway "$cluster_arg" train-finish "../simpleseg.genomedata" traindir
 
 ../../compare_directory.py ../touchstone_finish ./
 
-segway "$cluster_arg" "../simpleseg.genomedata" traindir identifydir \
-    identify --include-coords="../include-coords.bed"
+segway "$cluster_arg" identify --include-coords="../include-coords.bed" \
+    "../simpleseg.genomedata" traindir identifydir
 
 cd ..
 

@@ -27,15 +27,15 @@ fi
 set -x
 
 SEGWAY_RAND_SEED=7908 segway "$cluster_arg" \
-    "../simplesemi.genomedata" traindir train \
-    --semisupervised="../semi-label.bed" \
+    train --semisupervised="../semi-label.bed" \
     --resolution=10 \
     --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \
+    "../simplesemi.genomedata" traindir
 
 
-segway "$cluster_arg" "../simplesemi.genomedata" traindir identifydir \
-    identify --include-coords="../include-coords.bed"
+segway "$cluster_arg" identify --include-coords="../include-coords.bed" \
+    "../simplesemi.genomedata" traindir identifydir
 
 cd ..
 

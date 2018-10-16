@@ -1,4 +1,4 @@
 ## segway (%[^ ]+%) run (%[0-9a-f]{32}%) at (%[0-9]{4}%)-(%[0-9]{2}%)-(%[0-9]{2}%) (%[0-9]{2}%):(%[0-9]{2}%):(%[0-9]{2}%).(%[0-9]{1,}%)
 
 cd "(%[^"]+%)/test-(%\d{8}%).(%[0-9a-zA-Z]{6}%)"
-"(%[^"]+%)/segway" "--cluster-opt=(%[^\"]*%)" "(%[^"]+%)/simpleresolution.genomedata" "traindir" "identifydir" "identify" "--include-coords=(%[^"]+%)/include-coords.bed" "--seg-table=../seg_table.tab"
+"(%[^"]+%)/segway" "--cluster-opt=(%[^\"]*%)" "identify" "--include-coords=(%[^"]+%)/include-coords.bed" "--seg-table=../seg_table.tab" "(%[^"]+%)/simpleresolution.genomedata" "traindir" "identifydir"
