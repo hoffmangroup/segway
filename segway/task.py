@@ -53,7 +53,7 @@ GMTK_TRRNG_OPTION_STRING = "-trrng"  # Range to train over segment file
 
 
 def make_track_indexes(text):
-    return array(map(int, text.split(",")))
+    return array(list(map(int, text.split(","))))
 
 
 def divide_posterior_array(posterior_code, num_frames, num_sublabels):
