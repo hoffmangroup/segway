@@ -280,7 +280,7 @@ class Segmentation(defaultdict):
             final_outfile = outfile._items[0]
         except AttributeError:
             final_outfile = outfile
-        print(*self.trackline.rstrip(), file=final_outfile)
+        print(" ".join(self.trackline).rstrip(), file=final_outfile)
 
     def write(self, outfile):
         ends = {}
