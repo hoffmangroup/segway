@@ -1,20 +1,12 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function
 
-from six import viewitems
-from six.moves import map, range, zip
-
 """observations.py: prepare and save GMTK observations
 """
 
 __version__ = "$Revision$"
 
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
-try:
-    from cStringIO import StringIO
-except ImportError:
-    #"StringIO" has been moved into package io in Python 3
-    from io import StringIO
 from collections import deque
 from contextlib import closing
 from functools import partial
@@ -27,8 +19,9 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, invert, isnan, maximum, zeros)
-
 from path import Path
+from six import viewitems
+from six.moves import map, range, StringIO, zip
 from tabdelim import ListWriter
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
@@ -426,7 +419,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
     return continuous_cells
 
 
-def _save_window(float_filename, int_filename, float_data, resolution,
+def _save_window(float_filename_or_file, int_filename_or_file, float_data, resolution,
                  distribution, seq_data=None, supervision_data=None):
     # called by task.py as well as observation.py
 
@@ -464,7 +457,7 @@ def _save_window(float_filename, int_filename, float_data, resolution,
             float_data = downsample_add(float_data, resolution)
             float_data /= num_datapoints_min_1
 
-        float_data.tofile(float_filename)
+        float_data.tofile(float_filename_or_file)
 
     if seq_data is not None:
         assert resolution == 1  # not implemented yet
@@ -482,7 +475,7 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     else:
         int_data = array([], dtype=DTYPE_OBS_INT)
 
-    int_data.tofile(int_filename)
+    int_data.tofile(int_filename_or_file)
 
 
 def add_starts_ends(new_windows, starts, ends):
@@ -619,7 +612,7 @@ class Observations(object):
             new_starts = start + new_offsets
             new_ends = append(new_starts[1:], end)
 
-            return zip(new_starts, new_ends)
+            return list(zip(new_starts, new_ends))
 
         return [[start, end]]
 

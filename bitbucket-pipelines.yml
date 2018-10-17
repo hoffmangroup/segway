@@ -13,10 +13,10 @@ pipelines:
               - pip
             name: Python2
             script:
-              - pip install .
+              - python -m pip install .
               - python --version
-              - gmtkPrint -version
-              - pip list 
+              - pip list
+              - gmtkPrint -version 
               - cd test && ./test_all.sh
         - step:
             caches:
@@ -24,8 +24,8 @@ pipelines:
             name: Python3
             script:
               - alias python="python3"
-              - pip3 install .
+              - python -m pip install .
               - python --version
+              - pip list
               - gmtkPrint -version
-              - pip3 list
-              - cd test && ./test_all.sh
+              - cd test && SEGWAY_TEST_PYTHON_VERSION=3 ./test_all.sh

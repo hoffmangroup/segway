@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function, with_statement
 
-from six import viewitems
-from six.moves import map, zip
-
 __version__ = "$Revision$"
 
 # Copyright 2008-2009, 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
@@ -15,9 +12,10 @@ from gzip import open as _gzip_open
 from itertools import repeat
 from math import floor, log10
 from os import extsep
+import re
 from string import Template
 import sys
-import re
+
 
 import colorbrewer
 from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
@@ -25,6 +23,8 @@ from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
 from pkg_resources import resource_filename, resource_string
+from six import viewitems
+from six.moves import map, zip
 from tables import Filters, NoSuchNodeError, open_file
 
 from . import __package__

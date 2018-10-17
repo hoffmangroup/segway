@@ -36,4 +36,4 @@ segway "$cluster_arg" \
 
 cd ..
 
-../compare_directory.py ../data/touchstone ../data/${testdir#"./"}
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../compare_directory.py ../data/touchstone ../data/${testdir#"./"}

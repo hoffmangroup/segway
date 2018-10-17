@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, with_statement, print_function
-from six import iterkeys, reraise, viewitems
-from six.moves import map
 
 """
 layer: convert flattened Viterbi BED files to a layered thick/thin bed file
@@ -16,6 +14,8 @@ from tempfile import NamedTemporaryFile
 
 from numpy import array, diff, vstack
 from optbuild import OptionBuilder_ShortOptWithEquals
+from six import iterkeys, reraise, viewitems
+from six.moves import map
 from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native
@@ -158,7 +158,7 @@ def update_trackline(trackline, updates):
         trackline = TRACKLINE_DEFAULT[:]
 
     for word_index, word in enumerate(trackline):
-        if word.strip() == "visibility=dense":
+        if word == "visibility=dense":
             trackline[word_index] = "visibility=full"
 
     for key, value in viewitems(updates):
@@ -280,7 +280,7 @@ class Segmentation(defaultdict):
             final_outfile = outfile._items[0]
         except AttributeError:
             final_outfile = outfile
-        print(" ".join(self.trackline).rstrip(), file=final_outfile)
+        print(" ".join(self.trackline), file=final_outfile)
 
     def write(self, outfile):
         ends = {}

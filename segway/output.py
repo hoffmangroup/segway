@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from __future__ import division, print_function
-from six.moves import range
 
 """output.py: output savers: IdentifySaver, PosteriorSaver
 """
@@ -8,6 +7,8 @@ from six.moves import range
 __version__ = "$Revision$"
 
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+
+from six.moves import range
 
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename

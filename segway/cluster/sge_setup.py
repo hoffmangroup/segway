@@ -1,6 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function, with_statement
-from six import viewitems
 
 """
 sge_setup: setup mem_requested on each node
@@ -14,7 +13,7 @@ import sys
 from tempfile import NamedTemporaryFile
 
 from optbuild import OptionBuilder_ShortOptWithSpace
-# from path import path
+from six import viewitems
 
 QCONF_PROG = OptionBuilder_ShortOptWithSpace("qconf")
 QSTAT_PROG = OptionBuilder_ShortOptWithSpace("qstat")

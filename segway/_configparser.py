@@ -5,10 +5,11 @@ __version__ = "$Revision$"
 
 # Copyright 2009 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from cStringIO import StringIO
-from six import string_types
-from six.moves.configparser import RawConfigParser
 import sys
+
+from six import string_types
+from six.moves import StringIO
+from six.moves.configparser import RawConfigParser
 
 CONFIGPARSER_SECTION = "all"
 

@@ -1,7 +1,5 @@
 #!/usr/bin/env python
 from __future__ import absolute_import, division, print_function
-from six import viewitems, viewkeys
-from six.moves import zip
 
 """compare_directory.py: compare two directories, using regexes
 
@@ -17,6 +15,8 @@ import sys
 import tarfile
 
 from path import Path
+from six import viewitems, viewkeys
+from six.moves import zip
 
 from segway._util import maybe_gzip_open, SEGWAY_ENCODING
 from segway.version import __version__

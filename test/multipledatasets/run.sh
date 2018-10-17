@@ -34,4 +34,4 @@ segway "$cluster_arg" identify --include-coords="../include-coords.bed" \
 
 cd ..
 
-../compare_directory.py ../multipledatasets/touchstone ../multipledatasets/${testdir#"./"}
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../compare_directory.py ../multipledatasets/touchstone ../multipledatasets/${testdir#"./"}
