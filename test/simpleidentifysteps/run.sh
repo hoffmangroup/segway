@@ -35,10 +35,10 @@ segway "$cluster_arg" identify-init  --include-coords="../include-coords.bed" \
     
 ../../compare_directory.py ../touchstone_init ./
 
-segway "$cluster_arg" "../simpleseg.genomedata" traindir identifydir identify-run
+segway "$cluster_arg" identify-run "../simpleseg.genomedata" traindir identifydir
 
 ../../compare_directory.py ../touchstone_run ./
     
-segway "$cluster_arg" "../simpleseg.genomedata" traindir identifydir identify-finish
+segway "$cluster_arg" identify-finish "../simpleseg.genomedata" traindir identifydir
 
 ../../compare_directory.py ../touchstone_finish ./
