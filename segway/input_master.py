@@ -97,7 +97,7 @@ def make_spec(name, iterable):
     # __str__method from being called twice
     # Specifically in the string template standard library provided by Python
     # 2, there is a call to a string escape sequence + tuple, e.g.:
-    # print(“%s” % (some_string,))
+    # print("%s" % (some_string,))
     # This "some_string" has its own __str__ method called *twice* if if it is
     # a unicode string in Python 2. Python 3 does not have this issue. This
     # causes downstream issues since strings are generated often in our case
