@@ -63,7 +63,7 @@ def parse_bed4(line):
 
 re_trackline_split = re.compile(r"(?:[^ =]+=([\"'])[^\1]+?\1(?= |$)|[^ ]+)")
 def get_trackline_and_reader(iterator, datum_cls=Datum):
-    line = next(iterator)
+    line = next(iterator).rstrip()
 
     if line.startswith("track"):
         # retrieves group 1 of re_trackline_split match, which is the whole item
