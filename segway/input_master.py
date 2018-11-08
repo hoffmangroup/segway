@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division
 
 """input_master.py: write input master files
 """
@@ -10,18 +10,33 @@ __version__ = "$Revision$"
 
 from math import frexp, ldexp
 from string import Template
+import sys
 
 from genomedata._util import fill_array
-from numpy import (array, empty, float32, outer, sqrt, tile, vectorize, where,
-                   zeros)
+from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
+                   vectorize, where, zeros)
+from six.moves import map, range
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
                     OFFSET_END, OFFSET_START, OFFSET_STEP,
-                    resource_substitute, Saver,
+                    resource_substitute, Saver, SEGWAY_ENCODING,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED, USE_MFSDG)
+
+# NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
+# scalars and vectors in the parameter output. By default in newer (> 1.14)
+# versions printed output "giv[es] the shortest unique representation".
+# See Numpy 1.14 release notes: https://docs.scipy.org/doc/numpy/release.html
+# Under heading 'Many changes to array printing, disableable with the new
+# "legacy" printing mode'
+try:
+    # If it is a possibility, use the older printing style
+    set_printoptions(legacy='1.13')
+except TypeError:
+    # Otherwise ignore the attempt
+    pass
 
 if USE_MFSDG:
     # because tying not implemented yet
@@ -78,6 +93,19 @@ def make_spec(name, iterable):
 
     all_lines = header_lines + indexed_items
 
+    # In Python 2, convert from unicode to bytes to prevent 
+    # __str__method from being called twice
+    # Specifically in the string template standard library provided by Python
+    # 2, there is a call to a string escape sequence + tuple, e.g.:
+    # print("%s" % (some_string,))
+    # This "some_string" has its own __str__ method called *twice* if if it is
+    # a unicode string in Python 2. Python 3 does not have this issue. This
+    # causes downstream issues since strings are generated often in our case
+    # for random numbers. Calling __str__ twice will often cause re-iterating
+    # the RNG which makes for inconsitent results between Python versions.
+    if sys.version[0] == "2":
+        all_lines = [line.encode(SEGWAY_ENCODING) for line in all_lines]
+
     return "\n".join(all_lines) + "\n"
 
 
@@ -99,7 +127,7 @@ def make_zero_diagonal_table(length):
     res = fill_array(prob_self_other, (length, length))
 
     # set diagonal
-    range_cpt = xrange(length)
+    range_cpt = range(length)
     res[range_cpt, range_cpt] = prob_self_self
 
     return res
@@ -107,7 +135,7 @@ def make_zero_diagonal_table(length):
 
 def format_indexed_strs(fmt, num):
     full_fmt = fmt + "%d"
-    return [full_fmt % index for index in xrange(num)]
+    return [full_fmt % index for index in range(num)]
 
 
 def jitter_cell(cell, random_state):
@@ -166,6 +194,14 @@ class ParamSpec(object):
 
     def make_subsegnames(self):
         return format_indexed_strs("subseg", self.num_subsegs)
+
+    def get_template_component_suffix(self, component_number):
+        """Returns the subsitution for the component suffix in the GMTK model
+        template. Empty if there is only one component"""
+        if self.num_mix_components == 1:
+            return ""
+        else:
+            return "_component{}".format(component_number)
 
     def generate_tmpl_mappings(self):
         # need segnames because in the tied covariance case, the
@@ -239,7 +275,7 @@ class DTParamSpec(ParamSpec):
         seg_countdowns_initial = self.seg_countdowns_initial
 
         header = ([str(num_segs)] +
-                  [str(num_seg) for num_seg in xrange(num_segs - 1)] +
+                  [str(num_seg) for num_seg in range(num_segs - 1)] +
                   ["default"])
 
         lines = [" ".join(header)]
@@ -428,7 +464,7 @@ class DenseCPTParamSpec(TableParamSpec):
 
     def make_dense_cpt_seg_dinucleotide_spec(self):
         table = [self.make_dinucleotide_table_row()
-                 for seg_index in xrange(self.num_segs)]
+                 for seg_index in range(self.num_segs)]
 
         return self.make_table_spec("seg_dinucleotide", table)
 
@@ -515,10 +551,10 @@ class NameCollectionParamSpec(ParamSpec):
                            fullnum_subsegs=fullnum_subsegs)
 
             rows = [substitute_header(mapping)]
-            for seg_index in xrange(num_segs):
+            for seg_index in range(num_segs):
                 seg = "seg%d" % seg_index
 
-                for subseg_index in xrange(num_subsegs):
+                for subseg_index in range(num_subsegs):
                     subseg = "subseg%d" % subseg_index
                     mapping = dict(seg=seg, subseg=subseg,
                                    track=head_trackname)
@@ -530,7 +566,7 @@ class NameCollectionParamSpec(ParamSpec):
 
 class MeanParamSpec(ParamSpec):
     type_name = "MEAN"
-    object_tmpl = "mean_${seg}_${subseg}_${track}_component${component} 1 ${datum}"
+    object_tmpl = "mean_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
     jitter_std_bound = 0.2
 
     copy_attrs = ParamSpec.copy_attrs + ["means", "num_mix_components", "random_state", "vars"]
@@ -572,14 +608,16 @@ class MeanParamSpec(ParamSpec):
                     subseg_index = mapping["subseg_index"]
                     mapping["datum"] = data[seg_index, subseg_index, track_index]
                     mapping["track"] = mapping["track"]
-                    mapping["component"] = component
+                    mapping["component_suffix"] = \
+                        self.get_template_component_suffix(component)
+
                     mapping["datum"] = mapping["datum"]
                     yield substitute(mapping)
 
 
 class CovarParamSpec(ParamSpec):
     type_name = "COVAR"
-    object_tmpl = "covar_${seg}_${subseg}_${track}_component${component} 1 ${datum}"
+    object_tmpl = "covar_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
 
     copy_attrs = ParamSpec.copy_attrs + ["num_mix_components", "vars"]
 
@@ -603,13 +641,15 @@ class CovarParamSpec(ParamSpec):
                     subseg_index = mapping["subseg_index"]
                     mapping["datum"] = data[seg_index, subseg_index, track_index]
                     mapping["track"] = mapping["track"]
-                    mapping["component"] = component
+                    mapping["component_suffix"] = \
+                        self.get_template_component_suffix(component)
+
                     mapping["datum"] = mapping["datum"]
                     yield substitute(mapping)
     
 
 class TiedCovarParamSpec(CovarParamSpec):
-    object_tmpl = "covar_${track}_component${component} 1 ${datum}"
+    object_tmpl = "covar_${track}${component_suffix} 1 ${datum}"
 
     def make_segnames(self):
         return ["any"]
@@ -675,8 +715,8 @@ class NormMCParamSpec(MCParamSpec):
     else:
         # dimensionality component_type name mean covar
         object_tmpl = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-            " mc_${distribution}_${seg}_${subseg}_${track}_component${component}" \
-            " mean_${seg}_${subseg}_${track}_component${component} covar_${track}_component${component}"
+            " mc_${distribution}_${seg}_${subseg}_${track}${component_suffix}" \
+            " mean_${seg}_${subseg}_${track}${component_suffix} covar_${track}${component_suffix}"
 
     def generate_objects(self):
         """
@@ -684,13 +724,15 @@ class NormMCParamSpec(MCParamSpec):
         with names
         """
         substitute = Template(self.object_tmpl).substitute
-        for component in xrange(self.num_mix_components):
+        for component in range(self.num_mix_components):
             for mapping in self.generate_tmpl_mappings():
                 track_index = mapping["track_index"]
                 if self.distribution == DISTRIBUTION_GAMMA:
                     mapping["min_track"] = self.get_track_lt_min(track_index)
                 mapping["track"] = mapping["track"]
-                mapping["component"] = component
+                mapping["component_suffix"] = \
+                    self.get_template_component_suffix(component)
+
                 yield substitute(mapping)
 
 
@@ -709,8 +751,9 @@ class MXParamSpec(ParamSpec):
         with names
         """
         object_tmpl = "1 mx_${seg}_${subseg}_${track} ${num_mix_components} dpmf_${seg}_${subseg}_${track}"
-        for component in xrange(self.num_mix_components):
-            add = " mc_${distribution}_${seg}_${subseg}_${track}_component%s" % component
+        for component in range(self.num_mix_components):
+            add = " mc_${distribution}_${seg}_${subseg}_${track}%s" % (
+                self.get_template_component_suffix(component))
             object_tmpl += add
         substitute = Template(object_tmpl).substitute
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
+from __future__ import absolute_import, division, print_function, with_statement
 
 __version__ = "$Revision$"
 
@@ -12,18 +12,22 @@ from gzip import open as _gzip_open
 from itertools import repeat
 from math import floor, log10
 from os import extsep
+import re
 from string import Template
 import sys
-import re
+
 
 import colorbrewer
 from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
                     zeros)
-
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
-from path import path
+from path import Path
 from pkg_resources import resource_filename, resource_string
+from six import viewitems
+from six.moves import map, zip
 from tables import Filters, NoSuchNodeError, open_file
+
+from . import __package__
 
 # XXX: check that these are all in use
 
@@ -31,6 +35,8 @@ from tables import Filters, NoSuchNodeError, open_file
 # ignore PyFlakes warnings here
 
 PKG_DATA = ".".join([__package__, "data"])
+
+SEGWAY_ENCODING = "ascii"
 
 FILTERS_GZIP = Filters(complevel=1)
 
@@ -46,6 +52,8 @@ EXT_TAB = "tab"
 SUFFIX_BED = extsep + EXT_BED
 SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_TAB = extsep + EXT_TAB
+
+DELIMITER_BED = '\t'  # whitespace or tab is allowed
 
 DTYPE_IDENTIFY = intc
 DTYPE_OBS_INT = intc
@@ -79,7 +87,8 @@ OFFSET_END = 1
 OFFSET_STEP = 2
 
 data_filename = partial(resource_filename, PKG_DATA)
-data_string = partial(resource_string, PKG_DATA)
+def data_string(resource):
+    return resource_string(PKG_DATA, resource).decode(SEGWAY_ENCODING)
 
 NUM_COLORS = 8
 SCHEME = colorbrewer.Dark2[NUM_COLORS]
@@ -164,7 +173,7 @@ class PassThroughDict(dict):
 
 def die(msg=""):
     if msg:
-        print >>sys.stderr, msg
+        print(msg, file=sys.stderr)
     sys.exit(1)
 
 
@@ -198,7 +207,7 @@ def is_gz_filename(filename):
     return filename.endswith(SUFFIX_GZ)
 
 
-def maybe_gzip_open(filename, mode="r", *args, **kwargs):
+def maybe_gzip_open(filename, mode="rt", *args, **kwargs):
     if filename == "-":
         if mode.startswith("U"):
             raise NotImplementedError("U mode not implemented")
@@ -223,7 +232,7 @@ def constant(val):
     """
     constant values for defaultdict
     """
-    return repeat(val).next
+    return partial(next, repeat(val))
 
 array_factory = constant(array([]))
 
@@ -283,7 +292,7 @@ def load_coords(filename):
             coords[chrom].append((start, end))
 
     return defaultdict(array_factory, ((chrom, array(coords_list))
-                       for chrom, coords_list in coords.iteritems()))
+                       for chrom, coords_list in viewitems(coords)))
 
 
 def get_chrom_coords(coords, chrom):
@@ -303,7 +312,7 @@ def is_empty_array(arr):
 
 
 def chrom_name(filename):
-    return path(filename).namebase
+    return Path(filename).namebase
 
 
 # XXX: replace with stuff from prep_observations()
@@ -312,7 +321,7 @@ def chrom_name(filename):
 
 def iter_chroms_coords(filenames, coords):
     for filename in filenames:
-        print >>sys.stderr, filename
+        print(filename, file=sys.stderr)
         chrom = chrom_name(filename)
 
         chr_include_coords = get_chrom_coords(coords, chrom)
@@ -403,7 +412,7 @@ def parse_posterior(iterable, output_label):
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
     # ignores non-matching lines
     for line in iterable:
-        m_posterior_entry = re_posterior_entry.match(line.rstrip())
+        m_posterior_entry = re_posterior_entry.match(line.rstrip().decode(SEGWAY_ENCODING))
 
         if m_posterior_entry:
             group = m_posterior_entry.group
@@ -452,7 +461,7 @@ def make_default_filename(resource, dirname="WORKDIR", instance_index=None):
 
     filebasename = extjoin_not_none(prefix, instance_index, ext)
 
-    return path(dirname) / filebasename
+    return Path(dirname) / filebasename
 
 
 def save_substituted_resource(filename, resource, mapping):
@@ -469,7 +478,7 @@ def save_template(filename, resource, mapping, dirname=None, clobber=False,
     creates a temporary file if filename is None or empty
     """
     if filename:
-        is_new = clobber or not path(filename).exists()
+        is_new = clobber or not Path(filename).exists()
     else:
         filename = make_default_filename(resource, dirname, instance_index)
         is_new = True

@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division, print_function
 
 """observations.py: prepare and save GMTK observations
 """
@@ -7,12 +7,11 @@ from __future__ import division
 __version__ = "$Revision$"
 
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
-
-from cStringIO import StringIO
 from collections import deque
 from contextlib import closing
 from functools import partial
-from itertools import izip, repeat
+from itertools import repeat
+from operator import itemgetter
 from os import extsep
 import sys
 from tempfile import gettempdir
@@ -20,8 +19,9 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, invert, isnan, maximum, zeros)
-
-from path import path
+from path import Path
+from six import viewitems
+from six.moves import map, range, StringIO, zip
 from tabdelim import ListWriter
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
@@ -62,6 +62,35 @@ def convert_windows(attrs, name):
     return edges_array.tolist()
 
 
+def merge_windows(windows):
+    """Takes a sorted list of start/end tuples and returns a list of tuples of
+    merged together if any overlap"""
+
+    res = []
+
+    # Get first region
+    merge_start, merge_end = windows[0]
+
+    # For all remaining regions
+    for window_start, window_end in windows[1:]:
+        # If the next region does not overlap the current one under
+        # consideration
+        if window_start - merge_end > 0:
+            # Add our current merged region to the merged list
+            res.append((merge_start, merge_end))
+            # Set the current region under consideration to the current window
+            merge_start, merge_end = window_start, window_end
+        # Otherwise the regions overlap
+        else:
+            if window_end > merge_end:
+                merge_end = window_end
+
+    # Append the last region under consideration to the merge list
+    res.append((merge_start, merge_end))
+    # Return the list of merged windows
+    return res
+
+
 def update_starts(starts, ends, new_starts, new_ends):
     # reversed because extend left extends deque in reversed order
     starts.extendleft(reversed(new_starts))
@@ -87,7 +116,7 @@ def intersect_regions(start, end, coords, data=repeat(NoData)):
     # F             ---------
     res = []
 
-    for (include_start, include_end), datum in izip(coords, data):
+    for (include_start, include_end), datum in zip(coords, data):
         if start > include_end or end <= include_start:
             # cases A, B
             continue
@@ -206,11 +235,11 @@ def downsample_add(inarray, resolution):
         remainder = resolution
 
     # loop 0: every index up to remainder
-    for index in xrange(remainder):
+    for index in range(remainder):
         res += inarray[index::resolution]
 
     # loop 1: remainder
-    for index in xrange(remainder, resolution):
+    for index in range(remainder, resolution):
         # don't include the last element of res
         res[:-1] += inarray[index::resolution]
 
@@ -251,7 +280,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
     # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
     resolution_partitioned_input_array = (
             input_array[index:index+resolution]
-            for index in xrange(0, len(input_array), resolution)
+            for index in range(0, len(input_array), resolution)
             )
 
     downsampled_input_array = zeros(calc_downsampled_shape(input_array,
@@ -390,7 +419,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
     return continuous_cells
 
 
-def _save_window(float_filename, int_filename, float_data, resolution,
+def _save_window(float_filename_or_file, int_filename_or_file, float_data, resolution,
                  distribution, seq_data=None, supervision_data=None):
     # called by task.py as well as observation.py
 
@@ -428,7 +457,7 @@ def _save_window(float_filename, int_filename, float_data, resolution,
             float_data = downsample_add(float_data, resolution)
             float_data /= num_datapoints_min_1
 
-        float_data.tofile(float_filename)
+        float_data.tofile(float_filename_or_file)
 
     if seq_data is not None:
         assert resolution == 1  # not implemented yet
@@ -446,7 +475,7 @@ def _save_window(float_filename, int_filename, float_data, resolution,
     else:
         int_data = array([], dtype=DTYPE_OBS_INT)
 
-    int_data.tofile(int_filename)
+    int_data.tofile(int_filename_or_file)
 
 
 def add_starts_ends(new_windows, starts, ends):
@@ -474,7 +503,7 @@ def add_starts_ends(new_windows, starts, ends):
 def generate_coords_from_dict(coords_dict):
     # use a deque to allow fast insertion/removal at the 
     # beginning and end of the sequence
-    for chrom, coords_list in coords_dict.iteritems():
+    for chrom, coords_list in viewitems(coords_dict):
         starts, ends = map(deque, zip(*coords_list))
         yield chrom, starts, ends
 
@@ -504,22 +533,47 @@ class Observations(object):
 
         self.validation_windows = []
 
-    def generate_coords_all(self, genome):
-        for chromosome in genome:
-            starts = deque()
-            ends = deque()
+    def generate_coords_all(self, genomes):
+        """Generates a tuple of (chromosome, starts, ends) for each chromosome
+        across all genomes where the starts and ends are deques"""
 
-            for supercontig, continuous in chromosome.itercontinuous():
-                if continuous is not None:
-                    attrs = supercontig.attrs
+        # Get all chromosome names across all genomes
+        chromosome_names = set()
+        for genome in genomes:
+            chromosome_names = chromosome_names.union([chromosome.name for
+                                                       chromosome in genome])
 
-                    starts.extend(convert_windows(attrs, "chunk_starts"))
-                    ends.extend(convert_windows(attrs, "chunk_ends"))
+        # For each chromsome (in sorted order)
+        for chromosome_name in sorted(list(chromosome_names)):
+            chromosome_windows = []  # list of (start, end) tuples
 
-            if starts:
-                yield chromosome.name, starts, ends
+            # Get all genome-mapped regions across all genomes
+            for genome in genomes:
+                chromosome = genome[chromosome_name]
 
-    def generate_coords(self, genome):
+                # For each supercontig
+                for supercontig, continuous in chromosome.itercontinuous():
+                    # If the the supercontig is not empty
+                    if continuous is not None:
+                        attrs = supercontig.attrs
+
+                        starts = convert_windows(attrs, "chunk_starts")
+                        ends = convert_windows(attrs, "chunk_ends")
+
+                        chromosome_windows.extend(zip(starts, ends))
+
+            # If at least 1 window exists
+            if chromosome_windows:
+                # Sort regions (by start)
+                chromosome_windows.sort(key=itemgetter(0))
+                # Merge regions
+                merged_chromsome_windows = merge_windows(chromosome_windows)
+                # Convert start and end regions to deques
+                starts, ends = map(deque, zip(*merged_chromsome_windows))
+                # Yield the chromsome name and start/end region deques
+                yield chromosome_name, starts, ends
+
+    def generate_coords(self, genomes):
         """
         returns iterable of included coords, either explicitly
         specified, or all
@@ -530,7 +584,7 @@ class Observations(object):
         if self.include_coords:
             return generate_coords_from_dict(self.include_coords)
         else:
-            return self.generate_coords_all(genome)
+            return self.generate_coords_all(genomes)
 
     def skip_or_split_window(self, start, end):
         """
@@ -541,7 +595,7 @@ class Observations(object):
         num_frames = ceildiv(num_bases_window, self.resolution)
         if not MIN_FRAMES <= num_frames:
             text = " skipping short sequence of length %d" % num_frames
-            print >>sys.stderr, text
+            print(text, file=sys.stderr)
             return []
 
         if num_frames > max_frames:
@@ -558,7 +612,7 @@ class Observations(object):
             new_starts = start + new_offsets
             new_ends = append(new_starts[1:], end)
 
-            return zip(new_starts, new_ends)
+            return list(zip(new_starts, new_ends))
 
         return [[start, end]]
 
@@ -618,16 +672,16 @@ class Observations(object):
                                             starts,
                                             ends)
                     if split_start:
-                        for world in xrange(self.num_worlds):
+                        for world in range(self.num_worlds):
                             validation_windows.append(Window(
                                 world, chrom, split_start, split_end)
                                 )
 
         return validation_windows
 
-    def locate_windows(self, genome):
+    def locate_windows(self, genomes):
         """
-        input: Genome instance, include_coords, exclude_ coords, max_frames
+        input: Genome instances, include_coords, exclude_ coords, max_frames
         validation fraction/validation coords (if validation)
 
         sets: window_coords, validation_coords (if validation)
@@ -636,7 +690,7 @@ class Observations(object):
 
         windows = []
 
-        for chrom, starts, ends in self.generate_coords(genome):
+        for chrom, starts, ends in self.generate_coords(genomes):
             chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
 
             while True:
@@ -658,7 +712,7 @@ class Observations(object):
                 if start is None:
                     continue
 
-                for world in xrange(self.num_worlds):
+                for world in range(self.num_worlds):
                     windows.append(Window(world, chrom, start, end))
 
         if self.validation_fraction:
@@ -701,7 +755,7 @@ class Observations(object):
 
         if temp:
             prefix = "".join([prefix, self.uuid, extsep])
-            dirpath = path(gettempdir())
+            dirpath = Path(gettempdir())
         else:
             dirpath = self.obs_dirpath
 
@@ -711,8 +765,8 @@ class Observations(object):
 
     def print_filepaths(self, float_filelist, int_filelist, *args, **kwargs):
         float_filepath, int_filepath = self.make_filepaths(*args, **kwargs)
-        print >>float_filelist, float_filepath
-        print >>int_filelist, int_filepath
+        print(float_filepath, file=float_filelist)
+        print(int_filepath, file=int_filelist)
 
         self.float_filepaths.append(float_filepath)
         self.int_filepaths.append(int_filepath)
@@ -766,7 +820,7 @@ class Observations(object):
             row = [float_filepath, str(window_index), chrom, str(start),
                    str(end)]
             float_tabwriter.writerow(row)
-            print >>sys.stderr, " %s (%d, %d)" % (float_filepath, start, end)
+            print(" %s (%d, %d)" % (float_filepath, start, end), file=sys.stderr)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):

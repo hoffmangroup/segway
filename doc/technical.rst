@@ -12,10 +12,10 @@ its tasks, and it does this in the directory specified by the required
 *workdir* argument. When running training *workdir* is *TRAINDIR*;
 when running identification *workdir* is *IDENTIFYDIR*.
 
-The observation files can be quite large, taking up 8 bytes per track
-per position and cannot be compressed. As a result they are written out to a
-temporary directory on an as-needed basis. This is because otherwise they could take terabytes for
-identifying on the whole human genome with dozens of tracks.
+The observation files can be quite large, taking up 8 bytes per track per
+position and cannot be compressed. As a result they are written out to a
+temporary directory on an as-needed basis. This is because otherwise they could
+take terabytes for identifying on the whole human genome with dozens of tracks.
 
 You will find a full description of all the working files in the
 :ref:`workdir-files` section.
@@ -28,7 +28,10 @@ function, which searches for an appropriate directory as described in
 the documentation for `tempfile.tempdir`
 <https://docs.python.org/2/library/tempfile.html#tempfile.tempdir>. If
 you need to specify that temporary files go into a particular
-directory, set the `TMPDIR` environment variable.
+directory, set the `TMPDIR` environment variable. It is highly recommended that
+you ensure that you temporary directory does not reside on a slow storage
+medium such as a NFS filesystem. Since many temporary files are created and
+deleted this can significantly impact performance.
 
 Distributed computing
 =====================
@@ -108,15 +111,15 @@ script containing the GMTK commands and arguments for job
 Summary reports
 ---------------
 
-The ``jobs.tab`` file contains a tab-delimited file with each job
-Segway dispatched in a different row, reporting on job identifier
-(``jobid``), job name (``jobname``), GMTK program (``prog``), number
-of segment labels (``num_segs``), number of frames (``num_frames``),
-maximum memory usage (``maxvmem``), CPU time (``cpu``) and exit/error
-status (``exit_status``). Jobs are written as they are completed. The
-exit status is useful for determining whether the job succeeded
-(status 0) or failed (any other value, which is sometimes numeric, and
-sometimes text, depending on the clustering system used).
+The ``jobs.instance.tab`` file contains a tab-delimited file with each job
+Segway dispatched for this instance in a different row, reporting on job
+identifier (``jobid``), job name (``jobname``), GMTK program (``prog``), number
+of segment labels (``num_segs``), number of frames (``num_frames``), maximum
+memory usage (``maxvmem``), CPU time (``cpu``) and exit/error status
+(``exit_status``). Jobs are written as they are completed. The exit status is
+useful for determining whether the job succeeded (status 0) or failed (any
+other value, which is sometimes numeric, and sometimes text, depending on the
+clustering system used).
 
 The ``likelihood.*.tab`` files each track the progression of
 likelihood during a single instance of EM training. The file has a
@@ -215,7 +218,7 @@ workdir instead.
 ``log/``                                            diagnostic information
 |rarr| ``details.sh``                               script file that includes the exact
                                                     command-lines queued by Segway, with wrapper scripts
-|rarr| ``jobs.tab``                                 tab-delimeted summary of jobs queued,
+|rarr| ``jobs.instance.tab``                        tab-delimeted summary of jobs queued per instance,
                                                     including resource informatoin and exit status
 |rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
 |rarr| ``jt_info.posterior.txt``                    log file used by GMTK when creating a junction tree
@@ -256,6 +259,7 @@ workdir instead.
 |rarr| ``segway.str.``\ \*\ ``.``\ \*\ ``.trifile`` triangulation file
 ``viterbi/``                                        intermediate BED files created during distributed Viterbi decoding,
                                                     which get merged into ``segway.bed.gz``
+``window.bed``                                      a BED file containing chromosome regions and the indicies Segway assigns to them
 =================================================== =====================================================
 
 Job names

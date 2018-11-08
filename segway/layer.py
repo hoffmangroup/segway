@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
+from __future__ import absolute_import, division, with_statement, print_function
 
 """
 layer: convert flattened Viterbi BED files to a layered thick/thin bed file
@@ -14,6 +14,8 @@ from tempfile import NamedTemporaryFile
 
 from numpy import array, diff, vstack
 from optbuild import OptionBuilder_ShortOptWithEquals
+from six import iterkeys, reraise, viewitems
+from six.moves import map
 from tabdelim import DictReader
 
 from .bed import get_trackline_and_reader_native
@@ -21,7 +23,7 @@ from ._util import (BED_SCORE, BED_STRAND, get_label_color,
                     maybe_gzip_open, memoized_property, PassThroughDict,
                     SUFFIX_BED, SUFFIX_TAB)
 
-from version import __version__
+from .version import __version__
 
 BED_START = "0"
 ACCEPTABLE_STRANDS = set(".+")
@@ -83,7 +85,7 @@ class Tee(object):
             # Don't rely on sys.exc_info() still containing
             # the right information. Another exception may
             # have been raised and caught by an exit method
-            raise exc[0], exc[1], exc[2]
+            reraise(exc[0], exc[1], exc[2])
 
     def write(self, *args, **kwargs):
         for item in self._items:
@@ -159,7 +161,7 @@ def update_trackline(trackline, updates):
         if word == "visibility=dense":
             trackline[word_index] = "visibility=full"
 
-    for key, value in updates.iteritems():
+    for key, value in viewitems(updates):
         start = key + "="
         for word_index, word in enumerate(trackline):
             if word.startswith(start):
@@ -228,7 +230,7 @@ class Segmentation(defaultdict):
 
     @memoized_property
     def labels_sorted(self):
-        return uniquify(self.ordering + sorted(self.colors.iterkeys()))
+        return uniquify(self.ordering + sorted(iterkeys(self.colors)))
 
     def update_trackline(self, updates):
         update_trackline(self.trackline, updates)
@@ -241,7 +243,7 @@ class Segmentation(defaultdict):
             self.colors = recolor(mnemonics, self.labels_sorted)
 
     def save(self, outfilename, bigbed_outfilename):
-        outfile = maybe_gzip_open(outfilename, "w")
+        outfile = maybe_gzip_open(outfilename, "wt")
 
         if bigbed_outfilename:
             temp_file = NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_BED)
@@ -263,8 +265,8 @@ class Segmentation(defaultdict):
                 #         print >>temp_file, "blah"
                 #     print temp_file.name
                 with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB) as sizes_file:
-                    for chrom, end in ends.iteritems():
-                        print >>sizes_file, "\t".join([chrom, str(end)])
+                    for chrom, end in viewitems(ends):
+                        print(chrom, str(end), sep="\t", file=sizes_file)
 
                     sizes_file.flush()
                     BEDTOBIGBED_PROG(bigbed_infilename, sizes_file.name, bigbed_outfilename)
@@ -278,7 +280,7 @@ class Segmentation(defaultdict):
             final_outfile = outfile._items[0]
         except AttributeError:
             final_outfile = outfile
-        print >>final_outfile, " ".join(self.trackline).rstrip()
+        print(" ".join(self.trackline), file=final_outfile)
 
     def write(self, outfile):
         ends = {}
@@ -289,7 +291,7 @@ class Segmentation(defaultdict):
 
         self.write_trackline(outfile)
 
-        for chrom, chromosome in sorted(self.iteritems()):
+        for chrom, chromosome in sorted(viewitems(self)):
             for run in chromosome:
                 segments = array(run)
 
@@ -341,7 +343,7 @@ class Segmentation(defaultdict):
                            BED_STRAND, str(start), str(end), color, block_count,
                            block_sizes_str, block_starts_str]
 
-                    print >>outfile, "\t".join(row)
+                    print(*row, sep="\t", file=outfile)
 
         return ends
 

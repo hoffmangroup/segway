@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division, with_statement
+from __future__ import absolute_import, division, print_function, with_statement
 
 """
 sge_setup: setup mem_requested on each node
@@ -13,7 +13,7 @@ import sys
 from tempfile import NamedTemporaryFile
 
 from optbuild import OptionBuilder_ShortOptWithSpace
-# from path import path
+from six import viewitems
 
 QCONF_PROG = OptionBuilder_ShortOptWithSpace("qconf")
 QSTAT_PROG = OptionBuilder_ShortOptWithSpace("qstat")
@@ -36,8 +36,8 @@ def add_complex_mem_requested():
                                   delete=False)
 
     prior_complex_text = QCONF_PROG.getoutput(sc=True)
-    print >>tempfile, prior_complex_text
-    print >>tempfile, "mem_requested\tmr\tMEMORY\t<=\tYES\tYES\t0\t10"
+    print(prior_complex_text, file=tempfile)
+    print("mem_requested\tmr\tMEMORY\t<=\tYES\tYES\t0\t10", file=tempfile)
 
     tempfile.close()
 
@@ -73,7 +73,7 @@ def get_mem_totals():
 def modify_complex_values_mem_requested():
     mem_totals = get_mem_totals()
 
-    for hostname, mem_total in mem_totals.iteritems():
+    for hostname, mem_total in viewitems(mem_totals):
         QCONF_PROG("-mattr", "exechost", "complex_values",
                    "mem_requested=%s" % mem_total, hostname)
 
@@ -82,7 +82,7 @@ def sge_setup():
     modify_complex_values_mem_requested()
 
     # extra newline at beginning to space from qconf messages
-    print >>sys.stderr, """
+    print("""
 ===========================================================================
 The mem_requested resource is now configured on your cluster. While
 Segway uses this resource to control its own jobs, we recommend
@@ -102,7 +102,7 @@ It's also a good idea to verify the configuration by running:
 
 qhost -F mem_requested
 ===========================================================================
-"""
+""", file=sys.stderr)
 
 # XXX: a dry-run option would be good
 

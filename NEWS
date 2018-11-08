@@ -1,4 +1,19 @@
+2.0.4:
+
+2.0.3:
+* segway: fix fatal TypeError during --dry-run
+* segway: fix temporary file creation of observations for multiple instances
+* segway: Added compatibility for python 3
+* segway: No longer requires forked-path, now needs path.py>=10
+
 2.0.2:
+* segway: fix window selection when using multiple genomedata archives
+* segway: add window.bed output to cross reference window index to chromomsome
+  region
+* segway: add instance specific job log files to avoid log overwrites
+* segway: fix regression of stdout not being captured from training jobs
+* segway: update support for versions of numpy > 1.14 by adding legacy scalar
+  and vector text printing
 
 2.0.1:
 * segway: fix training results not being parsed properly due to validation

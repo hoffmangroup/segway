@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division
 
 __version__ = "$Revision$"
 
@@ -9,13 +9,15 @@ from itertools import chain
 import re
 import sys
 
+from six.moves import zip
+
 FIELDNAMES = ["chrom", "chromStart", "chromEnd", # required
               "name", "score", "strand", "thickStart", "thickEnd", "itemRgb",
               "blockCount", "blockSizes", "blockStarts"]
 
 class Datum(object):
     def __init__(self, words):
-        self.__dict__ = dict(zip(FIELDNAMES, words))
+        self.__dict__ = dict(list(zip(FIELDNAMES, words)))
         self._words = tuple(words)
 
     def __repr__(self):
@@ -61,7 +63,7 @@ def parse_bed4(line):
 
 re_trackline_split = re.compile(r"(?:[^ =]+=([\"'])[^\1]+?\1(?= |$)|[^ ]+)")
 def get_trackline_and_reader(iterator, datum_cls=Datum):
-    line = iterator.next()
+    line = next(iterator).rstrip()
 
     if line.startswith("track"):
         # retrieves group 1 of re_trackline_split match, which is the whole item

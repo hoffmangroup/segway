@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-from __future__ import division
+from __future__ import absolute_import, division
 
 """structure.py: write structure file
 """
@@ -8,7 +8,9 @@ __version__ = "$Revision$"
 
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from itertools import count, izip
+from itertools import count
+
+from six.moves import range, zip
 
 from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
                     USE_MFSDG)
@@ -40,7 +42,7 @@ class StructureSaver(Saver):
             # weight scale switches on the number of present data
             # points that make a model frame
             return " | ".join(make_weight_scale(index * multiplier)
-                              for index in xrange(resolution + 1))
+                              for index in range(resolution + 1))
 
     def make_conditionalparents_spec(self, trackname):
         """
@@ -90,7 +92,7 @@ class StructureSaver(Saver):
 
         observation_items = []
 
-        zipper = izip(count(), self.track_groups, num_datapoints)
+        zipper = zip(count(), self.track_groups, num_datapoints)
         for track_index, track_group, num_datapoints_track in zipper:
             trackname = track_group[0].name
 

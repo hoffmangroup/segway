@@ -7,7 +7,16 @@
 Installation
 ============
 
-Segway requires the following prerequisites:
+With the Conda_ environment manager and the additional Bioconda_ channel,
+Segway can be installed with the command::
+
+    conda install segway
+
+.. _Conda: https://conda.io/docs/
+.. _Bioconda: https://bioconda.github.io/
+
+Alternatively without Bioconda, the following prerequisites must be
+installed for Segway:
 
 You need Python 2.7.
 
@@ -77,9 +86,13 @@ Segway accomplishes four major tasks from a single command-line. It--
      parameters appropriate for this data;
   2. **trains** parameters of the model starting with the initial
      parameters; and
-  3. **identifies** segments in this data with the model.
+  3. **identifies or annotates** segments in this data with the model.
   4. calculates **posterior** probability for each possible segment
      label at each position.
+
+.. note::
+    The verbs "identify" and "annotate" are synonyms when using Segway. They
+    both describe the same task and may be used interchangably.
 
 .. todo: block diagram
 
@@ -198,27 +211,29 @@ as *windows*, and are supplied to GMTK for inference. There is no
 direction connection between the data in different windows during any
 inference process--the windows are treated independently.
 
-An alternative way to speed up training is to use the 
-:option:`--minibatch-fraction`\=\*frac* option, which will cause Segway to 
-use a fraction *frac* or more of genomic positions, chosen randomly at each 
-training iteration.  For example, using ``--minibatch-fraction=0.01`` will 
-use a different random one percent of the genome for each training round.  
-This will allow training to have access to the whole genome for training 
-while maintaining fast iterations.  Using this option will select on the 
-basis of windows, so the fraction of the genome chosen will be closer to 
-the specified fraction if the windows are small (but the chosen fraction will 
-always be at least as large as specified).  Therefore, it is best to combine 
---minibatch-fraction with --split-sequences.  The likelihood-based training 
-stopping criterion is no longer valid with minibatch training, so training 
-will always run to --max-train-rounds (100, by default) if 
---minibatch-fraction is set.
+An alternative way to speed up training is to use the
+:option:`--minibatch-fraction`\=\ *frac* option, which will cause Segway to use
+a fraction *frac* or more of genomic positions, chosen randomly at each
+training iteration.  The :option:`--exclude-coords`\=\ *file* and
+:option:`--include-coords`\=\ *file* options still apply when using minibatch.
+The fraction will only apply to the resulting chosen coordinates.  For example,
+using ``--minibatch-fraction=0.01`` will use a different random one percent of
+the genome for each training round.  This will allow training to have access to
+the whole genome for training while maintaining fast iterations.  Using this
+option will select on the basis of windows, so the fraction of the genome
+chosen will be closer to the specified fraction if the windows are small (but
+the chosen fraction will always be at least as large as specified).  Therefore,
+it is best to combine --minibatch-fraction with --split-sequences.  The
+likelihood-based training stopping criterion is no longer valid with minibatch
+training, so training will always run to --max-train-rounds (100, by default)
+if --minibatch-fraction is set.
 
 An alternative way to choose the winning set of parameters
-is available through the :option:`--validation-fraction`\=\*frac* or 
+is available through the :option:`--validation-fraction`\=\ *frac* or 
 :option:`--validation-coords` options. Specifying a fraction *frac* to 
 :option:`--validation-fraction` will cause Segway to choose a fraction *frac* 
 or more of genomic positions as a held-out validation set. 
-:option:`--validation-coords`\=\*file* allows one to explicitly specify genomic 
+:option:`--validation-coords`\=\ *file* allows one to explicitly specify genomic 
 coordinates in a BED-format file, to be used as a validation set. When 
 using either of these options, Segway will evaluate the model after each 
 training iteration on the validation set and will choose the winning set 

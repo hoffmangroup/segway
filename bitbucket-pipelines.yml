@@ -3,14 +3,29 @@
 # Only use spaces to indent your .yml configuration.
 # -----
 # You can specify a custom docker image from Docker Hub as your build environment.
-image: ericr86/segway-test-build:latest
+image: hoffmanlab/segway-test:latest
 
 pipelines:
   default:
-    - step:
-        script: # Modify the commands below to build your repository.
-          - pip install .
-          - python --version
-          - pip list
-          - gmtkPrint -version
-          - cd test && ./test_all.sh
+    - parallel:
+        - step:
+            caches:
+              - pip
+            name: Python2
+            script:
+              - python -m pip install .
+              - python --version
+              - pip list
+              - gmtkPrint -version 
+              - cd test && ./test_all.sh
+        - step:
+            caches:
+              - pip
+            name: Python3
+            script:
+              - alias python="python3"
+              - python -m pip install .
+              - python --version
+              - pip list
+              - gmtkPrint -version
+              - cd test && SEGWAY_TEST_PYTHON_VERSION=3 ./test_all.sh
