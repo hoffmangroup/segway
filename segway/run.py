@@ -507,7 +507,7 @@ class TrainThread(Thread):
         self.session = session
         self.num_segs = num_segs
         self.instance_index = instance_index
-        self.input_master_filename = make_default_filename \
+        self.runner.input_master_filename = make_default_filename \
             (InputMasterSaver.resource_name, runner.params_dirpath, instance_index)
 
         Thread.__init__(self)
@@ -518,7 +518,6 @@ class TrainThread(Thread):
         self.runner.instance_index = self.instance_index
         with self.runner.open_job_log_file() as self.runner.job_log_file:
             self.result = self.runner.run_train_instance()
-
 
 def maybe_quote_arg(text):
     """return quoted argument, adding backslash quotes
@@ -1320,10 +1319,12 @@ class Runner(object):
                                               EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
-        job_log_file = open(job_log_filename, "w")
+        job_log_file = open(job_log_filename, "a")
 
         # Print job log header
-        print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
+        job_log_path = Path(job_log_filename)
+        if not job_log_path.isfile():
+            print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
         yield job_log_file
 
