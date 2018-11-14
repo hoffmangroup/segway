@@ -280,12 +280,12 @@ TRAIN_OPTION_TYPES = \
          validation_fraction=float, validation_coords_filename=str,
          var_floor=float)
 
-TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
-                          validation_likelihood = float, 
-                          input_master_filename = str, params_filename = str,
-                          log_likelihood_filename = str,
-                          validation_output_filename = str,
-                          validation_sum_filename = str)
+TRAIN_RESULT_TYPES = OrderedDict([("log_likelihood", float), ("num_segs", int),
+                          ("validation_likelihood", float), 
+                          ("input_master_filename", str), ("params_filename", str),
+                          ("log_likelihood_filename", str),
+                          ("validation_output_filename", str),
+                          ("validation_sum_filename", str)])
 
 IDENTIFY_OPTION_TYPES = \
     	dict(include_coords_filename=str, exclude_coords_filename=str,
@@ -2877,7 +2877,7 @@ class Runner(object):
             writer = ListWriter(tabfile)
             writer.writerow(TRAIN_FIELDNAMES)
 
-            for name, typ in sorted(viewitems(attrs)):
+            for name, typ in viewitems(attrs):
                 value = getattr(values_object, name)
                 if isinstance(typ, list):
                     for item in value:
