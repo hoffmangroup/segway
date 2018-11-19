@@ -1319,11 +1319,11 @@ class Runner(object):
                                               EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
+        is_file = Path(job_log_filename).isfile()
         job_log_file = open(job_log_filename, "a")
 
-        # Print job log header
-        job_log_path = Path(job_log_filename)
-        if not job_log_path.isfile():
+        # Print job log header if the file is new
+        if not is_file:
             print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
         yield job_log_file
@@ -2877,7 +2877,7 @@ class Runner(object):
             writer = ListWriter(tabfile)
             writer.writerow(TRAIN_FIELDNAMES)
 
-            for name, typ in viewitems(attrs):
+            for name, typ in sorted(viewitems(attrs)):
                 value = getattr(values_object, name)
                 if isinstance(typ, list):
                     for item in value:
