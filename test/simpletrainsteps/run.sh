@@ -29,7 +29,7 @@ SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --tracks-from="../tracks.txt" --num-labels=4 \
     "../simpleseg.genomedata" traindir
     
-../../compare_directory.py ../touchstone_init ./
+python ../../compare_directory.py ../touchstone_init ./
 
 segway "$cluster_arg" train-run "../simpleseg.genomedata" traindir
 
