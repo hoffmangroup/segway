@@ -33,15 +33,15 @@ SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
 
 segway "$cluster_arg" train-run "../simpleseg.genomedata" traindir
 
-../../compare_directory.py ../touchstone_run ./
+python ../../compare_directory.py ../touchstone_run ./
     
 segway "$cluster_arg" train-finish "../simpleseg.genomedata" traindir
 
-../../compare_directory.py ../touchstone_finish ./
+python ../../compare_directory.py ../touchstone_finish ./
 
 segway "$cluster_arg" identify --include-coords="../include-coords.bed" \
     "../simpleseg.genomedata" traindir identifydir
 
 cd ..
 
-../compare_directory.py ../simpletrainsteps/touchstone_final ../simpletrainsteps/${testdir#"./"}
+python ../compare_directory.py ../simpletrainsteps/touchstone_final ../simpletrainsteps/${testdir#"./"}
