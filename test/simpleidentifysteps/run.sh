@@ -33,12 +33,12 @@ segway "$cluster_arg" identify-init  --include-coords="../include-coords.bed" \
     "../simpleseg.genomedata" traindir identifydir
     
     
-../../compare_directory.py ../touchstone_init ./
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../touchstone_init ./
 
 segway "$cluster_arg" identify-run "../simpleseg.genomedata" traindir identifydir
 
-../../compare_directory.py ../touchstone_run ./
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../touchstone_run ./
     
 segway "$cluster_arg" identify-finish "../simpleseg.genomedata" traindir identifydir
 
-../../compare_directory.py ../touchstone_finish ./
+python${SEGWAY_TEST_PYTHON_VERSION:-""} ../touchstone_finish ./
