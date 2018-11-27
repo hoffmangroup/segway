@@ -1615,6 +1615,7 @@ class Runner(object):
 
         Add index in Genomedata file for each data track.
         """
+
         tracks = self.tracks
         is_tracks_from_archive = False
 
@@ -2975,10 +2976,10 @@ class Runner(object):
 
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
-
         input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(self.input_master_filename,
                                    self.params_dirpath, self.clobber)
+
         self.input_master_filename = input_master_filename
 
         # save file locations to tab-delimited file
@@ -3626,11 +3627,22 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.run_train()
 
                 if self.identify.running() or self.posterior.running():
+                    if not self.dry_run:
+                        # resave now that num_segs is determined,
+                        # in case you tested multiple num_segs
+                        self.save_include()
+
                     if self.posterior:
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
                                 "posterior task"
+                            )
+
+                        if self.num_worlds != 1:
+                            raise NotImplementedError(
+                                "Tied tracks are not yet supported for "
+                                "the posterior task"
                             )
 
                     self.run_identify_posterior()
