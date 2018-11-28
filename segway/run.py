@@ -3628,7 +3628,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
                 if self.identify.running() or self.posterior.running():
 
-                    if self.posterior:
+                    if self.posterior.running():
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
