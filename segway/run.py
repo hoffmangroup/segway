@@ -3627,10 +3627,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.run_train()
 
                 if self.identify.running() or self.posterior.running():
-                    if not self.dry_run:
-                        # resave now that num_segs is determined,
-                        # in case you tested multiple num_segs
-                        self.save_include()
 
                     if self.posterior:
                         if self.recover_dirname:
