@@ -63,6 +63,26 @@ mx_seg1_subseg0_testtrack2A
 mx_seg2_subseg0_testtrack2A
 mx_seg3_subseg0_testtrack2A
 
+DIRICHLET_TAB_IN_FILE inline
+1
+
+0 dirichlet_num_mix_components 1 1
+100
+
+
+
+DPMF_IN_FILE inline
+8
+
+0 dpmf_seg0_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components  1.0
+1 dpmf_seg0_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components  1.0
+2 dpmf_seg1_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components  1.0
+3 dpmf_seg1_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components  1.0
+4 dpmf_seg2_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components  1.0
+5 dpmf_seg2_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components  1.0
+6 dpmf_seg3_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components  1.0
+7 dpmf_seg3_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components  1.0
+
 
 DETERMINISTIC_CPT_IN_FILE inline
 #if CARD_SUPERVISIONLABEL == -1
@@ -162,17 +182,15 @@ COVAR_IN_FILE inline
 0 covar_testtrack1A 1 0.247466461547
 1 covar_testtrack2A 1 0.247466461547
 
-DPMF_IN_FILE inline
-8
 
-0 dpmf_seg0_subseg0_testtrack1A 1 DirichletConst 100  1.0
-1 dpmf_seg0_subseg0_testtrack2A 1 DirichletConst 100  1.0
-2 dpmf_seg1_subseg0_testtrack1A 1 DirichletConst 100  1.0
-3 dpmf_seg1_subseg0_testtrack2A 1 DirichletConst 100  1.0
-4 dpmf_seg2_subseg0_testtrack1A 1 DirichletConst 100  1.0
-5 dpmf_seg2_subseg0_testtrack2A 1 DirichletConst 100  1.0
-6 dpmf_seg3_subseg0_testtrack1A 1 DirichletConst 100  1.0
-7 dpmf_seg3_subseg0_testtrack2A 1 DirichletConst 100  1.0
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+
+#endif
+
 
 MC_IN_FILE inline
 8
@@ -197,17 +215,4 @@ MX_IN_FILE inline
 5 1 mx_seg2_subseg0_testtrack2A 1 dpmf_seg2_subseg0_testtrack2A mc_asinh_norm_seg2_subseg0_testtrack2A
 6 1 mx_seg3_subseg0_testtrack1A 1 dpmf_seg3_subseg0_testtrack1A mc_asinh_norm_seg3_subseg0_testtrack1A
 7 1 mx_seg3_subseg0_testtrack2A 1 dpmf_seg3_subseg0_testtrack2A mc_asinh_norm_seg3_subseg0_testtrack2A
-
-
-#else
-
-DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
-MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
-COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
-DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
-MC_IN_FILE INPUT_PARAMS_FILENAME ascii
-MX_IN_FILE INPUT_PARAMS_FILENAME ascii
-
-#endif
-
 
