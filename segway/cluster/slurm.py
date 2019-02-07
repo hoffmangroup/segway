@@ -6,34 +6,43 @@ from __future__ import division
 from math import ceil
 import sys
 
+from optbuild import OptionBuilder
+
 from .._util import MB
-from .common import _JobTemplateFactory, make_native_spec
+from .common import _JobTemplateFactory
+
+NATIVE_SPEC_PROG = OptionBuilder()  # do not run
+
+# Reference: https://github.com/natefoo/slurm-drmaa
+NATIVE_SPEC_DEFAULT = dict(
+    nodes=1,  # Number of nodes to run on
+    ntasks_per_node=1,  # Number of tasks per node
+    cpus_per_task=1,  # Number of cpus per task
+    mincpus=1,  # Min cpus per node
+    requeue=True,  # Allow requeue on node failure or job preemption
+    share=True  # Allow job allocation to be shared on nodes
+)
 
 
 class JobTemplateFactory(_JobTemplateFactory):
-
     def __init__(self, *args, **kwargs):
         _JobTemplateFactory.__init__(self, *args, **kwargs)
 
     def make_res_req(self, mem_usage, tmp_usage):
-        # XXX: Unused tmp_usage for tmp stoarge requirements
+        # XXX: Unused tmp_usage for tmp storage requirements
         # Required minimum memory
         res_req = make_single_res_req("mem", mem_usage)
 
         return res_req
 
     def make_native_spec(self):
-        # Reference: https://github.com/natefoo/slurm-drmaa
-        native_specification = " --nodes=1 "  # Number of nodes to run on
-        "--ntasks-per-node=1 "  # Number of tasks per node
-        "--cpus-per-task=1 "  # Number of cpus per task
-        "--mincpus=1 "  # Min cpus per node
-        "--requeue "  # Allow requeue on node failure or job preemption
-        "--share "  # Allow job allocation to be shared on nodes
+        return " ".join([self.native_spec,
+                         make_native_spec(**NATIVE_SPEC_DEFAULT),
+                         self.res_req])
 
-        res_spec = make_native_spec(self.res_req)
 
-        return res_spec + native_specification
+def make_native_spec(*args, **kwargs):
+    return " ".join(NATIVE_SPEC_PROG.build_args(args=args, options=kwargs))
 
 
 def make_single_res_req(name, mem):
