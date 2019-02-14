@@ -72,8 +72,8 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_RESULTS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
-                    SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED, 
-                    USE_MFSDG, VALIDATE_PROG, VITERBI_PROG)
+                    SUPERVISION_SEMISUPERVISED, USE_MFSDG, 
+                    VALIDATE_PROG, VITERBI_PROG)
 from .version import __version__
 
 # set once per file run
@@ -280,16 +280,18 @@ TRAIN_OPTION_TYPES = \
          validation_fraction=float, validation_coords_filename=str,
          var_floor=float)
 
-TRAIN_RESULT_TYPES = OrderedDict([("log_likelihood", float), ("num_segs", int),
-                          ("validation_likelihood", float), 
-                          ("input_master_filename", str), ("params_filename", str),
-                          ("log_likelihood_filename", str),
-                          ("validation_output_filename", str),
-                          ("validation_sum_filename", str)])
+TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
+                          validation_likelihood = float, 
+                          input_master_filename = str, params_filename = str,
+                          log_likelihood_filename = str,
+                          validation_output_filename = str,
+                          validation_sum_filename = str)
 
 IDENTIFY_OPTION_TYPES = \
     	dict(include_coords_filename=str, exclude_coords_filename=str,
              seg_table_filename=str, output_label=str)
+
+SUB_TASK_DELIMITER = "-"
 
 class Results():
     def get_filenames(self, validation = False):
@@ -507,8 +509,8 @@ class TrainThread(Thread):
         self.session = session
         self.num_segs = num_segs
         self.instance_index = instance_index
-        self.runner.input_master_filename = make_default_filename \
-            (InputMasterSaver.resource_name, runner.params_dirpath, instance_index)
+        self.runner.input_master_filename = make_default_filename(
+            InputMasterSaver.resource_name, runner.params_dirpath, instance_index)
 
         Thread.__init__(self)
 
@@ -629,27 +631,6 @@ class TrackGroup(list):
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
 
-
-class RunningSteps(object):
-    init = False
-    run = False
-    finish = False
-    not_running = False
-
-    def running(self):
-        return not self.not_running
-    
-    def set_all(self):
-        self.init = True
-        self.run = True
-        self.finish = True
-        
-    def __init__(self, step):
-        if not step:
-            self.set_all()
-        else:
-            setattr(self, step[0], True)
-
 class Runner(object):
     """
     Purpose:
@@ -753,9 +734,9 @@ class Runner(object):
         # flags
         self.clobber = False
         # XXX: this should become an int for num_starts
-        self.train = RunningSteps(["not_running"])  # EM train
-        self.posterior = RunningSteps(["not_running"])
-        self.identify = RunningSteps(["not_running"])  # viterbi
+        self.train = steps(["not_running"])  # EM train
+        self.posterior = steps(["not_running"])
+        self.identify = steps(["not_running"])  # viterbi
         self.recover_round = False
         self.validate = False
         self.dry_run = False
@@ -763,17 +744,46 @@ class Runner(object):
 
         self.__dict__.update(kwargs)
 
+    class steps(object):
+        """
+        Purpose:
+        Determines which steps were selected for running
+        Sets all to true if none were
+        """
+        init = False
+        run = False
+        finish = False
+        not_running = False
+
+        def running(self):
+            return not self.not_running
+    
+        def set_all(self):
+            self.init = True
+            self.run = True
+            self.finish = True
+
+        def __init__(self, step):
+            if not step:
+                self.set_all()
+            else:
+                setattr(self, step[0], True)
+
     def set_tasks(self, text):
         tasks = text.split("+")
 
         for task in tasks:
-            task = task.split("-")
+            task = task.split(SUB_TASK_DELIMITER)
             task_name = task[0]
             step = task[1:]
-            if "round" in step:
+            # Ensure that extra steps were not specified
+            assert length(step) < 3
+            if length(step) == 2:
+                # If two conditions were supplied, ensure that they were run-round.
+                assert step[0] == "run" and step[1] == "round"
                 self.recover_dirname = self.work_dirname
                 self.recover_round = True
-            setattr(self, task_name, RunningSteps(step))
+            setattr(self, task_name, steps(step))
 
     def set_option(self, name, value):
         # want to actually set the Runner option when optparse option
@@ -1319,11 +1329,11 @@ class Runner(object):
                                               EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
-        is_file = Path(job_log_filename).isfile()
         job_log_file = open(job_log_filename, "a")
 
-        # Print job log header if the file is new
-        if not is_file:
+        # Print job log header
+        job_log_path = Path(job_log_filename)
+        if not job_log_path.isfile():
             print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
         yield job_log_file
@@ -1615,7 +1625,6 @@ class Runner(object):
 
         Add index in Genomedata file for each data track.
         """
-
         tracks = self.tracks
         is_tracks_from_archive = False
 
@@ -2086,7 +2095,6 @@ class Runner(object):
 
     def save_gmtk_input(self):
         # can't run train and identify/posterior in the same run
-        assert not self.supervision_type == SUPERVISION_SUPERVISED
         if self.supervision_type == SUPERVISION_SEMISUPERVISED:
             self.load_supervision()
         self.set_tracknames()
@@ -2976,10 +2984,10 @@ class Runner(object):
 
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
+
         input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(self.input_master_filename,
                                    self.params_dirpath, self.clobber)
-
         self.input_master_filename = input_master_filename
 
         # save file locations to tab-delimited file
@@ -3627,18 +3635,11 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.run_train()
 
                 if self.identify.running() or self.posterior.running():
-
-                    if self.posterior.running():
+                    if self.posterior:
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
                                 "posterior task"
-                            )
-
-                        if self.num_worlds != 1:
-                            raise NotImplementedError(
-                                "Tied tracks are not yet supported for "
-                                "the posterior task"
                             )
 
                     self.run_identify_posterior()
