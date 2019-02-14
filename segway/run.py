@@ -280,12 +280,12 @@ TRAIN_OPTION_TYPES = \
          validation_fraction=float, validation_coords_filename=str,
          var_floor=float)
 
-TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
-                          validation_likelihood = float, 
-                          input_master_filename = str, params_filename = str,
-                          log_likelihood_filename = str,
-                          validation_output_filename = str,
-                          validation_sum_filename = str)
+TRAIN_RESULT_TYPES = OrderedDict([("log_likelihood", float), ("num_segs", int),
+                          ("validation_likelihood", float), 
+                          ("input_master_filename", str), ("params_filename", str),
+                          ("log_likelihood_filename", str),
+                          ("validation_output_filename", str),
+                          ("validation_sum_filename", str)])
 
 IDENTIFY_OPTION_TYPES = \
     	dict(include_coords_filename=str, exclude_coords_filename=str,
@@ -507,7 +507,7 @@ class TrainThread(Thread):
         self.session = session
         self.num_segs = num_segs
         self.instance_index = instance_index
-        self.input_master_filename = make_default_filename \
+        self.runner.input_master_filename = make_default_filename \
             (InputMasterSaver.resource_name, runner.params_dirpath, instance_index)
 
         Thread.__init__(self)
@@ -518,7 +518,6 @@ class TrainThread(Thread):
         self.runner.instance_index = self.instance_index
         with self.runner.open_job_log_file() as self.runner.job_log_file:
             self.result = self.runner.run_train_instance()
-
 
 def maybe_quote_arg(text):
     """return quoted argument, adding backslash quotes
@@ -701,7 +700,6 @@ class Runner(object):
         self.include_coords_filename = None
         self.exclude_coords_filename = None
         self.validation_coords_filename = None
-        self.prior_archive = None
 
         self.minibatch_fraction = MINIBATCH_DEFAULT
         self.validation_fraction = None
@@ -815,8 +813,7 @@ class Runner(object):
                         ("output_label", "output_label"),
                         ("max_train_rounds", "max_em_iters"),
                         ("reverse_world", "reverse_worlds"),
-                        ("track", "track_specs"),
-                        ("prior", "prior_archive")]
+                        ("track", "track_specs")]
 
     @classmethod
     def fromargs(cls, command, args):
@@ -1322,10 +1319,12 @@ class Runner(object):
                                               EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
-        job_log_file = open(job_log_filename, "w")
+        is_file = Path(job_log_filename).isfile()
+        job_log_file = open(job_log_filename, "a")
 
-        # Print job log header
-        print("\t".join(JOB_LOG_FIELDNAMES), file=job_log_file)
+        # Print job log header if the file is new
+        if not is_file:
+            print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
         yield job_log_file
 
@@ -1513,9 +1512,6 @@ class Runner(object):
         directives["SEGTRANSITION_WEIGHT_SCALE"] = \
             self.segtransition_weight_scale
 
-        if self.train.running and self.prior_archive:
-            directives["VIRTUAL_EVIDENCE_VE_LIST_FILENAME"] = self.ve_filepaths[0]
-
         res = " ".join(CPP_DIRECTIVE_FMT % item
                        for item in viewitems(directives))
 
@@ -1619,6 +1615,7 @@ class Runner(object):
 
         Add index in Genomedata file for each data track.
         """
+
         tracks = self.tracks
         is_tracks_from_archive = False
 
@@ -2111,19 +2108,12 @@ class Runner(object):
 
         # XXX: does this need to be done before save()?
         self.subset_metadata()
-        observations.create_filepaths(temp=True)
+
         observations.create_validation_filepaths()
-        observations.create_ve_filepaths()
-
-        self.float_filepaths = observations.float_filepaths
-        self.int_filepaths = observations.int_filepaths
-
         self.validation_float_filepaths = \
             observations.validation_float_filepaths
         self.validation_int_filepaths = \
             observations.validation_int_filepaths
-
-        self.ve_filepaths = observations.ve_filepaths
 
         if self.train.running():
             self.set_log_likelihood_filenames()
@@ -2383,9 +2373,6 @@ class Runner(object):
             track_indexes_text = ",".join(map(str, track_indexes))
             genomedata_names_text = ",".join(genomedata_names)
 
-            float_filepath = self.float_filepaths[window_index]
-            int_filepath = self.int_filepaths[window_index]
-
             is_semisupervised = (self.supervision_type ==
                                  SUPERVISION_SEMISUPERVISED)
 
@@ -2396,23 +2383,13 @@ class Runner(object):
                 supervision_coords = None
                 supervision_labels = None
 
-            prior_archive = self.prior_archive
-            if prior_archive:
-                ve_filepath = self.ve_filepaths[window_index]
-            else:
-                ve_filepath = None
-
             additional_prefix_args = [
                genomedata_names_text,
-               float_filepath,
-               int_filepath,
                self.distribution,
                track_indexes_text,
                is_semisupervised,
                supervision_coords,
-               supervision_labels,
-               prior_archive,
-               ve_filepath
+               supervision_labels
             ]
 
         prefix_args = [segway_task_path,
@@ -2999,10 +2976,10 @@ class Runner(object):
 
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
-
         input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(self.input_master_filename,
                                    self.params_dirpath, self.clobber)
+
         self.input_master_filename = input_master_filename
 
         # save file locations to tab-delimited file
@@ -3434,7 +3411,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # landed
         Path(recover_filename).copy2(self.viterbi_filenames[window_index])
 
-        print("window %d already complete" % window_index, file=sys.stderr)
+        print("window", window_index, "already complete", file=sys.stderr)
 
         return True
 
@@ -3455,8 +3432,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         is_reverse = str(int(self.is_in_reversed_world(window_index)))
 
         window = self.windows[window_index]
-        float_filepath = self.float_filepaths[window_index]
-        int_filepath = self.int_filepaths[window_index]
 
         # The track indexes should be semi-colon separated for each genomedata
         # archive
@@ -3490,7 +3465,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
-                       genomedata_archives_text, float_filepath, int_filepath,
+                       genomedata_archives_text,
                        self.distribution, track_indexes_text, self.num_mix_components]
 
         output_filename = None
@@ -3606,7 +3581,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         with open(cmdline_top_filename, "a") as cmdline_top_file:
             print(run_msg, file=cmdline_top_file)
             print(file=cmdline_top_file)
-            print("cd %s" % maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
+            print("cd", maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
             print(cmdline2text(), file=cmdline_top_file)
 
         return run_msg
@@ -3652,11 +3627,18 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.run_train()
 
                 if self.identify.running() or self.posterior.running():
-                    if self.posterior:
+
+                    if self.posterior.running():
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
                                 "posterior task"
+                            )
+
+                        if self.num_worlds != 1:
+                            raise NotImplementedError(
+                                "Tied tracks are not yet supported for "
+                                "the posterior task"
                             )
 
                     self.run_identify_posterior()
@@ -3674,7 +3656,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
 
-    usage = "%(prog)s [GLOBAL_OPTION]...  TASK [TASK_OPTION] " \
+    usage = "%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]" \
             "GENOMEDATA [GENOMEDATA ...] TRAINDIR [IDENTIFYDIR]"
 
     version = "%(prog)s {}".format(__version__)
@@ -3715,8 +3697,6 @@ def parse_options(argv):
                        metavar="OPT",
                        help="specify an option to be passed to the "
                        "cluster manager")
-    group.add_argument("--prior-archive", help="Genomedata archive containing virtual"
-                       "evidence for use in the model", dest = "prior")
 
     group = parser.add_argument_group("Flags")
     group.add_argument("-c", "--clobber", action="store_true",
@@ -3725,9 +3705,6 @@ def parse_options(argv):
                        "overwritten")
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
-
-    # Positional arguments
-    parser.add_argument("args", nargs="*")  # "" for at least 1 arg
 
     tasks = parser.add_subparsers(help="Segway Tasks", dest = "command")
 
@@ -3950,6 +3927,7 @@ def parse_options(argv):
     args = options.args  # is a non-iterable Namespace object
 
     return command, options, args
+
 
 def main(argv=sys.argv[1:]):
     command, options, args = parse_options(argv)
