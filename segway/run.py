@@ -280,12 +280,13 @@ TRAIN_OPTION_TYPES = \
          validation_fraction=float, validation_coords_filename=str,
          var_floor=float)
 
-TRAIN_RESULT_TYPES = OrderedDict(log_likelihood = float, num_segs = int,
-                          validation_likelihood = float, 
-                          input_master_filename = str, params_filename = str,
-                          log_likelihood_filename = str,
-                          validation_output_filename = str,
-                          validation_sum_filename = str)
+
+TRAIN_RESULT_TYPES = OrderedDict([("log_likelihood", float), ("num_segs", int),
+                          ("validation_likelihood", float), 
+                          ("input_master_filename", str), ("params_filename", str),
+                          ("log_likelihood_filename", str),
+                          ("validation_output_filename", str),
+                          ("validation_sum_filename", str)])
 
 IDENTIFY_OPTION_TYPES = \
     	dict(include_coords_filename=str, exclude_coords_filename=str,
@@ -1329,11 +1330,12 @@ class Runner(object):
                                               EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
+        is_file = Path(job_log_filename).isfile()
         job_log_file = open(job_log_filename, "a")
 
-        # Print job log header
-        job_log_path = Path(job_log_filename)
-        if not job_log_path.isfile():
+
+        # Print job log header if the file is new
+        if not is_file:
             print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
         yield job_log_file
@@ -3635,11 +3637,16 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.run_train()
 
                 if self.identify.running() or self.posterior.running():
-                    if self.posterior:
+                    if self.posterior.running():
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
                                 "posterior task"
+                            )
+                        if self.num_worlds != 1:
+                            raise NotImplementedError(
+                                "Tied tracks are not yet supported for "
+                                "the posterior task"
                             )
 
                     self.run_identify_posterior()
