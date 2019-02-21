@@ -10,7 +10,7 @@ run: main Segway implementation
 from collections import defaultdict, OrderedDict
 from contextlib import contextmanager
 from copy import copy
-import csv
+from csv import writer
 from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
@@ -302,17 +302,11 @@ class Results():
                    self.validation_sum_filename]
         return[self.input_master_filename, self.params_filename, 
                self.log_likelihood_filename]
-               
-    def set_results(self, result_list):
+
+    def __init__(self, result_list):
         zipper = zip(result_list, TRAIN_RESULT_TYPES.keys())
         for value, name in zipper:
             setattr(self, name, value)
-
-    def __init__(self, result_list = None):
-        if result_list:
-            self.set_results(result_list)
-        else:
-            pass
     
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
@@ -1331,17 +1325,12 @@ class Runner(object):
                                               subdirname=SUBDIRNAME_LOG)
 
         is_file = Path(job_log_filename).isfile()
-        job_log_file = open(job_log_filename, "a")
+        with open(job_log_filename, "a") as job_log_file:
+            # Print job log header if the file is new
+            if not is_file:
+                print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
-
-        # Print job log header if the file is new
-        if not is_file:
-            print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
-
-        yield job_log_file
-
-        job_log_file.close()
-
+            yield job_log_file
 
     @memoized_property
     def use_dinucleotide(self):
@@ -2142,7 +2131,7 @@ class Runner(object):
         window_bed_filename = self.make_filename(PREFIX_WINDOW, EXT_BED)
 
         with open(window_bed_filename, "w") as window_bed_file:
-            bed_writer = csv.writer(window_bed_file, delimiter=DELIMITER_BED,
+            bed_writer = writer(window_bed_file, delimiter=DELIMITER_BED,
                     lineterminator="\n")  #NB: csv defaults to dos newlines
             for index, window in enumerate(self.windows):
                 bed_writer.writerow((window.chrom, window.start, window.end,
@@ -2789,7 +2778,7 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return Results(None, None, None, None, None, None, None, None)
+            return TrainResults([None, None, None, None, None, None, None, None])
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
@@ -2805,15 +2794,13 @@ class Runner(object):
         if (self.validate and
             self.recover_dirname):
             # recover last set of best results
-            result_list = [log_likelihood, self.num_segs,
-                           validation_likelihood,
-                           self.input_master_filename,
-                           self.best_params_filename,
-                           self.log_likelihood_filename,
-                           self.validation_output_winner_filename,
-                           self.validation_sum_winner_filename]
-            result = Results(result_list)
-
+            result = TrainResults([log_likelihood, self.num_segs,
+                                   validation_likelihood,
+                                   self.input_master_filename,
+                                   self.best_params_filename,
+                                   self.log_likelihood_filename,
+                                   self.validation_output_winner_filename,
+                                   self.validation_sum_winner_filename]
 
         while (round_index < self.max_em_iters and
                ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
@@ -2858,7 +2845,7 @@ class Runner(object):
                     copy2(self.validation_sum_filename,
                           self.validation_sum_winner_filename)
 
-                    result = Results([log_likelihood, self.num_segs,
+                    result = TrainResults([log_likelihood, self.num_segs,
                                      validation_likelihood,
                                      self.input_master_filename,
                                      self.last_params_filename,
@@ -2870,7 +2857,7 @@ class Runner(object):
             round_index += 1
 
         if not self.validate:
-            result = Results([log_likelihood, self.num_segs,
+            result = TrainResults([log_likelihood, self.num_segs,
                              validation_likelihood,
                              self.input_master_filename,
                              self.last_params_filename,
@@ -2881,26 +2868,26 @@ class Runner(object):
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
 
-    def save_tabfile(self, values_object, attrs, tabfilename):
-        filename = self.make_filename(tabfilename)
+    def save_tabfile(self, values_object, attrs, tab_filename):
+        filename = self.make_filename(tab_filename)
 
-        with open(filename, "w") as tabfile:
-            writer = ListWriter(tabfile)
-            writer.writerow(TRAIN_FIELDNAMES)
+        with open(filename, "w") as tab_file:
+            tab_writer = writer(tab_file, delimiter = DELIMITER_BED)
+            tab_writer.writerow(TRAIN_FIELDNAMES)
 
             for name, typ in sorted(viewitems(attrs)):
                 value = getattr(values_object, name)
                 if isinstance(typ, list):
                     for item in value:
-                        writer.writerow([name, item])
+                        tab_writer.writerow([name, item])
                 else:
-                    writer.writerow([name, value])
+                    tab_writer.writerow([name, value])
 
-    def load_train_options(self, traindirname):
+    def load_train_options(self, train_dir_name):
         """
-        load options from training and convert to appropriate type
+        load options from training
         """
-        filename = Path(traindirname) / TRAIN_FILEBASENAME
+        filename = Path(train_dir_name) / TRAIN_FILEBASENAME
 
         with open(filename) as tabfile:
             reader = DictReader(tabfile)
@@ -2909,46 +2896,45 @@ class Runner(object):
                 name = row["name"]
                 value = row["value"]
 
-                if not value:
-                    continue
-                # Don't override options shared by identify and train
-                if name in IDENTIFY_OPTION_TYPES.keys() and \
-                    (self.identify.running() or self.posterior.running()):
-                    continue
+                # Check if the option is used by identify as well, then ignore
+                is_identify_option = name in IDENTIFY_OPTION_TYPES.keys() and \
+                    (self.identify.running() or self.posterior.running())
+                if value and not is_identify_option:
+                    row_type = TRAIN_OPTION_TYPES[name]
+                    if isinstance(typ, list):
+                        assert len(typ) == 1
+                        item_type = row_type[0]
+                        getattr(self, name).append(item_type(value))
+                    else:
+                        setattr(self, name, row_type(value))
 
-                typ = TRAIN_OPTION_TYPES[name]
-                if isinstance(typ, list):
-                    assert len(typ) == 1
-                    item_typ = typ[0]
-                    getattr(self, name).append(item_typ(value))
-                else:
-                    setattr(self, name, typ(value))
-
-        if self.params_filename is not None and not self.train.running():
+        if self.params_filename is not None and \
+          not self.train.running():
             self.params_filenames = [self.params_filename]
 
     def load_train_results(self):
         pattern = extjoin(PREFIX_TRAIN_RESULTS, "*", EXT_TAB)
         instance_params = []
         for filename in Path(self.results_dirpath).files(pattern):
-            results = Results()
+            # Set variables to none to be overwritten by the tab file contents
+            results = TrainResults([None, None, None, None, None, None, None, None])
             with open(filename) as resultfile:
                 for line in resultfile.readlines()[1:]:
-                    values = line.strip("\n").split("\t")
+                    values = line.split(DELIMITER_BED)
                     name = values[0]
                     value = values[1]
-                    item_typ = TRAIN_RESULT_TYPES[name]
-                    setattr(results, name, item_typ(value))
+                    item_type = TRAIN_RESULT_TYPES[name]
+                    setattr(results, name, item_type(value))
 
             instance_params.append(results)
 
         return instance_params
 
-    def load_identify_options(self, traindirname):
+    def load_identify_options(self, identify_dir_name):
         """
-        load options from training and convert to appropriate type
+        load options set in identify-init
         """
-        filename = Path(traindirname) / IDENTIFY_FILEBASENAME
+        filename = Path(identify_dir_name) / IDENTIFY_FILEBASENAME
 
         with open(filename) as tabfile:
             reader = DictReader(tabfile)
@@ -2957,15 +2943,16 @@ class Runner(object):
                 name = row["name"]
                 value = row["value"]
 
-                typ = IDENTIFY_OPTION_TYPES[name]
-                if isinstance(typ, list):
-                    assert len(typ) == 1
-                    item_typ = typ[0]
-                    getattr(self, name).append(item_typ(value))
+                row_type = IDENTIFY_OPTION_TYPES[name]
+                # Checks if this option was of type list, sets each element to
+                # correct type then
+                if isinstance(row_type, list):
+                    item_type = row_type[0]
+                    getattr(self, name).append(item_type(value))
                 else:
-                    setattr(self, name, typ(value))
+                    setattr(self, name, row_type(value))
 
-    def setup_shared(self):
+    def setup_shared_steps(self):
         self.make_subdirs(SUBDIRNAMES_EITHER)
 
         self.save_gmtk_input()
@@ -2978,7 +2965,7 @@ class Runner(object):
         """
         assert self.num_instances >= 1
 
-        self.setup_shared()
+        self.setup_shared_steps()
         self.make_subdirs(SUBDIRNAMES_TRAIN)
 
         # save the destination file for input_master as we will be
@@ -2995,7 +2982,8 @@ class Runner(object):
         # save file locations to tab-delimited file
         self.save_tabfile(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
 
-        # Make new input master for each instance
+        # If a single instance is being run, create a single input.master
+        # Else create an input master for each instance
         if not self.instance_make_new_params:
             self.save_input_master()
         else:
@@ -3019,10 +3007,14 @@ class Runner(object):
             return self.run_train_singlethread
 
     def finish_train(self, instance_params, dst_filenames):
+        """
+        Finds and then copies the best training round and instance to the 
+        general files such as params.params, input.master, etc.
+        """
         if self.dry_run:
             return
 
-        # Copy the best best training instance for each training instance
+        # Copy the param from the best round of each training instance
         for instance in instance_params:
             # Remove instance number from end of param filename
             instance_param_filename = instance.params_filename.split(".")[0:-1]
@@ -3034,14 +3026,14 @@ class Runner(object):
                              key=attrgetter("validation_likelihood"))
         else:
             max_params = max(instance_params, key=attrgetter("log_likelihood"))
+
         check_filenames = max_params.get_filenames(self.validate)
 
         if None in check_filenames:
-            raise ValueError("all training instances failed")
+            raise RuntimeError("All training instances failed")
 
         best_params_filename = max_params.params_filename
         src_filenames = max_params.get_filenames(True)
-        assert LEN_TRAIN_ATTRNAMES == len(src_filenames) == len(dst_filenames)
 
         zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
         for name, src_filename, dst_filename in zipper:
@@ -3068,12 +3060,12 @@ class Runner(object):
     def run_train(self):
 
         if self.train.init:
-             dst_filenames = self.setup_train()
+             dest_filenames = self.setup_train()
         else:
             # Reload options and filenames
             self.load_train_options(self.work_dirpath)
             self.save_gmtk_input()
-            dst_filenames = [self.input_master_filename, self.params_filename,
+            dest_filenames = [self.input_master_filename, self.params_filename,
                              self.log_likelihood_filename,
                              self.validation_output_filename,
                              self.validation_sum_filename]
@@ -3094,7 +3086,7 @@ class Runner(object):
             instance_params = self.load_train_results()
 
         if self.train.finish:
-            self.finish_train(instance_params, dst_filenames)
+            self.finish_train(instance_params, dest_filenames)
 
     def run_train_singlethread(self, num_segs_range):
         # having a single-threaded version makes debugging much easier
@@ -3224,6 +3216,10 @@ to find the winning instance anyway.""" % thread.instance_index)
                                                            recover_dirname))
 
         if not self.recover_round:
+            # If we are recovering a previous training instance rather than
+            # a round we need to copy the files from the old training directory
+            # into our current one. If just using train-run-round, these will
+            # already be present.
             self.input_master_filename = \
                 self.recover_filename(InputMasterSaver.resource_name)
             log_likelihood_tab_filename = self.log_likelihood_tab_filename
@@ -3323,6 +3319,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         final_round_index = len(log_likelihoods)
         if final_round_index == 0:
+            # This is the case where train-run-round was used for the first round
+            # Sets the log_likelihood temporarily as it would be otherwise
             log_likelihood = -inf
         if final_round_index > 0:
             log_likelihood = log_likelihoods[-1]
@@ -3360,7 +3358,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.max_em_iters = final_round_index + 1
 
         return last_log_likelihood, log_likelihood, final_round_index, \
-            validation_likelihood, best_validation_likelihood        
+            validation_likelihood, best_validation_likelihood
 
     def make_instance_initial_results(self):
         """
@@ -3519,7 +3517,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         self.instance_index = "identify"
 
         if self.identify.init or self.posterior.init:
-            self.setup_shared()
+            self.setup_shared_steps()
             self.save_tabfile(self, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
         else:
             self.set_triangulation_filename()
