@@ -1,4 +1,8 @@
 2.0.4:
+* segway: priors and mixture components are now derived from previous EM
+  iterations instead of from input master
+* segway: the DPMF table is now stored as constants instead of a fixed table
+  allowing splitting and vanishing components to resize correctly
 * segway: updated test touchstones for newer GLIBC versions
 * segway: SLURM: added support for 18.08 (https://github.com/natefoo/slurm-drmaa)
 
