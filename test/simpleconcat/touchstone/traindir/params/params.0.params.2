@@ -75,27 +75,107 @@ covar_testtrack2A 1 1.7871307136e-05
 % dense PMFs
 8 
 0 
-dpmf_seg0_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components 
+dpmf_seg0_subseg0_testtrack1A 1 DirichletConst 1.00000000000000000e+02 
 1.00000000000000000e+00 
 1 
-dpmf_seg0_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components 
+dpmf_seg0_subseg0_testtrack2A 1 DirichletConst 1.00000000000000000e+02 
 1.00000000000000000e+00 
 2 
-dpmf_seg1_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components 
+dpmf_seg1_subseg0_testtrack1A 1 DirichletConst 1.00000000000000000e+02 
 1.00000000000000000e+00 
 3 
-dpmf_seg1_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components 
+dpmf_seg1_subseg0_testtrack2A 1 DirichletConst 1.00000000000000000e+02 
 1.00000000000000000e+00 
 4 
-dpmf_seg2_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components 
+dpmf_seg2_subseg0_testtrack1A 1 DirichletConst 1.00000000000000000e+02 
 1.00000000000000000e+00 
 5 
-dpmf_seg2_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components 
+dpmf_seg2_subseg0_testtrack2A 1 DirichletConst 1.00000000000000000e+02 
 1.00000000000000000e+00 
 6 
-dpmf_seg3_subseg0_testtrack1A 1 DirichletTable dirichlet_num_mix_components 
+dpmf_seg3_subseg0_testtrack1A 1 DirichletConst 1.00000000000000000e+02 
 1.00000000000000000e+00 
 7 
-dpmf_seg3_subseg0_testtrack2A 1 DirichletTable dirichlet_num_mix_components 
+dpmf_seg3_subseg0_testtrack2A 1 DirichletConst 1.00000000000000000e+02 
 1.00000000000000000e+00 
+
+
+% Components
+8 
+0 
+1 
+0 mc_asinh_norm_seg0_subseg0_testtrack1A 
+mean_seg0_subseg0_testtrack1A covar_testtrack1A 
+1 
+1 
+0 mc_asinh_norm_seg0_subseg0_testtrack2A 
+mean_seg0_subseg0_testtrack2A covar_testtrack2A 
+2 
+1 
+0 mc_asinh_norm_seg1_subseg0_testtrack1A 
+mean_seg1_subseg0_testtrack1A covar_testtrack1A 
+3 
+1 
+0 mc_asinh_norm_seg1_subseg0_testtrack2A 
+mean_seg1_subseg0_testtrack2A covar_testtrack2A 
+4 
+1 
+0 mc_asinh_norm_seg2_subseg0_testtrack1A 
+mean_seg2_subseg0_testtrack1A covar_testtrack1A 
+5 
+1 
+0 mc_asinh_norm_seg2_subseg0_testtrack2A 
+mean_seg2_subseg0_testtrack2A covar_testtrack2A 
+6 
+1 
+0 mc_asinh_norm_seg3_subseg0_testtrack1A 
+mean_seg3_subseg0_testtrack1A covar_testtrack1A 
+7 
+1 
+0 mc_asinh_norm_seg3_subseg0_testtrack2A 
+mean_seg3_subseg0_testtrack2A covar_testtrack2A 
+
+
+% Mixtures of components
+8 
+0 
+1 
+mx_seg0_subseg0_testtrack1A 
+1 dpmf_seg0_subseg0_testtrack1A 
+mc_asinh_norm_seg0_subseg0_testtrack1A 
+1 
+1 
+mx_seg0_subseg0_testtrack2A 
+1 dpmf_seg0_subseg0_testtrack2A 
+mc_asinh_norm_seg0_subseg0_testtrack2A 
+2 
+1 
+mx_seg1_subseg0_testtrack1A 
+1 dpmf_seg1_subseg0_testtrack1A 
+mc_asinh_norm_seg1_subseg0_testtrack1A 
+3 
+1 
+mx_seg1_subseg0_testtrack2A 
+1 dpmf_seg1_subseg0_testtrack2A 
+mc_asinh_norm_seg1_subseg0_testtrack2A 
+4 
+1 
+mx_seg2_subseg0_testtrack1A 
+1 dpmf_seg2_subseg0_testtrack1A 
+mc_asinh_norm_seg2_subseg0_testtrack1A 
+5 
+1 
+mx_seg2_subseg0_testtrack2A 
+1 dpmf_seg2_subseg0_testtrack2A 
+mc_asinh_norm_seg2_subseg0_testtrack2A 
+6 
+1 
+mx_seg3_subseg0_testtrack1A 
+1 dpmf_seg3_subseg0_testtrack1A 
+mc_asinh_norm_seg3_subseg0_testtrack1A 
+7 
+1 
+mx_seg3_subseg0_testtrack2A 
+1 dpmf_seg3_subseg0_testtrack2A 
+mc_asinh_norm_seg3_subseg0_testtrack2A 
 
