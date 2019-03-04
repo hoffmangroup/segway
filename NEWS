@@ -1,4 +1,5 @@
 2.0.4:
+* segway: updated test touchstones for newer GLIBC versions
 * segway: SLURM: added support for 18.08 (https://github.com/natefoo/slurm-drmaa)
 
 2.0.3:
