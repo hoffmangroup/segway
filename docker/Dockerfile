@@ -1,6 +1,6 @@
-FROM ubuntu:16.04
+FROM ubuntu:latest
 
-# Install Ubuntu 16.04 LTS (Xenial Xerus)
+# Install Ubuntu 18.04.01 LTS (Bionic Beaver)
 # Install pkg-config for locationg development files (hdf5)
 # Install python 2.7 and pip
 # Install python 3.6 and pip3
