@@ -26,7 +26,7 @@ fi
 
 set -x
 
-SEGWAY_RAND_SEED=1188 segway "$cluster_arg" \
+SEGWAY_RAND_SEED=7908 segway "$cluster_arg" \
     --semisupervised="../semi-label.bed" \
     --resolution=10 \
     --include-coords="../include-coords.bed" \

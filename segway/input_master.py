@@ -701,13 +701,23 @@ class GammaMCParamSpec(MCParamSpec):
 
 class MXParamSpec(ParamSpec):
     type_name = "MX"
-
     def generate_objects(self):
         """
         returns: iterable of strs containing gmtk parameter objects starting
         with names
         """
-        object_tmpl = "1 mx_${seg}_${subseg}_${track} ${num_mix_components} dpmf_${seg}_${subseg}_${track}"
+        object_tmpl = "1 mx_${seg}_${subseg}_${track} ${num_mix_components} "
+
+        # If the number of mixture components is one
+        if self.num_mix_components == 1:
+            # Set the dense probabily mass function containing component
+            # responsibilites to be set to always 1 for 1 component
+            object_tmpl += "dpmf_always"
+        # Otherwise set the dense probability mass function based on number
+        # of components from the GMTK DPMF definition
+        else:
+            object_tmpl += "dpmf_${seg}_${subseg}_${track}"
+
         for component in range(self.num_mix_components):
             add = " mc_${distribution}_${seg}_${subseg}_${track}%s" % (
                 self.get_template_component_suffix(component))
@@ -735,24 +745,32 @@ class DPMFParamSpec(DenseCPTParamSpec):
         returns: iterable of strs containing gmtk parameter objects starting
         with names
         """
+        # If the number of mixture components is one
+        if self.num_mix_components == 1:
+            # Create a dense probability mass function of one value of 1
+            # to fix the number of mixture components to one
+            yield "dpmf_always 1 1.0"
+        # Otherwise
+        else:
+            # Create a dense probability mass function of dirichlet constants
+            # with the same amount of mixture components
+            object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
+                        "DirichletConst %s ${weights}" % GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
+            weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
+            substitute = Template(object_tmpl).substitute
+            data = self.make_data()
+            for mapping in self.generate_tmpl_mappings():
+                mapping["weights"] = weights
+                track_index = mapping["track_index"]
+                mapping["num_mix_components"] = self.num_mix_components
+                if self.distribution == DISTRIBUTION_GAMMA:
+                    mapping["min_track"] = self.get_track_lt_min(track_index)
 
-        object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
-                      "DirichletConst %s ${weights}" % GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
-        weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
-        substitute = Template(object_tmpl).substitute
-        data = self.make_data()
-        for mapping in self.generate_tmpl_mappings():
-            mapping["weights"] = weights
-            track_index = mapping["track_index"]
-            mapping["num_mix_components"] = self.num_mix_components
-            if self.distribution == DISTRIBUTION_GAMMA:
-                mapping["min_track"] = self.get_track_lt_min(track_index)
-
-            if data is not None:
-                seg_index = mapping["seg_index"]
-                subseg_index = mapping["subseg_index"]
-                mapping["datum"] = data[seg_index, subseg_index, track_index]
-            yield substitute(mapping)
+                if data is not None:
+                    seg_index = mapping["seg_index"]
+                    subseg_index = mapping["subseg_index"]
+                    mapping["datum"] = data[seg_index, subseg_index, track_index]
+                yield substitute(mapping)
 
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"

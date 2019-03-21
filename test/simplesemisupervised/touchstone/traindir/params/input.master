@@ -170,14 +170,14 @@ DENSE_CPT_IN_FILE inline
 MEAN_IN_FILE inline
 8
 
-0 mean_seg0_subseg0_testtrack1 1 0.418286307235
-1 mean_seg0_subseg0_testtrack2 1 0.512173645926
-2 mean_seg1_subseg0_testtrack1 1 0.560935340366
-3 mean_seg1_subseg0_testtrack2 1 0.56688710599
-4 mean_seg2_subseg0_testtrack1 1 0.473605378467
-5 mean_seg2_subseg0_testtrack2 1 0.418997612987
-6 mean_seg3_subseg0_testtrack1 1 0.568943841213
-7 mean_seg3_subseg0_testtrack2 1 0.50007326646
+0 mean_seg0_subseg0_testtrack1 1 0.43247547774
+1 mean_seg0_subseg0_testtrack2 1 0.476368920382
+2 mean_seg1_subseg0_testtrack1 1 0.47649317939
+3 mean_seg1_subseg0_testtrack2 1 0.441271336575
+4 mean_seg2_subseg0_testtrack1 1 0.414144292884
+5 mean_seg2_subseg0_testtrack2 1 0.429763617252
+6 mean_seg3_subseg0_testtrack1 1 0.461187069602
+7 mean_seg3_subseg0_testtrack2 1 0.506075884739
 
 COVAR_IN_FILE inline
 2
@@ -186,16 +186,9 @@ COVAR_IN_FILE inline
 1 covar_testtrack2 1 0.247466461547
 
 DPMF_IN_FILE inline
-8
+1
 
-0 dpmf_seg0_subseg0_testtrack1 1 DirichletConst 100  1.0
-1 dpmf_seg0_subseg0_testtrack2 1 DirichletConst 100  1.0
-2 dpmf_seg1_subseg0_testtrack1 1 DirichletConst 100  1.0
-3 dpmf_seg1_subseg0_testtrack2 1 DirichletConst 100  1.0
-4 dpmf_seg2_subseg0_testtrack1 1 DirichletConst 100  1.0
-5 dpmf_seg2_subseg0_testtrack2 1 DirichletConst 100  1.0
-6 dpmf_seg3_subseg0_testtrack1 1 DirichletConst 100  1.0
-7 dpmf_seg3_subseg0_testtrack2 1 DirichletConst 100  1.0
+0 dpmf_always 1 1.0
 
 MC_IN_FILE inline
 8
@@ -212,14 +205,14 @@ MC_IN_FILE inline
 MX_IN_FILE inline
 8
 
-0 1 mx_seg0_subseg0_testtrack1 1 dpmf_seg0_subseg0_testtrack1 mc_asinh_norm_seg0_subseg0_testtrack1
-1 1 mx_seg0_subseg0_testtrack2 1 dpmf_seg0_subseg0_testtrack2 mc_asinh_norm_seg0_subseg0_testtrack2
-2 1 mx_seg1_subseg0_testtrack1 1 dpmf_seg1_subseg0_testtrack1 mc_asinh_norm_seg1_subseg0_testtrack1
-3 1 mx_seg1_subseg0_testtrack2 1 dpmf_seg1_subseg0_testtrack2 mc_asinh_norm_seg1_subseg0_testtrack2
-4 1 mx_seg2_subseg0_testtrack1 1 dpmf_seg2_subseg0_testtrack1 mc_asinh_norm_seg2_subseg0_testtrack1
-5 1 mx_seg2_subseg0_testtrack2 1 dpmf_seg2_subseg0_testtrack2 mc_asinh_norm_seg2_subseg0_testtrack2
-6 1 mx_seg3_subseg0_testtrack1 1 dpmf_seg3_subseg0_testtrack1 mc_asinh_norm_seg3_subseg0_testtrack1
-7 1 mx_seg3_subseg0_testtrack2 1 dpmf_seg3_subseg0_testtrack2 mc_asinh_norm_seg3_subseg0_testtrack2
+0 1 mx_seg0_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg0_subseg0_testtrack1
+1 1 mx_seg0_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg0_subseg0_testtrack2
+2 1 mx_seg1_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg1_subseg0_testtrack1
+3 1 mx_seg1_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg1_subseg0_testtrack2
+4 1 mx_seg2_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg2_subseg0_testtrack1
+5 1 mx_seg2_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg2_subseg0_testtrack2
+6 1 mx_seg3_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg3_subseg0_testtrack1
+7 1 mx_seg3_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg3_subseg0_testtrack2
 
 
 #else
