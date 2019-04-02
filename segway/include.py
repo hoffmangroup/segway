@@ -37,5 +37,6 @@ class IncludeSaver(Saver):
                     card_supervisionLabel=self.card_supervision_label,
                     card_frameIndex=self.max_frames,
                     supervisionLabel_rangeSize=self.supervision_label_range_size,
-                    ruler_scale=ruler_scale_scaled)
+                    ruler_scale=ruler_scale_scaled,
+                    virtual_evidence=int(self.virtual_evidence))
 

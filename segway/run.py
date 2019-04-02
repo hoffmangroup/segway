@@ -626,6 +626,7 @@ class Runner(object):
         self.job_log_filename = None
         self.seg_table_filename = None
         self.supervision_filename = None
+        self.virtual_evidence_filename = None
 
         self.params_filename = None  # actual params filename for this instance
         self.params_filenames = []  # list of possible params filenames
@@ -737,6 +738,7 @@ class Runner(object):
                         ("observations", "obs_dirname"),
                         ("bed", "bed_filename"),
                         ("semisupervised", "supervision_filename"),
+                        ("virtual_evidence", "virtual_evidence_filename"),
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
@@ -1372,6 +1374,10 @@ class Runner(object):
             return SUPERVISION_SEMISUPERVISED
         else:
             return SUPERVISION_UNSUPERVISED
+
+    @memoized_property
+    def virtual_evidence(self):
+        return self.virtual_evidence_filename is not None
 
     @memoized_property
     def world_track_indexes(self):
@@ -3636,6 +3642,10 @@ def parse_options(argv):
 
     group.add_argument("--semisupervised", metavar="FILE",
                        help="semisupervised segmentation with labels in "
+                       "FILE (default none)")
+
+    group.add_argument("--virtual-evidence", metavar="FILE",
+                       help="virtual evidence with priors for labels at each position in "
                        "FILE (default none)")
 
     group = parser.add_argument_group("Intermediate files")
