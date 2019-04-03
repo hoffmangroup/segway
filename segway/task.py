@@ -78,8 +78,9 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
             (float_observations_file, float_observations_filename), \
             mkstemp_observation(chromosome_name, start, end, EXT_INT) as \
             (int_observations_file, int_observations_filename), \
-            mkstemp_observation(chromosome_name, start, end, EXT_FLOAT) as \
+            mkstemp_observation(chromosome_name, start, end, EXT_VIRTUAL_EVIDENCE) as \
             (virtual_evidence_file, virtual_evidence_filename):
+            print(virtual_evidence_filename)
 
             # numpy's tofile (which is used) can take an open python file
             # object
@@ -614,7 +615,7 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     args = list(args)
 
     # Create placeholder observation lists
-    placeholder_float_list, placeholder_int_list = \
+    placeholder_float_list, placeholder_int_list, placeholder_virtual_evidence_list = \
         save_temp_observation_filelists(PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME)
@@ -623,6 +624,13 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     replace_subsequent_value(args, EXT_OPTIONS[EXT_FLOAT],
                              placeholder_float_list)
     replace_subsequent_value(args, EXT_OPTIONS[EXT_INT], placeholder_int_list)
+
+    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
+    cpp_array_index = args.index("-cppCommandOptions")
+    cppCommand_str = args[cpp_array_index + 1]
+    args[cpp_array_index + 1] =  cppCommand_str.replace(
+                                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
+                                    placeholder_virtual_evidence_list, 1)
 
     # Run EM bundling
     with files_to_remove([placeholder_float_list, placeholder_int_list]):

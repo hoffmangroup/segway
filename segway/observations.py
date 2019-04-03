@@ -18,7 +18,7 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, empty, invert, isnan, maximum, mean, zeros)
+                   column_stack, copy, empty, finfo, float32, invert, isnan, maximum, mean, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -46,6 +46,9 @@ ORD_g = ord("g")
 ORD_t = ord("t")
 
 DIM_TRACK = 1  # Dimension in numpy array for track data
+
+# epsilon to use when comparing two values
+EPSILON = finfo(float32).eps
 
 
 class NoData(object):
@@ -367,7 +370,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
                 else:
                     prior_list[prior_dict_index][label] = prior_dict[label]
 
-    uniform_prior = array([1.0/num_segs] * num_segs)
+    uniform_prior_vector = array([1.0/num_segs] * num_segs)
 
     if resolution == 1:
         # at resolution==1, it suffices to take the presence to be 1
@@ -383,7 +386,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
             if sum(prior_vector) == 1:
                 prior_array[prior_list_index] = prior_vector
             elif sum(prior_vector) == 0.0:
-                prior_array[prior_list_index] = uniform_prior
+                prior_array[prior_list_index] = uniform_prior_vector
             else:
                 raise ValueError("Priors must sum to 1.0 at every position")
 
@@ -398,35 +401,36 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
 
     # give the number of priors defined at each position
     presence_array = array([len(prior_dict) for prior_dict in input_array])
-    resolution_partitioned_presence_array = (
+    resolution_partitioned_presence_array = [
             presence_array[index:index+resolution]
             for index in range(0, len(presence_array), resolution)
-            )
+            ]
 
 
-    downsampled_input_array = zeros(calc_downsampled_shape(input_array,
-                                    resolution), input_array.dtype)
-    presence_downsampled_input_array = zeros(calc_downsampled_shape(input_array,
-                                             resolution), input_array.dtype)
+    downsampled_prior_array = zeros(calc_downsampled_shape(prior_list,
+                                    resolution), prior_list.dtype)
+    downsampled_presence_array = zeros(calc_downsampled_shape(presence_array,
+                                             resolution), dtype=DTYPE_OBS_INT)
     # For each input partition, calculate the mean prior for each label
     # if no priors given, use a uniform prior
     for index, input_partition in enumerate(resolution_partitioned_prior_list):
-        # take the mean of the given priors
-        mean_prior_vector = mean(prior_list[index], axis=1)
-        if sum(mean_prior_vector) == 1.0:
-            downsampled_input_array[index] = mean_prior_vector 
-        elif sum(mean_prior_vector) == 0.0:
-            downsampled_input_array[index] = uniform_prior_vector
+        # take the mean of the given priors for each label over the position axis
+        mean_prior_vector = mean(input_partition, axis=0)
+        if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
+            downsampled_prior_array[index] = mean_prior_vector 
+        elif abs(sum(mean_prior_vector) - 0.0) < EPSILON:
+            downsampled_prior_array[index] = uniform_prior_vector
         else:
             raise ValueError("Priors must sum to 1.0 at every position")
 
         # get the number of priors defined in the input partition
         number_priors_defined = sum(resolution_partitioned_presence_array[index])
-        assert(number_priors_defined <= num_segs) # we cannot define more priors than we have labels
-        presence_downsampled_input_array[index] = \
+        # in each resolution-length window, we cannot have more positions with priors defined than we have positions
+        assert(number_priors_defined <= resolution)
+        downsampled_presence_array[index] = \
             number_priors_defined
 
-    return downsampled_input_array, presence_downsampled_input_array
+    return downsampled_prior_array, downsampled_presence_array
 
 
 def make_dinucleotide_int_data(seq):
@@ -616,7 +620,10 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_blocks.append(presence_virtual_evidence_data)
 
         # separately save VE priors CPT in a temporary file
-        virtual_evidence_data.tofile(virtual_evidence_filename_or_file)
+        #flattened_evidence = virtual_evidence_data.flatten()
+        #flattened_evidence.tofile(virtual_evidence_filename_or_file)
+        for prior in virtual_evidence_data:
+            virtual_evidence_filename_or_file.write(' '.join(['{}'.format(prob) for prob in prior])+ '\n')
 
     if int_blocks:
         int_data = column_stack(int_blocks)

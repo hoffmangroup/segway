@@ -779,7 +779,7 @@ class VirtualEvidenceSpec(ParamSpec):
     # According to GMTK specification (tksrc/GMTK_VECPT.cc)
     # this should be of the format: 
     # CPT_name num_par par_card self_card VE_CPT_FILE nfs:nfloats nis:nints frs:floatrange irs:intrange ... fmt:obsformat ... END
-    object_tmpl = "seg_virtualEvidence 1 %s 2 %s nfs:%s nis:0 fmt:binary END"
+    object_tmpl = "seg_virtualEvidence 1 %s 2 %s nfs:%s nis:0 fmt:ascii END"
     copy_attrs = ParamSpec.copy_attrs + ["virtual_evidence", "num_segs"]
 
     def make_virtual_evidence_spec(self):

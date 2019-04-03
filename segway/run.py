@@ -151,6 +151,8 @@ NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
 NUM_SUPERVISION_COLS = 2  # supervision_data, presence_supervision_data
 
+NUM_VIRTUAL_EVIDENCE_COLS = 1  # presence virtual evidence data
+
 MAX_SPLIT_SEQUENCE_LENGTH = 2000000  # 2 million
 MAX_FRAMES = MAX_SPLIT_SEQUENCE_LENGTH
 MEM_USAGE_BUNDLE = 100 * MB  # XXX: should start using this again
@@ -1306,6 +1308,8 @@ class Runner(object):
             res += NUM_SEQ_COLS
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
             res += NUM_SUPERVISION_COLS
+        if self.virtual_evidence:
+            res += NUM_VIRTUAL_EVIDENCE_COLS
 
         return res
 
