@@ -22,12 +22,13 @@ import optbuild
 from six.moves import map, range, zip
 
 from .observations import (make_continuous_cells, make_supervision_cells,
-                           _save_window)
+                           make_virtual_evidence_cells, _save_window)
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
-                    EXT_INT, EXT_LIST, extract_superlabel, fill_array,
+                    EXT_INT, EXT_LIST, EXT_VIRTUAL_EVIDENCE, extract_superlabel, fill_array,
                     find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG)
+                    SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -87,14 +88,15 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
                          continuous_cells, resolution, distribution,
                          seq_data=None, supervision_data=supervision_data,
                          virtual_evidence_data=virtual_evidence_data,
-                         virtual_evidence_file=None,
+                         virtual_evidence_filename_or_file=virtual_evidence_file,
                          num_segs=num_segs)
 
     return float_observations_filename, int_observations_filename, virtual_evidence_filename
 
 
 def save_temp_observation_filelists(float_observations_filename,
-                                    int_observations_filename):
+                                    int_observations_filename,
+                                    virtual_evidence_observations_filename):
     """Create an observation file list containing the respective observation
     file name.
 
@@ -177,9 +179,9 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                              int_observation_list_filename)
 
     # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
-    cpp_array_index = gmtk_args.index("cppCommandOptions")
-    cppCommand_str = gmtk_args[cpp_array_index]
-    gmtk_args[cpp_array_index] =  cppCommand_str.replace(
+    cpp_array_index = gmtk_args.index("-cppCommandOptions")
+    cppCommand_str = gmtk_args[cpp_array_index + 1]
+    gmtk_args[cpp_array_index + 1] =  cppCommand_str.replace(
                                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
                                     virtual_evidence_list_filename, 1)
 
@@ -546,7 +548,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
               genomedata_names, distribution,
               track_indexes,
               is_semisupervised, supervision_coords, supervision_labels,
-              virtual_evidence,
+              virtual_evidence, virtual_evidence_coords, virtual_evidence_priors,
               num_segs,
               *args):
 
@@ -583,6 +585,11 @@ def run_train(coord, resolution, do_reverse, outfilename,
         supervision_cells = None
 
     if virtual_evidence:
+        virtual_evidence_coords = literal_eval(virtual_evidence_coords)
+        virtual_evidence_priors = literal_eval(virtual_evidence_priors)
+
+        num_segs = literal_eval(num_segs)
+       
         virtual_evidence_cells = make_virtual_evidence_cells(
                                     virtual_evidence_coords, 
                                     virtual_evidence_priors, 
@@ -609,6 +616,7 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     # Create placeholder observation lists
     placeholder_float_list, placeholder_int_list = \
         save_temp_observation_filelists(PLACEHOLDER_OBSERVATION_FILENAME,
+                                        PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME)
     # Modify the given gmtk arguments to use the temporary placeholder
     # observation lists

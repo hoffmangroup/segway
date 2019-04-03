@@ -76,6 +76,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     VALIDATE_PROG, VITERBI_PROG,
                     VIRTUAL_EVIDENCE_PRIOR_DELIMITER,
                     VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME,
                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 from .version import __version__
 
@@ -2027,7 +2028,7 @@ class Runner(object):
                 # this is a string of the format "label:prior,label:prior,..."
                 for prior_substr in prior_string.split(VIRTUAL_EVIDENCE_PRIOR_DELIMITER): 
                     label, prior = prior_substr.split(VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER)
-                    virtual_evidence_priors.append({int(label): float(prior)})
+                    virtual_evidence_priors[chrom].append({int(label): float(prior)})
 
         self.virtual_evidence_coords = virtual_evidence_coords
         self.virtual_evidence_priors = virtual_evidence_priors

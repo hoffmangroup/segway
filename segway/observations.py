@@ -18,7 +18,7 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, empty, invert, isnan, maximum, zeros)
+                   column_stack, copy, empty, invert, isnan, maximum, mean, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -319,7 +319,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
     return downsampled_input_array, presence_downsampled_input_array
 
 
-def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, num_seg):
+def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, num_segs):
     """
     Downsample a 1-dimensional list of prior dictionaries to a
     desired resolution by taking the average for all labels
@@ -352,33 +352,33 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
     # however, leave empty dictionaries (no priors specified) as all 0
     # so [{0:0.5, 1:0.2}, {1:0.4}, {}] with num_segs = 5 would become
     # [[0.5, 0.2, 0.10, 0.10, 0.10], [0.15, 0.4, 0.15, 0.15, 0.15], [0.0 ... 0.0]]
-    prior_list = np.zeros(len(input_array), num_segs)
+    prior_list = zeros((len(input_array), num_segs))
     for prior_dict_index, prior_dict in enumerate(input_array):
         if len(prior_dict) != 0:
             num_prior_labels = len(prior_dict) # number of labels with priors
             remaining_probability = 1 - sum(prior_dict.values())
 
             # divide remaining probability uniformly amongst the remaining labels
-            uniform_prior = remaining_probability / (1-num_prior_labels)
+            uniform_prior = remaining_probability / (num_segs-num_prior_labels)
 
-            for label in np.arange(num_segs):
+            for label in range(num_segs):
                 if label not in prior_dict:
                     prior_list[prior_dict_index][label] = uniform_prior
                 else:
                     prior_list[prior_dict_index][label] = prior_dict[label]
 
-    uniform_prior = np.array([1.0/num_segs] * num_segs)
+    uniform_prior = array([1.0/num_segs] * num_segs)
 
     if resolution == 1:
         # at resolution==1, it suffices to take the presence to be 1
         # at every position the user has defined any priors
         # and 0 otherwise
-        presence_array = np.array([1 if len(prior_dict) > 0 else 0 for prior_dict in input_array])
+        presence_array = array([1 if len(prior_dict) > 0 else 0 for prior_dict in input_array])
 
         # our "downsampled" prior array at resolution 1 is just the
         # vector of priors defined by the user at every position
         # with uniform priors filled in at all other positions
-        prior_array = np.zeros(len(input_array), num_segs)
+        prior_array = zeros((len(input_array), num_segs))
         for prior_list_index, prior_vector in enumerate(prior_list):
             if sum(prior_vector) == 1:
                 prior_array[prior_list_index] = prior_vector
@@ -397,7 +397,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
             )
 
     # give the number of priors defined at each position
-    presence_array = np.array([len(prior_dict) for prior_dict in input_array])
+    presence_array = array([len(prior_dict) for prior_dict in input_array])
     resolution_partitioned_presence_array = (
             presence_array[index:index+resolution]
             for index in range(0, len(presence_array), resolution)
@@ -412,7 +412,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
     # if no priors given, use a uniform prior
     for index, input_partition in enumerate(resolution_partitioned_prior_list):
         # take the mean of the given priors
-        mean_prior_vector = np.mean(prior_list[index], axis=1)
+        mean_prior_vector = mean(prior_list[index], axis=1)
         if sum(mean_prior_vector) == 1.0:
             downsampled_input_array[index] = mean_prior_vector 
         elif sum(mean_prior_vector) == 0.0:
@@ -505,22 +505,18 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
     end: int
 
     returns a 1-dimensional numpy.ndarray for the region specified by
-    virtual_evidence_coords where each cell is the transformed label specified by
-    supervision_labels for that region
-
-    the transformation results in the cell being 0 for no supervision
-    or SUPERVISION_LABEL_OFFSET (1)+the supervision label for supervision
+    virtual_evidence_coords where each cell is the prior data for that region
     """
 
-    res = [{} for _ in np.arange(end-start)] # zeros(end - start, dtype=DTYPE_OBS_INT)
+    res = [{} for _ in range(end-start)] # zeros(end - start, dtype=DTYPE_OBS_INT)
 
     # Get supervision regions that overlap with the start and end coords
     supercontig_coords_labels = \
-        intersect_regions(start, end, supervision_coords,
-                          supervision_labels)
+        intersect_regions(start, end, virtual_evidence_coords,
+                          virtual_evidence_priors)
 
     for label_start, label_end, data in supercontig_coords_labels:
-        res[(label_start - start):(label_end - start)] = data
+        res[(label_start - start):(label_end - start)] = [data] * ((label_end - start)-(label_start - start)) # copy data to all positions
 
     return res
 

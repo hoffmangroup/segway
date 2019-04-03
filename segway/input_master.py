@@ -780,11 +780,10 @@ class VirtualEvidenceSpec(ParamSpec):
     # this should be of the format: 
     # CPT_name num_par par_card self_card VE_CPT_FILE nfs:nfloats nis:nints frs:floatrange irs:intrange ... fmt:obsformat ... END
     object_tmpl = "seg_virtualEvidence 1 %s 2 %s nfs:%s nis:0 fmt:binary END"
-
     copy_attrs = ParamSpec.copy_attrs + ["virtual_evidence", "num_segs"]
 
     def make_virtual_evidence_spec(self):
-        return object_tmpl % (self.num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME, self.num_segs)
+        return self.object_tmpl % (self.num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME, self.num_segs)
 
     def generate_objects(self):
         if self.virtual_evidence:

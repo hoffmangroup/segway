@@ -14,7 +14,7 @@ class IncludeSaver(Saver):
     resource_name = "segway.inc.tmpl"
     copy_attrs = ["card_seg_countdown", "card_supervision_label", "max_frames",
                   "num_segs", "num_subsegs", "resolution", "ruler_scale", 
-                  "supervision_label_range_size"]
+                  "supervision_label_range_size", "virtual_evidence"]
 
     def make_mapping(self):
         num_segs = self.num_segs
