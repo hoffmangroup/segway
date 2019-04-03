@@ -98,6 +98,7 @@ OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
+VIRTUAL_EVIDENCE_NONE = -1
 MINIBATCH_DEFAULT = -1
 VAR_FLOOR_GMM_DEFAULT = 0.00001
 
@@ -1392,7 +1393,10 @@ class Runner(object):
 
     @memoized_property
     def virtual_evidence(self):
-        return self.virtual_evidence_filename is not None
+        if self.virtual_evidence_filename is not None and self.train:
+            return True
+        else:
+            return False
 
     @memoized_property
     def world_track_indexes(self):
@@ -1470,8 +1474,10 @@ class Runner(object):
 
 
         # prevent supervised variable from being inherited from train task
+        # similarly, prevent virtual evidence variable from being inherited from train task
         if self.identify:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
+            directives["VIRTUAL_EVIDENCE"] = VIRTUAL_EVIDENCE_NONE
 
         if self.virtual_evidence:
             directives[VIRTUAL_EVIDENCE_LIST_FILENAME] = \
@@ -2004,7 +2010,8 @@ class Runner(object):
         # This is handled using a presence variable for virtual evidence, which behaves
         # identically to other presence variables in Segway.
 
-        assert(self.virtual_evidence == True)
+        if not self.virtual_evidence:
+            return
 
         # defaultdict of list of dictionaries of the format {label: prior} 
         # key: chrom

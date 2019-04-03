@@ -585,7 +585,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
         # Otherwise ignore supervision
         supervision_cells = None
 
-    if virtual_evidence:
+    if virtual_evidence == "True":
         virtual_evidence_coords = literal_eval(virtual_evidence_coords)
         virtual_evidence_priors = literal_eval(virtual_evidence_priors)
 

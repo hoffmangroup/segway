@@ -376,7 +376,8 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
         # at resolution==1, it suffices to take the presence to be 1
         # at every position the user has defined any priors
         # and 0 otherwise
-        presence_array = array([1 if len(prior_dict) > 0 else 0 for prior_dict in input_array])
+        presence_array = array([1 if len(prior_dict) > 0 else 0 for prior_dict in input_array],
+                               dtype=DTYPE_OBS_INT)
 
         # our "downsampled" prior array at resolution 1 is just the
         # vector of priors defined by the user at every position
