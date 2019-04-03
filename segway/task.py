@@ -76,7 +76,7 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
     with mkstemp_observation(chromosome_name, start, end, EXT_FLOAT) as \
             (float_observations_file, float_observations_filename), \
             mkstemp_observation(chromosome_name, start, end, EXT_INT) as \
-            (int_observations_file, int_observations_filename),
+            (int_observations_file, int_observations_filename), \
             mkstemp_observation(chromosome_name, start, end, EXT_FLOAT) as \
             (virtual_evidence_file, virtual_evidence_filename):
 

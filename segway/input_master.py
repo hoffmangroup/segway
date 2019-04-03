@@ -773,7 +773,7 @@ class DPMFParamSpec(DenseCPTParamSpec):
                     mapping["datum"] = data[seg_index, subseg_index, track_index]
                 yield substitute(mapping)
 
-class VirtualEvidenceSpec(ParamSpec)
+class VirtualEvidenceSpec(ParamSpec):
     type_name = "VE_CPT"
 
     # According to GMTK specification (tksrc/GMTK_VECPT.cc)
