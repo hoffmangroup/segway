@@ -560,7 +560,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
 def _save_window(float_filename_or_file, int_filename_or_file, 
                  float_data, resolution, distribution, seq_data=None,
                  supervision_data=None, virtual_evidence_data=None,
-                 num_segs=None):
+                 virtual_evidence_filename_or_file=None, num_segs=None):
     # called by task.py as well as observation.py
 
     # input function in GMTK_ObservationMatrix.cc:
@@ -616,7 +616,11 @@ def _save_window(float_filename_or_file, int_filename_or_file,
                 virtual_evidence_data, 
                 resolution, 
                 num_segs)
+        # save presence data into int blocks
         int_blocks.append(presence_virtual_evidence_data)
+
+        # separately save VE priors CPT in a temporary file
+        virtual_evidence_data.tofile(virtual_evidence_filename_or_file)
 
     if int_blocks:
         int_data = column_stack(int_blocks)

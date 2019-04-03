@@ -23,7 +23,8 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     resource_substitute, Saver, SEGWAY_ENCODING,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
-                    SUPERVISION_SUPERVISED, USE_MFSDG)
+                    SUPERVISION_SUPERVISED, USE_MFSDG,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
 # scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -772,6 +773,24 @@ class DPMFParamSpec(DenseCPTParamSpec):
                     mapping["datum"] = data[seg_index, subseg_index, track_index]
                 yield substitute(mapping)
 
+class VirtualEvidenceSpec(ParamSpec)
+    type_name = "VE_CPT"
+
+    # According to GMTK specification (tksrc/GMTK_VECPT.cc)
+    # this should be of the format: 
+    # CPT_name num_par par_card self_card VE_CPT_FILE nfs:nfloats nis:nints frs:floatrange irs:intrange ... fmt:obsformat ... END
+    object_tmpl = "seg_virtualEvidence 1 %s 2 %s nfs:%s nis:0 fmt:binary END"
+
+    copy_attrs = ParamSpec.copy_attrs + ["virtual_evidence", "num_segs"]
+
+    def make_virtual_evidence_spec(self):
+        return object_tmpl % (self.num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME, self.num_segs)
+
+    def generate_objects(self):
+        if self.virtual_evidence:
+            yield self.make_virtual_evidence_spec()
+
+
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
     copy_attrs = ["num_bases", "num_segs", "num_subsegs",
@@ -842,5 +861,7 @@ class InputMasterSaver(Saver):
         name_collection_spec = NameCollectionParamSpec(self)
         card_seg = num_segs
         dpmf_spec = DPMFParamSpec(self)
+
+        ve_spec = VirtualEvidenceSpec(self)
 
         return locals()  # dict of vars set in this function

@@ -73,7 +73,10 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
-                    VALIDATE_PROG, VITERBI_PROG)
+                    VALIDATE_PROG, VITERBI_PROG,
+                    VIRTUAL_EVIDENCE_PRIOR_DELIMITER,
+                    VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 from .version import __version__
 
 # set once per file run
@@ -86,12 +89,6 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
 NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT = 1
-
-# define the delimiter for the prior string specification
-# between different label:prior pairs
-VIRTUAL_EVIDENCE_PRIOR_DELIMITER = ','
-# define the delimiter for each label:prior pair
-VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER = ':'
 
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
@@ -1470,6 +1467,10 @@ class Runner(object):
         # prevent supervised variable from being inherited from train task
         if self.identify:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
+
+        if self.virtual_evidence:
+            directives[VIRTUAL_EVIDENCE_LIST_FILENAME] = \
+                VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER
 
         directives["CARD_SEG"] = self.num_segs
         directives["CARD_SUBSEG"] = self.num_subsegs
