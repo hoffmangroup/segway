@@ -2427,7 +2427,8 @@ class Runner(object):
                supervision_labels,
                self.virtual_evidence,
                virtual_evidence_coords,
-               virtual_evidence_priors
+               virtual_evidence_priors,
+               self.num_segs # need number of segments to unpack VE priors later
             ]
 
         prefix_args = [segway_task_path,
