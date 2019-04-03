@@ -1,0 +1,7 @@
+#if VIRTUAL_EVIDENCE==1
+   variable: virtualEvidence {
+       type : discrete observed value 1 cardinality 2;
+       conditionalparents : seg(0) using VirtualEvidenceCPT("seg_virtualEvidence");
+   }
+#endif /* VIRTUAL_EVIDENCE==1 */
+

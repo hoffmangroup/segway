@@ -18,6 +18,7 @@ from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
 MAX_WEIGHT_SCALE = 25
 
 SUPERVISIONLABEL_WEIGHT_MULTIPLIER = 1
+VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER = 1
 
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
@@ -32,7 +33,7 @@ class StructureSaver(Saver):
     copy_attrs = ["num_track_groups", "num_datapoints",
                   "use_dinucleotide", "window_lens", "resolution",
                   "supervision_type", "track_groups",
-                  "gmtk_include_filename_relative"]
+                  "gmtk_include_filename_relative", "virtual_evidence"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -75,6 +76,25 @@ class StructureSaver(Saver):
         add_observation(observation_items, "supervision.tmpl",
                         track_index=next_int_track_index,
                         presence_index=next_int_track_index + 1,
+                        conditionalparents_spec=conditionalparents_spec,
+                        weight_spec=weight_spec)
+        return
+
+    def add_virtual_evidence_observation(self, observation_items, next_int_track_index):
+        # VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER = 1 since we are
+        # not normalising against the max length of the data tracks
+        weight_spec = self.make_weight_spec(VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER)
+
+        # create the supervision label's conditional parents
+        # using GMTK specification
+        spec = 'seg(0) using VirtualEvidenceCPT("seg_virtualEvidence")'
+        conditionalparents_spec = " | ".join([spec] * (self.resolution+1))
+
+        # the index of the presence block is just 'next_int_track_index'
+        # since VE only adds one int block and writes prior observations
+        # in a separate file
+        add_observation(observation_items, "virtual_evidence.tmpl",
+                        presence_index=next_int_track_index, 
                         conditionalparents_spec=conditionalparents_spec,
                         weight_spec=weight_spec)
         return
@@ -139,6 +159,10 @@ class StructureSaver(Saver):
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
             self.add_supervision_observation(observation_items, next_int_track_index)
             next_int_track_index += 2
+
+        if self.virtual_evidence:
+            self.add_virtual_evidence_observation(observation_items, next_int_track_index)
+            next_int_track_index += 1 # only adds one int block--presence data
 
         assert observation_items  # must be at least one track
         observations = "\n".join(observation_items)

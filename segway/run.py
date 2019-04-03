@@ -86,6 +86,13 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
 NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT = 1
+
+# define the delimiter for the prior string specification
+# between different label:prior pairs
+VIRTUAL_EVIDENCE_PRIOR_DELIMITER = ','
+# define the delimiter for each label:prior pair
+VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER = ':'
+
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -528,13 +535,13 @@ def _log_cmdline(logfile, cmdline):
     print(quoted_cmdline, file=logfile)
 
 
-def check_overlapping_supervision_labels(start, end, chrom, coords):
+def check_overlapping_labels(start, end, chrom, coords, label_type):
     for coord_start, coord_end in coords[chrom]:
         if not (coord_start >= end or coord_end <= start):
-            raise ValueError("supervision label %s(%s, %s) overlaps"
-                             "supervision label %s(%s, %s)" %
-                             (chrom, coord_start, coord_end,
-                              chrom, start, end))
+            raise ValueError("%s label %s(%s, %s) overlaps"
+                             "%s label %s(%s, %s)" %
+                             (label_type, chrom, coord_start, coord_end,
+                              label_type, chrom, start, end))
 
 
 def remove_bash_functions(environment):
@@ -563,10 +570,13 @@ class Track(object):
 
 TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
 TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
+TRACK_VIRTUAL_EVIDENCE = Track("virtualEvidence", is_data=False)
 
+# prevent any tracks from also being named "virtualEvidence"
 EXCLUDE_TRACKNAME_LIST = [
     TRACK_DINUCLEOTIDE.name_unquoted,
-    TRACK_SUPERVISIONLABEL.name_unquoted
+    TRACK_SUPERVISIONLABEL.name_unquoted,
+    TRACK_VIRTUAL_EVIDENCE.name_unquoted 
 ]
 
 
@@ -659,6 +669,9 @@ class Runner(object):
 
         self.supervision_coords = None
         self.supervision_labels = None
+
+        self.virtual_evidence_coords = None
+        self.virtual_evidence_priors = None
 
         self.card_supervision_label = -1
 
@@ -1927,8 +1940,9 @@ class Runner(object):
                 start = datum.chromStart
                 end = datum.chromEnd
 
-                check_overlapping_supervision_labels(start, end, chrom,
-                                                     supervision_coords)
+                check_overlapping_labels(start, end, chrom,
+                                         supervision_coords,
+                                         "supervision")
 
                 supervision_coords[chrom].append((start, end))
 
@@ -1968,6 +1982,55 @@ class Runner(object):
         self.tracks.append(TRACK_SUPERVISIONLABEL)
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
+
+
+    def load_virtual_evidence(self):
+        # Virtual evidence adds one additional binary node C to the DBN structure
+        # at every frame. A CPT is defined for C such that P(C|A=a) is the probability
+        # that the parent A (segment label) is a particular value 'a' at a given frame.
+        # Specifically, C exists only to constrain the parent (segment label) to be a 
+        # particular value (supervised label) with the specified prior probability.
+        # From the Segway application's point of view, nothing more changes
+        # other than the virtual evidence files need to be passed forwards to GMTK,
+        # which does all the magic here.
+        #
+        # It is possible to specify virtual evidence for some positions and not others.
+        # This is handled using a presence variable for virtual evidence, which behaves
+        # identically to other presence variables in Segway.
+
+        assert(self.virtual_evidence == True)
+
+        # defaultdict of list of dictionaries of the format {label: prior} 
+        # key: chrom
+        # value: list of dictionaries of the format {label: prior}
+        virtual_evidence_priors = defaultdict(list)
+
+        # defaultdict of lists of tuples
+        # key: chrom
+        # value: list of tuples (start, end)
+        virtual_evidence_coords = defaultdict(list)
+
+        with open(self.virtual_evidence_filename) as VE_file:
+            for datum in read_native(VE_file):
+                chrom = datum.chrom
+                start = datum.chromStart
+                end = datum.chromEnd
+
+                check_overlapping_labels(start, end, chrom,
+                                         virtual_evidence_coords,
+                                         "virtual evidence")
+
+                virtual_evidence_coords[chrom].append((start, end))
+
+                prior_string = datum.name
+                # this is a string of the format "label:prior,label:prior,..."
+                for prior_substr in prior_string.split(VIRTUAL_EVIDENCE_PRIOR_DELIMITER): 
+                    label, prior = prior_substr.split(VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER)
+                    virtual_evidence_priors.append({int(label): float(prior)})
+
+        self.virtual_evidence_coords = virtual_evidence_coords
+        self.virtual_evidence_priors = virtual_evidence_priors
+
 
     def set_supervision_label_range_size(self, new_extension):
         """This function takes a new label extension new_extension,
@@ -2053,6 +2116,7 @@ class Runner(object):
         assert not ((self.identify or self.posterior) and self.train)
 
         self.load_supervision()
+        self.load_virtual_evidence()
         self.set_tracknames()
 
         observations = Observations(self)
@@ -2347,13 +2411,23 @@ class Runner(object):
                 supervision_coords = None
                 supervision_labels = None
 
+            if self.virtual_evidence:
+                virtual_evidence_coords = self.virtual_evidence_coords[window.chrom]
+                virtual_evidence_priors = self.virtual_evidence_priors[window.chrom]
+            else:
+                virtual_evidence_coords = None
+                virtual_evidence_priors = None
+
             additional_prefix_args = [
                genomedata_names_text,
                self.distribution,
                track_indexes_text,
                is_semisupervised,
                supervision_coords,
-               supervision_labels
+               supervision_labels,
+               self.virtual_evidence,
+               virtual_evidence_coords,
+               virtual_evidence_priors
             ]
 
         prefix_args = [segway_task_path,

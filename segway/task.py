@@ -67,7 +67,8 @@ def mkstemp_observation(chromosome_name, start, end, suffix):
 
 
 def save_temp_observations(chromosome_name, start, end, continuous_cells,
-                           resolution, distribution, supervision_data):
+                           resolution, distribution, supervision_data,
+                           virtual_evidence_data):
     """Returns a tuple (float_obs, int_obs) of temporary filepaths for the
     int/float observation filenames unique to this process"""
 
@@ -82,7 +83,8 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
             # XXX: Currently seq_data is disabled until dinucleotide is enabled
             _save_window(float_observations_file, int_observations_file,
                          continuous_cells, resolution, distribution,
-                         seq_data=None, supervision_data=supervision_data)
+                         seq_data=None, supervision_data=supervision_data,
+                         virtual_evidence_data=virtual_evidence_data)
 
     return float_observations_filename, int_observations_filename
 
@@ -132,7 +134,7 @@ def replace_subsequent_value(input_list, query, new):
 
 def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                               continuous_cells, resolution, distribution,
-                              supervision_data=None):
+                              supervision_data=None, virtual_evidence_data=None):
     """Returns a list of filepaths to observation files created for gmtk
     and modifies the necessary arguments (args) for running gmtk"""
 
@@ -141,7 +143,7 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
         float_observations_filename, int_observations_filename = \
             save_temp_observations(chromosome_name, start, end,
                                    continuous_cells, resolution, distribution,
-                                   supervision_data)
+                                   supervision_data, virtual_evidence_data)
 
         # Create the gmtk observation file lists
         float_observation_list_filename, int_observation_list_filename = \
@@ -523,6 +525,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
               genomedata_names, distribution,
               track_indexes,
               is_semisupervised, supervision_coords, supervision_labels,
+              virtual_evidence,
               *args):
 
     # Create and save the train window
@@ -557,10 +560,19 @@ def run_train(coord, resolution, do_reverse, outfilename,
         # Otherwise ignore supervision
         supervision_cells = None
 
+    if virtual_evidence:
+        virtual_evidence_cells = make_virtual_evidence_cells(
+                                    virtual_evidence_coords, 
+                                    virtual_evidence_priors, 
+                                    start, end)
+    else:
+        virtual_evidence_cells = None
+
     temp_filenames = prepare_gmtk_observations(gmtk_args, chrom, start,
                                                end, continuous_cells,
                                                resolution, distribution,
-                                               supervision_cells)
+                                               supervision_cells,
+                                               virtual_evidence_cells)
     del continuous_cells
     gc.collect()
 

@@ -319,6 +319,79 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
     return downsampled_input_array, presence_downsampled_input_array
 
 
+def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution):
+    """
+    Downsample a 1-dimensional numpy array to a desired resolution
+    by taking the mode of each resolution-sized frame.
+    For example, [1 2 2 3 4 4] downsampled to resolution 3 is: [2 4]
+
+    This function returns a tuple (where each element is an array) of
+    the form: [downsampled input array], [presence of downsampled
+    input array] where 'presence' is the count of each mode in its
+    'window'.
+
+    Only downsamples 1D numpy arrays.
+
+    There is the possibility that there will be a 'remainder'
+    subarray. For that case, we choose to take its mode and append
+    it to the end of our array of modes.
+
+    As a rule, we will never choose 0 (no label) unless all elements
+    of the subarray are 0.
+
+    For example, for [1, 0, 0,...,0] our 'mode' will be 1.
+    But [0,0,0,0...,0] has a mode of 0.
+
+    """
+    if resolution == 1:
+        # at resolution==1, the presence for all nonzero values is 1
+        # and the presence for 0 is 0 (no supervision data)
+        presence_array = clip(input_array, 0, 1)
+        return input_array, presence_array
+
+    # split input_array into subarrays of length resolution.
+    # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
+    resolution_partitioned_input_array = (
+            input_array[index:index+resolution]
+            for index in range(0, len(input_array), resolution)
+            )
+
+    downsampled_input_array = zeros(calc_downsampled_shape(input_array,
+                                    resolution), input_array.dtype)
+    presence_downsampled_input_array = zeros(calc_downsampled_shape(input_array,
+                                             resolution), input_array.dtype)
+    # For each input partition find its mode
+    for index, input_partition in enumerate(resolution_partitioned_input_array):
+        # Get the number of times each index occurs in the input partition.
+        # bincount(a) returns an array where the elements are the number
+        # of times each index occurs in a.
+        resolution_sized_subarray_bincount = bincount(input_partition)
+
+        # by setting the 0th value of bincount to 0, we take care
+        # of two possible special cases:
+        # 1) number of 0s is the same as the count of the nonzero mode:
+        #   >we want to have the nonzero mode, not 0.
+        #   setting count of 0 to 0 will force argmax to default to
+        #   the nonzero mode.
+        #
+        # 2) the case of all 0's (no nonzero mode):
+        #   >we want the mode to be 0.
+        #   setting count of 0 to 0 will return an argmax of 0 since
+        #   there are no other numbers to choose.
+        resolution_sized_subarray_bincount[0] = 0
+
+        # in the case of ties for the max count, argmax takes the
+        # smallest numbered index.
+        mode = argmax(resolution_sized_subarray_bincount)
+        downsampled_input_array[index] = mode
+
+        # Get the count of the mode in our input partition
+        presence_downsampled_input_array[index] = \
+            resolution_sized_subarray_bincount[mode]
+
+    return downsampled_input_array, presence_downsampled_input_array
+
+
 def make_dinucleotide_int_data(seq):
     """
     makes an array with two columns, one with 0..15=AA..TT and the other
@@ -387,6 +460,34 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     return res
 
 
+def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors, start, end):
+    """
+    virtual_evidence_coords: list of tuples (start, end)
+    virtual_evidence_priors: list of dictionaries of the format {label: prior}
+    start: int
+    end: int
+
+    returns a 1-dimensional numpy.ndarray for the region specified by
+    virtual_evidence_coords where each cell is the transformed label specified by
+    supervision_labels for that region
+
+    the transformation results in the cell being 0 for no supervision
+    or SUPERVISION_LABEL_OFFSET (1)+the supervision label for supervision
+    """
+
+    res = [{} for _ in np.arange(end-start)] # zeros(end - start, dtype=DTYPE_OBS_INT)
+
+    # Get supervision regions that overlap with the start and end coords
+    supercontig_coords_labels = \
+        intersect_regions(start, end, supervision_coords,
+                          supervision_labels)
+
+    for label_start, label_end, data in supercontig_coords_labels:
+        res[(label_start - start):(label_end - start)] = data
+
+    return res
+
+
 def make_continuous_cells(track_indexes, genomedata_names,
                           chromosome_name, start, end):
     """
@@ -419,8 +520,9 @@ def make_continuous_cells(track_indexes, genomedata_names,
     return continuous_cells
 
 
-def _save_window(float_filename_or_file, int_filename_or_file, float_data, resolution,
-                 distribution, seq_data=None, supervision_data=None):
+def _save_window(float_filename_or_file, int_filename_or_file, 
+                 float_data, resolution, distribution, seq_data=None,
+                 supervision_data=None, virtual_evidence_data=None):
     # called by task.py as well as observation.py
 
     # input function in GMTK_ObservationMatrix.cc:
@@ -469,6 +571,11 @@ def _save_window(float_filename_or_file, int_filename_or_file, float_data, resol
 
         int_blocks.append(supervision_data)
         int_blocks.append(presence_supervision_data)
+
+    if virtual_evidence_data is not None:
+        virtual_evidence_data, presence_virtual_evidence_data = \
+            get_downsampled_virtual_evidence_data_and_presence(virtual_evidence_data, resolution)
+        int_blocks.append(presence_virtual_evidence_data)
 
     if int_blocks:
         int_data = column_stack(int_blocks)
@@ -520,7 +627,7 @@ class Observations(object):
                   "use_dinucleotide", "world_track_indexes",
                   "world_genomedata_names", "clobber",
                   "num_worlds", "validation_fraction", "validate",
-                  "validation_coords"]
+                  "validation_coords", "virtual_evidence"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)
