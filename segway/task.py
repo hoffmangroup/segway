@@ -179,12 +179,15 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
     replace_subsequent_value(gmtk_args, EXT_OPTIONS[EXT_INT],
                              int_observation_list_filename)
 
-    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
-    cpp_array_index = gmtk_args.index("-cppCommandOptions")
-    cppCommand_str = gmtk_args[cpp_array_index + 1]
-    gmtk_args[cpp_array_index + 1] =  cppCommand_str.replace(
-                                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
-                                    virtual_evidence_list_filename, 1)
+    try:
+        # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
+        cpp_array_index = gmtk_args.index("-cppCommandOptions")
+        cppCommand_str = gmtk_args[cpp_array_index + 1]
+        gmtk_args[cpp_array_index + 1] =  cppCommand_str.replace(
+                                        VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
+                                        virtual_evidence_list_filename, 1)
+    except ValueError:
+        pass # provided gmtk_args does not have any cppCommandOptions in it
 
     # Modify the given gmtk arguments so only the first (and only) file in the
     # observation lists are used
