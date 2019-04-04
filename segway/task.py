@@ -80,7 +80,6 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
             (int_observations_file, int_observations_filename), \
             mkstemp_observation(chromosome_name, start, end, EXT_VIRTUAL_EVIDENCE) as \
             (virtual_evidence_file, virtual_evidence_filename):
-            print(virtual_evidence_filename)
 
             # numpy's tofile (which is used) can take an open python file
             # object
@@ -179,15 +178,14 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
     replace_subsequent_value(gmtk_args, EXT_OPTIONS[EXT_INT],
                              int_observation_list_filename)
 
-    try:
-        # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
-        cpp_array_index = gmtk_args.index("-cppCommandOptions")
-        cppCommand_str = gmtk_args[cpp_array_index + 1]
-        gmtk_args[cpp_array_index + 1] =  cppCommand_str.replace(
-                                        VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
-                                        virtual_evidence_list_filename, 1)
-    except ValueError:
-        pass # provided gmtk_args does not have any cppCommandOptions in it
+    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
+    cpp_array_index = gmtk_args.index("-cppCommandOptions")
+    cppCommand_str = gmtk_args[cpp_array_index + 1]
+    # if the placeholder is present, it is replaced. otherwise, the cpp options
+    # are unchanged
+    gmtk_args[cpp_array_index + 1] =  cppCommand_str.replace(
+                                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
+                                    virtual_evidence_list_filename, 1)
 
     # Modify the given gmtk arguments so only the first (and only) file in the
     # observation lists are used
