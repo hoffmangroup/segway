@@ -339,7 +339,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
     This function returns a tuple (where each element is an array) of
     the form: [downsampled input array], [presence of downsampled
     input array] where 'presence' is the count of evidence-specified positions
-    in its 'window'.
+    in each subpartition.
 
     Downsampled input array is an array of arrays where each element
     is the vector of priors for the given downsampled position.
@@ -426,7 +426,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
 
         # get the number of priors defined in the input partition
         number_priors_defined = sum(resolution_partitioned_presence_array[index])
-        # in each resolution-length window, we cannot have more positions with priors defined than we have positions
+        # in each resolution-length partition, we cannot have more positions with priors defined than we have positions
         assert(number_priors_defined <= resolution)
         downsampled_presence_array[index] = \
             number_priors_defined
