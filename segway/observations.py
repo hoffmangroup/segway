@@ -19,7 +19,7 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, empty, finfo, float32, invert, isnan,
-                   maximum, mean, zeros)
+                   maximum, mean, sum, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -416,15 +416,6 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
     # For each input partition, calculate the mean prior for each label
     # if no priors given, use a uniform prior
     for index, input_partition in enumerate(resolution_partitioned_prior_list):
-        # take the mean of the given priors for each label over the position axis
-        mean_prior_vector = mean(input_partition, axis=0)
-        if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
-            downsampled_prior_array[index] = mean_prior_vector 
-        elif abs(sum(mean_prior_vector) - 0.0) < EPSILON:
-            downsampled_prior_array[index] = uniform_prior_vector
-        else:
-            raise ValueError("Priors must sum to 1.0 at every position")
-
         # get the number of priors defined in the input partition
         number_priors_defined = sum(resolution_partitioned_presence_array[index])
         # in each resolution-length partition, we cannot have more positions
@@ -432,6 +423,21 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
         assert(number_priors_defined <= resolution)
         downsampled_presence_array[index] = \
             number_priors_defined
+
+        # take the sum of the given priors for each label over the position axis
+        sum_prior_vector = sum(input_partition, axis=0)
+        # if no priors are defined in this partition,
+        # set the mean vector to be uniform
+        if number_priors_defined == 0:
+            downsampled_prior_array[index] = uniform_prior_vector
+        else:
+            # if priors are defined, check that the mean across
+            # defined positions sums to 1
+            mean_prior_vector = sum_prior_vector / number_priors_defined
+            if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
+                downsampled_prior_array[index] = mean_prior_vector
+            else:
+                raise ValueError("Priors must sum to 1.0 at every position")
 
     return downsampled_prior_array, downsampled_presence_array
 
