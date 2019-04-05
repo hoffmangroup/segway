@@ -18,7 +18,8 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, empty, finfo, float32, invert, isnan, maximum, mean, zeros)
+                   column_stack, copy, empty, finfo, float32, invert, isnan,
+                   maximum, mean, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -426,7 +427,8 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
 
         # get the number of priors defined in the input partition
         number_priors_defined = sum(resolution_partitioned_presence_array[index])
-        # in each resolution-length partition, we cannot have more positions with priors defined than we have positions
+        # in each resolution-length partition, we cannot have more positions
+        # with priors defined than we have positions
         assert(number_priors_defined <= resolution)
         downsampled_presence_array[index] = \
             number_priors_defined
@@ -521,7 +523,9 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
                           virtual_evidence_priors)
 
     for label_start, label_end, data in supercontig_coords_labels:
-        res[(label_start - start):(label_end - start)] = [data] * ((label_end - start)-(label_start - start)) # copy data to all positions
+        # copy data to all positions
+        res[(label_start - start):(label_end - start)] = \
+            [data] * ((label_end - start)-(label_start - start))
 
     return res
 
@@ -624,7 +628,8 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         #flattened_evidence = virtual_evidence_data.flatten()
         #flattened_evidence.tofile(virtual_evidence_filename_or_file)
         for prior in virtual_evidence_data:
-            virtual_evidence_filename_or_file.write(' '.join(['{}'.format(prob) for prob in prior])+ '\n')
+            virtual_evidence_filename_or_file.write(
+                ' '.join(['{}'.format(prob) for prob in prior])+ '\n')
 
     if int_blocks:
         int_data = column_stack(int_blocks)

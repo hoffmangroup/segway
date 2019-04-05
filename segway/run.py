@@ -1474,7 +1474,8 @@ class Runner(object):
 
 
         # prevent supervised variable from being inherited from train task
-        # similarly, prevent virtual evidence variable from being inherited from train task
+        # similarly, prevent virtual evidence variable from being
+        # inherited from train task
         if self.identify:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
             directives["VIRTUAL_EVIDENCE"] = VIRTUAL_EVIDENCE_NONE
@@ -2037,9 +2038,12 @@ class Runner(object):
 
                 prior_string = datum.name
                 # this is a string of the format "label:prior,label:prior,..."
-                for prior_substr in prior_string.split(VIRTUAL_EVIDENCE_PRIOR_DELIMITER): 
-                    label, prior = prior_substr.split(VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER)
-                    virtual_evidence_priors[chrom].append({int(label): float(prior)})
+                for prior_substr in prior_string.split(
+                    VIRTUAL_EVIDENCE_PRIOR_DELIMITER): 
+                    label, prior = prior_substr.split(
+                        VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER)
+                    virtual_evidence_priors[chrom].append(
+                        {int(label): float(prior)})
 
         self.virtual_evidence_coords = virtual_evidence_coords
         self.virtual_evidence_priors = virtual_evidence_priors
@@ -2425,8 +2429,10 @@ class Runner(object):
                 supervision_labels = None
 
             if self.virtual_evidence:
-                virtual_evidence_coords = self.virtual_evidence_coords[window.chrom]
-                virtual_evidence_priors = self.virtual_evidence_priors[window.chrom]
+                virtual_evidence_coords = \
+                    self.virtual_evidence_coords[window.chrom]
+                virtual_evidence_priors = \
+                    self.virtual_evidence_priors[window.chrom]
             else:
                 virtual_evidence_coords = None
                 virtual_evidence_priors = None
