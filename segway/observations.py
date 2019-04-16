@@ -360,7 +360,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
     for prior_dict_index, prior_dict in enumerate(input_array):
         if len(prior_dict) != 0:
             num_prior_labels = len(prior_dict) # number of labels with priors
-            remaining_probability = 1 - sum(prior_dict.values())
+            remaining_probability = 1 - sum(list(prior_dict.values()))
 
             # divide remaining probability uniformly amongst the remaining labels
             uniform_prior = remaining_probability / (num_segs-num_prior_labels)
