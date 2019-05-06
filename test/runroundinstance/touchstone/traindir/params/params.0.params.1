@@ -73,29 +73,87 @@ covar_h3k36me3 1 7.6622754335e-02
 
 
 % dense PMFs
+1 
+0 
+dpmf_always 1 1.00000000000000000e+00 
+
+
+% Components
 8 
 0 
-dpmf_seg0_subseg0_h3k27me3 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
 1 
-dpmf_seg0_subseg0_h3k36me3 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+0 mc_asinh_norm_seg0_subseg0_h3k27me3 
+mean_seg0_subseg0_h3k27me3 covar_h3k27me3 
+1 
+1 
+0 mc_asinh_norm_seg0_subseg0_h3k36me3 
+mean_seg0_subseg0_h3k36me3 covar_h3k36me3 
 2 
-dpmf_seg1_subseg0_h3k27me3 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg1_subseg0_h3k27me3 
+mean_seg1_subseg0_h3k27me3 covar_h3k27me3 
 3 
-dpmf_seg1_subseg0_h3k36me3 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg1_subseg0_h3k36me3 
+mean_seg1_subseg0_h3k36me3 covar_h3k36me3 
 4 
-dpmf_seg2_subseg0_h3k27me3 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg2_subseg0_h3k27me3 
+mean_seg2_subseg0_h3k27me3 covar_h3k27me3 
 5 
-dpmf_seg2_subseg0_h3k36me3 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg2_subseg0_h3k36me3 
+mean_seg2_subseg0_h3k36me3 covar_h3k36me3 
 6 
-dpmf_seg3_subseg0_h3k27me3 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg3_subseg0_h3k27me3 
+mean_seg3_subseg0_h3k27me3 covar_h3k27me3 
 7 
-dpmf_seg3_subseg0_h3k36me3 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg3_subseg0_h3k36me3 
+mean_seg3_subseg0_h3k36me3 covar_h3k36me3 
+
+
+% Mixtures of components
+8 
+0 
+1 
+mx_seg0_subseg0_h3k27me3 
+1 dpmf_always 
+mc_asinh_norm_seg0_subseg0_h3k27me3 
+1 
+1 
+mx_seg0_subseg0_h3k36me3 
+1 dpmf_always 
+mc_asinh_norm_seg0_subseg0_h3k36me3 
+2 
+1 
+mx_seg1_subseg0_h3k27me3 
+1 dpmf_always 
+mc_asinh_norm_seg1_subseg0_h3k27me3 
+3 
+1 
+mx_seg1_subseg0_h3k36me3 
+1 dpmf_always 
+mc_asinh_norm_seg1_subseg0_h3k36me3 
+4 
+1 
+mx_seg2_subseg0_h3k27me3 
+1 dpmf_always 
+mc_asinh_norm_seg2_subseg0_h3k27me3 
+5 
+1 
+mx_seg2_subseg0_h3k36me3 
+1 dpmf_always 
+mc_asinh_norm_seg2_subseg0_h3k36me3 
+6 
+1 
+mx_seg3_subseg0_h3k27me3 
+1 dpmf_always 
+mc_asinh_norm_seg3_subseg0_h3k27me3 
+7 
+1 
+mx_seg3_subseg0_h3k36me3 
+1 dpmf_always 
+mc_asinh_norm_seg3_subseg0_h3k36me3 
 
