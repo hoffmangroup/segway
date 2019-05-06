@@ -1,3 +1,12 @@
+2.0.4:
+* segway: gaussian mixtures no longer split with only one component
+* segway: priors and mixture components are now derived from previous EM
+  iterations instead of from input master
+* segway: the DPMF table is now stored as constants instead of a fixed table
+  allowing splitting and vanishing components to resize correctly
+* segway: updated test touchstones for newer GLIBC versions
+* segway: SLURM: added support for 18.08 (https://github.com/natefoo/slurm-drmaa)
+
 2.0.3:
 * segway: fix fatal TypeError during --dry-run
 * segway: fix temporary file creation of observations for multiple instances

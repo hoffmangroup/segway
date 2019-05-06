@@ -49,23 +49,23 @@ Left_interface:Run_Bdry_Alg(T),Bnd_Heurs(S),TravFrac(1.000000),Tri_Heur(complete
 
 % ---
 % --- P partition information: variables and their neighbors
-% segCountDown(0) : seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% seg(0) : segCountDown(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% subseg(0) : segCountDown(0), seg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% presence__testtrack1(0) : segCountDown(0), seg(0), subseg(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% testtrack1(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% presence__testtrack2(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% testtrack2(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% alwaysTrue(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% presence__supervisionLabel(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% supervisionLabel(0) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% ruler(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), segCountDown(1), segTransition(1), seg(1), subseg(1),
-% segCountDown(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segTransition(1), seg(1), subseg(1),
-% segTransition(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), seg(1), subseg(1),
-% seg(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), subseg(1),
-% subseg(1) : segCountDown(0), seg(0), subseg(0), presence__testtrack1(0), testtrack1(0), presence__testtrack2(0), testtrack2(0), alwaysTrue(0), presence__supervisionLabel(0), supervisionLabel(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
+(%__ANY_LINE__%)% segCountDown(0) : (%((seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% seg(0) : (%((segCountDown\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% subseg(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% presence__testtrack1(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% testtrack1(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% presence__testtrack2(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% testtrack2(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% alwaysTrue(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% presence__supervisionLabel(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% supervisionLabel(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% ruler(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% segCountDown(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% segTransition(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% seg(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(subseg\(1\),? ?)){14}%)
+(%__ANY_LINE__%)% subseg(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(subseg\(0\),? ?)|(presence__testtrack1\(0\),? ?)|(testtrack1\(0\),? ?)|(presence__testtrack2\(0\),? ?)|(testtrack2\(0\),? ?)|(alwaysTrue\(0\),? ?)|(presence__supervisionLabel\(0\),? ?)|(supervisionLabel\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){14}%)
 % --- P partition definition
-P_PARTITION 15 segCountDown 0 seg 0 subseg 0 presence__testtrack1 0 testtrack1 0 presence__testtrack2 0 testtrack2 0 alwaysTrue 0 presence__supervisionLabel 0 supervisionLabel 0 ruler 1 segCountDown 1 segTransition 1 seg 1 subseg 1 
+P_PARTITION 15 (%((segCountDown\ 0 ?)|(seg\ 0 ?)|(subseg\ 0 ?)|(presence__testtrack1\ 0 ?)|(testtrack1\ 0 ?)|(presence__testtrack2\ 0 ?)|(testtrack2\ 0 ?)|(alwaysTrue\ 0 ?)|(presence__supervisionLabel\ 0 ?)|(supervisionLabel\ 0 ?)|(ruler\ 1 ?)|(segCountDown\ 1 ?)|(segTransition\ 1 ?)|(seg\ 1 ?)|(subseg\ 1 ?)){15}%)
 
 % ---
 % --- C partition information: variables and their neighbors
@@ -125,25 +125,25 @@ CE_PARTITION 3 segCountDown 2 seg 2 subseg 2
 % ---- 1 total max-cliques 
 % ---- Triangulation came from method: 1-completed
 % 0 : 15  1.982271
-%    segCountDown(0)
-%    seg(0)
-%    subseg(0)
-%    presence__testtrack1(0)
-%    testtrack1(0)
-%    presence__testtrack2(0)
-%    testtrack2(0)
-%    alwaysTrue(0)
-%    presence__supervisionLabel(0)
-%    supervisionLabel(0)
-%    ruler(1)
-%    segCountDown(1)
-%    segTransition(1)
-%    seg(1)
-%    subseg(1)
+(%__ANY_LINE__%)%    segCountDown(0)
+(%__ANY_LINE__%)%    seg(0)
+(%__ANY_LINE__%)%    subseg(0)
+(%__ANY_LINE__%)%    presence__testtrack1(0)
+(%__ANY_LINE__%)%    testtrack1(0)
+(%__ANY_LINE__%)%    presence__testtrack2(0)
+(%__ANY_LINE__%)%    testtrack2(0)
+(%__ANY_LINE__%)%    alwaysTrue(0)
+(%__ANY_LINE__%)%    presence__supervisionLabel(0)
+(%__ANY_LINE__%)%    supervisionLabel(0)
+(%__ANY_LINE__%)%    ruler(1)
+(%__ANY_LINE__%)%    segCountDown(1)
+(%__ANY_LINE__%)%    segTransition(1)
+(%__ANY_LINE__%)%    seg(1)
+(%__ANY_LINE__%)%    subseg(1)
 % Maximum clique state space = 1e1.982271, total state space = 1e1.982271
 1-completed 
 1 
-0 15 segCountDown 0 seg 0 subseg 0 presence__testtrack1 0 testtrack1 0 presence__testtrack2 0 testtrack2 0 alwaysTrue 0 presence__supervisionLabel 0 supervisionLabel 0 ruler 1 segCountDown 1 segTransition 1 seg 1 subseg 1 
+0 15 (%((segCountDown\ 0 ?)|(seg\ 0 ?)|(subseg\ 0 ?)|(presence__testtrack1\ 0 ?)|(testtrack1\ 0 ?)|(presence__testtrack2\ 0 ?)|(testtrack2\ 0 ?)|(alwaysTrue\ 0 ?)|(presence__supervisionLabel\ 0 ?)|(supervisionLabel\ 0 ?)|(ruler\ 1 ?)|(segCountDown\ 1 ?)|(segTransition\ 1 ?)|(seg\ 1 ?)|(subseg\ 1 ?)){15}%)
 
 % ---
 % ---- C Partitions Cliques and their weights

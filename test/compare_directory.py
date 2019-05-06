@@ -21,6 +21,10 @@ from six.moves import zip
 from segway._util import maybe_gzip_open, SEGWAY_ENCODING
 from segway.version import __version__
 
+# marker for matching anywhere in file
+ANY_LINE_MARKER = b"(%__ANY_LINE__%)"
+ANY_LINE_MARKER_LENGTH = len(ANY_LINE_MARKER)
+
 def get_dir_filenames(dirname):
     if (not Path(dirname).exists()):
         raise IOError("Directory %s not found" % dirname)
@@ -49,7 +53,6 @@ def get_dir_filenames(dirname):
 # regular expression unescape
 re_unescape = re_compile(b"\(%.*?%\)")
 
-
 def make_regex(text):
     """
     make regex, escaping things that aren't with (% %)
@@ -74,20 +77,59 @@ def compare_file(template_filename, query_filename):
 
     # If the files are different find and report the differences based on
     # embedded regex criteria
+    
+    # Create a template held out set for lines that can match elsewhere 
+    match_anywhere_regexs = set()
+
     res = True
     with maybe_gzip_open(template_filename, mode = "rb") as template_file:
         with maybe_gzip_open(query_filename, mode = "rb") as query_file:
             for line_number, lines in enumerate(
                     zip(template_file, query_file),
                     start=1):
-                re_template = make_regex(lines[0])
-                match = re_template.match(lines[1])
-                if not match:
-                    res = False
-                    print("Line %d differences for %s" % (
-                        line_number,
-                        template_filename))
-                    print("Different line:\n%s" % (lines[1]))
+                template_line = lines[0]
+                # If the template line can be matched anywhere
+                if template_line.startswith(ANY_LINE_MARKER):
+                    # Create regex from marker-removed template line
+                    # Save to held out match anywhere line set
+                    match_anywhere_regexs.add(
+                        make_regex(template_line[ANY_LINE_MARKER_LENGTH:])
+                    )
+                else:
+                    re_template = make_regex(template_line)
+                    match = re_template.match(lines[1])
+                    if not match:
+                        res = False
+                        print("Line %d differences for %s" % (
+                            line_number,
+                            template_filename))
+                        print("Different line:\n%s" % (lines[1]))
+
+    # If there are lines that may be matched anywhere
+    if match_anywhere_regexs:
+        # Fo each line in the the query file
+        with maybe_gzip_open(query_filename, mode = "rb") as query_file:
+            for query_line in query_file:
+                # If a query line matches the regex in the match anywhere set
+                regex_matches = []
+                for template_regex in match_anywhere_regexs:
+                    match = template_regex.match(query_line)
+                    if match:
+                        regex_matches.append(template_regex)
+
+                # Remove any matched regexs from the match anywhere set
+                match_anywhere_regexs.difference_update(regex_matches)
+                # If there are no more match anywhere regexs
+                if not match_anywhere_regexs:
+                    # Stop searching
+                    break
+
+    # If there any match anywhere lines that do not match the query file
+    if match_anywhere_regexs:
+        # Report failure
+        res = False
+        for regex in match_anywhere_regexs:
+            print("Cannot find any match for {}\n".format(regex.pattern))
 
     return res
 

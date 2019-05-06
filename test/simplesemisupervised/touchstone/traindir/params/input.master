@@ -86,26 +86,6 @@ mx_seg1_subseg0_testtrack2
 mx_seg2_subseg0_testtrack2
 mx_seg3_subseg0_testtrack2
 
-DIRICHLET_TAB_IN_FILE inline
-1
-
-0 dirichlet_num_mix_components 1 1
-100
-
-
-
-DPMF_IN_FILE inline
-8
-
-0 dpmf_seg0_subseg0_testtrack1 1 DirichletTable dirichlet_num_mix_components  1.0
-1 dpmf_seg0_subseg0_testtrack2 1 DirichletTable dirichlet_num_mix_components  1.0
-2 dpmf_seg1_subseg0_testtrack1 1 DirichletTable dirichlet_num_mix_components  1.0
-3 dpmf_seg1_subseg0_testtrack2 1 DirichletTable dirichlet_num_mix_components  1.0
-4 dpmf_seg2_subseg0_testtrack1 1 DirichletTable dirichlet_num_mix_components  1.0
-5 dpmf_seg2_subseg0_testtrack2 1 DirichletTable dirichlet_num_mix_components  1.0
-6 dpmf_seg3_subseg0_testtrack1 1 DirichletTable dirichlet_num_mix_components  1.0
-7 dpmf_seg3_subseg0_testtrack2 1 DirichletTable dirichlet_num_mix_components  1.0
-
 
 DETERMINISTIC_CPT_IN_FILE inline
 #if CARD_SUPERVISIONLABEL == -1
@@ -205,15 +185,10 @@ COVAR_IN_FILE inline
 0 covar_testtrack1 1 0.247466461547
 1 covar_testtrack2 1 0.247466461547
 
+DPMF_IN_FILE inline
+1
 
-#else
-
-DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
-MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
-COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
-
-#endif
-
+0 dpmf_always 1 1.0
 
 MC_IN_FILE inline
 8
@@ -230,12 +205,25 @@ MC_IN_FILE inline
 MX_IN_FILE inline
 8
 
-0 1 mx_seg0_subseg0_testtrack1 1 dpmf_seg0_subseg0_testtrack1 mc_asinh_norm_seg0_subseg0_testtrack1
-1 1 mx_seg0_subseg0_testtrack2 1 dpmf_seg0_subseg0_testtrack2 mc_asinh_norm_seg0_subseg0_testtrack2
-2 1 mx_seg1_subseg0_testtrack1 1 dpmf_seg1_subseg0_testtrack1 mc_asinh_norm_seg1_subseg0_testtrack1
-3 1 mx_seg1_subseg0_testtrack2 1 dpmf_seg1_subseg0_testtrack2 mc_asinh_norm_seg1_subseg0_testtrack2
-4 1 mx_seg2_subseg0_testtrack1 1 dpmf_seg2_subseg0_testtrack1 mc_asinh_norm_seg2_subseg0_testtrack1
-5 1 mx_seg2_subseg0_testtrack2 1 dpmf_seg2_subseg0_testtrack2 mc_asinh_norm_seg2_subseg0_testtrack2
-6 1 mx_seg3_subseg0_testtrack1 1 dpmf_seg3_subseg0_testtrack1 mc_asinh_norm_seg3_subseg0_testtrack1
-7 1 mx_seg3_subseg0_testtrack2 1 dpmf_seg3_subseg0_testtrack2 mc_asinh_norm_seg3_subseg0_testtrack2
+0 1 mx_seg0_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg0_subseg0_testtrack1
+1 1 mx_seg0_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg0_subseg0_testtrack2
+2 1 mx_seg1_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg1_subseg0_testtrack1
+3 1 mx_seg1_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg1_subseg0_testtrack2
+4 1 mx_seg2_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg2_subseg0_testtrack1
+5 1 mx_seg2_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg2_subseg0_testtrack2
+6 1 mx_seg3_subseg0_testtrack1 1 dpmf_always mc_asinh_norm_seg3_subseg0_testtrack1
+7 1 mx_seg3_subseg0_testtrack2 1 dpmf_always mc_asinh_norm_seg3_subseg0_testtrack2
+
+
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
+MC_IN_FILE INPUT_PARAMS_FILENAME ascii
+MX_IN_FILE INPUT_PARAMS_FILENAME ascii
+
+#endif
+
 

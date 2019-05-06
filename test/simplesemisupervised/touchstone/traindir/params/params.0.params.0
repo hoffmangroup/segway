@@ -45,7 +45,7 @@ segCountDown_seg_segTransition
 
 
 % means
-10 
+8 
 0 
 mean_seg0_subseg0_testtrack1 1 6.7394969605e-09 
 1 
@@ -62,48 +62,98 @@ mean_seg2_subseg0_testtrack2 1 5.3405660391e-01
 mean_seg3_subseg0_testtrack1 1 4.3732225895e-01 
 7 
 mean_seg3_subseg0_testtrack2 1 4.4405028224e-01 
-8 
-mean_seg2_subseg0_testtrack1_cl0 1 8.7783291936e-02 
-9 
-mean_seg2_subseg0_testtrack2_cl0 1 4.4155454636e-01 
 
 
 % diagonal covariance matrices
-4 
+2 
 0 
 covar_testtrack1 1 9.7842209041e-02 
 1 
 covar_testtrack2 1 9.7843520343e-02 
-2 
-covar_testtrack1_cl0 1 6.7563965917e-02 
-3 
-covar_testtrack2_cl0 1 8.8761337101e-02 
 
 
 % dense PMFs
+1 
+0 
+dpmf_always 1 1.00000000000000000e+00 
+
+
+% Components
 8 
 0 
-dpmf_seg0_subseg0_testtrack1 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
 1 
-dpmf_seg0_subseg0_testtrack2 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+0 mc_asinh_norm_seg0_subseg0_testtrack1 
+mean_seg0_subseg0_testtrack1 covar_testtrack1 
+1 
+1 
+0 mc_asinh_norm_seg0_subseg0_testtrack2 
+mean_seg0_subseg0_testtrack2 covar_testtrack2 
 2 
-dpmf_seg1_subseg0_testtrack1 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg1_subseg0_testtrack1 
+mean_seg1_subseg0_testtrack1 covar_testtrack1 
 3 
-dpmf_seg1_subseg0_testtrack2 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg1_subseg0_testtrack2 
+mean_seg1_subseg0_testtrack2 covar_testtrack2 
 4 
-dpmf_seg2_subseg0_testtrack1 2 DirichletTable dirichlet_num_mix_components 
-5.00000000000000000e-01 5.00000000000000000e-01 
+1 
+0 mc_asinh_norm_seg2_subseg0_testtrack1 
+mean_seg2_subseg0_testtrack1 covar_testtrack1 
 5 
-dpmf_seg2_subseg0_testtrack2 2 DirichletTable dirichlet_num_mix_components 
-5.00000000000000000e-01 5.00000000000000000e-01 
+1 
+0 mc_asinh_norm_seg2_subseg0_testtrack2 
+mean_seg2_subseg0_testtrack2 covar_testtrack2 
 6 
-dpmf_seg3_subseg0_testtrack1 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg3_subseg0_testtrack1 
+mean_seg3_subseg0_testtrack1 covar_testtrack1 
 7 
-dpmf_seg3_subseg0_testtrack2 1 DirichletTable dirichlet_num_mix_components 
-1.00000000000000000e+00 
+1 
+0 mc_asinh_norm_seg3_subseg0_testtrack2 
+mean_seg3_subseg0_testtrack2 covar_testtrack2 
+
+
+% Mixtures of components
+8 
+0 
+1 
+mx_seg0_subseg0_testtrack1 
+1 dpmf_always 
+mc_asinh_norm_seg0_subseg0_testtrack1 
+1 
+1 
+mx_seg0_subseg0_testtrack2 
+1 dpmf_always 
+mc_asinh_norm_seg0_subseg0_testtrack2 
+2 
+1 
+mx_seg1_subseg0_testtrack1 
+1 dpmf_always 
+mc_asinh_norm_seg1_subseg0_testtrack1 
+3 
+1 
+mx_seg1_subseg0_testtrack2 
+1 dpmf_always 
+mc_asinh_norm_seg1_subseg0_testtrack2 
+4 
+1 
+mx_seg2_subseg0_testtrack1 
+1 dpmf_always 
+mc_asinh_norm_seg2_subseg0_testtrack1 
+5 
+1 
+mx_seg2_subseg0_testtrack2 
+1 dpmf_always 
+mc_asinh_norm_seg2_subseg0_testtrack2 
+6 
+1 
+mx_seg3_subseg0_testtrack1 
+1 dpmf_always 
+mc_asinh_norm_seg3_subseg0_testtrack1 
+7 
+1 
+mx_seg3_subseg0_testtrack2 
+1 dpmf_always 
+mc_asinh_norm_seg3_subseg0_testtrack2 
 
