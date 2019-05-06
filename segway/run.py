@@ -294,7 +294,7 @@ IDENTIFY_OPTION_TYPES = \
 
 SUB_TASK_DELIMITER = "-"
 
-class Results():
+class TrainResults():
     def get_filenames(self, validation = False):
         if validation:
             return[self.input_master_filename, self.params_filename, 
@@ -729,9 +729,9 @@ class Runner(object):
         # flags
         self.clobber = False
         # XXX: this should become an int for num_starts
-        self.train = steps(["not_running"])  # EM train
-        self.posterior = steps(["not_running"])
-        self.identify = steps(["not_running"])  # viterbi
+        self.train = self.steps()  # EM train
+        self.posterior = self.steps()
+        self.identify = self.steps()  # viterbi
         self.recover_round = False
         self.validate = False
         self.dry_run = False
@@ -742,27 +742,23 @@ class Runner(object):
     class steps(object):
         """
         Purpose:
-        Determines which steps were selected for running
-        Sets all to true if none were
+        Determines which steps were selected for the given task
+        Sets all to true if none were specified, running the full task
         """
-        init = False
-        run = False
-        finish = False
-        not_running = False
-
-        def running(self):
-            return not self.not_running
-    
-        def set_all(self):
-            self.init = True
-            self.run = True
-            self.finish = True
-
-        def __init__(self, step):
-            if not step:
-                self.set_all()
-            else:
+        def set_steps(self, step):
+            self.running = True
+            if step:
                 setattr(self, step[0], True)
+            else:
+                self.init = True
+                self.run = True
+                self.finish = True
+
+        def __init__(self):
+            self.init = False
+            self.run = False
+            self.finish = False
+            self.running = False
 
     def set_tasks(self, text):
         tasks = text.split("+")
@@ -772,13 +768,13 @@ class Runner(object):
             task_name = task[0]
             step = task[1:]
             # Ensure that extra steps were not specified
-            assert length(step) < 3
-            if length(step) == 2:
+            assert len(step) < 3
+            if len(step) == 2:
                 # If two conditions were supplied, ensure that they were run-round.
                 assert step[0] == "run" and step[1] == "round"
                 self.recover_dirname = self.work_dirname
                 self.recover_round = True
-            setattr(self, task_name, steps(step))
+            getattr(self, task_name).set_steps(step)
 
     def set_option(self, name, value):
         # want to actually set the Runner option when optparse option
@@ -829,7 +825,7 @@ class Runner(object):
         res.set_tasks(command)
 
         # If we're running the training task
-        if res.train.running():
+        if res.train.running:
             # The genomedata archives are all arguments execept the final
             # train directory
             res.genomedata_names = args[0:-1]
@@ -1423,7 +1419,7 @@ class Runner(object):
     @memoized_property
     def supervision_type(self):
         # Only supervision used is in training
-        if self.supervision_filename and self.train.running():
+        if self.supervision_filename and self.train.running:
             return SUPERVISION_SEMISUPERVISED
         else:
             return SUPERVISION_UNSUPERVISED
@@ -1504,7 +1500,7 @@ class Runner(object):
 
 
         # prevent supervised variable from being inherited from train task
-        if self.identify.running():
+        if self.identify.running:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
 
         directives["CARD_SEG"] = self.num_segs
@@ -1718,7 +1714,7 @@ class Runner(object):
         # make new filenames when new is set, or params_filename is
         # not set, or the file already exists and we are training
         if (new or not params_filename or
-           (self.train.running() and Path(params_filename).exists())):
+           (self.train.running and Path(params_filename).exists())):
             params_filename = self.make_params_filename(instance_index)
 
         return params_filename, last_params_filename
@@ -2114,7 +2110,7 @@ class Runner(object):
         self.validation_int_filepaths = \
             observations.validation_int_filepaths
 
-        if self.train.running():
+        if self.train.running:
             self.set_log_likelihood_filenames()
 
             if self.validate:
@@ -2800,7 +2796,7 @@ class Runner(object):
                                    self.best_params_filename,
                                    self.log_likelihood_filename,
                                    self.validation_output_winner_filename,
-                                   self.validation_sum_winner_filename]
+                                   self.validation_sum_winner_filename])
 
         while (round_index < self.max_em_iters and
                ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
@@ -2868,16 +2864,16 @@ class Runner(object):
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
 
-    def save_tabfile(self, values_object, attrs, tab_filename):
+    def save_tab_file(self, values_object, attrs, tab_filename):
         filename = self.make_filename(tab_filename)
 
         with open(filename, "w") as tab_file:
-            tab_writer = writer(tab_file, delimiter = DELIMITER_BED)
+            tab_writer = ListWriter(tab_file, delimiter = DELIMITER_BED)
             tab_writer.writerow(TRAIN_FIELDNAMES)
 
-            for name, typ in sorted(viewitems(attrs)):
+            for name, object_type in sorted(viewitems(attrs)):
                 value = getattr(values_object, name)
-                if isinstance(typ, list):
+                if isinstance(object_type, list):
                     for item in value:
                         tab_writer.writerow([name, item])
                 else:
@@ -2898,18 +2894,18 @@ class Runner(object):
 
                 # Check if the option is used by identify as well, then ignore
                 is_identify_option = name in IDENTIFY_OPTION_TYPES.keys() and \
-                    (self.identify.running() or self.posterior.running())
+                    (self.identify.running or self.posterior.running)
                 if value and not is_identify_option:
                     row_type = TRAIN_OPTION_TYPES[name]
-                    if isinstance(typ, list):
-                        assert len(typ) == 1
+                    if isinstance(row_type, list):
+                        assert len(row_type) == 1
                         item_type = row_type[0]
                         getattr(self, name).append(item_type(value))
                     else:
                         setattr(self, name, row_type(value))
 
         if self.params_filename is not None and \
-          not self.train.running():
+          not self.train.running:
             self.params_filenames = [self.params_filename]
 
     def load_train_results(self):
@@ -2920,7 +2916,7 @@ class Runner(object):
             results = TrainResults([None, None, None, None, None, None, None, None])
             with open(filename) as resultfile:
                 for line in resultfile.readlines()[1:]:
-                    values = line.split(DELIMITER_BED)
+                    values = line.strip("\n").split(DELIMITER_BED)
                     name = values[0]
                     value = values[1]
                     item_type = TRAIN_RESULT_TYPES[name]
@@ -2980,7 +2976,7 @@ class Runner(object):
         self.input_master_filename = input_master_filename
 
         # save file locations to tab-delimited file
-        self.save_tabfile(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
+        self.save_tab_file(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
 
         # If a single instance is being run, create a single input.master
         # Else create an input master for each instance
@@ -3079,7 +3075,7 @@ class Runner(object):
             for index, instance_param in enumerate(instance_params):
                 result_filename = make_default_filename \
                     (TRAIN_RESULTS_TMPL, SUBDIRNAME_RESULTS, index)
-                self.save_tabfile(instance_param, TRAIN_RESULT_TYPES,
+                self.save_tab_file(instance_param, TRAIN_RESULT_TYPES,
                                   result_filename)
 
         elif self.train.finish:
@@ -3518,7 +3514,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         if self.identify.init or self.posterior.init:
             self.setup_shared_steps()
-            self.save_tabfile(self, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
+            self.save_tab_file(self, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
         else:
             self.set_triangulation_filename()
             self.load_identify_options(self.work_dirname)
@@ -3631,11 +3627,11 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.train.init):
                     self.save_validation_set()
 
-                if self.train.running():
+                if self.train.running:
                     self.run_train()
 
-                if self.identify.running() or self.posterior.running():
-                    if self.posterior.running():
+                if self.identify.running or self.posterior.running:
+                    if self.posterior.running:
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
