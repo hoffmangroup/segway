@@ -295,6 +295,9 @@ IDENTIFY_OPTION_TYPES = \
 SUB_TASK_DELIMITER = "-"
 
 class TrainResults():
+    """
+    This class stores the results from a single training instance.
+    """
     def get_filenames(self, validation = False):
         if validation:
             return[self.input_master_filename, self.params_filename, 
@@ -741,10 +744,10 @@ class Runner(object):
 
     class steps(object):
         """
-        Purpose:
         Determines which steps were selected for the given task
         Sets all to true if none were specified, running the full task
         """
+
         def set_steps(self, step):
             self.running = True
             if step:
@@ -761,16 +764,21 @@ class Runner(object):
             self.running = False
 
     def set_tasks(self, text):
+        """
+        Sets the tasks for Segway to run, as well as determining
+        if any specific steps were specified. Else runs all steps
+        for task.
+        """
+
         tasks = text.split("+")
 
         for task in tasks:
             task = task.split(SUB_TASK_DELIMITER)
             task_name = task[0]
             step = task[1:]
-            # Ensure that extra steps were not specified
-            assert len(step) < 3
             if len(step) == 2:
-                # If two conditions were supplied, ensure that they were run-round.
+                # If two steps were supplied, ensure that they were run-round.
+                # Others should not be possible unless set in ArgParse
                 assert step[0] == "run" and step[1] == "round"
                 self.recover_dirname = self.work_dirname
                 self.recover_round = True
@@ -843,7 +851,6 @@ class Runner(object):
                 # train.tab use is optional
                 if err.errno != ENOENT:
                     raise
-            assert len(args) >= 3
 
         return res
 
@@ -1418,7 +1425,7 @@ class Runner(object):
 
     @memoized_property
     def supervision_type(self):
-        # Only supervision used is in training
+        # Supervision is only used in training
         if self.supervision_filename and self.train.running:
             return SUPERVISION_SEMISUPERVISED
         else:
@@ -1612,6 +1619,7 @@ class Runner(object):
 
         Add index in Genomedata file for each data track.
         """
+
         tracks = self.tracks
         is_tracks_from_archive = False
 
@@ -2865,6 +2873,12 @@ class Runner(object):
         return result
 
     def save_tab_file(self, values_object, attrs, tab_filename):
+        """
+        Creates a .tab file to store specific variables between steps, such as
+        train results between run and finish, as well as options between
+        steps and tasks, such as between train and identify.
+        """
+
         filename = self.make_filename(tab_filename)
 
         with open(filename, "w") as tab_file:
@@ -2909,6 +2923,12 @@ class Runner(object):
             self.params_filenames = [self.params_filename]
 
     def load_train_results(self):
+        """
+        Loads the training results in train-finish saved in the /results/ dir.
+        Stores as a list of TrainResults in instance_params to select best in
+        finish.
+        """
+
         pattern = extjoin(PREFIX_TRAIN_RESULTS, "*", EXT_TAB)
         instance_params = []
         for filename in Path(self.results_dirpath).files(pattern):
@@ -2930,6 +2950,7 @@ class Runner(object):
         """
         load options set in identify-init
         """
+
         filename = Path(identify_dir_name) / IDENTIFY_FILEBASENAME
 
         with open(filename) as tabfile:
@@ -2949,6 +2970,10 @@ class Runner(object):
                     setattr(self, name, row_type(value))
 
     def setup_shared_steps(self):
+        """
+        Perform setup tasks shared by all of train, posterior and identify.
+        """
+
         self.make_subdirs(SUBDIRNAMES_EITHER)
 
         self.save_gmtk_input()
@@ -2959,6 +2984,7 @@ class Runner(object):
         """
         return value: dst_filenames
         """
+
         assert self.num_instances >= 1
 
         self.setup_shared_steps()
@@ -3007,6 +3033,7 @@ class Runner(object):
         Finds and then copies the best training round and instance to the 
         general files such as params.params, input.master, etc.
         """
+
         if self.dry_run:
             return
 
@@ -3305,12 +3332,14 @@ to find the winning instance anyway.""" % thread.instance_index)
                 copy2(recover_validation_output_winner_filename,
                       self.validation_output_winner_filename)
 
+        # Check if a round had been finished, and produced a likelihood
         if recover_log_likelihood_tab_filepath.isfile():
             with open(recover_log_likelihood_tab_filepath) \
                     as log_likelihood_tab_file:
                 log_likelihoods = [float(line.rstrip())
                                    for line in log_likelihood_tab_file.readlines()]
         else:
+            # Otherwise, set likelihoods to empty
             log_likelihoods = []
 
         final_round_index = len(log_likelihoods)
