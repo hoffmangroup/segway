@@ -18,7 +18,8 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, empty, invert, isnan, maximum, zeros)
+                   column_stack, copy, empty, finfo, float32, invert, isnan,
+                   maximum, mean, sum, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -46,6 +47,9 @@ ORD_g = ord("g")
 ORD_t = ord("t")
 
 DIM_TRACK = 1  # Dimension in numpy array for track data
+
+# epsilon to use when comparing two values
+EPSILON = finfo(float32).eps
 
 
 class NoData(object):
@@ -319,6 +323,125 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
     return downsampled_input_array, presence_downsampled_input_array
 
 
+def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, num_segs):
+    """
+    Downsample a 1-dimensional list of prior dictionaries to a
+    desired resolution by taking the average for all labels
+    over the positions with priors.
+    For example, the 10-position frame
+    [{0:0.5, 1:0.2}, {1:0.4}, {}, ..., {}]
+    downsampled to resolution 10 is [{0:0.4, 1:0.3, 2:0.3}]
+    since for label 0 we take mean(0.5, 0.3) = 0.4
+          for label 1 we take mean(0.2, 0.4) = 0.3
+          for label 2 we take mean(0.3, 0.3) = 0.3
+
+    If no priors are specified then the average prior is uniform.
+
+    This function returns a tuple (where each element is an array) of
+    the form: [downsampled input array], [presence of downsampled
+    input array] where 'presence' is the count of evidence-specified positions
+    in each subpartition.
+
+    Downsampled input array is an array of arrays where each element
+    is the vector of priors for the given downsampled position.
+
+    Only downsamples 1D lists of dictionaries of priors.
+
+    There is the possibility that there will be a 'remainder'
+    subarray. For that case, we choose to take its average (same as above)
+    and append it to the end of our array of downsampled priors.
+    """
+
+    # first convert the dictionaries of priors to lists
+    # however, leave empty dictionaries (no priors specified) as all 0
+    # so [{0:0.5, 1:0.2}, {1:0.4}, {}] with num_segs = 5 would become
+    # [[0.5, 0.2, 0.10, 0.10, 0.10], [0.15, 0.4, 0.15, 0.15, 0.15], [0.0 ... 0.0]]
+    prior_list = zeros((len(input_array), num_segs))
+    for prior_dict_index, prior_dict in enumerate(input_array):
+        if len(prior_dict) != 0:
+            num_prior_labels = len(prior_dict) # number of labels with priors
+            remaining_probability = 1 - sum(list(prior_dict.values()))
+
+            # divide remaining probability uniformly amongst the remaining labels
+            uniform_prior = remaining_probability / (num_segs-num_prior_labels)
+
+            for label in range(num_segs):
+                if label not in prior_dict:
+                    prior_list[prior_dict_index][label] = uniform_prior
+                else:
+                    prior_list[prior_dict_index][label] = prior_dict[label]
+
+    uniform_prior_vector = array([1.0/num_segs] * num_segs)
+
+    if resolution == 1:
+        # at resolution==1, it suffices to take the presence to be 1
+        # at every position the user has defined any priors
+        # and 0 otherwise
+        presence_array = array([1 if len(prior_dict) > 0 else 0 for prior_dict in input_array],
+                               dtype=DTYPE_OBS_INT)
+
+        # our "downsampled" prior array at resolution 1 is just the
+        # vector of priors defined by the user at every position
+        # with uniform priors filled in at all other positions
+        prior_array = zeros((len(input_array), num_segs))
+        for prior_list_index, prior_vector in enumerate(prior_list):
+            if sum(prior_vector) == 1:
+                prior_array[prior_list_index] = prior_vector
+            elif sum(prior_vector) == 0.0:
+                prior_array[prior_list_index] = uniform_prior_vector
+            else:
+                raise ValueError("Priors must sum to 1.0 at every position")
+
+        return prior_array, presence_array
+
+    # split input_array into subarrays of length resolution.
+    # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
+    resolution_partitioned_prior_list = (
+            prior_list[index:index+resolution]
+            for index in range(0, len(prior_list), resolution)
+            )
+
+    # give the number of priors defined at each position
+    presence_array = array([len(prior_dict) for prior_dict in input_array])
+    resolution_partitioned_presence_array = [
+            presence_array[index:index+resolution]
+            for index in range(0, len(presence_array), resolution)
+            ]
+
+
+    downsampled_prior_array = zeros(calc_downsampled_shape(prior_list,
+                                    resolution), prior_list.dtype)
+    downsampled_presence_array = zeros(calc_downsampled_shape(presence_array,
+                                             resolution), dtype=DTYPE_OBS_INT)
+    # For each input partition, calculate the mean prior for each label
+    # if no priors given, use a uniform prior
+    for index, input_partition in enumerate(resolution_partitioned_prior_list):
+        # get the number of priors defined in the input partition
+        number_priors_defined = sum(resolution_partitioned_presence_array[index])
+        # in each resolution-length partition, we cannot have more positions
+        # with priors defined than we have positions
+        assert(number_priors_defined <= resolution)
+        downsampled_presence_array[index] = \
+            number_priors_defined
+
+        # take the sum of the given priors for each label over the position axis
+        sum_prior_vector = sum(input_partition, axis=0)
+        # if no priors are defined in this partition,
+        # set the mean vector to be uniform
+        if number_priors_defined == 0:
+            downsampled_prior_array[index] = uniform_prior_vector
+        else:
+            # if priors are defined, check that the mean across
+            # defined positions sums to 1
+            mean_prior_vector = sum_prior_vector / number_priors_defined
+            if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
+                downsampled_prior_array[index] = mean_prior_vector
+            else:
+                raise ValueError("Priors must sum to 1.0 at every position")
+
+    return downsampled_prior_array, downsampled_presence_array
+
+
 def make_dinucleotide_int_data(seq):
     """
     makes an array with two columns, one with 0..15=AA..TT and the other
@@ -387,6 +510,32 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     return res
 
 
+def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors, start, end):
+    """
+    virtual_evidence_coords: list of tuples (start, end)
+    virtual_evidence_priors: list of dictionaries of the format {label: prior}
+    start: int
+    end: int
+
+    returns a 1-dimensional numpy.ndarray for the region specified by
+    virtual_evidence_coords where each cell is the prior data for that region
+    """
+
+    res = [{} for _ in range(end-start)] # zeros(end - start, dtype=DTYPE_OBS_INT)
+
+    # Get supervision regions that overlap with the start and end coords
+    supercontig_coords_labels = \
+        intersect_regions(start, end, virtual_evidence_coords,
+                          virtual_evidence_priors)
+
+    for label_start, label_end, data in supercontig_coords_labels:
+        # copy data to all positions
+        res[(label_start - start):(label_end - start)] = \
+            [data] * ((label_end - start)-(label_start - start))
+
+    return res
+
+
 def make_continuous_cells(track_indexes, genomedata_names,
                           chromosome_name, start, end):
     """
@@ -419,8 +568,10 @@ def make_continuous_cells(track_indexes, genomedata_names,
     return continuous_cells
 
 
-def _save_window(float_filename_or_file, int_filename_or_file, float_data, resolution,
-                 distribution, seq_data=None, supervision_data=None):
+def _save_window(float_filename_or_file, int_filename_or_file, 
+                 float_data, resolution, distribution, seq_data=None,
+                 supervision_data=None, virtual_evidence_data=None,
+                 virtual_evidence_filename_or_file=None, num_segs=None):
     # called by task.py as well as observation.py
 
     # input function in GMTK_ObservationMatrix.cc:
@@ -469,6 +620,22 @@ def _save_window(float_filename_or_file, int_filename_or_file, float_data, resol
 
         int_blocks.append(supervision_data)
         int_blocks.append(presence_supervision_data)
+
+    if virtual_evidence_data is not None:
+        virtual_evidence_data, presence_virtual_evidence_data = \
+            get_downsampled_virtual_evidence_data_and_presence(
+                virtual_evidence_data, 
+                resolution, 
+                num_segs)
+        # save presence data into int blocks
+        int_blocks.append(presence_virtual_evidence_data)
+
+        # separately save VE priors CPT in a temporary file
+        #flattened_evidence = virtual_evidence_data.flatten()
+        #flattened_evidence.tofile(virtual_evidence_filename_or_file)
+        for prior in virtual_evidence_data:
+            virtual_evidence_filename_or_file.write(
+                ' '.join(['{}'.format(prob) for prob in prior])+ '\n')
 
     if int_blocks:
         int_data = column_stack(int_blocks)
@@ -520,7 +687,7 @@ class Observations(object):
                   "use_dinucleotide", "world_track_indexes",
                   "world_genomedata_names", "clobber",
                   "num_worlds", "validation_fraction", "validate",
-                  "validation_coords"]
+                  "validation_coords", "virtual_evidence"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)

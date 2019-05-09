@@ -72,8 +72,12 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_RESULTS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
-                    SUPERVISION_SEMISUPERVISED, USE_MFSDG, 
-                    VALIDATE_PROG, VITERBI_PROG)
+                    SUPERVISION_SEMISUPERVISED, USE_MFSDG,
+                    VALIDATE_PROG, VITERBI_PROG,
+                    VIRTUAL_EVIDENCE_PRIOR_DELIMITER,
+                    VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 from .version import __version__
 
 # set once per file run
@@ -86,6 +90,7 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
 NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT = 1
+
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -560,13 +565,13 @@ def _log_cmdline(logfile, cmdline):
     print(quoted_cmdline, file=logfile)
 
 
-def check_overlapping_supervision_labels(start, end, chrom, coords):
+def check_overlapping_labels(start, end, chrom, coords, label_type):
     for coord_start, coord_end in coords[chrom]:
         if not (coord_start >= end or coord_end <= start):
-            raise ValueError("supervision label %s(%s, %s) overlaps"
-                             "supervision label %s(%s, %s)" %
-                             (chrom, coord_start, coord_end,
-                              chrom, start, end))
+            raise ValueError("%s label %s(%s, %s) overlaps"
+                             "%s label %s(%s, %s)" %
+                             (label_type, chrom, coord_start, coord_end,
+                              label_type, chrom, start, end))
 
 
 def remove_bash_functions(environment):
@@ -595,10 +600,12 @@ class Track(object):
 
 TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
 TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
+TRACK_VIRTUAL_EVIDENCE = Track("virtualEvidence", is_data=False)
 
 EXCLUDE_TRACKNAME_LIST = [
     TRACK_DINUCLEOTIDE.name_unquoted,
-    TRACK_SUPERVISIONLABEL.name_unquoted
+    TRACK_SUPERVISIONLABEL.name_unquoted,
+    TRACK_VIRTUAL_EVIDENCE.name_unquoted 
 ]
 
 
@@ -689,6 +696,10 @@ class Runner(object):
 
         self.supervision_coords = None
         self.supervision_labels = None
+
+        self.virtual_evidence_coords = None
+        self.virtual_evidence_priors = None
+        self.virtual_evidence = False
 
         self.card_supervision_label = -1
 
@@ -1507,6 +1518,8 @@ class Runner(object):
 
 
         # prevent supervised variable from being inherited from train task
+        # similarly, prevent virtual evidence variable from being
+        # inherited from train task
         if self.identify.running:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
 
@@ -1967,8 +1980,9 @@ class Runner(object):
                 start = datum.chromStart
                 end = datum.chromEnd
 
-                check_overlapping_supervision_labels(start, end, chrom,
-                                                     supervision_coords)
+                check_overlapping_labels(start, end, chrom,
+                                         supervision_coords,
+                                         "supervision")
 
                 supervision_coords[chrom].append((start, end))
 
@@ -2392,7 +2406,11 @@ class Runner(object):
                track_indexes_text,
                is_semisupervised,
                supervision_coords,
-               supervision_labels
+               supervision_labels,
+               self.virtual_evidence,
+               virtual_evidence_coords,
+               virtual_evidence_priors,
+               self.num_segs # need number of segments to unpack VE priors later
             ]
 
         prefix_args = [segway_task_path,
@@ -3881,6 +3899,10 @@ def parse_options(argv):
     group.add_argument("--max-train-rounds", type=int, metavar="NUM",
                        help="each training instance runs a maximum of NUM"
                        " rounds (default %d)" % MAX_EM_ITERS)
+    group.add_argument("--virtual-evidence", metavar="FILE",
+                       help="virtual evidence with priors for labels at each position in "
+                       "FILE (default none)")
+
 
     # Directory would be recovered from train-run
     group = train_run.add_argument_group("Intermediate files (train-run)")

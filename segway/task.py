@@ -22,12 +22,13 @@ import optbuild
 from six.moves import map, range, zip
 
 from .observations import (make_continuous_cells, make_supervision_cells,
-                           _save_window)
+                           make_virtual_evidence_cells, _save_window)
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
-                    EXT_INT, EXT_LIST, extract_superlabel, fill_array,
+                    EXT_INT, EXT_LIST, EXT_VIRTUAL_EVIDENCE, extract_superlabel, fill_array,
                     find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG)
+                    SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
@@ -67,7 +68,8 @@ def mkstemp_observation(chromosome_name, start, end, suffix):
 
 
 def save_temp_observations(chromosome_name, start, end, continuous_cells,
-                           resolution, distribution, supervision_data):
+                           resolution, distribution, supervision_data,
+                           virtual_evidence_data, num_segs):
     """Returns a tuple (float_obs, int_obs) of temporary filepaths for the
     int/float observation filenames unique to this process"""
 
@@ -75,20 +77,26 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
     with mkstemp_observation(chromosome_name, start, end, EXT_FLOAT) as \
             (float_observations_file, float_observations_filename), \
             mkstemp_observation(chromosome_name, start, end, EXT_INT) as \
-            (int_observations_file, int_observations_filename):
+            (int_observations_file, int_observations_filename), \
+            mkstemp_observation(chromosome_name, start, end, EXT_VIRTUAL_EVIDENCE) as \
+            (virtual_evidence_file, virtual_evidence_filename):
 
             # numpy's tofile (which is used) can take an open python file
             # object
             # XXX: Currently seq_data is disabled until dinucleotide is enabled
             _save_window(float_observations_file, int_observations_file,
                          continuous_cells, resolution, distribution,
-                         seq_data=None, supervision_data=supervision_data)
+                         seq_data=None, supervision_data=supervision_data,
+                         virtual_evidence_data=virtual_evidence_data,
+                         virtual_evidence_filename_or_file=virtual_evidence_file,
+                         num_segs=num_segs)
 
-    return float_observations_filename, int_observations_filename
+    return float_observations_filename, int_observations_filename, virtual_evidence_filename
 
 
 def save_temp_observation_filelists(float_observations_filename,
-                                    int_observations_filename):
+                                    int_observations_filename,
+                                    virtual_evidence_observations_filename):
     """Create an observation file list containing the respective observation
     file name.
 
@@ -101,7 +109,8 @@ def save_temp_observation_filelists(float_observations_filename,
         mkstemp(prefix=EXT_FLOAT + extsep, suffix=extsep + EXT_LIST)
     int_observation_list_fd, int_observation_list_filename = \
         mkstemp(prefix=EXT_INT + extsep, suffix=extsep + EXT_LIST)
-
+    virtual_evidence_observation_list_fd, virtual_evidence_observation_list_filename = \
+        mkstemp(prefix=EXT_VIRTUAL_EVIDENCE + extsep, suffix=extsep + EXT_LIST)
     # Write out the observation filename to their respective observation list
     # For gmtk observation list files, there may be more than one
     # observation file. In this case we only ever insert one
@@ -109,8 +118,10 @@ def save_temp_observation_filelists(float_observations_filename,
     # os-level file descriptor
     print_to_fd(float_observation_list_fd, float_observations_filename)
     print_to_fd(int_observation_list_fd, int_observations_filename)
+    print_to_fd(virtual_evidence_observation_list_fd, virtual_evidence_observations_filename)
 
-    return float_observation_list_filename, int_observation_list_filename
+    return float_observation_list_filename, int_observation_list_filename, \
+           virtual_evidence_observation_list_filename
 
 
 def replace_subsequent_value(input_list, query, new):
@@ -132,28 +143,32 @@ def replace_subsequent_value(input_list, query, new):
 
 def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                               continuous_cells, resolution, distribution,
-                              supervision_data=None):
+                              supervision_data=None, virtual_evidence_data=None,
+                              num_segs=None):
     """Returns a list of filepaths to observation files created for gmtk
     and modifies the necessary arguments (args) for running gmtk"""
 
     try:
         # Create the gmtk observation files
-        float_observations_filename, int_observations_filename = \
+        float_observations_filename, int_observations_filename, virtual_evidence_filename = \
             save_temp_observations(chromosome_name, start, end,
                                    continuous_cells, resolution, distribution,
-                                   supervision_data)
+                                   supervision_data, virtual_evidence_data, num_segs)
 
         # Create the gmtk observation file lists
-        float_observation_list_filename, int_observation_list_filename = \
+        float_observation_list_filename, int_observation_list_filename, virtual_evidence_list_filename = \
             save_temp_observation_filelists(float_observations_filename,
-                                            int_observations_filename)
+                                            int_observations_filename,
+                                            virtual_evidence_filename)
     # If any exception occurred
     except:  # NOQA
         # Attempt to remove any created files
         force_remove_all_files([float_observations_filename,
                                 int_observations_filename,
+                                virtual_evidence_filename,
                                 float_observation_list_filename,
-                                int_observation_list_filename])
+                                int_observation_list_filename,
+                                virtual_evidence_list_filename])
         # Reraise the exception
         raise
 
@@ -162,13 +177,25 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                              float_observation_list_filename)
     replace_subsequent_value(gmtk_args, EXT_OPTIONS[EXT_INT],
                              int_observation_list_filename)
+
+    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
+    cpp_array_index = gmtk_args.index("-cppCommandOptions")
+    cppCommand_str = gmtk_args[cpp_array_index + 1]
+    # if the placeholder is present, it is replaced. otherwise, the cpp options
+    # are unchanged
+    gmtk_args[cpp_array_index + 1] =  cppCommand_str.replace(
+                                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
+                                    virtual_evidence_list_filename, 1)
+
     # Modify the given gmtk arguments so only the first (and only) file in the
     # observation lists are used
     replace_subsequent_value(gmtk_args, GMTK_TRRNG_OPTION_STRING, "0")
 
     # Return the list of filenames created
     return [float_observations_filename, int_observations_filename,
-            float_observation_list_filename, int_observation_list_filename]
+            virtual_evidence_filename,
+            float_observation_list_filename, int_observation_list_filename,
+            virtual_evidence_list_filename]
 
 
 @contextmanager
@@ -523,6 +550,8 @@ def run_train(coord, resolution, do_reverse, outfilename,
               genomedata_names, distribution,
               track_indexes,
               is_semisupervised, supervision_coords, supervision_labels,
+              virtual_evidence, virtual_evidence_coords, virtual_evidence_priors,
+              num_segs,
               *args):
 
     # Create and save the train window
@@ -557,10 +586,25 @@ def run_train(coord, resolution, do_reverse, outfilename,
         # Otherwise ignore supervision
         supervision_cells = None
 
+    if virtual_evidence == "True":
+        virtual_evidence_coords = literal_eval(virtual_evidence_coords)
+        virtual_evidence_priors = literal_eval(virtual_evidence_priors)
+
+        num_segs = literal_eval(num_segs)
+       
+        virtual_evidence_cells = make_virtual_evidence_cells(
+                                    virtual_evidence_coords, 
+                                    virtual_evidence_priors, 
+                                    start, end)
+    else:
+        virtual_evidence_cells = None
+
     temp_filenames = prepare_gmtk_observations(gmtk_args, chrom, start,
                                                end, continuous_cells,
                                                resolution, distribution,
-                                               supervision_cells)
+                                               supervision_cells,
+                                               virtual_evidence_cells,
+                                               num_segs)
     del continuous_cells
     gc.collect()
 
@@ -572,14 +616,22 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     args = list(args)
 
     # Create placeholder observation lists
-    placeholder_float_list, placeholder_int_list = \
+    placeholder_float_list, placeholder_int_list, placeholder_virtual_evidence_list = \
         save_temp_observation_filelists(PLACEHOLDER_OBSERVATION_FILENAME,
+                                        PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME)
     # Modify the given gmtk arguments to use the temporary placeholder
     # observation lists
     replace_subsequent_value(args, EXT_OPTIONS[EXT_FLOAT],
                              placeholder_float_list)
     replace_subsequent_value(args, EXT_OPTIONS[EXT_INT], placeholder_int_list)
+
+    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
+    cpp_array_index = args.index("-cppCommandOptions")
+    cppCommand_str = args[cpp_array_index + 1]
+    args[cpp_array_index + 1] =  cppCommand_str.replace(
+                                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
+                                    placeholder_virtual_evidence_list, 1)
 
     # Run EM bundling
     with files_to_remove([placeholder_float_list, placeholder_int_list]):

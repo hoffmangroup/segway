@@ -8,7 +8,7 @@ from numpy import empty
 
 from segway.observations import merge_windows
 from segway.task import prepare_gmtk_observations
-from segway._util import EXT_INT, EXT_FLOAT
+from segway._util import EXT_INT, EXT_FLOAT, EXT_VIRTUAL_EVIDENCE
 
 
 class TestObservations(unittest.TestCase):
@@ -34,10 +34,10 @@ class TestObservations(unittest.TestCase):
 class TestTask(unittest.TestCase):
 
     def test_prepare_observations(self):
-        gmtk_args = ["baz", "-of1", "foo", "-of2", "bar"]
+        gmtk_args = ["baz", "-of1", "foo", "-of2", "bar", "-cppCommandOptions","-DVIRTUAL_EVIDENCE_LIST_FILENAME=VE_PLACEHOLDER"]
 
-        [float_obs_filename, int_obs_filename,
-         float_obs_list_filename, int_obs_list_filename] = \
+        [float_obs_filename, int_obs_filename, virtual_evidence_filename,
+         float_obs_list_filename, int_obs_list_filename, virtual_evidence_list_filename] = \
             prepare_gmtk_observations(gmtk_args, "chr1", 0, 8000, empty(0), 1,
                                       None)
 
@@ -52,15 +52,22 @@ class TestTask(unittest.TestCase):
                             proper_obs_filename_prefix))
         self.assertTrue(int_obs_filename.endswith(EXT_INT))
 
+        self.assertTrue(virtual_evidence_filename.startswith(
+                            proper_obs_filename_prefix))
+        self.assertTrue(virtual_evidence_filename.endswith(EXT_VIRTUAL_EVIDENCE))
+
         # Test filenames exist in the given environment's tempdir
         self.assertTrue(float_obs_list_filename.startswith(current_tmp_dir))
         self.assertTrue(int_obs_list_filename.startswith(current_tmp_dir))
+        self.assertTrue(virtual_evidence_list_filename.startswith(current_tmp_dir))
         self.assertTrue(float_obs_filename.startswith(current_tmp_dir))
         self.assertTrue(int_obs_filename.startswith(current_tmp_dir))
+        self.assertTrue(virtual_evidence_filename.startswith(current_tmp_dir))
 
         # Check if the observation files exist
         self.assertTrue(isfile(float_obs_filename))
         self.assertTrue(isfile(int_obs_filename))
+        self.assertTrue(isfile(virtual_evidence_filename))
 
         # Check the first line in the list contains their respective
         # observation file (and type)
@@ -74,16 +81,24 @@ class TestTask(unittest.TestCase):
             self.assertTrue(line.startswith(proper_obs_filename_prefix))
             self.assertTrue(line.endswith(EXT_INT))
 
+        with open(virtual_evidence_list_filename) as virtual_evidence_list_file:
+            line = virtual_evidence_list_file.readlines()[0].strip()
+            self.assertTrue(line.startswith(proper_obs_filename_prefix))
+            self.assertTrue(line.endswith(EXT_VIRTUAL_EVIDENCE))
         # Check gmtk args were modified for the temp list files
         # -of1 option
         self.assertEqual(gmtk_args[2], float_obs_list_filename)
         # -of2 option
         self.assertEqual(gmtk_args[4], int_obs_list_filename)
+        # virtual evidence cpp directive
+        self.assertEqual(gmtk_args[6], "-DVIRTUAL_EVIDENCE_LIST_FILENAME=%s" % virtual_evidence_list_filename)
 
         remove(float_obs_list_filename)
         remove(int_obs_list_filename)
+        remove(virtual_evidence_list_filename)
         remove(int_obs_filename)
         remove(float_obs_filename)
+        remove(virtual_evidence_filename)
 
 
 if __name__ == "__main__":
