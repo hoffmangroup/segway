@@ -98,6 +98,7 @@ OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
+VIRTUAL_EVIDENCE_NONE = -1
 MINIBATCH_DEFAULT = -1
 VAR_FLOOR_GMM_DEFAULT = 0.00001
 
@@ -150,6 +151,8 @@ LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
 NUM_SUPERVISION_COLS = 2  # supervision_data, presence_supervision_data
+
+NUM_VIRTUAL_EVIDENCE_COLS = 1  # presence virtual evidence data
 
 MAX_SPLIT_SEQUENCE_LENGTH = 2000000  # 2 million
 MAX_FRAMES = MAX_SPLIT_SEQUENCE_LENGTH
@@ -281,9 +284,9 @@ TRAIN_OPTION_TYPES = \
          num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
-         supervision_filename=str, minibatch_fraction=float,
-         validation_fraction=float, validation_coords_filename=str,
-         var_floor=float)
+         supervision_filename=str, virtual_evidence_filename = str, 
+         minibatch_fraction=float, validation_fraction=float, 
+         validation_coords_filename=str, var_floor=float)
 
 
 TRAIN_RESULT_TYPES = OrderedDict([("log_likelihood", float), ("num_segs", int),
@@ -295,7 +298,7 @@ TRAIN_RESULT_TYPES = OrderedDict([("log_likelihood", float), ("num_segs", int),
 
 IDENTIFY_OPTION_TYPES = \
     	dict(include_coords_filename=str, exclude_coords_filename=str,
-             seg_table_filename=str, output_label=str)
+             seg_table_filename=str, output_label=str, virtual_evidence_filename = str)
 
 SUB_TASK_DELIMITER = "-"
 
@@ -664,6 +667,8 @@ class Runner(object):
         self.job_log_filename = None
         self.seg_table_filename = None
         self.supervision_filename = None
+        self.virtual_evidence_filename = None
+        self.new_virtual_evidence_filename = None
 
         self.params_filename = None  # actual params filename for this instance
         self.params_filenames = []  # list of possible params filenames
@@ -699,7 +704,6 @@ class Runner(object):
 
         self.virtual_evidence_coords = None
         self.virtual_evidence_priors = None
-        self.virtual_evidence = False
 
         self.card_supervision_label = -1
 
@@ -806,6 +810,8 @@ class Runner(object):
                         ("observations", "obs_dirname"),
                         ("bed", "bed_filename"),
                         ("semisupervised", "supervision_filename"),
+                        ("virtual_evidence", "virtual_evidence_filename"),
+                        ("new_virtual_evidence", "new_virtual_evidence_filename"),
                         ("bigBed", "bigbed_filename"),
                         ("include_coords", "include_coords_filename"),
                         ("exclude_coords", "exclude_coords_filename"),
@@ -1361,6 +1367,8 @@ class Runner(object):
             res += NUM_SEQ_COLS
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
             res += NUM_SUPERVISION_COLS
+        if self.virtual_evidence:
+            res += NUM_VIRTUAL_EVIDENCE_COLS
 
         return res
 
@@ -1443,6 +1451,13 @@ class Runner(object):
             return SUPERVISION_UNSUPERVISED
 
     @memoized_property
+    def virtual_evidence(self):
+        if self.virtual_evidence_filename is not None and self.train:
+            return True
+        else:
+            return False
+
+    @memoized_property
     def world_track_indexes(self):
         """
         Track indexes for a particular world.
@@ -1522,6 +1537,11 @@ class Runner(object):
         # inherited from train task
         if self.identify.running:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
+            #directives["VIRTUAL_EVIDENCE"] = VIRTUAL_EVIDENCE_NONE
+
+        if self.virtual_evidence:
+            directives[VIRTUAL_EVIDENCE_LIST_FILENAME] = \
+                VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER
 
         directives["CARD_SEG"] = self.num_segs
         directives["CARD_SUBSEG"] = self.num_subsegs
@@ -2023,6 +2043,66 @@ class Runner(object):
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
 
+    def load_virtual_evidence(self):
+        # Virtual evidence adds one additional binary node C to the DBN structure
+        # at every frame. A CPT is defined for C such that P(C|A=a) is the probability
+        # that the parent A (segment label) is a particular value 'a' at a given frame.
+        # Specifically, C exists only to constrain the parent (segment label) to be a 
+        # particular value (supervised label) with the specified prior probability.
+        # From the Segway application's point of view, nothing more changes
+        # other than the virtual evidence files need to be passed forwards to GMTK,
+        # which does all the magic here.
+        #
+        # It is possible to specify virtual evidence for some positions and not others.
+        # This is handled using a presence variable for virtual evidence, which behaves
+        # identically to other presence variables in Segway.
+        if not self.virtual_evidence:
+            return
+
+        # Check if file supplied during init exists, warn if not saying it will
+        # have to be replaced before running.
+        if not Path(self.virtual_evidence_filename).exists():
+           if self.train.run or self.identify.init or self.posterior.init:
+               raise FileNotFoundError()
+           elif self.train.init:
+                warn("Virtual evidence file provided does not exist."
+                     " A new one will need to be supplied by --new-virtual-evidence"
+                     " during train-run for Segway to be able to apply it to the model")
+           return
+        # defaultdict of list of dictionaries of the format {label: prior} 
+        # key: chrom
+        # value: list of dictionaries of the format {label: prior}
+        virtual_evidence_priors = defaultdict(list)
+
+        # defaultdict of lists of tuples
+        # key: chrom
+        # value: list of tuples (start, end)
+        virtual_evidence_coords = defaultdict(list)
+
+        with open(self.virtual_evidence_filename) as VE_file:
+            for datum in read_native(VE_file):
+                chrom = datum.chrom
+                start = datum.chromStart
+                end = datum.chromEnd
+
+                check_overlapping_labels(start, end, chrom,
+                                         virtual_evidence_coords,
+                                         "virtual evidence")
+
+                virtual_evidence_coords[chrom].append((start, end))
+
+                prior_string = datum.name
+                # this is a string of the format "label:prior,label:prior,..."
+                for prior_substr in prior_string.split(
+                    VIRTUAL_EVIDENCE_PRIOR_DELIMITER): 
+                    label, prior = prior_substr.split(
+                        VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER)
+                    virtual_evidence_priors[chrom].append(
+                        {int(label): float(prior)})
+
+        self.virtual_evidence_coords = virtual_evidence_coords
+        self.virtual_evidence_priors = virtual_evidence_priors
+
     def set_supervision_label_range_size(self, new_extension):
         """This function takes a new label extension new_extension,
         and add it into the supervision_label_range_size set.
@@ -2106,6 +2186,7 @@ class Runner(object):
         # can't run train and identify/posterior in the same run
         if self.supervision_type == SUPERVISION_SEMISUPERVISED:
             self.load_supervision()
+        self.load_virtual_evidence()
         self.set_tracknames()
 
         observations = Observations(self)
@@ -2399,6 +2480,15 @@ class Runner(object):
             else:
                 supervision_coords = None
                 supervision_labels = None
+
+            if self.virtual_evidence:
+                virtual_evidence_coords = \
+                    self.virtual_evidence_coords[window.chrom]
+                virtual_evidence_priors = \
+                    self.virtual_evidence_priors[window.chrom]
+            else:
+                virtual_evidence_coords = None
+                virtual_evidence_priors = None
 
             additional_prefix_args = [
                genomedata_names_text,
@@ -2939,6 +3029,13 @@ class Runner(object):
         if self.params_filename is not None and \
           not self.train.running:
             self.params_filenames = [self.params_filename]
+
+        if self.new_virtual_evidence_filename:
+            if not self.virtual_evidence:
+                warn("Model was not initialized with virtual evidence set."
+                        "VE file supplied will not be used.")
+            else:
+                self.virtual_evidence_filename = self.new_virtual_evidence_filename
 
     def load_train_results(self):
         """
@@ -3508,6 +3605,10 @@ to find the winning instance anyway.""" % thread.instance_index)
         # Build a semi-colon separated string
         track_indexes_text = ";".join(track_string_list)
 
+        if self.virtual_evidence:
+            track_indexes = self.world_track_indexes[window.world]
+            track_indexes_text = ",".join(map(str, track_indexes))
+
         genomedata_archives_text = ",".join(
             ordered_unique_world_genomedata_names)
 
@@ -3517,7 +3618,12 @@ to find the winning instance anyway.""" % thread.instance_index)
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
                        genomedata_archives_text,
-                       self.distribution, track_indexes_text, self.num_mix_components]
+                       self.distribution, track_indexes_text,
+                       self.virtual_evidence,
+                       self.virtual_evidence_coords[window.chrom],
+                       self.virtual_evidence_priors[window.chrom],
+                       self.num_segs,  # need number of segments to unpack VE priors later 
+                       self.num_mix_components,]
 
         output_filename = None
 
@@ -3894,15 +4000,19 @@ def parse_options(argv):
                          "mixture of Gaussians, default unused, else default %f"
                          % VAR_FLOOR_GMM_DEFAULT)
 
+    group.add_argument("--virtual-evidence", metavar="FILE",
+                       help="virtual evidence with priors for labels at each position in "
+                       "FILE (default none)")
+
+
     # Train run is where the train-rounds are calculated
     group = train_run.add_argument_group("Modeling Variables (train-run)")
     group.add_argument("--max-train-rounds", type=int, metavar="NUM",
                        help="each training instance runs a maximum of NUM"
                        " rounds (default %d)" % MAX_EM_ITERS)
-    group.add_argument("--virtual-evidence", metavar="FILE",
-                       help="virtual evidence with priors for labels at each position in "
+    group.add_argument("--new-virtual-evidence", metavar="FILE",
+                       help="Replace previously specified VE file with one new "
                        "FILE (default none)")
-
 
     # Directory would be recovered from train-run
     group = train_run.add_argument_group("Intermediate files (train-run)")
@@ -3936,6 +4046,10 @@ def parse_options(argv):
     group.add_argument("--seg-table", metavar="FILE",
                        help="load segment hyperparameters from FILE"
                        " (default none)")
+
+    group.add_argument("--virtual-evidence", metavar="FILE",
+                       help="virtual evidence with priors for labels at each position in "
+                       "FILE (default none)")
 
     # output files are produced by identify-finish
     group = identify_finish.add_argument_group("Output files (identify-finish)")

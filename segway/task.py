@@ -512,7 +512,8 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                          num_labels, num_sublabels, output_label,
                          genomedata_names, distribution, track_indexes_text,
-                         *args):
+                         virtual_evidence, virtual_evidence_coords, virtual_evidence_priors,
+                         num_segs, *args):
     # convert from tuple
     args = list(args)
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
@@ -522,17 +523,34 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
     # Create a list of a list of tracks ordered based on genomedata archive
     # specified order (delimited with a ';')
-    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
-                     for genomedata_track_indexes_text
-                     in track_indexes_text.split(';')]
+    # track_indexes = [make_track_indexes(genomedata_track_indexes_text)
+    #                 for genomedata_track_indexes_text
+    #                 in track_indexes_text.split(';')]
+    if virtual_evidence:
+        track_indexes = map(int, track_indexes_text.split(","))
     genomedata_names = genomedata_names.split(",")
 
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
+    if virtual_evidence == "True":
+        virtual_evidence_coords = literal_eval(virtual_evidence_coords)
+        virtual_evidence_priors = literal_eval(virtual_evidence_priors)
+
+        num_segs = literal_eval(num_segs)
+       
+        virtual_evidence_cells = make_virtual_evidence_cells(
+                                    virtual_evidence_coords, 
+                                    virtual_evidence_priors, 
+                                    start, end)
+    else:
+        virtual_evidence_cells = None
+
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
                                                continuous_cells,
-                                               resolution, distribution)
+                                               resolution, distribution,
+                                               None, virtual_evidence_cells,
+                                               num_segs)
     # remove from memory
     del continuous_cells
     gc.collect()

@@ -24,14 +24,18 @@ fi
 
 set -x
 
-SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
+SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" train-init\
     --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \
-    --virtual-evidence="../virtual_evidence.bed" \
-    train "../simplevirtualevidence.genomedata" traindir
+    --virtual-evidence="n" \
+    "../simplevirtualevidence.genomedata" traindir
+    
+segway "$cluster_arg" train-run --new-virtual-evidence="../virtual_evidence.bed" "../simplevirtualevidence.genomedata" traindir
 
-segway "$cluster_arg" --include-coords="../include-coords.bed" \
-    identify "../simplevirtualevidence.genomedata" traindir identifydir
+segway "$cluster_arg" train-finish "../simplevirtualevidence.genomedata" traindir
+
+segway "$cluster_arg" identify --virtual-evidence="../virtual_evidence.bed" --include-coords="../include-coords.bed" \
+    "../simplevirtualevidence.genomedata" traindir identifydir
 
 cd ..
 
