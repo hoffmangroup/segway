@@ -521,13 +521,15 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
 def run_train(coord, resolution, do_reverse, outfilename,
               genomedata_names, distribution,
-              track_indexes,
+              track_indexes_text,
               is_semisupervised, supervision_coords, supervision_labels,
               *args):
 
     # Create and save the train window
+    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
+                     for genomedata_track_indexes_text
+                     in track_indexes_text.split(';')]
     genomedata_names = genomedata_names.split(",")
-    track_indexes = map(int, track_indexes.split(","))
 
     (chrom, start, end) = coord
     gmtk_args = list(args)

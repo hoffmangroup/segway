@@ -2325,11 +2325,32 @@ class Runner(object):
 
             is_reverse = str(int(self.is_in_reversed_world(window_index)))
 
-            track_indexes = self.world_track_indexes[window.world]
-            genomedata_names = self.world_genomedata_names[window.world]
+            # The track indexes should be semi-colon separated for each genomedata
+            # archive
+            track_string_list = []
 
-            track_indexes_text = ",".join(map(str, track_indexes))
-            genomedata_names_text = ",".join(genomedata_names)
+            # The genomedata names for the worlds needs to be ordered and unique
+            # from the world it comes from
+            world_genomedata_names = self.world_genomedata_names[window.world]
+            ordered_unique_world_genomedata_names = []
+            for genomedata_name in world_genomedata_names:
+                if genomedata_name not in ordered_unique_world_genomedata_names:
+                    ordered_unique_world_genomedata_names.append(genomedata_name)
+
+            # For each unique genomedata archive in this world
+            for genomedata_name in ordered_unique_world_genomedata_names:
+                # For every track in this world
+                tracks_from_world = list(zip(*self.track_groups))[window.world]
+                track_list = [track.index for track in tracks_from_world
+                              if track.genomedata_name == genomedata_name]
+                # Build a comma separated string
+                track_string = ",".join(map(str, track_list))
+                track_string_list.append(track_string)
+            # Build a semi-colon separated string
+            track_indexes_text = ";".join(track_string_list)
+
+            genomedata_archives_text = ",".join(
+                ordered_unique_world_genomedata_names)
 
             is_semisupervised = (self.supervision_type ==
                                  SUPERVISION_SEMISUPERVISED)
@@ -2342,7 +2363,7 @@ class Runner(object):
                 supervision_labels = None
 
             additional_prefix_args = [
-               genomedata_names_text,
+               genomedata_archives_text,
                self.distribution,
                track_indexes_text,
                is_semisupervised,
