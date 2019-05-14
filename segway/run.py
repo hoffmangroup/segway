@@ -1542,6 +1542,8 @@ class Runner(object):
         if self.virtual_evidence:
             directives[VIRTUAL_EVIDENCE_LIST_FILENAME] = \
                 VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER
+        else:
+            directives["VIRTUAL_EVIDENCE"] = VIRTUAL_EVIDENCE_NONE
 
         directives["CARD_SEG"] = self.num_segs
         directives["CARD_SUBSEG"] = self.num_subsegs
@@ -2085,11 +2087,24 @@ class Runner(object):
                 start = datum.chromStart
                 end = datum.chromEnd
 
-                check_overlapping_labels(start, end, chrom,
+                if self.num_worlds != 1:
+                    chrom_split = chrom.split(".", 1)
+                    if len(chrom_split) != 2:
+                        raise ValueError("""
+                                         Error reading virtual evidence file: %s
+                                         When running with concatenated tracks, the chrom field
+                                         must have the format <world>.<chrom>
+                                         """ % (self.virtual_evidence_filename))
+                    world = int(chrom_split[0])
+                    chrom = chrom_split[1]
+                else:
+                    world = 0
+
+                check_overlapping_labels(start, end, (world, chrom),
                                          virtual_evidence_coords,
                                          "virtual evidence")
 
-                virtual_evidence_coords[chrom].append((start, end))
+                virtual_evidence_coords[(world, chrom)].append((start, end))
 
                 prior_string = datum.name
                 # this is a string of the format "label:prior,label:prior,..."
@@ -2097,7 +2112,7 @@ class Runner(object):
                     VIRTUAL_EVIDENCE_PRIOR_DELIMITER): 
                     label, prior = prior_substr.split(
                         VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER)
-                    virtual_evidence_priors[chrom].append(
+                    virtual_evidence_priors[(world, chrom)].append(
                         {int(label): float(prior)})
 
         self.virtual_evidence_coords = virtual_evidence_coords
@@ -2483,9 +2498,9 @@ class Runner(object):
 
             if self.virtual_evidence:
                 virtual_evidence_coords = \
-                    self.virtual_evidence_coords[window.chrom]
+                    self.virtual_evidence_coords[(window.world, window.chrom)]
                 virtual_evidence_priors = \
-                    self.virtual_evidence_priors[window.chrom]
+                    self.virtual_evidence_priors[(window.world, window.chrom)]
             else:
                 virtual_evidence_coords = None
                 virtual_evidence_priors = None
@@ -3605,12 +3620,15 @@ to find the winning instance anyway.""" % thread.instance_index)
         # Build a semi-colon separated string
         track_indexes_text = ";".join(track_string_list)
 
-        if self.virtual_evidence:
-            track_indexes = self.world_track_indexes[window.world]
-            track_indexes_text = ",".join(map(str, track_indexes))
-
         genomedata_archives_text = ",".join(
             ordered_unique_world_genomedata_names)
+
+        if self.virtual_evidence:
+            virtual_evidence_coords = self.virtual_evidence_coords[window.chrom]
+            virtual_evidence_priors = self.virtual_evidence_priors[window.chrom]
+        else:
+            virtual_evidence_coords = None
+            virtual_evidence_priors = None
 
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
@@ -3620,8 +3638,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                        genomedata_archives_text,
                        self.distribution, track_indexes_text,
                        self.virtual_evidence,
-                       self.virtual_evidence_coords[window.chrom],
-                       self.virtual_evidence_priors[window.chrom],
+                       virtual_evidence_coords,
+                       virtual_evidence_priors,
                        self.num_segs,  # need number of segments to unpack VE priors later 
                        self.num_mix_components,]
 

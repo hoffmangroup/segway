@@ -17,7 +17,7 @@ import sys
 from tempfile import mkstemp
 
 from genomedata import Genome
-from numpy import argmax, array, empty, where, diff, r_, zeros
+from numpy import argmax, array, column_stack, empty, where, diff, r_, zeros
 import optbuild
 from six.moves import map, range, zip
 
@@ -523,26 +523,30 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
     # Create a list of a list of tracks ordered based on genomedata archive
     # specified order (delimited with a ';')
-    # track_indexes = [make_track_indexes(genomedata_track_indexes_text)
-    #                 for genomedata_track_indexes_text
-    #                 in track_indexes_text.split(';')]
-    if virtual_evidence:
-        track_indexes = map(int, track_indexes_text.split(","))
+    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
+                     for genomedata_track_indexes_text
+                     in track_indexes_text.split(';')]
     genomedata_names = genomedata_names.split(",")
 
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
-    if virtual_evidence == "True":
-        virtual_evidence_coords = literal_eval(virtual_evidence_coords)
-        virtual_evidence_priors = literal_eval(virtual_evidence_priors)
 
-        num_segs = literal_eval(num_segs)
-       
-        virtual_evidence_cells = make_virtual_evidence_cells(
-                                    virtual_evidence_coords, 
-                                    virtual_evidence_priors, 
-                                    start, end)
+
+    if virtual_evidence == "True":
+        virtual_evidence_cells = []
+        zipper = zip(virtual_evidence_coords.split(";"), virtual_evidence_priors.split(";"))
+        for coords, priors in zipper: 
+            virtual_evidence_coords = literal_eval(coords)
+            virtual_evidence_priors = literal_eval(priors)
+
+            num_segs = literal_eval(num_segs)
+
+            cell = make_virtual_evidence_cells(
+                       virtual_evidence_coords, 
+                       virtual_evidence_priors, 
+                       start, end)
+            virtual_evidence_cells.append(cell)
     else:
         virtual_evidence_cells = None
 
@@ -574,7 +578,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
 
     # Create and save the train window
     genomedata_names = genomedata_names.split(",")
-    track_indexes = map(int, track_indexes.split(","))
+    track_indexes = make_track_indexes(track_indexes)
 
     (chrom, start, end) = coord
     gmtk_args = list(args)
@@ -610,10 +614,10 @@ def run_train(coord, resolution, do_reverse, outfilename,
 
         num_segs = literal_eval(num_segs)
        
-        virtual_evidence_cells = make_virtual_evidence_cells(
+        virtual_evidence_cells = [make_virtual_evidence_cells(
                                     virtual_evidence_coords, 
                                     virtual_evidence_priors, 
-                                    start, end)
+                                    start, end)]
     else:
         virtual_evidence_cells = None
 

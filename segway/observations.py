@@ -18,8 +18,8 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, empty, finfo, float32, invert, isnan,
-                   maximum, mean, sum, zeros)
+                   column_stack, copy, dstack, empty, finfo, float32, invert,
+                   isnan, maximum, mean, sum, vstack, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -622,23 +622,34 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_blocks.append(presence_supervision_data)
 
     if virtual_evidence_data is not None:
-        virtual_evidence_data, presence_virtual_evidence_data = \
-            get_downsampled_virtual_evidence_data_and_presence(
-                virtual_evidence_data, 
-                resolution, 
-                num_segs)
+        presence_virtual_evidence_data = []
+        virtual_evidence_data_array = []
+        for datum in virtual_evidence_data:
+            virtual_evidence_datum, presence_virtual_evidence_datum = \
+                get_downsampled_virtual_evidence_data_and_presence(
+                    datum, 
+                    resolution, 
+                    num_segs)
+            presence_virtual_evidence_data.append(presence_virtual_evidence_datum)
+            virtual_evidence_data_array.append(virtual_evidence_datum)
         # save presence data into int blocks
+        virtual_evidence_data_array = dstack(virtual_evidence_data_array).transpose((0,2,1))
+        presence_virtual_evidence_data = vstack(presence_virtual_evidence_data).T
         int_blocks.append(presence_virtual_evidence_data)
 
         # separately save VE priors CPT in a temporary file
-        #flattened_evidence = virtual_evidence_data.flatten()
+        #flattened_evidence = virtual_evidence_data_array.flatten()
         #flattened_evidence.tofile(virtual_evidence_filename_or_file)
-        for prior in virtual_evidence_data:
-            virtual_evidence_filename_or_file.write(
-                ' '.join(['{}'.format(prob) for prob in prior])+ '\n')
+        for prior in virtual_evidence_data_array:
+            for world in prior:
+               virtual_evidence_filename_or_file.write(
+                    ' '.join(['{}'.format(prob) for prob in world])+ '\n')
 
     if int_blocks:
-        int_data = column_stack(int_blocks)
+        if int_blocks[0].ndim == 3:
+            int_data = dstack(int_blocks)
+        else:
+            int_data = column_stack(int_blocks)
     else:
         int_data = array([], dtype=DTYPE_OBS_INT)
 
