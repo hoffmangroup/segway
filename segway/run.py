@@ -3313,7 +3313,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         track_indexes_text = ",".join(map(str, track_indexes))
         genomedata_names_text = ",".join(genomedata_names)
 
-
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,

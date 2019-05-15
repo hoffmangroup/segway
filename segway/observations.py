@@ -396,6 +396,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
     dim 0: position
     dim 1: track
     """
+
     continuous_cells = None
 
     # For every track in each genomedata archive
