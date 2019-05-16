@@ -6,7 +6,8 @@ genomedata-load --sequence=chr1.fa \
 
 genomedata-load --sequence=chr1.fa \
     --track=testtrack2A=testtrack2A.bedgraph \
-    --file-mode --verbose track2a.genomedata
+    --track=testtrack3A=testtrack3A.bedgraph \
+    --file-mode --verbose track23a.genomedata
 
 genomedata-load --sequence=chr1.fa \
     --track=testtrack1B=testtrack1B.bedgraph \
@@ -14,4 +15,5 @@ genomedata-load --sequence=chr1.fa \
 
 genomedata-load --sequence=chr1.fa \
     --track=testtrack2B=testtrack2B.bedgraph \
-    --file-mode --verbose track2b.genomedata
+    --track=testtrack3B=testtrack3B.bedgraph \
+    --file-mode --verbose track23b.genomedata
