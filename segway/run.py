@@ -2036,14 +2036,17 @@ class Runner(object):
 
                 virtual_evidence_coords[chrom].append((start, end))
 
-                prior_string = datum.name
                 # this is a string of the format "label:prior,label:prior,..."
+                prior_string = datum.name
+
+                VE_priors_dict = {}
                 for prior_substr in prior_string.split(
                     VIRTUAL_EVIDENCE_PRIOR_DELIMITER): 
                     label, prior = prior_substr.split(
                         VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER)
-                    virtual_evidence_priors[chrom].append(
-                        {int(label): float(prior)})
+                    VE_priors_dict[int(label)] = float(prior)
+                virtual_evidence_priors[chrom].append(
+                    VE_priors_dict)
 
         self.virtual_evidence_coords = virtual_evidence_coords
         self.virtual_evidence_priors = virtual_evidence_priors
