@@ -2065,7 +2065,8 @@ class Runner(object):
         # have to be replaced before running.
         if not Path(self.virtual_evidence_filename).exists():
            if self.train.run or self.identify.init or self.posterior.init:
-               raise FileNotFoundError()
+               raise FileNotFoundError("Could not locate virtual evidence file: %s"
+                                       % (self.virtual_evidence_filename))
            elif self.train.init:
                 warn("Virtual evidence file provided does not exist."
                      " A new one will need to be supplied by --new-virtual-evidence"
@@ -2088,15 +2089,13 @@ class Runner(object):
                 end = datum.chromEnd
 
                 if self.num_worlds != 1:
-                    chrom_split = chrom.split(".", 1)
-                    if len(chrom_split) != 2:
+                    if not hasattr(datum, score):
                         raise ValueError("""
                                          Error reading virtual evidence file: %s
-                                         When running with concatenated tracks, the chrom field
-                                         must have the format <world>.<chrom>
+                                         When running with concatenated tracks, the final
+                                         column of each prior must contain the world number
                                          """ % (self.virtual_evidence_filename))
-                    world = int(chrom_split[0])
-                    chrom = chrom_split[1]
+                    world = datum.score
                 else:
                     world = 0
 
