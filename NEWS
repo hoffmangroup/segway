@@ -6,6 +6,7 @@
   allowing splitting and vanishing components to resize correctly
 * segway: updated test touchstones for newer GLIBC versions
 * segway: SLURM: added support for 18.08 (https://github.com/natefoo/slurm-drmaa)
+* segway: fixed bug where identify would error given archives of different track numbers
 
 2.0.3:
 * segway: fix fatal TypeError during --dry-run
