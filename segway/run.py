@@ -72,7 +72,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_RESULTS,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
-                    SUPERVISION_SEMISUPERVISED, USE_MFSDG, 
+                    SUPERVISION_SEMISUPERVISED, USE_MFSDG,
                     VALIDATE_PROG, VITERBI_PROG)
 from .version import __version__
 
@@ -272,7 +272,7 @@ TRAIN_FIELDNAMES = ["name", "value"]
 TRAIN_OPTION_TYPES = \
     dict(input_master_filename=str, structure_filename=str,
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
-         include_coords_filename=str, distribution=str, len_seg_strength=float, 
+         include_coords_filename=str, distribution=str, len_seg_strength=float,
          num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
@@ -519,6 +519,7 @@ class TrainThread(Thread):
         with self.runner.open_job_log_file() as self.runner.job_log_file:
             self.result = self.runner.run_train_instance()
 
+
 def maybe_quote_arg(text):
     """return quoted argument, adding backslash quotes
 
@@ -628,6 +629,7 @@ class TrackGroup(list):
 
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
+
 
 class Runner(object):
     """
