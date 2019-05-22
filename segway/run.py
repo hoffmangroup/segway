@@ -1428,7 +1428,7 @@ class Runner(object):
     @memoized_property
     def supervision_type(self):
         # Supervision is only used in training
-        if self.supervision_filename and self.train.running:
+        if self.supervision_filename:
             return SUPERVISION_SEMISUPERVISED
         else:
             return SUPERVISION_UNSUPERVISED
@@ -2091,8 +2091,6 @@ class Runner(object):
         return len(tracknames_quoted) != len(frozenset(tracknames_quoted))
 
     def save_gmtk_input(self):
-        import pdb
-        pdb.set_trace()
         if self.supervision_type == SUPERVISION_SEMISUPERVISED:
             self.load_supervision()
         self.set_tracknames()
@@ -2785,7 +2783,7 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return TrainResults([None, None, None, None, None, None, None, None])
+            return TrainInstanceResults([None, None, None, None, None, None, None, None])
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
@@ -2801,7 +2799,7 @@ class Runner(object):
         if (self.validate and
             self.recover_dirname):
             # recover last set of best results
-            result = TrainResults([log_likelihood, self.num_segs,
+            result = TrainInstanceResults([log_likelihood, self.num_segs,
                                    validation_likelihood,
                                    self.input_master_filename,
                                    self.best_params_filename,
@@ -2852,7 +2850,7 @@ class Runner(object):
                     copy2(self.validation_sum_filename,
                           self.validation_sum_winner_filename)
 
-                    result = TrainResults([log_likelihood, self.num_segs,
+                    result = TrainInstanceResults([log_likelihood, self.num_segs,
                                      validation_likelihood,
                                      self.input_master_filename,
                                      self.last_params_filename,
@@ -2864,7 +2862,7 @@ class Runner(object):
             round_index += 1
 
         if not self.validate:
-            result = TrainResults([log_likelihood, self.num_segs,
+            result = TrainInstanceResults([log_likelihood, self.num_segs,
                              validation_likelihood,
                              self.input_master_filename,
                              self.last_params_filename,
