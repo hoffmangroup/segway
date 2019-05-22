@@ -1,5 +1,5 @@
 2.0.5:
-* segway: Fixed bug causing identify to fail with archives of different track numbers
+* segway: fixed bug causing identify to fail with archives of different track numbers
 
 2.0.4:
 * segway: gaussian mixtures no longer split with only one component
