@@ -3048,7 +3048,7 @@ class Runner(object):
             instance_param_filename = instance.params_filename.split(".")[0:-1]
             copy2(instance.params_filename,extjoin(*instance_param_filename))
 
-        # finds the min by info_criterion (maximize log_likelihood)
+        # finds max log_likelihood for validation or regular
         if self.validate:
             max_params = max(instance_params,
                              key=attrgetter("validation_likelihood"))
