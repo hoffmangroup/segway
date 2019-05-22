@@ -754,7 +754,7 @@ class Runner(object):
         """
 
         def set_steps(self, step):
-            self.running = True
+            self.selected = True
             if step:
                 setattr(self, step[0], True)
             else:
@@ -766,7 +766,7 @@ class Runner(object):
             self.init = False
             self.run = False
             self.finish = False
-            self.running = False
+            self.selected = False
 
     def set_tasks(self, text):
         """
@@ -838,7 +838,7 @@ class Runner(object):
         res.set_tasks(command)
 
         # If we're running the training task
-        if res.train.running:
+        if res.train.selected:
             # The genomedata archives are all arguments execept the final
             # train directory
             res.genomedata_names = args[0:-1]
@@ -1509,7 +1509,7 @@ class Runner(object):
 
 
         # prevent supervised variable from being inherited from train task
-        if self.identify.running:
+        if self.identify.selected:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
 
         directives["CARD_SEG"] = self.num_segs
@@ -1724,7 +1724,7 @@ class Runner(object):
         # make new filenames when new is set, or params_filename is
         # not set, or the file already exists and we are training
         if (new or not params_filename or
-           (self.train.running and Path(params_filename).exists())):
+           (self.train.selected and Path(params_filename).exists())):
             params_filename = self.make_params_filename(instance_index)
 
         return params_filename, last_params_filename
@@ -2119,7 +2119,7 @@ class Runner(object):
         self.validation_int_filepaths = \
             observations.validation_int_filepaths
 
-        if self.train.running:
+        if self.train.selected:
             self.set_log_likelihood_filenames()
 
             if self.validate:
@@ -2909,7 +2909,7 @@ class Runner(object):
 
                 # Check if the option is used by identify as well, then ignore
                 is_identify_option = name in IDENTIFY_OPTION_TYPES.keys() and \
-                    (self.identify.running or self.posterior.running)
+                    (self.identify.selected or self.posterior.selected)
                 if value and not is_identify_option:
                     row_type = TRAIN_OPTION_TYPES[name]
                     if isinstance(row_type, list):
@@ -2920,7 +2920,7 @@ class Runner(object):
                         setattr(self, name, row_type(value))
 
         if self.params_filename is not None and \
-          not self.train.running:
+          not self.train.selected:
             self.params_filenames = [self.params_filename]
 
     def load_train_results(self):
@@ -3659,11 +3659,11 @@ to find the winning instance anyway.""" % thread.instance_index)
                     self.train.init):
                     self.save_validation_set()
 
-                if self.train.running:
+                if self.train.selected:
                     self.run_train()
 
-                if self.identify.running or self.posterior.running:
-                    if self.posterior.running:
+                if self.identify.selected or self.posterior.selected:
+                    if self.posterior.selected:
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
