@@ -737,9 +737,9 @@ class Runner(object):
         # flags
         self.clobber = False
         # XXX: this should become an int for num_starts
-        self.train = self.Steps()  # EM train
-        self.posterior = self.Steps()
-        self.identify = self.Steps()  # viterbi
+        self.train = self.TaskSteps()  # EM train
+        self.posterior = self.TaskSteps()
+        self.identify = self.TaskSteps()  # viterbi
         self.recover_round = False
         self.validate = False
         self.dry_run = False
@@ -747,7 +747,7 @@ class Runner(object):
 
         self.__dict__.update(kwargs)
 
-    class Steps(object):
+    class TaskSteps(object):
         """
         Determines which steps were selected for the given task
         Sets all to true if none were specified, running the full task
@@ -781,10 +781,8 @@ class Runner(object):
             task = task.split(SUB_TASK_DELIMITER)
             task_name = task[0]
             step = task[1:]
-            if len(step) == 2:
-                # If two steps were supplied, ensure that they were run-round.
-                # Others should not be possible unless set in ArgParse
-                assert step[0] == "run" and step[1] == "round"
+            if len(step) == 2 and \
+              (step[0] == "run" and step[1] == "round"):
                 self.recover_dirname = self.work_dirname
                 self.recover_round = True
             getattr(self, task_name).set_steps(step)
