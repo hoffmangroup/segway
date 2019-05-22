@@ -294,9 +294,12 @@ IDENTIFY_OPTION_TYPES = \
 
 SUB_TASK_DELIMITER = "-"
 
-class TrainResults():
+class TrainInstanceResults():
     """
-    This class stores the results from a single training instance.
+    This class stores the best results from each training instance run,
+    depending on whether or not validation was used, and stores the
+    resulting likelihood and params, as well as the files used to
+    generate it: the input master and validation files.
     """
     def get_filenames(self, validation = False):
         if validation:
@@ -433,16 +436,16 @@ def slice2range(s):
     return range(start, stop, step)
 
 
-def file_or_string_to_string_list(file_or_string):
+def filename_or_string_to_string_list(filename_or_string):
     """Returns a list that will either contain each line from a file object or
     the single string given."""
 
     # Try to read all the lines from a file object
     try:
-        return [line.rstrip() for line in file_or_string.readlines()]
+        return [line.rstrip() for line in filename_or_string.readlines()]
     # If the object isn't a file, return its own type (presumed string)
     except AttributeError:
-        return [file_or_string]
+        return [filename_or_string]
 
 
 def is_training_progressing(last_ll, curr_ll,
@@ -734,9 +737,9 @@ class Runner(object):
         # flags
         self.clobber = False
         # XXX: this should become an int for num_starts
-        self.train = self.steps()  # EM train
-        self.posterior = self.steps()
-        self.identify = self.steps()  # viterbi
+        self.train = self.Steps()  # EM train
+        self.posterior = self.Steps()
+        self.identify = self.Steps()  # viterbi
         self.recover_round = False
         self.validate = False
         self.dry_run = False
@@ -744,7 +747,7 @@ class Runner(object):
 
         self.__dict__.update(kwargs)
 
-    class steps(object):
+    class Steps(object):
         """
         Determines which steps were selected for the given task
         Sets all to true if none were specified, running the full task
@@ -915,8 +918,8 @@ class Runner(object):
         track_specs = []
         tracks = getattr(options, "track", None)
         if tracks:
-            for file_or_string in tracks:
-                track_specs.extend(file_or_string_to_string_list(file_or_string))
+            for filename_or_string in tracks:
+                track_specs.extend(filename_or_string_to_string_list(filename_or_string))
 
         options.track = track_specs
 
@@ -932,11 +935,8 @@ class Runner(object):
             except ValueError:
                 src, = option_to_attr
                 dst = src
-            try:
-                res.set_option(dst, getattr(options, src))
-            except AttributeError:
-                # Option didn't apply to this task
-                pass
+
+            res.set_option(dst, getattr(options, src, None))
 
         # multiple lists to one
         res.user_native_spec = sum([opt.split(" ")
@@ -2091,7 +2091,8 @@ class Runner(object):
         return len(tracknames_quoted) != len(frozenset(tracknames_quoted))
 
     def save_gmtk_input(self):
-        # can't run train and identify/posterior in the same run
+        import pdb
+        pdb.set_trace()
         if self.supervision_type == SUPERVISION_SEMISUPERVISED:
             self.load_supervision()
         self.set_tracknames()
@@ -2926,8 +2927,8 @@ class Runner(object):
 
     def load_train_results(self):
         """
-        Loads the training results in train-finish saved in the /results/ dir.
-        Stores as a list of TrainResults in instance_params to select best in
+        Loads the training results in train-finish saved in SUBDIRNAME_RESULTS.
+        Stores as a list of TrainInstanceResults in instance_params to select best in
         finish.
         """
 
@@ -2937,10 +2938,11 @@ class Runner(object):
             # Set variables to none to be overwritten by the tab file contents
             results = TrainResults([None, None, None, None, None, None, None, None])
             with open(filename) as resultfile:
-                for line in resultfile.readlines()[1:]:
-                    values = line.strip("\n").split(DELIMITER_BED)
-                    name = values[0]
-                    value = values[1]
+                reader = DictReader(resultfile)
+                for line in reader:
+                    name = line["name"]
+                    value = line["value"]
+
                     item_type = TRAIN_RESULT_TYPES[name]
                     setattr(results, name, item_type(value))
 
@@ -2950,7 +2952,8 @@ class Runner(object):
 
     def load_identify_options(self, identify_dir_name):
         """
-        load options set in identify-init
+        load options set in identify-init, stored in the identify.tab file
+        in the main directory.
         """
 
         filename = Path(identify_dir_name) / IDENTIFY_FILEBASENAME

@@ -479,6 +479,8 @@ def save_template(filename, resource, mapping, dirname=None, clobber=False,
     creates a temporary file if filename is None or empty
     """
     if filename:
+        import pdb
+        pdb.set_trace()
         is_new = clobber or not Path(filename).exists()
     else:
         filename = make_default_filename(resource, dirname, instance_index)
