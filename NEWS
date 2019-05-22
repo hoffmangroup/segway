@@ -1,3 +1,5 @@
+2.0.5:
+
 2.0.4:
 * segway: gaussian mixtures no longer split with only one component
 * segway: priors and mixture components are now derived from previous EM
