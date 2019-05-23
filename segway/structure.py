@@ -33,7 +33,8 @@ class StructureSaver(Saver):
     copy_attrs = ["num_track_groups", "num_datapoints",
                   "use_dinucleotide", "window_lens", "resolution",
                   "supervision_type", "track_groups",
-                  "gmtk_include_filename_relative", "virtual_evidence"]
+                  "gmtk_include_filename_relative", "virtual_evidence",
+                  "model_weight", "virtual_evidence_weight"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -83,7 +84,10 @@ class StructureSaver(Saver):
     def add_virtual_evidence_observation(self, observation_items, next_int_track_index):
         # VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER = 1 since we are
         # not normalising against the max length of the data tracks
-        weight_spec = self.make_weight_spec(VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER)
+        if self.virtual_evidence_weight:
+            weight_spec = "scale VIRTUAL_EVIDENCE_WEIGHT"
+        else:
+            weight_spec = self.make_weight_spec(VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER)
 
         # create the supervision label's conditional parents
         # using GMTK specification
@@ -134,7 +138,11 @@ class StructureSaver(Saver):
 
             conditionalparents_spec = \
                 self.make_conditionalparents_spec(trackname)
-            weight_spec = self.make_weight_spec(weight_multiplier)
+
+            if self.model_weight:
+                weight_spec = "scale MODEL_WEIGHT"
+            else:
+                weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK

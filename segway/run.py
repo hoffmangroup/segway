@@ -286,7 +286,7 @@ TRAIN_OPTION_TYPES = \
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
          supervision_filename=str, virtual_evidence_filename = str, 
          minibatch_fraction=float, validation_fraction=float, 
-         validation_coords_filename=str, var_floor=float)
+         validation_coords_filename=str, var_floor=float, model_weight=float)
 
 
 TRAIN_RESULT_TYPES = OrderedDict([("log_likelihood", float), ("num_segs", int),
@@ -737,6 +737,8 @@ class Runner(object):
         self.max_split_sequence_length = MAX_SPLIT_SEQUENCE_LENGTH
         self.max_frames = MAX_FRAMES
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
+        self.model_weight = None
+        self.virtual_evidence_weight = None
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
@@ -830,6 +832,8 @@ class Runner(object):
                         ("distribution",),
                         ("prior_strength", "len_seg_strength"),
                         ("segtransition_weight_scale",),
+                        ("model_weight",),
+                        ("virtual_evidence_weight",),
                         ("ruler_scale",),
                         ("resolution",),
                         ("var_floor",),
@@ -1550,6 +1554,9 @@ class Runner(object):
         directives["CARD_FRAMEINDEX"] = self.max_frames
         directives["SEGTRANSITION_WEIGHT_SCALE"] = \
             self.segtransition_weight_scale
+
+        if self.model_weight:
+            directives["MODEL_WEIGHT"] = self.model_weight
 
         res = " ".join(CPP_DIRECTIVE_FMT % item
                        for item in viewitems(directives))
@@ -4003,6 +4010,14 @@ def parse_options(argv):
                        metavar="SCALE",
                        help="exponent for segment transition probability "
                        " (default %f)" % SEGTRANSITION_WEIGHT_SCALE)
+
+    group.add_argument("--model-weight", type=float,
+                       help="exponent for whole model probability "
+                       "default 1")
+
+    group.add_argument("--virtual-evidence-weight", type=float,
+                       help="exponent for virtual evidence probability "
+                       "default 1")
 
     group.add_argument("--reverse-world", action="append", type=int,
                        default=[], metavar="WORLD",
