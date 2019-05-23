@@ -387,9 +387,9 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
         # with uniform priors filled in at all other positions
         prior_array = zeros((len(input_array), num_segs))
         for prior_list_index, prior_vector in enumerate(prior_list):
-            if sum(prior_vector) == 1:
+            if abs(sum(prior_vector) - 1.0) < EPSILON:
                 prior_array[prior_list_index] = prior_vector
-            elif sum(prior_vector) == 0.0:
+            elif abs(sum(prior_vector) - 0.0) < EPSILON:
                 prior_array[prior_list_index] = uniform_prior_vector
             else:
                 raise ValueError("Priors must sum to 1.0 at every position")
