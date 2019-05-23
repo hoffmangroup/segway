@@ -1426,7 +1426,8 @@ class Runner(object):
     @memoized_property
     def supervision_type(self):
         # Supervision is only used in training
-        if self.supervision_filename:
+        # If another task is selected, set to unsupervised
+        if self.supervision_filename and self.train.selected:
             return SUPERVISION_SEMISUPERVISED
         else:
             return SUPERVISION_UNSUPERVISED
@@ -2932,7 +2933,7 @@ class Runner(object):
         instance_params = []
         for filename in Path(self.results_dirpath).files(pattern):
             # Set variables to none to be overwritten by the tab file contents
-            results = TrainResults([None, None, None, None, None, None, None, None])
+            results = TrainInstanceResults([None, None, None, None, None, None, None, None])
             with open(filename) as resultfile:
                 reader = DictReader(resultfile)
                 for line in reader:
