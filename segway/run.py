@@ -3739,7 +3739,8 @@ def parse_options(argv):
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
 
-    tasks = parser.add_subparsers(help="Segway Tasks", dest = "command")
+    tasks = parser.add_subparsers(help="Segway Tasks", dest = "command",
+                                  metavar="")
 
     # define steps for each of the three main tasks
     train_init = tasks.add_parser("", add_help=False)
