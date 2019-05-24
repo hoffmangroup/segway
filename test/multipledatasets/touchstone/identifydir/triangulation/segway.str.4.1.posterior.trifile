@@ -46,38 +46,38 @@ Left_interface:Run_Bdry_Alg(T),Bnd_Heurs(S),TravFrac(1.000000),Tri_Heur(complete
 
 % ---
 % --- P partition information: variables and their neighbors
-% segCountDown(0) : seg(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% seg(0) : segCountDown(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% presence__testtrack1A(0) : segCountDown(0), seg(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% testtrack1A(0) : segCountDown(0), seg(0), presence__testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% presence__testtrack2A(0) : segCountDown(0), seg(0), presence__testtrack1A(0), testtrack1A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% testtrack2A(0) : segCountDown(0), seg(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% presence__testtrack3A(0) : segCountDown(0), seg(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), testtrack3A(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% testtrack3A(0) : segCountDown(0), seg(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), ruler(1), segCountDown(1), segTransition(1), seg(1),
-% ruler(1) : segCountDown(0), seg(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), segCountDown(1), segTransition(1), seg(1),
-% segCountDown(1) : segCountDown(0), seg(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segTransition(1), seg(1),
-% segTransition(1) : segCountDown(0), seg(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segCountDown(1), seg(1),
-% seg(1) : segCountDown(0), seg(0), presence__testtrack1A(0), testtrack1A(0), presence__testtrack2A(0), testtrack2A(0), presence__testtrack3A(0), testtrack3A(0), ruler(1), segCountDown(1), segTransition(1),
+(%__ANY_LINE__%)% segCountDown(0) : (%((seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% seg(0) : (%((segCountDown\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% presence__testtrack1A(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% testtrack1A(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% presence__testtrack2A(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% testtrack2A(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% presence__testtrack3A(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% testtrack3A(0) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% ruler(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% segCountDown(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segTransition\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% segTransition(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)){11}%)
+(%__ANY_LINE__%)% seg(1) : (%((segCountDown\(0\),? ?)|(seg\(0\),? ?)|(presence__testtrack1A\(0\),? ?)|(testtrack1A\(0\),? ?)|(presence__testtrack2A\(0\),? ?)|(testtrack2A\(0\),? ?)|(presence__testtrack3A\(0\),? ?)|(testtrack3A\(0\),? ?)|(ruler\(1\),? ?)|(segCountDown\(1\),? ?)|(segTransition\(1\),? ?)){11}%)
 % --- P partition definition
-P_PARTITION 12 segCountDown 0 seg 0 presence__testtrack1A 0 testtrack1A 0 presence__testtrack2A 0 testtrack2A 0 presence__testtrack3A 0 testtrack3A 0 ruler 1 segCountDown 1 segTransition 1 seg 1
+P_PARTITION 12 (%((segCountDown\ 0 ?)|(seg\ 0 ?)|(presence__testtrack1A\ 0 ?)|(testtrack1A\ 0 ?)|(presence__testtrack2A\ 0 ?)|(testtrack2A\ 0 ?)|(presence__testtrack3A\ 0 ?)|(testtrack3A\ 0 ?)|(ruler\ 1 ?)|(segCountDown\ 1 ?)|(segTransition\ 1 ?)|(seg\ 1 ?)){12}%)
 
 % ---
 % --- C partition information: variables and their neighbors
-% frameIndex(1) : segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% segCountDown(1) : frameIndex(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% seg(1) : frameIndex(1), segCountDown(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% presence__testtrack1A(1) : frameIndex(1), segCountDown(1), seg(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% testtrack1A(1) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% presence__testtrack2A(1) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% testtrack2A(1) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% presence__testtrack3A(1) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% testtrack3A(1) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% ruler(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), segCountDown(2), segTransition(2), seg(2),
-% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segTransition(2), seg(2),
-% segTransition(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), seg(2),
-% seg(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2),
+(%__ANY_LINE__%)% frameIndex(1) : (%((segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% segCountDown(1) : (%((frameIndex\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% seg(1) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% presence__testtrack1A(1) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% testtrack1A(1) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% presence__testtrack2A(1) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% testtrack2A(1) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% presence__testtrack3A(1) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% testtrack3A(1) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% ruler(2) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% segCountDown(2) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% segTransition(2) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(seg\(2\),? ?)){12}%)
+(%__ANY_LINE__%)% seg(2) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)){12}%)
 % --- C partition definition
-C_PARTITION 13 frameIndex 1 segCountDown 1 seg 1 presence__testtrack1A 1 testtrack1A 1 presence__testtrack2A 1 testtrack2A 1 presence__testtrack3A 1 testtrack3A 1 ruler 2 segCountDown 2 segTransition 2 seg 2
+C_PARTITION 13 (%((frameIndex\ 1 ?)|(segCountDown\ 1 ?)|(seg\ 1 ?)|(presence__testtrack1A\ 1 ?)|(testtrack1A\ 1 ?)|(presence__testtrack2A\ 1 ?)|(testtrack2A\ 1 ?)|(presence__testtrack3A\ 1 ?)|(testtrack3A\ 1 ?)|(ruler\ 2 ?)|(segCountDown\ 2 ?)|(segTransition\ 2 ?)|(seg\ 2 ?)){13}%)
 
 % ---
 % --- E partition information: variables and their neighbors
@@ -95,15 +95,15 @@ E_PARTITION 9 frameIndex 2 segCountDown 2 seg 2 presence__testtrack1A 2 testtrac
 
 % ---
 % --- PC information : variables and their neighbors
-% segCountDown(1) : frameIndex(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% segCountDown(1) : (%((frameIndex\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
 % seg(1) : frameIndex(1), segCountDown(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
 % --- PC interface definition
 PC_PARTITION 2 segCountDown 1 seg 1
 
 % ---
 % --- CE information : variables and their neighbors
-% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segTransition(2), seg(2),
-% seg(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2),
+% segCountDown(2) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+% seg(2) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)){12}%)
 % --- CE interface definition
 CE_PARTITION 2 segCountDown 2 seg 2
 
@@ -112,22 +112,22 @@ CE_PARTITION 2 segCountDown 2 seg 2
 % ---- 1 total max-cliques
 % ---- Triangulation came from method: 1-completed
 % 0 : 12  1.982271
-%    segCountDown(0)
-%    seg(0)
-%    presence__testtrack1A(0)
-%    testtrack1A(0)
-%    presence__testtrack2A(0)
-%    testtrack2A(0)
-%    presence__testtrack3A(0)
-%    testtrack3A(0)
-%    ruler(1)
-%    segCountDown(1)
-%    segTransition(1)
-%    seg(1)
+(%__ANY_LINE__%)%    segCountDown(0)
+(%__ANY_LINE__%)%    seg(0)
+(%__ANY_LINE__%)%    presence__testtrack1A(0)
+(%__ANY_LINE__%)%    testtrack1A(0)
+(%__ANY_LINE__%)%    presence__testtrack2A(0)
+(%__ANY_LINE__%)%    testtrack2A(0)
+(%__ANY_LINE__%)%    presence__testtrack3A(0)
+(%__ANY_LINE__%)%    testtrack3A(0)
+(%__ANY_LINE__%)%    ruler(1)
+(%__ANY_LINE__%)%    segCountDown(1)
+(%__ANY_LINE__%)%    segTransition(1)
+(%__ANY_LINE__%)%    seg(1)
 % Maximum clique state space = 1e1.982271, total state space = 1e1.982271
 1-completed
 2
-0 12 segCountDown 0 seg 0 presence__testtrack1A 0 testtrack1A 0 presence__testtrack2A 0 testtrack2A 0 presence__testtrack3A 0 testtrack3A 0 ruler 1 segCountDown 1 segTransition 1 seg 1
+0 12 (%((segCountDown\ 0 ?)|(seg\ 0 ?)|(presence__testtrack1A\ 0 ?)|(testtrack1A\ 0 ?)|(presence__testtrack2A\ 0 ?)|(testtrack2A\ 0 ?)|(presence__testtrack3A\ 0 ?)|(testtrack3A\ 0 ?)|(ruler\ 1 ?)|(segCountDown\ 1 ?)|(segTransition\ 1 ?)|(seg\ 1 ?)){12}%)
 1 1 seg 0
 
 % ---
@@ -135,23 +135,23 @@ CE_PARTITION 2 segCountDown 2 seg 2
 % ---- 1 total max-cliques
 % ---- Triangulation came from method: 1-completed
 % 0 : 13  2.283301
-%    frameIndex(1)
-%    segCountDown(1)
-%    seg(1)
-%    presence__testtrack1A(1)
-%    testtrack1A(1)
-%    presence__testtrack2A(1)
-%    testtrack2A(1)
-%    presence__testtrack3A(1)
-%    testtrack3A(1)
-%    ruler(2)
-%    segCountDown(2)
-%    segTransition(2)
-%    seg(2)
+(%__ANY_LINE__%)%    frameIndex(1)
+(%__ANY_LINE__%)%    segCountDown(1)
+(%__ANY_LINE__%)%    seg(1)
+(%__ANY_LINE__%)%    presence__testtrack1A(1)
+(%__ANY_LINE__%)%    testtrack1A(1)
+(%__ANY_LINE__%)%    presence__testtrack2A(1)
+(%__ANY_LINE__%)%    testtrack2A(1)
+(%__ANY_LINE__%)%    presence__testtrack3A(1)
+(%__ANY_LINE__%)%    testtrack3A(1)
+(%__ANY_LINE__%)%    ruler(2)
+(%__ANY_LINE__%)%    segCountDown(2)
+(%__ANY_LINE__%)%    segTransition(2)
+(%__ANY_LINE__%)%    seg(2)
 % Maximum clique state space = 1e2.283301, total state space = 1e2.283301
 1-completed
 2
-0 13 frameIndex 1 segCountDown 1 seg 1 presence__testtrack1A 1 testtrack1A 1 presence__testtrack2A 1 testtrack2A 1 presence__testtrack3A 1 testtrack3A 1 ruler 2 segCountDown 2 segTransition 2 seg 2
+0 13 (%((frameIndex\ 1 ?)|(segCountDown\ 1 ?)|(seg\ 1 ?)|(presence__testtrack1A\ 1 ?)|(testtrack1A\ 1 ?)|(presence__testtrack2A\ 1 ?)|(testtrack2A\ 1 ?)|(presence__testtrack3A\ 1 ?)|(testtrack3A\ 1 ?)|(ruler\ 2 ?)|(segCountDown\ 2 ?)|(segTransition\ 2 ?)|(seg\ 2 ?)){13}%)
 1 1 seg 1
 
 % ---
