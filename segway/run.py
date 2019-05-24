@@ -779,6 +779,8 @@ class Runner(object):
         for task in tasks:
             task = task.split(SUB_TASK_DELIMITER)
             task_name = task[0]
+            if task_name == "annotate":
+                task_name = "identify"
             step = task[1:]
             if len(step) == 2 and \
               (step[0] == "run" and step[1] == "round"):
@@ -3731,10 +3733,6 @@ def parse_options(argv):
                        "cluster manager")
 
     group = parser.add_argument_group("Flags")
-    group.add_argument("-c", "--clobber", action="store_true",
-                       help="delete any preexisting files and assumes any "
-                       "model files specified in options as output to be "
-                       "overwritten")
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
 
@@ -3878,6 +3876,12 @@ def parse_options(argv):
                          "mixture of Gaussians, default unused, else default %f"
                          % VAR_FLOOR_GMM_DEFAULT)
 
+    group = train_init.add_argument_group("Flags(train-init)")
+    group.add_argument("-c", "--clobber", action="store_true",
+                       help="delete any preexisting files and assumes any "
+                       "model files specified in options as output to be "
+                       "overwritten")
+
     # Train run is where the train-rounds are calculated
     group = train_run.add_argument_group("Modeling Variables (train-run)")
     group.add_argument("--max-train-rounds", type=int, metavar="NUM",
@@ -3894,6 +3898,12 @@ def parse_options(argv):
 
     group.add_argument("-r", "--recover", metavar="DIR",
                        help="continue from interrupted run in DIR")
+
+    group = identify_init.add_argument_group("Flags(identify-init)")
+    group.add_argument("-c", "--clobber", action="store_true",
+                       help="delete any preexisting files and assumes any "
+                       "model files specified in options as output to be "
+                       "overwritten")
 
     # select coords to identify in the init step
     group = identify_init.add_argument_group("Data selection (idenfity-init)")
@@ -3935,9 +3945,9 @@ def parse_options(argv):
     tasks.add_parser("train-finish", parents = [train_finish, args])
     tasks.add_parser("train-run-round", parents = [train_run_round, args])
 
-    tasks.add_parser("identify-init", parents = [identify_init, args])
-    tasks.add_parser("identify-run", parents = [identify_run, args])
-    tasks.add_parser("identify-finish", parents = [identify_finish, args])
+    tasks.add_parser("annotate-init", parents = [identify_init, args])
+    tasks.add_parser("annotate-run", parents = [identify_run, args])
+    tasks.add_parser("annotate-finish", parents = [identify_finish, args])
 
     # posterior and identify take the same options
     tasks.add_parser("posterior-init", parents = [identify_init, args])
@@ -3946,6 +3956,8 @@ def parse_options(argv):
 
     tasks.add_parser("train",
         parents = [train_init, train_run, train_finish, args])
+    tasks.add_parser("annotate",
+        parents = [identify_init, identify_run, identify_finish, args])
     tasks.add_parser("identify",
         parents = [identify_init, identify_run, identify_finish, args])
     tasks.add_parser("posterior",
