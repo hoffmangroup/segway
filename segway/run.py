@@ -293,26 +293,6 @@ IDENTIFY_OPTION_TYPES = \
              seg_table_filename=str, output_label=str)
 
 SUB_TASK_DELIMITER = "-"
-
-class TrainInstanceResults():
-    """
-    This class stores the best results from each training instance run,
-    depending on whether or not validation was used, and stores the
-    resulting likelihood and params, as well as the files used to
-    generate it: the input master and validation files.
-    """
-    def get_filenames(self, validation = False):
-        if validation:
-            return[self.input_master_filename, self.params_filename, 
-                   self.log_likelihood_filename, self.validation_output_filename,
-                   self.validation_sum_filename]
-        return[self.input_master_filename, self.params_filename, 
-               self.log_likelihood_filename]
-
-    def __init__(self, result_list):
-        zipper = zip(result_list, TRAIN_RESULT_TYPES.keys())
-        for value, name in zipper:
-            setattr(self, name, value)
     
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
@@ -500,6 +480,25 @@ class Mixin_Lockable(AddableMixin):  # noqa
 
 LockableDefaultDict = Mixin_Lockable + defaultdict
 
+class TrainInstanceResults():
+    """
+    This class stores the best results from each training instance run,
+    depending on whether or not validation was used, and stores the
+    resulting likelihood and params, as well as the files used to
+    generate it: the input master and validation files.
+    """
+    def get_filenames(self, validation = False):
+        if validation:
+            return[self.input_master_filename, self.params_filename, 
+                   self.log_likelihood_filename, self.validation_output_filename,
+                   self.validation_sum_filename]
+        return[self.input_master_filename, self.params_filename, 
+               self.log_likelihood_filename]
+
+    def __init__(self, result_list):
+        zipper = zip(result_list, TRAIN_RESULT_TYPES.keys())
+        for value, name in zipper:
+            setattr(self, name, value)
 
 class TrainThread(Thread):
     def __init__(self, runner, session, instance_index, num_segs):
