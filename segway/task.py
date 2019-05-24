@@ -452,7 +452,7 @@ def print_to_fd(fd, line):
 
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                            num_labels, num_sublabels, output_label,
-                           genomedata_names, distribution, track_indexes_text,
+                           genomedata_names, distribution, track_indexes,
                            *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
@@ -461,10 +461,12 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
     (chrom, start, end) = coord
-    track_indexes = make_track_indexes(track_indexes_text)
+    # Create and save the window
+    genomedata_names = genomedata_names.split(",")
+    track_indexes = make_track_indexes(track_indexes)
 
-    with Genome(genomedata_names) as genome:
-        continuous_cells = genome[chrom][start:end, track_indexes]
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
 
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
                                                continuous_cells, resolution,
@@ -484,7 +486,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                          num_labels, num_sublabels, output_label,
-                         genomedata_names, distribution, track_indexes_text,
+                         genomedata_names, distribution, track_indexes,
                          *args):
     # convert from tuple
     args = list(args)
@@ -493,12 +495,9 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
     (chrom, start, end) = coord
 
-    # Create a list of a list of tracks ordered based on genomedata archive
-    # specified order (delimited with a ';')
-    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
-                     for genomedata_track_indexes_text
-                     in track_indexes_text.split(';')]
+    # Create and save the window
     genomedata_names = genomedata_names.split(",")
+    track_indexes = make_track_indexes(track_indexes)
 
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
@@ -524,10 +523,9 @@ def run_train(coord, resolution, do_reverse, outfilename,
               track_indexes,
               is_semisupervised, supervision_coords, supervision_labels,
               *args):
-
     # Create and save the train window
     genomedata_names = genomedata_names.split(",")
-    track_indexes = map(int, track_indexes.split(","))
+    track_indexes = make_track_indexes(track_indexes)
 
     (chrom, start, end) = coord
     gmtk_args = list(args)
