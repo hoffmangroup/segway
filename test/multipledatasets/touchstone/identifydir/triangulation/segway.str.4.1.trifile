@@ -94,15 +94,15 @@ E_PARTITION 9 frameIndex 2 segCountDown 2 seg 2 presence__testtrack1A 2 testtrac
 
 % ---
 % --- PC information : variables and their neighbors
-% segCountDown(1) : frameIndex(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
-% seg(1) : frameIndex(1), segCountDown(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2), seg(2),
+% segCountDown(1) : (%((frameIndex\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+% seg(1) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
 % --- PC interface definition
 PC_PARTITION 2 segCountDown 1 seg 1 
 
 % ---
 % --- CE information : variables and their neighbors
-% segCountDown(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segTransition(2), seg(2),
-% seg(2) : frameIndex(1), segCountDown(1), seg(1), presence__testtrack1A(1), testtrack1A(1), presence__testtrack2A(1), testtrack2A(1), presence__testtrack3A(1), testtrack3A(1), ruler(2), segCountDown(2), segTransition(2),
+% segCountDown(2) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segTransition\(2\),? ?)|(seg\(2\),? ?)){12}%)
+% seg(2) : (%((frameIndex\(1\),? ?)|(segCountDown\(1\),? ?)|(seg\(1\),? ?)|(presence__testtrack1A\(1\),? ?)|(testtrack1A\(1\),? ?)|(presence__testtrack2A\(1\),? ?)|(testtrack2A\(1\),? ?)|(presence__testtrack3A\(1\),? ?)|(testtrack3A\(1\),? ?)|(ruler\(2\),? ?)|(segCountDown\(2\),? ?)|(segTransition\(2\),? ?)){12}%)
 % --- CE interface definition
 CE_PARTITION 2 segCountDown 2 seg 2 
 
