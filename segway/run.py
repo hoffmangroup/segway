@@ -2099,29 +2099,16 @@ class Runner(object):
                 label = datum.name
                 prior = datum.score
 
-                if self.num_worlds != 1:
-                    if not hasattr(datum, score):
-                        raise ValueError("""
-                                         Error reading virtual evidence file: %s
-                                         When running with concatenated tracks, the final
-                                         column of each prior must contain the world number
-                                         """ % (self.virtual_evidence_filename))
-                    world = datum.score
+                # Check if a world was specified for this prior
+                if hasattr(datum, strand):
+                    worlds = [int(datum.strand)]
+                # Otherwise apply it to all worlds be trained on
                 else:
-                    world = 0
-
-                check_overlapping_labels(start, end, (world, chrom),
-                                         virtual_evidence_coords,
-                                         "virtual evidence")
+                    worlds = range(self.num_worlds)
 
                 virtual_evidence_coords[(world, chrom)].append((start, end))
 
-                prior_string = datum.name
-                # this is a string of the format "label:prior,label:prior,..."
-                for prior_substr in prior_string.split(
-                    VIRTUAL_EVIDENCE_PRIOR_DELIMITER): 
-                    label, prior = prior_substr.split(
-                        VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER)
+                for world in worlds:
                     virtual_evidence_priors[(world, chrom)].append(
                         {int(label): float(prior)})
 
