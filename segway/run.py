@@ -3892,6 +3892,7 @@ def parse_options(argv):
     train_run = tasks.add_parser("", add_help=False)
     train_finish = tasks.add_parser("", add_help=False)
     train_run_round = tasks.add_parser("", add_help=False)
+    train_init_run = tasks.add_parser("", add_help=False)
 
     identify_init = tasks.add_parser("", add_help=False)
     identify_run = tasks.add_parser("", add_help=False)
@@ -4011,14 +4012,6 @@ def parse_options(argv):
                        help="exponent for segment transition probability "
                        " (default %f)" % SEGTRANSITION_WEIGHT_SCALE)
 
-    group.add_argument("--model-weight", type=float,
-                       help="exponent for whole model probability "
-                       "default 1")
-
-    group.add_argument("--virtual-evidence-weight", type=float,
-                       help="exponent for virtual evidence probability "
-                       "default 1")
-
     group.add_argument("--reverse-world", action="append", type=int,
                        default=[], metavar="WORLD",
                        help="reverse sequences in concatenated world WORLD"
@@ -4032,19 +4025,11 @@ def parse_options(argv):
                          "mixture of Gaussians, default unused, else default %f"
                          % VAR_FLOOR_GMM_DEFAULT)
 
-    group.add_argument("--virtual-evidence", metavar="FILE",
-                       help="virtual evidence with priors for labels at each position in "
-                       "FILE (default none)")
-
-
     # Train run is where the train-rounds are calculated
     group = train_run.add_argument_group("Modeling Variables (train-run)")
     group.add_argument("--max-train-rounds", type=int, metavar="NUM",
                        help="each training instance runs a maximum of NUM"
                        " rounds (default %d)" % MAX_EM_ITERS)
-    group.add_argument("--new-virtual-evidence", metavar="FILE",
-                       help="Replace previously specified VE file with one new "
-                       "FILE (default none)")
 
     # Directory would be recovered from train-run
     group = train_run.add_argument_group("Intermediate files (train-run)")
@@ -4056,6 +4041,20 @@ def parse_options(argv):
 
     group.add_argument("-r", "--recover", metavar="DIR",
                        help="continue from interrupted run in DIR")
+
+    group = train_init_run.add_argument_group("Virtual Evidence "
+                                              "(train-init, train-run)")
+    group.add_argument("--virtual-evidence", metavar="FILE",
+                       help="virtual evidence with priors for labels at each position in "
+                       "FILE (default none)")
+    group.add_argument("--model-weight", type=float,
+                       help="exponent for whole model probability "
+                       "default 1")
+
+    group.add_argument("--virtual-evidence-weight", type=float,
+                       help="exponent for virtual evidence probability "
+                       "default 1")
+
 
     # select coords to identify in the init step
     group = identify_init.add_argument_group("Data selection (idenfity-init)")
@@ -4096,10 +4095,11 @@ def parse_options(argv):
     # Positional arguments
     args.add_argument("args", nargs="+")  # "+" for at least 1 arg
 
-    tasks.add_parser("train-init", parents = [train_init, args])
-    tasks.add_parser("train-run", parents = [train_run, args])
+    tasks.add_parser("train-init", parents = [train_init, train_init_run, args])
+    tasks.add_parser("train-run", parents = [train_run, train_init_run, args])
     tasks.add_parser("train-finish", parents = [train_finish, args])
-    tasks.add_parser("train-run-round", parents = [train_run_round, args])
+    tasks.add_parser("train-run-round", parents = [train_run_round,
+                                                   train_init_run, args])
 
     tasks.add_parser("identify-init", parents = [identify_init, args])
     tasks.add_parser("identify-run", parents = [identify_run, args])
@@ -4111,7 +4111,7 @@ def parse_options(argv):
     tasks.add_parser("posterior-finish", parents = [identify_finish, args])
 
     tasks.add_parser("train",
-        parents = [train_init, train_run, train_finish, args])
+        parents = [train_init, train_run, train_finish, train_init_run, args])
     tasks.add_parser("identify",
         parents = [identify_init, identify_run, identify_finish, args])
     tasks.add_parser("posterior",
