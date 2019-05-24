@@ -111,45 +111,45 @@ CE_PARTITION 2 segCountDown 2 seg 2
 % ---- 1 total max-cliques 
 % ---- Triangulation came from method: 1-completed
 % 0 : 12  1.982271
-%    segCountDown(0)
-%    seg(0)
-%    presence__testtrack1A(0)
-%    testtrack1A(0)
-%    presence__testtrack2A(0)
-%    testtrack2A(0)
-%    presence__testtrack3A(0)
-%    testtrack3A(0)
-%    ruler(1)
-%    segCountDown(1)
-%    segTransition(1)
-%    seg(1)
+(%__ANY_LINE__%)%    segCountDown(0)
+(%__ANY_LINE__%)%    seg(0)
+(%__ANY_LINE__%)%    presence__testtrack1A(0)
+(%__ANY_LINE__%)%    testtrack1A(0)
+(%__ANY_LINE__%)%    presence__testtrack2A(0)
+(%__ANY_LINE__%)%    testtrack2A(0)
+(%__ANY_LINE__%)%    presence__testtrack3A(0)
+(%__ANY_LINE__%)%    testtrack3A(0)
+(%__ANY_LINE__%)%    ruler(1)
+(%__ANY_LINE__%)%    segCountDown(1)
+(%__ANY_LINE__%)%    segTransition(1)
+(%__ANY_LINE__%)%    seg(1)
 % Maximum clique state space = 1e1.982271, total state space = 1e1.982271
 1-completed 
 1 
-0 12 segCountDown 0 seg 0 presence__testtrack1A 0 testtrack1A 0 presence__testtrack2A 0 testtrack2A 0 presence__testtrack3A 0 testtrack3A 0 ruler 1 segCountDown 1 segTransition 1 seg 1 
+0 12 (%((segCountDown\ 0 ?)|(seg\ 0 ?)|(presence__testtrack1A\ 0 ?)|(testtrack1A\ 0 ?)|(presence__testtrack2A\ 0 ?)|(testtrack2A\ 0 ?)|(presence__testtrack3A\ 0 ?)|(testtrack3A\ 0 ?)|(ruler\ 1 ?)|(segCountDown\ 1 ?)|(segTransition\ 1 ?)|(seg\ 1 ?)){12}%)
 
 % ---
 % ---- C Partitions Cliques and their weights
 % ---- 1 total max-cliques 
 % ---- Triangulation came from method: 1-completed
 % 0 : 13  2.283301
-%    frameIndex(1)
-%    segCountDown(1)
-%    seg(1)
-%    presence__testtrack1A(1)
-%    testtrack1A(1)
-%    presence__testtrack2A(1)
-%    testtrack2A(1)
-%    presence__testtrack3A(1)
-%    testtrack3A(1)
-%    ruler(2)
-%    segCountDown(2)
-%    segTransition(2)
-%    seg(2)
+(%__ANY_LINE__%)%    frameIndex(1)
+(%__ANY_LINE__%)%    segCountDown(1)
+(%__ANY_LINE__%)%    seg(1)
+(%__ANY_LINE__%)%    presence__testtrack1A(1)
+(%__ANY_LINE__%)%    testtrack1A(1)
+(%__ANY_LINE__%)%    presence__testtrack2A(1)
+(%__ANY_LINE__%)%    testtrack2A(1)
+(%__ANY_LINE__%)%    presence__testtrack3A(1)
+(%__ANY_LINE__%)%    testtrack3A(1)
+(%__ANY_LINE__%)%    ruler(2)
+(%__ANY_LINE__%)%    segCountDown(2)
+(%__ANY_LINE__%)%    segTransition(2)
+(%__ANY_LINE__%)%    seg(2)
 % Maximum clique state space = 1e2.283301, total state space = 1e2.283301
 1-completed 
 1 
-0 13 frameIndex 1 segCountDown 1 seg 1 presence__testtrack1A 1 testtrack1A 1 presence__testtrack2A 1 testtrack2A 1 presence__testtrack3A 1 testtrack3A 1 ruler 2 segCountDown 2 segTransition 2 seg 2 
+0 13 (%((frameIndex\ 1 ?)|(segCountDown\ 1 ?)|(seg\ 1 ?)|(presence__testtrack1A\ 1 ?)|(testtrack1A\ 1 ?)|(presence__testtrack2A\ 1 ?)|(testtrack2A\ 1 ?)|(presence__testtrack3A\ 1 ?)|(testtrack3A\ 1 ?)|(ruler\ 2 ?)|(segCountDown\ 2 ?)|(segTransition\ 2 ?)|(seg\ 2 ?)){13}%)
 
 % ---
 % ---- E Partitions Cliques and their weights

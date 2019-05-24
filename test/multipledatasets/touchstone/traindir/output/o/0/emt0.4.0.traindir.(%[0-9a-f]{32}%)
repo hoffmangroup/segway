@@ -1,2 +1,2 @@
-Segment 0, after Island, log(prob(evidence)) = 109071.5(%\d{5}%), per frame =13.633938, per numUFrams = 13.633938
+Segment 0, after Island, log(prob(evidence)) = 109071.5(%\d{5}%), per frame =13.63393(%\d{1}%), per numUFrams = 13.63393(%\d{1}%)
 ____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT (%[^_]+%)____
