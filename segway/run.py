@@ -2076,7 +2076,7 @@ class Runner(object):
                                        % (self.virtual_evidence_filename))
            elif self.train.init:
                 warn("Virtual evidence file provided does not exist."
-                     " A new one will need to be supplied by --new-virtual-evidence"
+                     " A new one will need to be supplied by --virtual-evidence"
                      " during train-run for Segway to be able to apply it to the model")
            return
         # defaultdict of list of dictionaries of the format {label: prior} 
@@ -2091,9 +2091,13 @@ class Runner(object):
 
         with open(self.virtual_evidence_filename) as VE_file:
             for datum in read_native(VE_file):
+                import pdb
+                pdb.set_trace()
                 chrom = datum.chrom
                 start = datum.chromStart
                 end = datum.chromEnd
+                label = datum.name
+                prior = datum.score
 
                 if self.num_worlds != 1:
                     if not hasattr(datum, score):
