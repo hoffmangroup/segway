@@ -2091,8 +2091,6 @@ class Runner(object):
 
         with open(self.virtual_evidence_filename) as VE_file:
             for datum in read_native(VE_file):
-                import pdb
-                pdb.set_trace()
                 chrom = datum.chrom
                 start = datum.chromStart
                 end = datum.chromEnd
@@ -2100,15 +2098,15 @@ class Runner(object):
                 prior = datum.score
 
                 # Check if a world was specified for this prior
-                if hasattr(datum, strand):
+                if hasattr(datum, "strand"):
                     worlds = [int(datum.strand)]
                 # Otherwise apply it to all worlds be trained on
                 else:
                     worlds = range(self.num_worlds)
 
-                virtual_evidence_coords[(world, chrom)].append((start, end))
-
                 for world in worlds:
+                    virtual_evidence_coords[(world, chrom)].append(
+                        (start, end))
                     virtual_evidence_priors[(world, chrom)].append(
                         {int(label): float(prior)})
 

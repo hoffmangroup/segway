@@ -18,7 +18,7 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, dstack, empty, finfo, float32, invert,
+                   column_stack, copy, dstack, empty, finfo, float32, full, invert,
                    isnan, maximum, mean, sum, vstack, zeros)
 from path import Path
 from six import viewitems
@@ -358,18 +358,22 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
     # [[0.5, 0.2, 0.10, 0.10, 0.10], [0.15, 0.4, 0.15, 0.15, 0.15], [0.0 ... 0.0]]
     prior_list = zeros((len(input_array), num_segs))
     for prior_dict_index, prior_dict in enumerate(input_array):
-        if len(prior_dict) != 0:
-            num_prior_labels = len(prior_dict) # number of labels with priors
-            remaining_probability = 1 - sum(list(prior_dict.values()))
+        if any(prior_dict):
+            prior_dict_values = list(filter(None, prior_dict))
+            num_prior_labels = len(prior_dict_values) # number of labels with priors
+            remaining_probability = 1 - sum(prior_dict_values)
+
+            if remaining_probability < 0:
+                raise ValueError("Priors must sum to 1.0 at every position")
 
             # divide remaining probability uniformly amongst the remaining labels
             uniform_prior = remaining_probability / (num_segs-num_prior_labels)
 
             for label in range(num_segs):
-                if label not in prior_dict:
+                if not prior_dict[label]:
                     prior_list[prior_dict_index][label] = uniform_prior
                 else:
-                    prior_list[prior_dict_index][label] = prior_dict[label]
+                    prior_list[prior_dict_index][label] = prior_dict_values[label]
 
     uniform_prior_vector = array([1.0/num_segs] * num_segs)
 
@@ -510,7 +514,7 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     return res
 
 
-def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors, start, end):
+def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors, start, end, num_segs):
     """
     virtual_evidence_coords: list of tuples (start, end)
     virtual_evidence_priors: list of dictionaries of the format {label: prior}
@@ -521,7 +525,7 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
     virtual_evidence_coords where each cell is the prior data for that region
     """
 
-    res = [{} for _ in range(end-start)] # zeros(end - start, dtype=DTYPE_OBS_INT)
+    res = full((num_segs, (end-start)), None) # zeros(end - start, dtype=DTYPE_OBS_INT)
 
     # Get supervision regions that overlap with the start and end coords
     supercontig_coords_labels = \
@@ -529,11 +533,14 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
                           virtual_evidence_priors)
 
     for label_start, label_end, data in supercontig_coords_labels:
+        label = list(data.keys())[0]
         # copy data to all positions
-        res[(label_start - start):(label_end - start)] = \
-            [data] * ((label_end - start)-(label_start - start))
+        if any(res[label][(label_start - start):(label_end - start)]):
+            raise ValueError("VE label overlaps")
+        res[label][(label_start - start):(label_end - start)] = \
+            list(data.values()) * ((label_end - start)-(label_start - start))
 
-    return res
+    return res.transpose()
 
 
 def make_continuous_cells(track_indexes, genomedata_names,

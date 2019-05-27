@@ -617,7 +617,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
         virtual_evidence_cells = [make_virtual_evidence_cells(
                                     virtual_evidence_coords, 
                                     virtual_evidence_priors, 
-                                    start, end)]
+                                    start, end, num_segs)]
     else:
         virtual_evidence_cells = None
 
