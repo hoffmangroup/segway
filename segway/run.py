@@ -335,6 +335,7 @@ COMMENT_POSTERIOR_TRIANGULATION = \
 RESOLUTION = 1
 
 SEGTRANSITION_WEIGHT_SCALE = 1.0
+VIRTUAL_EVIDENCE_WEIGHT = 1.0
 
 DIRPATH_WORK_DIR_HELP = Path("WORKDIR")
 DIRPATH_AUX = DIRPATH_WORK_DIR_HELP / SUBDIRNAME_AUX
@@ -738,7 +739,7 @@ class Runner(object):
         self.max_frames = MAX_FRAMES
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
         self.model_weight = None
-        self.virtual_evidence_weight = None
+        self.virtual_evidence_weight = VIRTUAL_EVIDENCE_WEIGHT
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
@@ -864,6 +865,9 @@ class Runner(object):
         else:
             # The genomedata archives except the final train directory and
             # posterior/identify working directory
+            if len(args) < 3:
+                raise RuntimeError("Please specify at least one genomedata archive,"
+                            " the train directory and the final directory.")
             res.genomedata_names = args[0:-2]
             train_dir_name = args[-2]
             try:
@@ -1456,7 +1460,7 @@ class Runner(object):
 
     @memoized_property
     def virtual_evidence(self):
-        if self.virtual_evidence_filename is not None and self.train:
+        if self.virtual_evidence_filename is not None:
             return True
         else:
             return False
@@ -1546,6 +1550,7 @@ class Runner(object):
         if self.virtual_evidence:
             directives[VIRTUAL_EVIDENCE_LIST_FILENAME] = \
                 VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER
+            directives["VIRTUAL_EVIDENCE"] = 1
         else:
             directives["VIRTUAL_EVIDENCE"] = VIRTUAL_EVIDENCE_NONE
 
@@ -1557,6 +1562,9 @@ class Runner(object):
 
         if self.model_weight:
             directives["MODEL_WEIGHT"] = self.model_weight
+
+        directives["VIRTUAL_EVIDENCE_WEIGHT"] = \
+            self.virtual_evidence_weight
 
         res = " ".join(CPP_DIRECTIVE_FMT % item
                        for item in viewitems(directives))
@@ -2071,10 +2079,10 @@ class Runner(object):
         # Check if file supplied during init exists, warn if not saying it will
         # have to be replaced before running.
         if not Path(self.virtual_evidence_filename).exists():
-           if self.train.run or self.identify.init or self.posterior.init:
+           if self.train.run:
                raise FileNotFoundError("Could not locate virtual evidence file: %s"
                                        % (self.virtual_evidence_filename))
-           elif self.train.init:
+           elif self.train.init or self.identify.init or self.posterior.init:
                 warn("Virtual evidence file provided does not exist."
                      " A new one will need to be supplied by --virtual-evidence"
                      " during train-run for Segway to be able to apply it to the model")
@@ -3619,8 +3627,8 @@ to find the winning instance anyway.""" % thread.instance_index)
             ordered_unique_world_genomedata_names)
 
         if self.virtual_evidence:
-            virtual_evidence_coords = self.virtual_evidence_coords[window.chrom]
-            virtual_evidence_priors = self.virtual_evidence_priors[window.chrom]
+            virtual_evidence_coords = self.virtual_evidence_coords[(window.world, window.chrom)]
+            virtual_evidence_priors = self.virtual_evidence_priors[(window.world, window.chrom)]
         else:
             virtual_evidence_coords = None
             virtual_evidence_priors = None
@@ -3815,7 +3823,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # XXX: register atexit for cleanup_resources
 
         work_dirname = self.work_dirname
-        if not Path(work_dirname).isdir():
+        if not Path(work_dirname).isdir() or self.clobber:
             self.make_dir(work_dirname, self.clobber)
 
         self.run(*args, **kwargs)
@@ -3886,6 +3894,7 @@ def parse_options(argv):
     identify_init = tasks.add_parser("", add_help=False)
     identify_run = tasks.add_parser("", add_help=False)
     identify_finish = tasks.add_parser("", add_help=False)
+    identify_init_run = tasks.add_parser("", add_help=False)
 
     # next two groups of options belong in train-init
     # with OptionGroup(parser, "Data selection") as group:
@@ -4067,9 +4076,18 @@ def parse_options(argv):
                        help="load segment hyperparameters from FILE"
                        " (default none)")
 
+    group = identify_init_run.add_argument_group("Virtual Evidence "
+                                              "(train-init, train-run)")
     group.add_argument("--virtual-evidence", metavar="FILE",
                        help="virtual evidence with priors for labels at each position in "
                        "FILE (default none)")
+    group.add_argument("--model-weight", type=float,
+                       help="exponent for whole model probability "
+                       "default 1")
+
+    group.add_argument("--virtual-evidence-weight", type=float,
+                       help="exponent for virtual evidence probability "
+                       "default 1")
 
     # output files are produced by identify-finish
     group = identify_finish.add_argument_group("Output files (identify-finish)")
@@ -4090,23 +4108,23 @@ def parse_options(argv):
     tasks.add_parser("train-run-round", parents = [train_run_round,
                                                    train_init_run, args])
 
-    tasks.add_parser("identify-init", parents = [identify_init, args])
-    tasks.add_parser("identify-run", parents = [identify_run, args])
+    tasks.add_parser("identify-init", parents = [identify_init, identify_init_run, args])
+    tasks.add_parser("identify-run", parents = [identify_run, identify_init_run, args])
     tasks.add_parser("identify-finish", parents = [identify_finish, args])
 
     # posterior and identify take the same options
-    tasks.add_parser("posterior-init", parents = [identify_init, args])
-    tasks.add_parser("posterior-run", parents = [identify_run, args])
+    tasks.add_parser("posterior-init", parents = [identify_init, identify_init_run, args])
+    tasks.add_parser("posterior-run", parents = [identify_run, identify_init_run, args])
     tasks.add_parser("posterior-finish", parents = [identify_finish, args])
 
     tasks.add_parser("train",
         parents = [train_init, train_run, train_finish, train_init_run, args])
     tasks.add_parser("identify",
-        parents = [identify_init, identify_run, identify_finish, args])
+        parents = [identify_init, identify_run, identify_finish, identify_init_run, args])
     tasks.add_parser("posterior",
-        parents = [identify_init, identify_run, identify_finish, args])
+        parents = [identify_init, identify_run, identify_finish, identify_init_run, args])
     tasks.add_parser("identify+posterior", 
-        parents = [identify_init, identify_run, identify_finish, args])
+        parents = [identify_init, identify_run, identify_finish, identify_init_run, args])
 
     options = parser.parse_args(argv)
 

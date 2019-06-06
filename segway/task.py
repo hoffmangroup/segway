@@ -480,7 +480,8 @@ def print_to_fd(fd, line):
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                            num_labels, num_sublabels, output_label,
                            genomedata_names, distribution, track_indexes_text,
-                           *args):
+                           virtual_evidence, virtual_evidence_coords, virtual_evidence_priors,
+                           num_segs, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
     args = list(args)
@@ -493,9 +494,28 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     with Genome(genomedata_names) as genome:
         continuous_cells = genome[chrom][start:end, track_indexes]
 
+    if virtual_evidence == "True":
+        virtual_evidence_cells = []
+        zipper = zip(virtual_evidence_coords.split(";"), virtual_evidence_priors.split(";"))
+        for coords, priors in zipper: 
+            virtual_evidence_coords = literal_eval(coords)
+            virtual_evidence_priors = literal_eval(priors)
+
+            num_segs = literal_eval(num_segs)
+
+            cell = make_virtual_evidence_cells(
+                       virtual_evidence_coords, 
+                       virtual_evidence_priors, 
+                       start, end, num_segs)
+            virtual_evidence_cells.append(cell)
+    else:
+        virtual_evidence_cells = None
+
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
-                                               continuous_cells, resolution,
-                                               distribution)
+                                               continuous_cells,
+                                               resolution, distribution,
+                                               None, virtual_evidence_cells,
+                                               num_segs)
     # remove from memory
     del continuous_cells
     gc.collect()
@@ -531,8 +551,6 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
-
-
     if virtual_evidence == "True":
         virtual_evidence_cells = []
         zipper = zip(virtual_evidence_coords.split(";"), virtual_evidence_priors.split(";"))
@@ -545,7 +563,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
             cell = make_virtual_evidence_cells(
                        virtual_evidence_coords, 
                        virtual_evidence_priors, 
-                       start, end)
+                       start, end, num_segs)
             virtual_evidence_cells.append(cell)
     else:
         virtual_evidence_cells = None

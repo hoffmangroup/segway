@@ -84,10 +84,7 @@ class StructureSaver(Saver):
     def add_virtual_evidence_observation(self, observation_items, next_int_track_index):
         # VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER = 1 since we are
         # not normalising against the max length of the data tracks
-        if self.virtual_evidence_weight:
-            weight_spec = "scale VIRTUAL_EVIDENCE_WEIGHT"
-        else:
-            weight_spec = self.make_weight_spec(VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER)
+        weight_spec = "scale VIRTUAL_EVIDENCE_WEIGHT"
 
         # create the supervision label's conditional parents
         # using GMTK specification
@@ -168,9 +165,9 @@ class StructureSaver(Saver):
             self.add_supervision_observation(observation_items, next_int_track_index)
             next_int_track_index += 2
 
-        if self.virtual_evidence:
-            self.add_virtual_evidence_observation(observation_items, next_int_track_index)
-            next_int_track_index += 1 # only adds one int block--presence data
+        #if self.virtual_evidence:
+        self.add_virtual_evidence_observation(observation_items, next_int_track_index)
+        next_int_track_index += 1 # only adds one int block--presence data
 
         assert observation_items  # must be at least one track
         observations = "\n".join(observation_items)

@@ -363,7 +363,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
             num_prior_labels = len(prior_dict_values) # number of labels with priors
             remaining_probability = 1 - sum(prior_dict_values)
 
-            if remaining_probability < 0:
+            if remaining_probability < -0.001:
                 raise ValueError("Priors must sum to 1.0 at every position")
 
             # divide remaining probability uniformly amongst the remaining labels
@@ -377,19 +377,20 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
 
     uniform_prior_vector = array([1.0/num_segs] * num_segs)
 
+    presence_array = array([1 if len(prior_dict) > 0 else 0 for prior_dict in input_array],
+                               dtype=DTYPE_OBS_INT)
+
     if resolution == 1:
         # at resolution==1, it suffices to take the presence to be 1
         # at every position the user has defined any priors
         # and 0 otherwise
-        presence_array = array([1 if len(prior_dict) > 0 else 0 for prior_dict in input_array],
-                               dtype=DTYPE_OBS_INT)
 
         # our "downsampled" prior array at resolution 1 is just the
         # vector of priors defined by the user at every position
         # with uniform priors filled in at all other positions
         prior_array = zeros((len(input_array), num_segs))
         for prior_list_index, prior_vector in enumerate(prior_list):
-            if sum(prior_vector) == 1:
+            if 0.999 <= sum(prior_vector) <= 1.001:
                 prior_array[prior_list_index] = prior_vector
             elif sum(prior_vector) == 0.0:
                 prior_array[prior_list_index] = uniform_prior_vector
@@ -405,8 +406,6 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
             for index in range(0, len(prior_list), resolution)
             )
 
-    # give the number of priors defined at each position
-    presence_array = array([len(prior_dict) for prior_dict in input_array])
     resolution_partitioned_presence_array = [
             presence_array[index:index+resolution]
             for index in range(0, len(presence_array), resolution)
