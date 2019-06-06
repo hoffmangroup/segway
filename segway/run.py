@@ -795,38 +795,39 @@ class Runner(object):
         if value or value == 0:
             setattr(self, name, value)
 
-    options_to_attrs = [("recover", "recover_dirname"),
-                        ("observations", "obs_dirname"),
-                        ("bed", "bed_filename"),
-                        ("semisupervised", "supervision_filename"),
-                        ("bigBed", "bigbed_filename"),
-                        ("include_coords", "include_coords_filename"),
-                        ("exclude_coords", "exclude_coords_filename"),
-                        ("minibatch_fraction",),
-                        ("validation_fraction",),
-                        ("validation_coords", "validation_coords_filename"),
-                        ("num_instances",),
-                        ("verbosity",),
-                        ("split_sequences", "max_split_sequence_length"),
-                        ("clobber",),
-                        ("dry_run",),
-                        ("input_master", "input_master_filename"),
-                        ("structure", "structure_filename"),
-                        ("dont_train", "dont_train_filename"),
-                        ("seg_table", "seg_table_filename"),
-                        ("distribution",),
-                        ("prior_strength", "len_seg_strength"),
-                        ("segtransition_weight_scale",),
-                        ("ruler_scale",),
-                        ("resolution",),
-                        ("var_floor",),
-                        ("mixture_components", "num_mix_components",),
-                        ("num_labels", "num_segs"),
-                        ("num_sublabels", "num_subsegs"),
-                        ("output_label", "output_label"),
-                        ("max_train_rounds", "max_em_iters"),
-                        ("reverse_world", "reverse_worlds"),
-                        ("track", "track_specs")]
+    options_to_attrs = {"recover": "recover_dirname",
+                        "observations": "obs_dirname",
+                        "bed": "bed_filename",
+                        "semisupervised": "supervision_filename",
+                        "bigBed": "bigbed_filename",
+                        "include_coords": "include_coords_filename",
+                        "exclude_coords": "exclude_coords_filename",
+                        "minibatch_fraction": "minibatch_fraction",
+                        "validation_fraction": "validation_fraction",
+                        "validation_coords": "validation_coords_filename",
+                        "num_instances": "num_instances",
+                        "verbosity": "verbosity",
+                        "split_sequences": "max_split_sequence_length",
+                        "clobber": "clobber",
+                        "dry_run": "dry_run",
+                        "input_master": "input_master_filename",
+                        "structure": "structure_filename",
+                        "dont_train": "dont_train_filename",
+                        "seg_table": "seg_table_filename",
+                        "distribution": "distribution",
+                        "prior_strength": "len_seg_strength",
+                        "segtransition_weight_scale": "segtransition_weight_scale",
+                        "ruler_scale": "ruler_scale",
+                        "resolution": "resolution",
+                        "var_floor": "var_floor",
+                        "mixture_components": "num_mix_components",
+                        "num_labels": "num_segs",
+                        "num_sublabels": "num_subsegs",
+                        "output_label": "output_label",
+                        "max_train_rounds": "max_em_iters",
+                        "reverse_world": "reverse_worlds",
+                        "track": "track_specs",
+                        "trainable_params": "params_filenames"}
 
     @classmethod
     def fromargs(cls, command, args):
@@ -904,54 +905,66 @@ class Runner(object):
         res = cls.fromargs(command, args)
         res.from_environment()
 
-        # If the observations directory has been specified
-        if getattr(options, "observations", None):
-            # Stop segway and show a "not implemented error" with description
-            raise NotImplementedError(
-                "'--observations' option not used: "
-                "Segway only creates observations in a temporary directory"
-            )
+        # Convert the options namespace into a dictionary
+        options_dict = vars(options)
 
-        # Preprocess options
-        # Convert any track files into a list of tracks
-        track_specs = []
-        tracks = getattr(options, "track", None)
-        if tracks:
-            for filename_or_string in tracks:
-                track_specs.extend(filename_or_string_to_string_list(filename_or_string))
+        # Add all options from this task into the Runner object
+        for option in options_dict.keys():
+            # The command and args positional arguents handled in fromargs above
+            if option == "args" or option == "command":
+                continue
 
-        options.track = track_specs
+            # multiple lists to one
+            if option == "cluster_opt":
+                res.user_native_spec = sum([opt.split(" ")
+                                            for opt in options.cluster_opt], [])
+                # No further processing required on this option, continue
+                continue
 
-        # Convert labels string into potential slice or an int
-        # If num labels was specified
-        if getattr(options, "num_labels", None):
-            options.num_labels = str2slice_or_int(options.num_labels)
+            if option == "mem_usage":
+                mem_usage_list = list(map(float, options.mem_usage.split(",")))
+                # XXX: should do a ceil first?
+                # use int64 in case run.py is run on a 32-bit machine to control
+                # 64-bit compute nodes
+                res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
+                # No further processing required on this option, continue
+                continue
 
-        # bulk copy options that need no further processing
-        for option_to_attr in cls.options_to_attrs:
-            try:
-                src, dst = option_to_attr
-            except ValueError:
-                src, = option_to_attr
-                dst = src
+            # If the observations directory has been specified
+            if option == "observations" \
+                and options_dict[option]:
+                    # Stop segway and show a "not implemented error" with description
+                    raise NotImplementedError(
+                        "'--observations' option not used: "
+                        "Segway only creates observations in a temporary directory"
+                    )
 
-            res.set_option(dst, getattr(options, src, None))
+            # Preprocess options
+            # Convert any track files into a list of tracks
+            if option == "track" \
+                and options_dict[option]:
+                track_specs = []
+                tracks = options_dict[option]
+                for filename_or_string in tracks:
+                    track_specs.extend(filename_or_string_to_string_list(filename_or_string))
 
-        # multiple lists to one
-        res.user_native_spec = sum([opt.split(" ")
-                                    for opt in options.cluster_opt], [])
+                options_dict[option] = track_specs
 
-        mem_usage_list = list(map(float, options.mem_usage.split(",")))
+            # Convert labels string into potential slice or an int
+            # If num labels was specified
+            if option == "num_labels" \
+                and options_dict[option]:
+                options.num_labels = str2slice_or_int(options_dict[option])
 
-        # XXX: should do a ceil first?
-        # use int64 in case run.py is run on a 32-bit machine to control
-        # 64-bit compute nodes
-        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
+            # bulk copy options that need no further processing
+            dst = cls.options_to_attrs[option]
+
+            res.set_option(dst, options_dict[option])
 
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
         if (res.resolution != RESOLUTION and
-            not getattr(options, "ruler_scale", None)):
+            not res.ruler_scale):
             # Set the ruler scale to 10x the non-default value
             res.ruler_scale = res.resolution * 10
         # Else if the ruler is not divisible by the resolution
@@ -962,11 +975,6 @@ class Runner(object):
                              (res.ruler_scale, res.resolution))
 
         res.max_frames = ceildiv(res.max_split_sequence_length, res.resolution)
-
-        # don't change from None if this is false
-        params_filenames = getattr(options, "trainable_params", None)
-        if params_filenames:
-            res.params_filenames = params_filenames
 
         # track option processing
         for track_spec in res.track_specs:
