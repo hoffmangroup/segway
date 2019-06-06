@@ -15,6 +15,7 @@ from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
+import io
 from itertools import count, product
 from math import ceil, ldexp
 from os import (environ, extsep, fdopen, open as os_open, O_WRONLY, O_CREAT,
@@ -839,32 +840,23 @@ class Runner(object):
                         "trainable_params": "params_filenames"}
 
     @classmethod
-    def fromargs(cls, task_spec, args):
+    def fromargs(cls, task_spec, archives, traindir, annotatedir):
         """Parses the arguments (not options) that were given to segway"""
         res = cls()
 
-        res.work_dirname = args[-1]
-        res.set_tasks(task_spec)
-
-        # If we're running the training task
-        if res.train:
-            # The genomedata archives are all arguments execept the final
-            # train directory
-            res.genomedata_names = args[0:-1]
-            # Check that there is at least 2 arguments
-            assert len(args) >= 2
-        # Otherwise
-        else:
-            # The genomedata archives except the final train directory and
-            # posterior/identify working directory
-            res.genomedata_names = args[0:-2]
-            train_dir_name = args[-2]
+        if annotatedir:
+            res.work_dirname = annotatedir
             try:
-                res.load_train_options(train_dir_name)
+                res.load_train_options(traindir)
             except IOError as err:
                 # train.tab use is optional
                 if err.errno != ENOENT:
                     raise
+        else:
+            res.work_dirname = traindir
+
+        res.genomedata_names = archives
+        res.set_tasks(task_spec)
 
         return res
 
@@ -906,12 +898,13 @@ class Runner(object):
 
 
     @classmethod
-    def fromoptions(cls, command, args, options):
+    def fromoptions(cls, task_spec, archives, traindir, annotatedir, options):
         """This is the usual way a Runner is created.
 
         Calls Runner.fromargs() first.
         """
-        res = cls.fromargs(command, args)
+
+        res = cls.fromargs(task_spec, archives, traindir, annotatedir)
         res.from_environment()
 
         # Convert the options namespace into a dictionary
@@ -920,7 +913,8 @@ class Runner(object):
         # Add all options from this task into the Runner object
         for option in options_dict.keys():
             # The task_spec and args positional arguents handled in fromargs above
-            if option == "args" or option == "task_spec":
+            if option == "archives" or option == "task_spec" or \
+               option == "traindir" or option == "annotatedir":
                 continue
 
             # multiple lists to one
@@ -1345,10 +1339,9 @@ class Runner(object):
                                               EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
-        is_file = Path(job_log_filename).isfile()
-        with open(job_log_filename, "a") as job_log_file:
+        with io.open(job_log_filename, "a") as job_log_file:
             # Print job log header if the file is new
-            if not is_file:
+            if job_log_file.tell() == 0:
                 print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
             yield job_log_file
@@ -3955,46 +3948,59 @@ def parse_options(argv):
 
     args = tasks.add_parser("", add_help=False)
     # Positional arguments
-    args.add_argument("args", nargs="+")  # "+" for at least 1 arg
+    args.add_argument("archives", nargs="+")  # "+" for at least 1 arg
+    args.add_argument("traindir", nargs=1)
+
+    identify_args = tasks.add_parser("", add_help=False)
+    identify_args.add_argument("annotatedir", nargs=1)
 
     tasks.add_parser("train-init", parents = [train_init, args])
     tasks.add_parser("train-run", parents = [train_run, args])
     tasks.add_parser("train-finish", parents = [train_finish, args])
     tasks.add_parser("train-run-round", parents = [train_run_round, args])
 
-    tasks.add_parser("annotate-init", parents = [identify_init, args])
-    tasks.add_parser("annotate-run", parents = [identify_run, args])
-    tasks.add_parser("annotate-finish", parents = [identify_finish, args])
+    tasks.add_parser("annotate-init", parents = [identify_init, args, identify_args])
+    tasks.add_parser("annotate-run", parents = [identify_run, args, identify_args])
+    tasks.add_parser("annotate-finish", parents = [identify_finish, args, identify_args])
 
     # posterior and identify take the same options
-    tasks.add_parser("posterior-init", parents = [identify_init, args])
-    tasks.add_parser("posterior-run", parents = [identify_run, args])
-    tasks.add_parser("posterior-finish", parents = [identify_finish, args])
+    tasks.add_parser("posterior-init", parents = [identify_init, args, identify_args])
+    tasks.add_parser("posterior-run", parents = [identify_run, args, identify_args])
+    tasks.add_parser("posterior-finish", parents = [identify_finish, args, identify_args])
 
     tasks.add_parser("train",
         parents = [train_init, train_run, train_finish, args])
     tasks.add_parser("annotate",
-        parents = [identify_init, identify_run, identify_finish, args])
+        parents = [identify_init, identify_run, identify_finish, args, identify_args])
     tasks.add_parser("identify",
-        parents = [identify_init, identify_run, identify_finish, args])
+        parents = [identify_init, identify_run, identify_finish, args, identify_args])
     tasks.add_parser("posterior",
-        parents = [identify_init, identify_run, identify_finish, args])
+        parents = [identify_init, identify_run, identify_finish, args, identify_args])
     tasks.add_parser("identify+posterior", 
-        parents = [identify_init, identify_run, identify_finish, args])
+        parents = [identify_init, identify_run, identify_finish, args, identify_args])
 
     options = parser.parse_args(argv)
 
+    # options is a non-iterable Namespace object
     # Separate arguments and task_spec from options
     task_spec = options.task_spec
-    args = options.args  # is a non-iterable Namespace object
+    archives = options.archives
+    # Add [0] to unlist directory names
+    traindir = options.traindir[0]
+    if hasattr(options, "annotatedir"):
+        annotatedir = options.annotatedir[0]
+    else:
+        annotatedir = None
 
-    return task_spec, options, args
+    return task_spec, options, archives, traindir, annotatedir
 
 
 def main(argv=sys.argv[1:]):
-    task_spec, options, args = parse_options(argv)
 
-    runner = Runner.fromoptions(task_spec, args, options)
+    task_spec, options, archives, traindir, annotatedir = parse_options(argv)
+
+    runner = Runner.fromoptions(task_spec, archives,
+                                traindir, annotatedir, options)
 
     return runner()
 
