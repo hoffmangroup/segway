@@ -830,12 +830,12 @@ class Runner(object):
                         "trainable_params": "params_filenames"}
 
     @classmethod
-    def fromargs(cls, command, args):
+    def fromargs(cls, task_spec, args):
         """Parses the arguments (not options) that were given to segway"""
         res = cls()
 
         res.work_dirname = args[-1]
-        res.set_tasks(command)
+        res.set_tasks(task_spec)
 
         # If we're running the training task
         if res.train.selected:
@@ -910,8 +910,8 @@ class Runner(object):
 
         # Add all options from this task into the Runner object
         for option in options_dict.keys():
-            # The command and args positional arguents handled in fromargs above
-            if option == "args" or option == "command":
+            # The task_spec and args positional arguents handled in fromargs above
+            if option == "args" or option == "task_spec":
                 continue
 
             # multiple lists to one
@@ -3744,7 +3744,7 @@ def parse_options(argv):
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
 
-    tasks = parser.add_subparsers(help="Segway Tasks", dest = "command",
+    tasks = parser.add_subparsers(help="Segway Tasks", dest = "task_spec",
                                   metavar="")
 
     # define steps for each of the three main tasks
@@ -3975,17 +3975,17 @@ def parse_options(argv):
 
     options = parser.parse_args(argv)
 
-    # Separate arguments and command from options
-    command = options.command
+    # Separate arguments and task_spec from options
+    task_spec = options.task_spec
     args = options.args  # is a non-iterable Namespace object
 
-    return command, options, args
+    return task_spec, options, args
 
 
 def main(argv=sys.argv[1:]):
-    command, options, args = parse_options(argv)
+    task_spec, options, args = parse_options(argv)
 
-    runner = Runner.fromoptions(command, args, options)
+    runner = Runner.fromoptions(task_spec, args, options)
 
     return runner()
 
