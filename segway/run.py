@@ -69,7 +69,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     PREFIX_VALIDATION_OUTPUT_WINNER,
                     PREFIX_VALIDATION_SUM_WINNER,
                     SEG_TABLE_WIDTH,
-                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_RESULTS,
+                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_INTERMEDIATE,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
@@ -253,7 +253,7 @@ SUBDIRNAME_VITERBI = "viterbi"
 
 SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
-                     SUBDIRNAME_PARAMS, SUBDIRNAME_RESULTS]
+                     SUBDIRNAME_PARAMS, SUBDIRNAME_INTERMEDIATE]
 
 # job script file permissions: owner has read/write/execute
 # permissions, group/others have read/execute permissions
@@ -1270,8 +1270,8 @@ class Runner(object):
         return self.work_dirpath / SUBDIRNAME_PARAMS
 
     @memoized_property
-    def results_dirpath(self):
-        return self.work_dirpath / SUBDIRNAME_RESULTS
+    def intermediate_dirpath(self):
+        return self.work_dirpath / SUBDIRNAME_INTERMEDIATE
 
     @memoized_property
     def recover_params_dirpath(self):
@@ -2933,14 +2933,14 @@ class Runner(object):
 
     def load_train_results(self):
         """
-        Loads the training results in train-finish saved in SUBDIRNAME_RESULTS.
+        Loads the training results in train-finish saved in SUBDIRNAME_INTERMEDIATE.
         Stores as a list of TrainInstanceResults in instance_params to select best in
         finish.
         """
 
         pattern = extjoin(PREFIX_TRAIN_RESULTS, "*", EXT_TAB)
         instance_params = []
-        for filename in Path(self.results_dirpath).files(pattern):
+        for filename in Path(self.intermediate_dirpath).files(pattern):
             # Set variables to none to be overwritten by the tab file contents
             results = TrainInstanceResults([None, None, None, None, None, None, None, None])
             with open(filename) as resultfile:
@@ -3112,7 +3112,7 @@ class Runner(object):
             # write results from each instance to their own file
             for index, instance_param in enumerate(instance_params):
                 result_filename = make_default_filename \
-                    (TRAIN_RESULTS_TMPL, SUBDIRNAME_RESULTS, index)
+                    (TRAIN_RESULTS_TMPL, SUBDIRNAME_INTERMEDIATE, index)
                 self.save_tab_file(instance_param, TRAIN_RESULT_TYPES,
                                   result_filename)
 
