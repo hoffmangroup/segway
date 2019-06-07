@@ -53,6 +53,8 @@ class IncrementingDefaultDict(defaultdict):
 
 class Tee(object):
     def __init__(self, *args):
+        import pdb
+        pdb.set_trace()
         self._items = args
         self._exits = []
 
@@ -246,7 +248,7 @@ class Segmentation(defaultdict):
         outfile = maybe_gzip_open(outfilename, "wt")
 
         if bigbed_outfilename:
-            temp_file = NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_BED)
+            temp_file = NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_BED, mode = "wt")
             bigbed_infilename = temp_file.name
             outfile = Tee(outfile, temp_file)
 
@@ -264,7 +266,7 @@ class Segmentation(defaultdict):
                 #     with temp_file
                 #         print >>temp_file, "blah"
                 #     print temp_file.name
-                with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB) as sizes_file:
+                with NamedTemporaryFile(mode = "wt", prefix=__package__, suffix=SUFFIX_TAB) as sizes_file:
                     for chrom, end in viewitems(ends):
                         print(chrom, str(end), sep="\t", file=sizes_file)
 
