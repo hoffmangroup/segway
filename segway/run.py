@@ -1032,7 +1032,9 @@ class Runner(object):
     @memoized_property
     def triangulation_dirpath(self):
         res = self.work_dirpath / "triangulation"
-        self.make_dir(res)
+        # Check to make sure this wasn't created by an ealier subtask
+        if not Path(res).exists():
+            self.make_dir(res)
 
         return res
 
@@ -1864,8 +1866,15 @@ class Runner(object):
             except OSError as err:
                 if err.errno != ENOENT:
                     raise
-        if not dirpath.isdir():
+
+        try:
             dirpath.makedirs()
+        except OSError as err:
+            # if the error is because directory exists, but it's
+            # empty, then do nothing
+            if (err.errno != EEXIST or not dirpath.isdir() or
+                    dirpath.listdir()):
+                raise
 
     def make_subdir(self, subdirname):
         self.make_dir(self.work_dirpath / subdirname)
@@ -3638,8 +3647,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         self.interrupt_event = Event()
 
-        # start log files
-        self.make_subdir(SUBDIRNAME_LOG)
+        # start log files, if they weren't already created by an ealier subtask
+        if not Path(self.work_dirpath / SUBDIRNAME_LOG).exists():
+            self.make_subdir(SUBDIRNAME_LOG)
         run_msg = self.make_run_msg()
 
         cmdline_short_filename = \
