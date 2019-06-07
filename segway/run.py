@@ -412,16 +412,16 @@ def slice2range(s):
     return range(start, stop, step)
 
 
-def filename_or_string_to_string_list(filename_or_string):
+def file_or_string_to_string_list(file_or_string):
     """Returns a list that will either contain each line from a file object or
     the single string given."""
 
     # Try to read all the lines from a file object
     try:
-        return [line.rstrip() for line in filename_or_string.readlines()]
+        return [line.rstrip() for line in file_or_string.readlines()]
     # If the object isn't a file, return its own type (presumed string)
     except AttributeError:
-        return [filename_or_string]
+        return [file_or_string]
 
 
 def is_training_progressing(last_ll, curr_ll,
@@ -946,8 +946,8 @@ class Runner(object):
                 and options_dict[option]:
                 track_specs = []
                 tracks = options_dict[option]
-                for filename_or_string in tracks:
-                    track_specs.extend(filename_or_string_to_string_list(filename_or_string))
+                for file_or_string in tracks:
+                    track_specs.extend(file_or_string_to_string_list(file_or_string))
 
                 options_dict[option] = track_specs
 
