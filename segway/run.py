@@ -770,7 +770,7 @@ class Runner(object):
 
         # XXX: This line was added for python 2-3 compatibility
         # May be removed when python 2 support is dropped
-        __non_zero__ = __bool__
+        __nonzero__ = __bool__
 
 
     def set_tasks(self, text):
@@ -2883,7 +2883,7 @@ class Runner(object):
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
 
-    def save_tab_file(self, values_object, attrs, tab_filename):
+    def save_tab_file(self, values, attrs, tab_filename):
         """
         Creates a .tab file to store specific variables between steps, such as
         train results between run and finish, as well as options between
@@ -2893,22 +2893,22 @@ class Runner(object):
         filename = self.make_filename(tab_filename)
 
         with open(filename, "w") as tab_file:
-            tab_writer = ListWriter(tab_file, delimiter = DELIMITER_BED)
-            tab_writer.writerow(TRAIN_FIELDNAMES)
+            writer = ListWriter(tab_file, delimiter=DELIMITER_BED)
+            writer.writerow(TRAIN_FIELDNAMES)
 
             for name, object_type in sorted(viewitems(attrs)):
-                value = getattr(values_object, name)
+                value = getattr(values, name)
                 if isinstance(object_type, list):
                     for item in value:
-                        tab_writer.writerow([name, item])
+                        writer.writerow([name, item])
                 else:
-                    tab_writer.writerow([name, value])
+                    writer.writerow([name, value])
 
-    def load_train_options(self, train_dir_name):
+    def load_train_options(self, train_dirname):
         """
         load options from training
         """
-        filename = Path(train_dir_name) / TRAIN_FILEBASENAME
+        filename = Path(train_dirname) / TRAIN_FILEBASENAME
 
         with open(filename) as tabfile:
             reader = DictReader(tabfile)
@@ -2944,7 +2944,7 @@ class Runner(object):
         instance_params = []
         for filename in Path(self.intermediate_dirpath).files(pattern):
             # Set variables to none to be overwritten by the tab file contents
-            results = TrainInstanceResults([None, None, None, None, None, None, None, None])
+            results = TrainInstanceResults()
             with open(filename) as resultfile:
                 reader = DictReader(resultfile)
                 for line in reader:
@@ -2982,9 +2982,9 @@ class Runner(object):
                 else:
                     setattr(self, name, row_type(value))
 
-    def setup_shared_steps(self):
+    def init_shared(self):
         """
-        Perform setup tasks shared by all of train, posterior and identify.
+        Perform initialization shared by all of train, posterior and identify.
         """
 
         self.make_subdirs(SUBDIRNAMES_EITHER)
@@ -2993,14 +2993,14 @@ class Runner(object):
         self.save_window_list()
         self.run_triangulate()
 
-    def setup_train(self):
+    def init_train(self):
         """
         return value: dst_filenames
         """
 
         assert self.num_instances >= 1
 
-        self.setup_shared_steps()
+        self.init_shared()
         self.make_subdirs(SUBDIRNAMES_TRAIN)
 
         # save the destination file for input_master as we will be
@@ -3052,9 +3052,10 @@ class Runner(object):
 
         # Copy the param from the best round of each training instance
         for instance in instance_params:
-            # Remove instance number from end of param filename
-            instance_param_filename = instance.params_filename.split(".")[0:-1]
-            copy2(instance.params_filename,extjoin(*instance_param_filename))
+            # Remove iteration number from end of winning param filename
+            winning_instance_param_filename = \
+                instance.params_filename.rpartition(".")[0]
+            copy2(instance.params_filename,winning_instance_param_filename)
 
         # finds max log_likelihood for validation or regular
         if self.validate:
@@ -3096,7 +3097,7 @@ class Runner(object):
     def run_train(self):
 
         if self.train.init:
-             dest_filenames = self.setup_train()
+             dest_filenames = self.init_train()
         else:
             # Reload options and filenames
             self.load_train_options(self.work_dirpath)
@@ -3555,7 +3556,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         self.instance_index = "identify"
 
         if self.identify.init or self.posterior.init:
-            self.setup_shared_steps()
+            self.init_shared()
             self.save_tab_file(self, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
         else:
             self.set_triangulation_filename()
