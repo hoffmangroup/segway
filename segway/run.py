@@ -300,11 +300,6 @@ RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_SEG_TABLE = "seg_table.tab"
 
-TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
-                   "log_likelihood_filename", "validation_output_filename",
-                   "validation_sum_filename"]
-LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
-
 COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % __package__
 
@@ -490,11 +485,14 @@ class TrainInstanceResults():
     """
     def get_filenames(self, validation = False):
         if validation:
-            return (self.input_master_filename, self.params_filename, 
-                    self.log_likelihood_filename, self.validation_output_filename,
-                    self.validation_sum_filename)
-        return (self.input_master_filename, self.params_filename, 
-                self.log_likelihood_filename)
+            return {"input_master_filename": self.input_master_filename,
+                    "params_filename": self.params_filename, 
+                    "log_likelihood_filename": self.log_likelihood_filename,
+                    "validation_output_filenames": self.validation_output_filename,
+                    "validation_sum_filename": self.validation_sum_filename}
+        return {"input_master_filename": self.input_master_filename,
+                "params_filename": self.params_filename, 
+                "log_likelihood_filename": self.log_likelihood_filename}
 
     def __init__(self, result_list = [None for _ in TRAIN_RESULT_TYPES]):
         zipper = zip(result_list, TRAIN_RESULT_TYPES.keys())
@@ -2152,13 +2150,15 @@ class Runner(object):
                 bed_writer.writerow((window.chrom, window.start, window.end,
                                      index))
 
-    def copy_results(self, name, src_filename, dst_filename):
+    def copy_results(self, name, src_filename):
+        dst_filename = getattr(self, name)
+        if dst_filename == src_filename:
+            return
         if dst_filename:
             copy2(src_filename, dst_filename)
         else:
             dst_filename = src_filename
-
-        setattr(self, name, dst_filename)
+            setattr(self, name, dst_filename)
 
     def prog_factory(self, prog):
         """
@@ -2793,7 +2793,7 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return TrainInstanceResults([None, None, None, None, None, None, None, None])
+            return TrainInstanceResults()
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
@@ -3030,18 +3030,13 @@ class Runner(object):
             # do not overwrite existing file
             input_master_filename = None
 
-        return [input_master_filename, self.params_filename,
-                self.log_likelihood_filename,
-                self.validation_output_filename,
-                self.validation_sum_filename]
-
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
             return self.run_train_multithread
         else:
             return self.run_train_singlethread
 
-    def finish_train(self, instance_params, dst_filenames):
+    def finish_train(self, instance_params):
         """
         Finds and then copies the best training round and instance to the 
         general files such as params.params, input.master, etc.
@@ -3064,18 +3059,15 @@ class Runner(object):
         else:
             max_params = max(instance_params, key=attrgetter("log_likelihood"))
 
-        check_filenames = max_params.get_filenames(self.validate)
+        src_filenames = max_params.get_filenames(self.validate)
 
-        if None in check_filenames:
+        if None in src_filenames.values():
             raise RuntimeError("All training instances failed")
 
         best_params_filename = max_params.params_filename
-        src_filenames = max_params.get_filenames(True)
 
-        zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
-        for name, src_filename, dst_filename in zipper:
-            if src_filename != dst_filename:
-                self.copy_results(name, src_filename, dst_filename)
+        for filename in src_filenames:
+            self.copy_results(filename, src_filenames[filename])
 
         # always overwrite params.params
         copy2(best_params_filename, self.make_params_filename())
@@ -3097,15 +3089,11 @@ class Runner(object):
     def run_train(self):
 
         if self.train.init:
-             dest_filenames = self.init_train()
+            self.init_train()
         else:
             # Reload options and filenames
             self.load_train_options(self.work_dirpath)
             self.save_gmtk_input()
-            dest_filenames = [self.input_master_filename, self.params_filename,
-                             self.log_likelihood_filename,
-                             self.validation_output_filename,
-                             self.validation_sum_filename]
 
         if self.train.run:
             run_train_func = self.get_thread_run_func()
@@ -3123,7 +3111,7 @@ class Runner(object):
             instance_params = self.load_train_results()
 
         if self.train.finish:
-            self.finish_train(instance_params, dest_filenames)
+            self.finish_train(instance_params)
 
     def run_train_singlethread(self, num_segs_range):
         # having a single-threaded version makes debugging much easier
