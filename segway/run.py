@@ -190,6 +190,9 @@ BUNDLE_TRAIN_TASK_KIND = "bundle-train"
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
+# supported segway tasks
+TASK_LIST = ["train", "identify", "posterior"]
+
 # extensions and suffixes
 EXT_BEDGRAPH = "bedGraph"
 EXT_BIN = "bin"
@@ -734,10 +737,6 @@ class Runner(object):
 
         # flags
         self.clobber = False
-        # XXX: this should become an int for num_starts
-        self.train = self.TaskSteps()  # EM train
-        self.posterior = self.TaskSteps()
-        self.identify = self.TaskSteps()  # viterbi
         self.recover_round = False
         self.validate = False
         self.dry_run = False
@@ -745,23 +744,25 @@ class Runner(object):
 
         self.__dict__.update(kwargs)
 
-    class TaskSteps(object):
+    class SubTaskSpecification(object):
         """
-        Determines which steps were selected for the given task
-        Sets all to True if none were specified, running the full task
+        Determines which step was selected for the given task
+        Sets all to match the selected if none were specified
         """
-        def set_subtask(self, step):
-            if step:
-                setattr(self, step[0], True)
+        def __init__(self, selected, subtask = None):
+            # If a subtask was specified and the task was set for this run
+            if subtask and selected:
+                # set all subtasks to False initially
+                self.init = False
+                self.run = False
+                self.finish = False
+                # Overwrite the selected subtask back to true
+                setattr(self, subtask[0], True)
             else:
-                self.init = True
-                self.run = True
-                self.finish = True
-
-        def __init__(self):
-            self.init = False
-            self.run = False
-            self.finish = False
+            # Otherwise all steps are set to selected or not
+                self.init = selected
+                self.run = selected
+                self.finish = selected
 
         def __bool__(self):
             return any([self.init, self.run, self.finish])
@@ -777,10 +778,9 @@ class Runner(object):
         if any specific steps were specified. Else runs all steps
         for task.
         """
+        selected_tasks = text.split("+")
 
-        tasks = text.split("+")
-
-        for task in tasks:
+        for task in selected_tasks:
             task = task.split(SUB_TASK_DELIMITER)
             task_name = task[0]
             if task_name == "annotate":
@@ -794,7 +794,11 @@ class Runner(object):
             else:
                # Otherwise make sure only one step was selected at a time
                assert(len(subtask) < 2)
-            getattr(self, task_name).set_subtask(subtask)
+            setattr(self, task_name, self.SubTaskSpecification(True, subtask))
+
+        for task in TASK_LIST:
+            if not hasattr(self, task):
+                setattr(self, task, self.SubTaskSpecification(False))
 
     def set_option(self, name, value):
         # want to actually set the Runner option when optparse option
@@ -844,17 +848,18 @@ class Runner(object):
 
         if annotatedir:
             res.work_dirname = annotatedir
-            try:
-                res.load_train_options(traindir)
-            except IOError as err:
-                # train.tab use is optional
-                if err.errno != ENOENT:
-                    raise
         else:
             res.work_dirname = traindir
 
         res.genomedata_names = archives
         res.set_tasks(task_spec)
+
+        try:
+            res.load_train_options(traindir)
+        except IOError as err:
+            # train.tab use is optional
+            if err.errno != ENOENT:
+                raise
 
         return res
 
@@ -3091,8 +3096,7 @@ class Runner(object):
         if self.train.init:
             self.init_train()
         else:
-            # Reload options and filenames
-            self.load_train_options(self.work_dirpath)
+            # Reload filenames
             self.save_gmtk_input()
 
         if self.train.run:
