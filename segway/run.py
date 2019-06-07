@@ -490,13 +490,13 @@ class TrainInstanceResults():
     """
     def get_filenames(self, validation = False):
         if validation:
-            return[self.input_master_filename, self.params_filename, 
-                   self.log_likelihood_filename, self.validation_output_filename,
-                   self.validation_sum_filename]
-        return[self.input_master_filename, self.params_filename, 
-               self.log_likelihood_filename]
+            return (self.input_master_filename, self.params_filename, 
+                    self.log_likelihood_filename, self.validation_output_filename,
+                    self.validation_sum_filename)
+        return (self.input_master_filename, self.params_filename, 
+                self.log_likelihood_filename)
 
-    def __init__(self, result_list):
+    def __init__(self, result_list = [None for _ in TRAIN_RESULT_TYPES]):
         zipper = zip(result_list, TRAIN_RESULT_TYPES.keys())
         for value, name in zipper:
             setattr(self, name, value)
