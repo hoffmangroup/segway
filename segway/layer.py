@@ -53,8 +53,6 @@ class IncrementingDefaultDict(defaultdict):
 
 class Tee(object):
     def __init__(self, *args):
-        import pdb
-        pdb.set_trace()
         self._items = args
         self._exits = []
 
