@@ -280,7 +280,7 @@ TRAIN_OPTION_TYPES = \
          num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
-         supervision_filename=str, minibatch_fraction=float,
+         supervision_filename=str, minibatch_fraction=float, max_frames=int,
          validation_fraction=float, validation_coords_filename=str,
          var_floor=float)
 
