@@ -285,7 +285,7 @@ TRAIN_OPTION_TYPES = \
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
          supervision_filename=str, virtual_evidence_filename = str, 
-         minibatch_fraction=float, validation_fraction=float, 
+         minibatch_fraction=float, validation_fraction=float, max_frames = int,
          validation_coords_filename=str, var_floor=float, model_weight=float)
 
 

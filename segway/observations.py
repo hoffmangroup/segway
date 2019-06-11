@@ -377,7 +377,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
 
     uniform_prior_vector = array([1.0/num_segs] * num_segs)
 
-    presence_array = array([1 if len(prior_dict) > 0 else 0 for prior_dict in input_array],
+    presence_array = array([1 if any(prior_dict) else 0 for prior_dict in input_array],
                                dtype=DTYPE_OBS_INT)
 
     if resolution == 1:
