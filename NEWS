@@ -1,5 +1,6 @@
 2.0.5:
 * segway: fixed bug causing identify to fail with archives of different track numbers
+* segway: fixed python 3 encoding issue arising when --BigBed is selected
 * segway: removed sleeping on main segway process for multiple training instances
 * segway: when running locally segway will no longer initially sleep training threads
 
