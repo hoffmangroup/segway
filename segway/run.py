@@ -39,7 +39,7 @@ from optbuild import AddableMixin
 from path import Path
 import pipes
 from pkg_resources import Requirement, working_set
-from six import viewitems, viewvalues
+from six import PY2, viewitems, viewvalues
 from six.moves import map, range, zip
 from six.moves.urllib.parse import quote
 from tabdelim import DictReader, ListWriter
@@ -117,6 +117,9 @@ assert (ISLAND or
 LINEAR_MEM_USAGE_MULTIPLIER = 1
 MEM_USAGE_MULTIPLIER = 2
 
+JOIN_TIMEOUT = None
+if PY2:
+    JOIN_TIMEOUT = finfo(float).max
 
 SWAP_ENDIAN = False
 
@@ -3004,10 +3007,8 @@ class Runner(object):
             #                params_filename)
             instance_params = []
             for thread in threads:
-                if thread.is_alive():
-                    # XXX: Does not catch KeyboardInterrupt (SIGINT) in
-                    # Python 2
-                    thread.join()
+                while thread.is_alive():
+                    thread.join(JOIN_TIMEOUT)
 
                 # this will get AttributeError if the thread failed and
                 # therefore did not set thread.result
