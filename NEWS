@@ -1,5 +1,7 @@
 2.0.5:
 * segway: fixed bug causing identify to fail with archives of different track numbers
+* segway: removed sleeping on main segway process for multiple training instances
+* segway: when running locally segway will no longer initially sleep training threads
 
 2.0.4:
 * segway: gaussian mixtures no longer split with only one component
