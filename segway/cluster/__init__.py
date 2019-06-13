@@ -61,6 +61,11 @@ MAX_JOB_ATTEMPTS = 2
 # these settings limit job queueing to 360 at once
 
 
+def is_running_locally():
+    """Returns True if not submitting to a cluster system"""
+    return DRIVER_NAME_OVERRIDE == DRIVER_NAME_LOCAL
+
+
 def get_driver_name(session):
     if DRIVER_NAME_OVERRIDE:
         return DRIVER_NAME_OVERRIDE
@@ -148,7 +153,7 @@ class RestartableJob(object):
         jobname = job_template.jobName
 
         # alert the user if they are running locally
-        if DRIVER_NAME_OVERRIDE == DRIVER_NAME_LOCAL:
+        if is_running_locally():
             job_location = "running locally"
         else:
             job_location = "queued"
