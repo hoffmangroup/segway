@@ -3,6 +3,7 @@
 * segway: fixed python 3 encoding issue arising when --BigBed is selected
 * segway: removed sleeping on main segway process for multiple training instances
 * segway: when running locally segway will no longer initially sleep training threads
+* segway: fix RestartableJob priority sorting when memory requirements match
 
 2.0.4:
 * segway: gaussian mixtures no longer split with only one component

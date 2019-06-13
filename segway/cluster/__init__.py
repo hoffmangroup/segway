@@ -120,6 +120,9 @@ class RestartableJob(object):
     def __repr__(self):
         return "<RestartableJob '%s'>" % self.job_tmpl_factory.template.jobName
 
+    def __lt__(self, other):
+        return self.sort_key < other.sort_key
+
     def run(self):
         job_tmpl_factory = self.job_tmpl_factory
 
@@ -216,11 +219,11 @@ class RestartableJobDict(dict):
             self._queue_unconditional(restartable_job)
         else:
             sort_key = restartable_job.sort_key
-            heappush(self.unqueued_jobs, (sort_key, restartable_job))
+            heappush(self.unqueued_jobs, restartable_job)
 
     def queue_unqueued_jobs(self):
         while self.unqueued_jobs and self.is_sleep_time_gt_min():
-            self._queue_unconditional(heappop(self.unqueued_jobs)[1])
+            self._queue_unconditional(heappop(self.unqueued_jobs))
 
     def get_job_info_exit_status(self, job_info):
         if job_info.hasSignal:
