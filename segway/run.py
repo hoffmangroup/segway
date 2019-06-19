@@ -285,12 +285,12 @@ TRAIN_OPTION_TYPES = \
          var_floor=float)
 
 
-TRAIN_RESULT_TYPES = OrderedDict([("log_likelihood", float), ("num_segs", int),
-                          ("validation_likelihood", float), 
-                          ("input_master_filename", str), ("params_filename", str),
-                          ("log_likelihood_filename", str),
-                          ("validation_output_filename", str),
-                          ("validation_sum_filename", str)])
+TRAIN_RESULT_TYPES = dict(log_likelihood=float, num_segs=int,
+                          validation_likelihood=float, 
+                          input_master_filename=str, params_filename=str,
+                          log_likelihood_filename=str,
+                          validation_output_filename=str,
+                          validation_sum_filename=str)
 
 IDENTIFY_OPTION_TYPES = \
     	dict(include_coords_filename=str, exclude_coords_filename=str,
@@ -505,9 +505,8 @@ class TrainInstanceResults():
                 item_type = TRAIN_RESULT_TYPES[name]
                 setattr(self, name, item_type(value))
 
-    def __init__(self, result_list = [None for _ in TRAIN_RESULT_TYPES]):
-        zipper = zip(result_list, TRAIN_RESULT_TYPES.keys())
-        for value, name in zipper:
+    def __init__(self, **kwargs):
+        for name, value in kwargs.items():
             setattr(self, name, value)
 
 class TrainThread(Thread):
@@ -754,8 +753,9 @@ class Runner(object):
 
     class SubTaskSpecification(object):
         """
-        Determines which step was selected for the given task
-        Sets all to match the selected if none were specified
+        Class determines if a subtask was specified for a given task,
+        if none, sets all class variables to the same value; signifying whether
+        we are running the whole task or not.
         """
         def __init__(self, selected, subtask = None):
             # If a subtask was specified and the task was set for this run
@@ -799,7 +799,7 @@ class Runner(object):
               (subtask[0] == "run" and subtask[1] == "round"):
                 self.recover_dirname = self.work_dirname
                 self.recover_round = True
-            elif len(subtask >= 2):
+            elif len(subtask) >= 2:
                # Otherwise error if more than one subtask was somehow specified
                raise ValueError("More than one subtask was specified at once")
             setattr(self, task_name, self.SubTaskSpecification(True, subtask))
@@ -2831,13 +2831,16 @@ class Runner(object):
         if (self.validate and
             self.recover_dirname):
             # recover last set of best results
-            result = TrainInstanceResults([log_likelihood, self.num_segs,
-                                   validation_likelihood,
-                                   self.input_master_filename,
-                                   self.best_params_filename,
-                                   self.log_likelihood_filename,
-                                   self.validation_output_winner_filename,
-                                   self.validation_sum_winner_filename])
+            result = TrainInstanceResults(log_likelihood = log_likelihood, 
+                                   num_segs = self.num_segs,
+                                   validation_likelihood = validation_likelihood,
+                                   input_master_filename = self.input_master_filename,
+                                   params_filename = self.best_params_filename,
+                                   log_likelihood_filename = self.log_likelihood_filename,
+                                   validation_output_filename = \
+                                       self.validation_output_winner_filename,
+                                   validation_sum_filename = \
+                                       self.validation_sum_winner_filename)
 
         while (round_index < self.max_em_iters and
                ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
@@ -2882,25 +2885,31 @@ class Runner(object):
                     copy2(self.validation_sum_filename,
                           self.validation_sum_winner_filename)
 
-                    result = TrainInstanceResults([log_likelihood, self.num_segs,
-                                     validation_likelihood,
-                                     self.input_master_filename,
-                                     self.last_params_filename,
-                                     self.log_likelihood_filename,
-                                     self.validation_output_winner_filename,
-                                     self.validation_sum_winner_filename])
+                    result = TrainInstanceResults(log_likelihood = log_likelihood, 
+                                   num_segs = self.num_segs,
+                                   validation_likelihood = validation_likelihood,
+                                   input_master_filename = self.input_master_filename,
+                                   params_filename = self.best_params_filename,
+                                   log_likelihood_filename = self.log_likelihood_filename,
+                                   validation_output_filename = \
+                                       self.validation_output_winner_filename,
+                                   validation_sum_filename = \
+                                       self.validation_sum_winner_filename)
                     best_validation_likelihood = validation_likelihood
 
             round_index += 1
 
         if not self.validate:
-            result = TrainInstanceResults([log_likelihood, self.num_segs,
-                             validation_likelihood,
-                             self.input_master_filename,
-                             self.last_params_filename,
-                             self.log_likelihood_filename,
-                             self.validation_output_filename,
-                             self.validation_sum_filename])
+            result = TrainInstanceResults(log_likelihood = log_likelihood, 
+                                   num_segs = self.num_segs,
+                                   validation_likelihood = validation_likelihood,
+                                   input_master_filename = self.input_master_filename,
+                                   params_filename = self.last_params_filename,
+                                   log_likelihood_filename = self.log_likelihood_filename,
+                                   validation_output_filename = \
+                                       self.validation_output_winner_filename,
+                                   validation_sum_filename = \
+                                       self.validation_sum_winner_filename)
 
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
