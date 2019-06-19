@@ -3898,7 +3898,7 @@ def parse_options(argv):
                          "mixture of Gaussians, default unused, else default %f"
                          % VAR_FLOOR_GMM_DEFAULT)
 
-    group = train_init.add_argument_group("Flags(train-init)")
+    group = train_init.add_argument_group("Flags (train-init)")
     group.add_argument("-c", "--clobber", action="store_true",
                        help="delete any preexisting files and assumes any "
                        "model files specified in options as output to be "
@@ -3921,7 +3921,7 @@ def parse_options(argv):
     group.add_argument("-r", "--recover", metavar="DIR",
                        help="continue from interrupted run in DIR")
 
-    group = identify_init.add_argument_group("Flags(identify-init)")
+    group = identify_init.add_argument_group("Flags (identify-init)")
     group.add_argument("-c", "--clobber", action="store_true",
                        help="delete any preexisting files and assumes any "
                        "model files specified in options as output to be "
