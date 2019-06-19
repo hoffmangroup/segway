@@ -1344,7 +1344,7 @@ class Runner(object):
                                               EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
-        with io.open(job_log_filename, "a") as job_log_file:
+        with open(job_log_filename, "a") as job_log_file:
             # Print job log header if the file is new
             if job_log_file.tell() == 0:
                 print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
