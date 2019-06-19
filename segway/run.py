@@ -2960,6 +2960,8 @@ class Runner(object):
                     else:
                         setattr(self, name, row_type(value))
 
+        # If we are running identify/posterior and the params filename was specified
+        # during train, save it in params_filenames as well.
         if self.params_filename is not None and \
           not self.train:
             self.params_filenames = [self.params_filename]
