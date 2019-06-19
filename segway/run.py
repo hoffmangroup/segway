@@ -476,6 +476,7 @@ class Mixin_Lockable(AddableMixin):  # noqa
         self.lock = Lock()
         return AddableMixin.__init__(self, *args, **kwargs)
 
+
 LockableDefaultDict = Mixin_Lockable + defaultdict
 
 class TrainInstanceResults():
@@ -507,6 +508,7 @@ class TrainInstanceResults():
     def __init__(self, **kwargs):
         for name, value in kwargs.items():
             setattr(self, name, value)
+
 
 class TrainThread(Thread):
     def __init__(self, runner, session, instance_index, num_segs):
@@ -603,6 +605,7 @@ class Track(object):
     @memoized_property
     def name(self):
         return quote_trackname(self.name_unquoted)
+
 
 TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
 TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
