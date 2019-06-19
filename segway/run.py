@@ -7,7 +7,7 @@ run: main Segway implementation
 
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from collections import defaultdict, OrderedDict
+from collections import defaultdict
 from contextlib import contextmanager
 from copy import copy
 from csv import writer
@@ -15,7 +15,6 @@ from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
-import io
 from itertools import count, product
 from math import ceil, ldexp
 from os import (environ, extsep, fdopen, open as os_open, O_WRONLY, O_CREAT,
@@ -286,7 +285,7 @@ TRAIN_OPTION_TYPES = \
 
 
 TRAIN_RESULT_TYPES = dict(log_likelihood=float, num_segs=int,
-                          validation_likelihood=float, 
+                          validation_likelihood=float,
                           input_master_filename=str, params_filename=str,
                           log_likelihood_filename=str,
                           validation_output_filename=str,
@@ -297,7 +296,7 @@ IDENTIFY_OPTION_TYPES = \
              seg_table_filename=str, output_label=str)
 
 SUB_TASK_DELIMITER = "-"
-    
+
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
@@ -1030,7 +1029,7 @@ class Runner(object):
             res.validate = True
 
         if (res.validation_fraction and
-            (res.validation_fraction + 
+            (res.validation_fraction +
             res.minibatch_fraction > 1.0)):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
@@ -1560,11 +1559,11 @@ class Runner(object):
 
     def load_validation_log_likelihood(self):
         """
-        Parses gmtkJT output to obtain each window's log probability of evidence 
+        Parses gmtkJT output to obtain each window's log probability of evidence
         log(prob(E)).
 
         Raises error if it is found that the validation task was unsucccessful.
-        
+
         Returns the validation window indices and corresponding likelihoods
         """
         with open(self.validation_output_filename) as infile:
@@ -1588,7 +1587,7 @@ class Runner(object):
                 if MSG_SUCCESS not in line:
                     raise RuntimeError("Validation not successful: " + line)
 
-        return validation_window_indices,validation_window_likelihoods
+        return validation_window_indices, validation_window_likelihoods
 
 
     def get_full_validation_output(self, validation_window_indices,
@@ -2831,15 +2830,15 @@ class Runner(object):
         if (self.validate and
             self.recover_dirname):
             # recover last set of best results
-            result = TrainInstanceResults(log_likelihood = log_likelihood, 
-                                   num_segs = self.num_segs,
-                                   validation_likelihood = validation_likelihood,
-                                   input_master_filename = self.input_master_filename,
-                                   params_filename = self.best_params_filename,
-                                   log_likelihood_filename = self.log_likelihood_filename,
-                                   validation_output_filename = \
+            result = TrainInstanceResults(log_likelihood=log_likelihood,
+                                   num_segs=self.num_segs,
+                                   validation_likelihood=validation_likelihood,
+                                   input_master_filename=self.input_master_filename,
+                                   params_filename=self.best_params_filename,
+                                   log_likelihood_filename=self.log_likelihood_filename,
+                                   validation_output_filename= \
                                        self.validation_output_winner_filename,
-                                   validation_sum_filename = \
+                                   validation_sum_filename= \
                                        self.validation_sum_winner_filename)
 
         while (round_index < self.max_em_iters and
@@ -2885,30 +2884,30 @@ class Runner(object):
                     copy2(self.validation_sum_filename,
                           self.validation_sum_winner_filename)
 
-                    result = TrainInstanceResults(log_likelihood = log_likelihood, 
-                                   num_segs = self.num_segs,
-                                   validation_likelihood = validation_likelihood,
-                                   input_master_filename = self.input_master_filename,
-                                   params_filename = self.best_params_filename,
-                                   log_likelihood_filename = self.log_likelihood_filename,
-                                   validation_output_filename = \
+                    result = TrainInstanceResults(log_likelihood=log_likelihood,
+                                   num_segs=self.num_segs,
+                                   validation_likelihood=validation_likelihood,
+                                   input_master_filename=self.input_master_filename,
+                                   params_filename=self.best_params_filename,
+                                   log_likelihood_filename=self.log_likelihood_filename,
+                                   validation_output_filename= \
                                        self.validation_output_winner_filename,
-                                   validation_sum_filename = \
+                                   validation_sum_filename= \
                                        self.validation_sum_winner_filename)
                     best_validation_likelihood = validation_likelihood
 
             round_index += 1
 
         if not self.validate:
-            result = TrainInstanceResults(log_likelihood = log_likelihood, 
-                                   num_segs = self.num_segs,
-                                   validation_likelihood = validation_likelihood,
-                                   input_master_filename = self.input_master_filename,
-                                   params_filename = self.last_params_filename,
-                                   log_likelihood_filename = self.log_likelihood_filename,
-                                   validation_output_filename = \
+            result = TrainInstanceResults(log_likelihood=log_likelihood,
+                                   num_segs=self.num_segs,
+                                   validation_likelihood=validation_likelihood,
+                                   input_master_filename=self.input_master_filename,
+                                   params_filename=self.last_params_filename,
+                                   log_likelihood_filename=self.log_likelihood_filename,
+                                   validation_output_filename= \
                                        self.validation_output_winner_filename,
-                                   validation_sum_filename = \
+                                   validation_sum_filename= \
                                        self.validation_sum_winner_filename)
 
         # log_likelihood, num_segs and a list of src_filenames to save
@@ -3063,7 +3062,7 @@ class Runner(object):
 
     def finish_train(self, instance_params):
         """
-        Finds and then copies the best training round and instance to the 
+        Finds and then copies the best training round and instance to the
         general files such as params.params, input.master, etc.
         """
 
@@ -3075,7 +3074,7 @@ class Runner(object):
             # Remove iteration number from end of winning param filename
             winning_instance_param_filename = \
                 instance.params_filename.rpartition(".")[0]
-            copy2(instance.params_filename,winning_instance_param_filename)
+            copy2(instance.params_filename, winning_instance_param_filename)
 
         # finds max log_likelihood for validation or regular
         if self.validate:
@@ -3857,7 +3856,7 @@ def parse_options(argv):
     group.add_argument("--mixture-components", type=int,
                          default=NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT,
                          help="Number of Gaussian mixture "
-                         "components (default %d)" 
+                         "components (default %d)"
                          % NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT)
 
     group.add_argument("--num-instances", type=int,
@@ -3968,30 +3967,30 @@ def parse_options(argv):
     identify_args = tasks.add_parser("", add_help=False)
     identify_args.add_argument("annotatedir", nargs=1)
 
-    tasks.add_parser("train-init", parents = [train_init, args])
-    tasks.add_parser("train-run", parents = [train_run, args])
-    tasks.add_parser("train-finish", parents = [train_finish, args])
-    tasks.add_parser("train-run-round", parents = [train_run_round, args])
+    tasks.add_parser("train-init", parents=[train_init, args])
+    tasks.add_parser("train-run", parents=[train_run, args])
+    tasks.add_parser("train-finish", parents=[train_finish, args])
+    tasks.add_parser("train-run-round", parents=[train_run_round, args])
 
-    tasks.add_parser("annotate-init", parents = [identify_init, args, identify_args])
-    tasks.add_parser("annotate-run", parents = [identify_run, args, identify_args])
-    tasks.add_parser("annotate-finish", parents = [identify_finish, args, identify_args])
+    tasks.add_parser("annotate-init", parents=[identify_init, args, identify_args])
+    tasks.add_parser("annotate-run", parents=[identify_run, args, identify_args])
+    tasks.add_parser("annotate-finish", parents=[identify_finish, args, identify_args])
 
     # posterior and identify take the same options
-    tasks.add_parser("posterior-init", parents = [identify_init, args, identify_args])
-    tasks.add_parser("posterior-run", parents = [identify_run, args, identify_args])
-    tasks.add_parser("posterior-finish", parents = [identify_finish, args, identify_args])
+    tasks.add_parser("posterior-init", parents=[identify_init, args, identify_args])
+    tasks.add_parser("posterior-run", parents=[identify_run, args, identify_args])
+    tasks.add_parser("posterior-finish", parents=[identify_finish, args, identify_args])
 
     tasks.add_parser("train",
-        parents = [train_init, train_run, train_finish, args])
+        parents=[train_init, train_run, train_finish, args])
     tasks.add_parser("annotate",
-        parents = [identify_init, identify_run, identify_finish, args, identify_args])
+        parents=[identify_init, identify_run, identify_finish, args, identify_args])
     tasks.add_parser("identify",
-        parents = [identify_init, identify_run, identify_finish, args, identify_args])
+        parents=[identify_init, identify_run, identify_finish, args, identify_args])
     tasks.add_parser("posterior",
-        parents = [identify_init, identify_run, identify_finish, args, identify_args])
-    tasks.add_parser("identify+posterior", 
-        parents = [identify_init, identify_run, identify_finish, args, identify_args])
+        parents=[identify_init, identify_run, identify_finish, args, identify_args])
+    tasks.add_parser("identify+posterior",
+        parents=[identify_init, identify_run, identify_finish, args, identify_args])
 
     options = parser.parse_args(argv)
 
