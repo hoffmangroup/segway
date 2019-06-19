@@ -759,7 +759,7 @@ class Runner(object):
         """
         def __init__(self, selected, subtask = None):
             # If a subtask was specified and the task was set for this run
-            if subtask and selected:
+            if subtask:
                 # set all subtasks to False initially
                 self.init = False
                 self.run = False
@@ -799,9 +799,9 @@ class Runner(object):
               (subtask[0] == "run" and subtask[1] == "round"):
                 self.recover_dirname = self.work_dirname
                 self.recover_round = True
-            else:
-               # Otherwise make sure only one step was selected at a time
-               assert(len(subtask) < 2)
+            elif len(subtask >= 2):
+               # Otherwise error if more than one subtask was somehow specified
+               raise ValueError("More than one subtask was specified at once")
             setattr(self, task_name, self.SubTaskSpecification(True, subtask))
 
         for task in TASK_LIST:
