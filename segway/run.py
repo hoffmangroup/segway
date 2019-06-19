@@ -487,15 +487,23 @@ class TrainInstanceResults():
     generate it: the input master and validation files.
     """
     def get_filenames(self, validation = False):
+        filename_saver = {"input_master_filename": self.input_master_filename,
+                         "params_filename": self.params_filename, 
+                         "log_likelihood_filename": self.log_likelihood_filename}
         if validation:
-            return {"input_master_filename": self.input_master_filename,
-                    "params_filename": self.params_filename, 
-                    "log_likelihood_filename": self.log_likelihood_filename,
-                    "validation_output_filenames": self.validation_output_filename,
-                    "validation_sum_filename": self.validation_sum_filename}
-        return {"input_master_filename": self.input_master_filename,
-                "params_filename": self.params_filename, 
-                "log_likelihood_filename": self.log_likelihood_filename}
+            filename_saver.update({"validation_output_filenames": self.validation_output_filename,
+                                  "validation_sum_filename": self.validation_sum_filename})
+        return filename_saver
+
+    def load_results(self, filename):
+        with open(filename) as resultfile:
+            reader = DictReader(resultfile)
+            for line in reader:
+                name = line["name"]
+                value = line["value"]
+
+                item_type = TRAIN_RESULT_TYPES[name]
+                setattr(self, name, item_type(value))
 
     def __init__(self, result_list = [None for _ in TRAIN_RESULT_TYPES]):
         zipper = zip(result_list, TRAIN_RESULT_TYPES.keys())
@@ -918,26 +926,24 @@ class Runner(object):
             # The task_spec and args positional arguents handled in fromargs above
             if option == "archives" or option == "task_spec" or \
                option == "traindir" or option == "annotatedir":
-                continue
+                pass
 
             # multiple lists to one
-            if option == "cluster_opt":
+            elif option == "cluster_opt":
                 res.user_native_spec = sum([opt.split(" ")
                                             for opt in options.cluster_opt], [])
                 # No further processing required on this option, continue
-                continue
 
-            if option == "mem_usage":
+            elif option == "mem_usage":
                 mem_usage_list = list(map(float, options.mem_usage.split(",")))
                 # XXX: should do a ceil first?
                 # use int64 in case run.py is run on a 32-bit machine to control
                 # 64-bit compute nodes
                 res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
                 # No further processing required on this option, continue
-                continue
 
             # If the observations directory has been specified
-            if option == "observations" \
+            elif option == "observations" \
                 and options_dict[option]:
                     # Stop segway and show a "not implemented error" with description
                     raise NotImplementedError(
@@ -945,27 +951,29 @@ class Runner(object):
                         "Segway only creates observations in a temporary directory"
                     )
 
-            # Preprocess options
-            # Convert any track files into a list of tracks
-            if option == "track" \
-                and options_dict[option]:
-                track_specs = []
-                tracks = options_dict[option]
-                for file_or_string in tracks:
-                    track_specs.extend(file_or_string_to_string_list(file_or_string))
+            # All other options need to be processed and saved to Runner
+            else:
+                # Preprocess options
+                # Convert any track files into a list of tracks
+                if option == "track" \
+                    and options_dict[option]:
+                    track_specs = []
+                    tracks = options_dict[option]
+                    for file_or_string in tracks:
+                        track_specs.extend(file_or_string_to_string_list(file_or_string))
 
-                options_dict[option] = track_specs
+                    options_dict[option] = track_specs
 
-            # Convert labels string into potential slice or an int
-            # If num labels was specified
-            if option == "num_labels" \
-                and options_dict[option]:
-                options.num_labels = str2slice_or_int(options_dict[option])
+                # Convert labels string into potential slice or an int
+                # If num labels was specified
+                if option == "num_labels" \
+                    and options_dict[option]:
+                    options.num_labels = str2slice_or_int(options_dict[option])
 
-            # bulk copy options that need no further processing
-            dst = cls.options_to_attrs[option]
+                # bulk copy options that need no further processing
+                dst = cls.options_to_attrs[option]
 
-            res.set_option(dst, options_dict[option])
+                res.set_option(dst, options_dict[option])
 
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
@@ -2959,15 +2967,7 @@ class Runner(object):
         for filename in Path(self.intermediate_dirpath).files(pattern):
             # Set variables to none to be overwritten by the tab file contents
             results = TrainInstanceResults()
-            with open(filename) as resultfile:
-                reader = DictReader(resultfile)
-                for line in reader:
-                    name = line["name"]
-                    value = line["value"]
-
-                    item_type = TRAIN_RESULT_TYPES[name]
-                    setattr(results, name, item_type(value))
-
+            results.load_results(filename)
             instance_params.append(results)
 
         return instance_params
