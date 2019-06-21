@@ -486,13 +486,13 @@ class TrainInstanceResults():
     resulting likelihood and params, as well as the files used to
     generate it: the input master and validation files.
     """
-    def get_filenames(self, validation = False):
+    def get_filenames(self, validation=False):
         filename_saver = {"input_master_filename": self.input_master_filename,
-                         "params_filename": self.params_filename, 
-                         "log_likelihood_filename": self.log_likelihood_filename}
+                          "params_filename": self.params_filename, 
+                          "log_likelihood_filename": self.log_likelihood_filename}
         if validation:
             filename_saver.update({"validation_output_filenames": self.validation_output_filename,
-                                  "validation_sum_filename": self.validation_sum_filename})
+                                   "validation_sum_filename": self.validation_sum_filename})
         return filename_saver
 
     def load_results(self, filename):
@@ -759,7 +759,7 @@ class Runner(object):
         if none, sets all class variables to the same value; signifying whether
         we are running the whole task or not.
         """
-        def __init__(self, selected, subtask = None):
+        def __init__(self, selected, subtask=None):
             # If a subtask was specified and the task was set for this run
             if subtask:
                 # set all subtasks to False initially
@@ -802,8 +802,8 @@ class Runner(object):
                 self.recover_dirname = self.work_dirname
                 self.recover_round = True
             elif len(subtask) >= 2:
-               # Otherwise error if more than one subtask was somehow specified
-               raise ValueError("More than one subtask was specified at once")
+                # Otherwise error if more than one subtask was somehow specified
+                raise ValueError("More than one subtask was specified at once")
             setattr(self, task_name, self.SubTaskSpecification(True, subtask))
 
         for task in TASK_LIST:
@@ -942,11 +942,11 @@ class Runner(object):
             # If the observations directory has been specified
             elif option == "observations" \
                 and options_dict[option]:
-                    # Stop segway and show a "not implemented error" with description
-                    raise NotImplementedError(
-                        "'--observations' option not used: "
-                        "Segway only creates observations in a temporary directory"
-                    )
+                # Stop segway and show a "not implemented error" with description
+                raise NotImplementedError(
+                    "'--observations' option not used: "
+                    "Segway only creates observations in a temporary directory"
+                )
 
             # All other options need to be processed and saved to Runner
             # The task_spec and args positional arguents handled in fromargs above
@@ -3759,7 +3759,7 @@ def parse_options(argv):
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
 
-    tasks = parser.add_subparsers(help="Segway Tasks", dest = "task_spec",
+    tasks = parser.add_subparsers(help="Segway Tasks", dest="task_spec",
                                   metavar="")
 
     # define steps for each of the three main tasks
