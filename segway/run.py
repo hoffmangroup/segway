@@ -39,14 +39,14 @@ from optbuild import AddableMixin
 from path import Path
 import pipes
 from pkg_resources import Requirement, working_set
-from six import viewitems, viewvalues
+from six import PY2, viewitems, viewvalues
 from six.moves import map, range, zip
 from six.moves.urllib.parse import quote
 from tabdelim import DictReader, ListWriter
 
 from .bed import parse_bed4, read_native
-from .cluster import (make_native_spec, JobTemplateFactory, RestartableJob,
-                      RestartableJobDict, Session)
+from .cluster import (is_running_locally, make_native_spec, JobTemplateFactory,
+                      RestartableJob, RestartableJobDict, Session)
 from .include import IncludeSaver
 from .input_master import InputMasterSaver
 from .observations import Observations
@@ -117,7 +117,9 @@ assert (ISLAND or
 LINEAR_MEM_USAGE_MULTIPLIER = 1
 MEM_USAGE_MULTIPLIER = 2
 
-JOIN_TIMEOUT = finfo(float).max
+JOIN_TIMEOUT = None
+if PY2:
+    JOIN_TIMEOUT = finfo(float).max
 
 SWAP_ENDIAN = False
 
@@ -528,6 +530,13 @@ class TrainThread(Thread):
         self.runner.session = self.session
         self.runner.num_segs = self.num_segs
         self.runner.instance_index = self.instance_index
+
+        # If this thread is running on a cluster management system
+        if not is_running_locally():
+            # Sleep this thread to not overload cluster management system if
+            # not the first training instance
+            sleep(THREAD_START_SLEEP_TIME*self.instance_index)
+
         with self.runner.open_job_log_file() as self.runner.job_log_file:
             self.result = self.runner.run_train_instance()
 
@@ -3181,49 +3190,31 @@ class Runner(object):
 
         threads = []
         with Session() as session:
-            try:
-                for instance_index, instance_features in enumerator:
-                    num_seg, seg_instance_index = instance_features
-                    # print >>sys.stderr, (
-                    #    "instance_index %s, num_seg %s, seg_instance_index %s"
-                    #    % (instance_index, num_seg, seg_instance_index))
-                    thread = TrainThread(self, session, instance_index,
-                                         num_seg)
-                    thread.start()
-                    threads.append(thread)
+            for instance_index, instance_features in enumerator:
+                num_seg, seg_instance_index = instance_features
 
-                    # let all of one thread's jobs drop in the queue
-                    # before you do the next one
-                    # XXX: using some sort of semaphore would be better
-                    # XXX: using a priority option to the system would be best
-                    sleep(THREAD_START_SLEEP_TIME)
+                thread = TrainThread(self, session, instance_index, num_seg)
+                thread.start()
+                threads.append(thread)
 
-                # list of tuples(log_likelihood, input_master_filename,
-                #                params_filename)
-                instance_params = []
-                for thread in threads:
-                    while thread.isAlive():
-                        # XXX: KeyboardInterrupts only occur if there is a
-                        # timeout specified here. Is this a Python bug?
-                        thread.join(JOIN_TIMEOUT)
+            # list of tuples(log_likelihood, input_master_filename,
+            #                params_filename)
+            instance_params = []
+            for thread in threads:
+                while thread.is_alive():
+                    thread.join(JOIN_TIMEOUT)
 
-                    # this will get AttributeError if the thread failed and
-                    # therefore did not set thread.result
-                    try:
-                        thread_result = thread.result
-                    except AttributeError:
-                        raise AttributeError("""\
+                # this will get AttributeError if the thread failed and
+                # therefore did not set thread.result
+                try:
+                    thread_result = thread.result
+                except AttributeError:
+                    raise AttributeError("""\
 Training instance %s failed. See previously printed error for reason.
 Final params file will not be written. Rerun the instance or use segway-winner
 to find the winning instance anyway.""" % thread.instance_index)
-                    else:
-                        instance_params.append(thread_result)
-            except KeyboardInterrupt:
-                self.interrupt_event.set()
-                for thread in threads:
-                    thread.join()
-
-                raise
+                else:
+                    instance_params.append(thread_result)
 
         return instance_params
 
@@ -3633,8 +3624,6 @@ to find the winning instance anyway.""" % thread.instance_index)
         run_train() or run_identify_posterior()
         """
         # XXXopt: use binary I/O to gmtk rather than ascii for parameters
-
-        self.interrupt_event = Event()
 
         # start log files, if they weren't already created by an ealier subtask
         if not Path(self.work_dirpath / SUBDIRNAME_LOG).exists():
