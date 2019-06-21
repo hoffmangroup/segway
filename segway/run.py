@@ -925,13 +925,8 @@ class Runner(object):
 
         # Add all options from this task into the Runner object
         for option in options_dict.keys():
-            # The task_spec and args positional arguents handled in fromargs above
-            if option == "archives" or option == "task_spec" or \
-               option == "traindir" or option == "annotatedir":
-                pass
-
             # multiple lists to one
-            elif option == "cluster_opt":
+            if option == "cluster_opt":
                 res.user_native_spec = sum([opt.split(" ")
                                             for opt in options.cluster_opt], [])
                 # No further processing required on this option, continue
@@ -954,7 +949,9 @@ class Runner(object):
                     )
 
             # All other options need to be processed and saved to Runner
-            else:
+            # The task_spec and args positional arguents handled in fromargs above
+            elif not (option == "archives" or option == "task_spec" or \
+               option == "traindir" or option == "annotatedir"):
                 # Preprocess options
                 # Convert any track files into a list of tracks
                 if option == "track" \
