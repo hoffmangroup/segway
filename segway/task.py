@@ -16,7 +16,6 @@ import re
 import sys
 from tempfile import mkstemp
 
-from genomedata import Genome
 from numpy import argmax, array, empty, where, diff, r_, zeros
 import optbuild
 from six.moves import map, range, zip

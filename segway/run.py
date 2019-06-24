@@ -24,7 +24,7 @@ from shutil import copy2
 import stat
 from string import ascii_letters
 import sys
-from threading import Event, Lock, Thread
+from threading import Lock, Thread
 from time import sleep
 from uuid import uuid1
 from warnings import warn

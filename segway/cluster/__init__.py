@@ -218,7 +218,6 @@ class RestartableJobDict(dict):
         if self.is_sleep_time_gt_min():
             self._queue_unconditional(restartable_job)
         else:
-            sort_key = restartable_job.sort_key
             heappush(self.unqueued_jobs, restartable_job)
 
     def queue_unqueued_jobs(self):
