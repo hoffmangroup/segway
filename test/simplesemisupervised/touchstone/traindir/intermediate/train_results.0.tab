@@ -1,0 +1,9 @@
+name	value
+input_master_filename	traindir/params/input.master
+log_likelihood	39489.53592997074
+log_likelihood_filename	traindir/likelihood/likelihood.ll
+num_segs	4
+params_filename	traindir/params/params.0.params.4
+validation_likelihood	-inf
+validation_output_filename	
+validation_sum_filename	
