@@ -483,19 +483,24 @@ LockableDefaultDict = Mixin_Lockable + defaultdict
 
 class TrainInstanceResults():
     """
-    This class stores the best results from each training instance run,
-    depending on whether or not validation was used, and stores the
-    resulting likelihood and params, as well as the files used to
-    generate it: the input master and validation files.
+    Each TrainInstanceResults instance stores the filenames from the winning rounds
+    of training for each segway train instance. Additionally contains their 
+    log likelihood and validation likelihoods. 
     """
     def get_filenames(self, validation=False):
-        filename_saver = {"input_master_filename": self.input_master_filename,
-                          "params_filename": self.params_filename, 
-                          "log_likelihood_filename": self.log_likelihood_filename}
+        """
+        Returns a dictionary, where the keys represent runner attributes containing
+        the dst filenames and the values are the source filenames stored in the class.
+        Validation represents whether the validation files exist and need to be copied
+        as well.
+        """
+        res = {"input_master_filename": self.input_master_filename,
+               "params_filename": self.params_filename, 
+               "log_likelihood_filename": self.log_likelihood_filename}
         if validation:
-            filename_saver.update({"validation_output_filenames": self.validation_output_filename,
-                                   "validation_sum_filename": self.validation_sum_filename})
-        return filename_saver
+            res.update({"validation_output_filenames": self.validation_output_filename,
+                        "validation_sum_filename": self.validation_sum_filename})
+        return res
 
     def load_results(self, filename):
         with open(filename) as resultfile:
@@ -764,12 +769,11 @@ class Runner(object):
 
     class SubTaskSpecification(object):
         """
-        Class determines if a subtask was specified for a given task,
-        if none, sets all class variables to the same value; signifying whether
-        we are running the whole task or not.
+        SubTaskSpecification instance stores the segway task/subtask specification for the current
+        session.
         """
         def __init__(self, selected, subtask=None):
-            # If a subtask was specified and the task was set for this run
+            # Subtask contains the name of the subtask chosen this time (init, run or finish)
             if subtask:
                 # set all subtasks to False initially
                 self.init = False
@@ -778,7 +782,7 @@ class Runner(object):
                 # Overwrite the selected subtask back to true
                 setattr(self, subtask[0], True)
             else:
-            # Otherwise all steps are set to selected or not
+            # If no subtask is specified, all subtasks are set to match the selected boolean variable
                 self.init = selected
                 self.run = selected
                 self.finish = selected
@@ -949,8 +953,8 @@ class Runner(object):
                 # No further processing required on this option, continue
 
             # If the observations directory has been specified
-            elif option == "observations" \
-                and options_dict[option]:
+            elif (option == "observations" 
+                  and options_dict[option]):
                 # Stop segway and show a "not implemented error" with description
                 raise NotImplementedError(
                     "'--observations' option not used: "
@@ -959,12 +963,12 @@ class Runner(object):
 
             # All other options need to be processed and saved to Runner
             # The task_spec and args positional arguents handled in fromargs above
-            elif not (option == "archives" or option == "task_spec" or \
-               option == "traindir" or option == "annotatedir"):
+            elif not (option == "archives" or option == "task_spec" or 
+                      option == "traindir" or option == "annotatedir"):
                 # Preprocess options
                 # Convert any track files into a list of tracks
-                if option == "track" \
-                    and options_dict[option]:
+                if (option == "track"
+                    and options_dict[option]):
                     track_specs = []
                     tracks = options_dict[option]
                     for file_or_string in tracks:
@@ -974,8 +978,8 @@ class Runner(object):
 
                 # Convert labels string into potential slice or an int
                 # If num labels was specified
-                if option == "num_labels" \
-                    and options_dict[option]:
+                if (option == "num_labels"
+                    and options_dict[option]):
                     options.num_labels = str2slice_or_int(options_dict[option])
 
                 # bulk copy options that need no further processing
