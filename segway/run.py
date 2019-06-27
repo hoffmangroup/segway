@@ -808,7 +808,9 @@ class Runner(object):
             task_name = task[0]
             if task_name == "annotate":
                 task_name = "identify"
+
             subtask = task[1:]
+
             # Check if multiple subtasks are present, meaning run-round was chosen
             if len(subtask) == 2 and \
               (subtask[0] == "run" and subtask[1] == "round"):
@@ -2974,8 +2976,8 @@ class Runner(object):
 
         # If we are running identify/posterior and the params filename was specified
         # during train, save it in params_filenames as well.
-        if self.params_filename is not None and \
-          not self.train:
+        if (self.params_filename is not None and
+            not self.train):
             self.params_filenames = [self.params_filename]
 
     def load_train_results(self):
