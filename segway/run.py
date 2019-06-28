@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function, with_statement
+from __future__ import (absolute_import, division, print_function,
+                        with_statement)
 
 """
 run: main Segway implementation
@@ -294,7 +295,7 @@ TRAIN_RESULT_TYPES = dict(log_likelihood=float, num_segs=int,
                           validation_sum_filename=str)
 
 IDENTIFY_OPTION_TYPES = \
-    	dict(include_coords_filename=str, exclude_coords_filename=str,
+        dict(include_coords_filename=str, exclude_coords_filename=str,
              seg_table_filename=str, output_label=str)
 
 SUB_TASK_DELIMITER = "-"
@@ -324,7 +325,8 @@ REVERSE_GPR = "^0:-1:0"
 OFFSET_FILENAMES = 3  # where the filenames begin in Results
 OFFSET_VALIDATION_FILENAMES = 6  # where the validation filenames begin
 
-GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+GMTKJT_OUTPUT_PATTERN = \
+    "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
 GMTKJT_PATTERN_WINDOW_MATCH_INDEX = 1
 GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX = 2
 
@@ -481,25 +483,28 @@ class Mixin_Lockable(AddableMixin):  # noqa
 
 LockableDefaultDict = Mixin_Lockable + defaultdict
 
+
 class TrainInstanceResults():
     """
-    Each TrainInstanceResults instance stores the filenames from the winning rounds
-    of training for each segway train instance. Additionally contains their 
-    log likelihood and validation likelihoods. 
+    Each TrainInstanceResults instance stores the filenames from the winning
+    rounds of training for each segway train instance. Additionally contains
+    their log likelihood and validation likelihoods.
     """
     def get_filenames(self, validation=False):
         """
-        Returns a dictionary, where the keys represent runner attributes containing
-        the dst filenames and the values are the source filenames stored in the class.
-        Validation represents whether the validation files exist and need to be copied
-        as well.
+        Returns a dictionary, where the keys represent runner attributes
+        containing the dst filenames and the values are the source filenames
+        stored in the class. Validation represents whether the validation
+        files exist and need to be copied as well.
         """
         res = {"input_master_filename": self.input_master_filename,
-               "params_filename": self.params_filename, 
+               "params_filename": self.params_filename,
                "log_likelihood_filename": self.log_likelihood_filename}
         if validation:
-            res.update({"validation_output_filenames": self.validation_output_filename,
-                        "validation_sum_filename": self.validation_sum_filename})
+            res.update({"validation_output_filenames":
+                             self.validation_output_filename,
+                        "validation_sum_filename":
+                             self.validation_sum_filename})
         return res
 
     def load_results(self, filename):
@@ -527,7 +532,8 @@ class TrainThread(Thread):
         self.num_segs = num_segs
         self.instance_index = instance_index
         self.runner.input_master_filename = make_default_filename(
-            InputMasterSaver.resource_name, runner.params_dirpath, instance_index)
+            InputMasterSaver.resource_name, runner.params_dirpath,
+            instance_index)
 
         Thread.__init__(self)
 
@@ -654,6 +660,7 @@ class TrackGroup(list):
     def insert(self, index, item):
         return list.insert(self, index, self._set_group(item))
 
+
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
 
@@ -769,11 +776,12 @@ class Runner(object):
 
     class SubTaskSpecification(object):
         """
-        SubTaskSpecification instance stores the segway task/subtask specification for the current
-        session.
+        SubTaskSpecification instance stores the segway task/subtask
+        specification for the current session.
         """
         def __init__(self, selected, subtask=None):
-            # Subtask contains the name of the subtask chosen this time (init, run or finish)
+            # Subtask contains the name of the subtask chosen
+            # this time (init, run or finish)
             if subtask:
                 # set all subtasks to False initially
                 self.init = False
@@ -782,7 +790,8 @@ class Runner(object):
                 # Overwrite the selected subtask back to true
                 setattr(self, subtask[0], True)
             else:
-            # If no subtask is specified, all subtasks are set to match the selected boolean variable
+                # If no subtask is specified, all subtasks are set to match
+                # the selected boolean variable
                 self.init = selected
                 self.run = selected
                 self.finish = selected
@@ -809,13 +818,14 @@ class Runner(object):
             if task_name == "annotate":
                 task_name = "identify"
             subtask = task[1:]
-            # Check if multiple subtasks are present, meaning run-round was chosen
-            if len(subtask) == 2 and \
-              (subtask[0] == "run" and subtask[1] == "round"):
+            # Check if multiple subtasks are present,
+            # meaning run-round was chosen
+            if (len(subtask) == 2 and
+               (subtask[0] == "run" and subtask[1] == "round")):
                 self.recover_dirname = self.work_dirname
                 self.recover_round = True
             elif len(subtask) >= 2:
-                # Otherwise error if more than one subtask was somehow specified
+                # Otherwise error if more than one subtask was specified
                 raise ValueError("More than one subtask was specified at once")
             setattr(self, task_name, self.SubTaskSpecification(True, subtask))
 
@@ -851,7 +861,8 @@ class Runner(object):
                         "seg_table": "seg_table_filename",
                         "distribution": "distribution",
                         "prior_strength": "len_seg_strength",
-                        "segtransition_weight_scale": "segtransition_weight_scale",
+                        "segtransition_weight_scale":
+                            "segtransition_weight_scale",
                         "ruler_scale": "ruler_scale",
                         "resolution": "resolution",
                         "var_floor": "var_floor",
@@ -886,7 +897,6 @@ class Runner(object):
 
         return res
 
-
     def from_environment(self):
         # If there is a seed from the environment
         try:
@@ -898,7 +908,6 @@ class Runner(object):
 
         # Create a random number generator for this runner
         self.random_state = RandomState(self.random_seed)
-
 
     def add_track_group(self, tracknames):
         tracks = self.tracks
@@ -921,7 +930,6 @@ class Runner(object):
             tracknames_unquoted.add(trackname)
 
         self.track_groups.append(track_group)
-
 
     @classmethod
     def fromoptions(cls, task_spec, archives, traindir, annotatedir, options):
@@ -947,23 +955,26 @@ class Runner(object):
             elif option == "mem_usage":
                 mem_usage_list = list(map(float, options.mem_usage.split(",")))
                 # XXX: should do a ceil first?
-                # use int64 in case run.py is run on a 32-bit machine to control
-                # 64-bit compute nodes
-                res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
+                # use int64 in case run.py is run on a 32-bit machine to
+                # control 64-bit compute nodes
+                res.mem_usage_progression = \
+                    (array(mem_usage_list) * GB).astype(int64)
                 # No further processing required on this option, continue
 
             # If the observations directory has been specified
-            elif (option == "observations" 
+            elif (option == "observations"
                   and options_dict[option]):
-                # Stop segway and show a "not implemented error" with description
+                # Stop segway and show a "not implemented error"
+                # with description
                 raise NotImplementedError(
                     "'--observations' option not used: "
                     "Segway only creates observations in a temporary directory"
                 )
 
             # All other options need to be processed and saved to Runner
-            # The task_spec and args positional arguents handled in fromargs above
-            elif not (option == "archives" or option == "task_spec" or 
+            # The task_spec and args positional arguents handled in
+            # fromargs above
+            elif not (option == "archives" or option == "task_spec" or
                       option == "traindir" or option == "annotatedir"):
                 # Preprocess options
                 # Convert any track files into a list of tracks
@@ -972,7 +983,8 @@ class Runner(object):
                     track_specs = []
                     tracks = options_dict[option]
                     for file_or_string in tracks:
-                        track_specs.extend(file_or_string_to_string_list(file_or_string))
+                        track_specs.extend(
+                            file_or_string_to_string_list(file_or_string))
 
                     options_dict[option] = track_specs
 
@@ -1542,7 +1554,6 @@ class Runner(object):
         if output_params_filename:
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
 
-
         # prevent supervised variable from being inherited from train task
         if self.identify:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
@@ -1572,8 +1583,8 @@ class Runner(object):
 
     def load_validation_log_likelihood(self):
         """
-        Parses gmtkJT output to obtain each window's log probability of evidence
-        log(prob(E)).
+        Parses gmtkJT output to obtain each window's log probability of
+        evidence log(prob(E)).
 
         Raises error if it is found that the validation task was unsucccessful.
 
@@ -1594,21 +1605,20 @@ class Runner(object):
                     validation_match.group(GMTKJT_PATTERN_WINDOW_MATCH_INDEX)
                     ))
                 validation_window_likelihoods.append(float(
-                    validation_match.group(GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX)
-                    ))
+                    validation_match.group(
+                        GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX)))
             else:
                 if MSG_SUCCESS not in line:
                     raise RuntimeError("Validation not successful: " + line)
 
         return validation_window_indices, validation_window_likelihoods
 
-
     def get_full_validation_output(self, validation_window_indices,
                                    validation_window_likelihoods):
         """
-        Takes as input the validation window indices and corresponding likelihoods
-        and returns an array of tuples where each entry is the validation window
-        index, size, and log likelihood.
+        Takes as input the validation window indices and corresponding
+        likelihoods and returns an array of tuples where each entry is the
+        validation window index, size, and log likelihood.
         """
         full_validation_output = []
         for validation_window_index, validation_window_likelihood \
@@ -2170,7 +2180,7 @@ class Runner(object):
         self.save_include()
         self.set_params_filename()
         self.save_structure()
-        
+
     def save_window_list(self):
         """Saves the current list of windows to a BED file where the name field
         is the window index that Segway has assigned"""
@@ -2784,8 +2794,8 @@ class Runner(object):
 
         # If a random number generator seed exists
         if self.random_seed:
-            # Create a new random number generator for this instance based on its
-            # own index
+            # Create a new random number generator for this instance based on
+            # its own index
             self.random_seed += instance_index
             self.random_state = RandomState(self.random_seed)
 
@@ -2846,12 +2856,14 @@ class Runner(object):
             result = TrainInstanceResults(log_likelihood=log_likelihood,
                                    num_segs=self.num_segs,
                                    validation_likelihood=validation_likelihood,
-                                   input_master_filename=self.input_master_filename,
+                                   input_master_filename=
+                                       self.input_master_filename,
                                    params_filename=self.best_params_filename,
-                                   log_likelihood_filename=self.log_likelihood_filename,
-                                   validation_output_filename= \
+                                   log_likelihood_filename=
+                                       self.log_likelihood_filename,
+                                   validation_output_filename=
                                        self.validation_output_winner_filename,
-                                   validation_sum_filename= \
+                                   validation_sum_filename=
                                        self.validation_sum_winner_filename)
 
         while (round_index < self.max_em_iters and
@@ -2887,9 +2899,9 @@ class Runner(object):
                 with open(self.validation_sum_tab_filename, "a") as logfile:
                     logfile.write(str(validation_likelihood) + "\n")
 
-                # if the new validation likelihood is better than our previous best,
-                # choose it as our current winner and update instance's winner files
-                # winning set of results to be passed
+                # if the new validation likelihood is better than our previous
+                # best, choose it as our current winner and update instance's
+                # winner files winning set of results to be passed
                 if validation_likelihood > best_validation_likelihood:
                     copy2(self.validation_output_filename,
                           self.validation_output_winner_filename)
@@ -2900,12 +2912,14 @@ class Runner(object):
                     result = TrainInstanceResults(log_likelihood=log_likelihood,
                                    num_segs=self.num_segs,
                                    validation_likelihood=validation_likelihood,
-                                   input_master_filename=self.input_master_filename,
+                                   input_master_filename=
+                                       self.input_master_filename,
                                    params_filename=self.best_params_filename,
-                                   log_likelihood_filename=self.log_likelihood_filename,
-                                   validation_output_filename= \
+                                   log_likelihood_filename=
+                                       self.log_likelihood_filename,
+                                   validation_output_filename=
                                        self.validation_output_winner_filename,
-                                   validation_sum_filename= \
+                                   validation_sum_filename=
                                        self.validation_sum_winner_filename)
                     best_validation_likelihood = validation_likelihood
 
@@ -2915,12 +2929,14 @@ class Runner(object):
             result = TrainInstanceResults(log_likelihood=log_likelihood,
                                    num_segs=self.num_segs,
                                    validation_likelihood=validation_likelihood,
-                                   input_master_filename=self.input_master_filename,
+                                   input_master_filename=
+                                       self.input_master_filename,
                                    params_filename=self.last_params_filename,
-                                   log_likelihood_filename=self.log_likelihood_filename,
-                                   validation_output_filename= \
+                                   log_likelihood_filename=
+                                       self.log_likelihood_filename,
+                                   validation_output_filename=
                                        self.validation_output_winner_filename,
-                                   validation_sum_filename= \
+                                   validation_sum_filename=
                                        self.validation_sum_winner_filename)
 
         # log_likelihood, num_segs and a list of src_filenames to save
@@ -2972,17 +2988,17 @@ class Runner(object):
                     else:
                         setattr(self, name, row_type(value))
 
-        # If we are running identify/posterior and the params filename was specified
-        # during train, save it in params_filenames as well.
+        # If we are running identify/posterior and the params filename was
+        # specified during train, save it in params_filenames as well.
         if self.params_filename is not None and \
           not self.train:
             self.params_filenames = [self.params_filename]
 
     def load_train_results(self):
         """
-        Loads the training results in train-finish saved in SUBDIRNAME_INTERMEDIATE.
-        Stores as a list of TrainInstanceResults in instance_params to select best in
-        finish.
+        Loads the training results in train-finish saved in 
+        SUBDIRNAME_INTERMEDIATE. Stores as a list of TrainInstanceResults in
+        instance_params to select best in finish.
         """
 
         pattern = extjoin(PREFIX_TRAIN_RESULTS, "*", EXT_TAB)
@@ -3241,7 +3257,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         return new_filename
 
     def recover_train_instance(self, last_log_likelihood, log_likelihood,
-                               validation_likelihood, best_validation_likelihood):
+                               validation_likelihood,
+                               best_validation_likelihood):
         instance_index = self.instance_index
         recover_dirname = self.recover_dirname
 
@@ -3266,7 +3283,8 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.input_master_filename = \
                 self.recover_filename(InputMasterSaver.resource_name)
             log_likelihood_tab_filename = self.log_likelihood_tab_filename
-            recover_log_likelihood_tab_filepath.copy2(log_likelihood_tab_filename)
+            recover_log_likelihood_tab_filepath.copy2(
+                log_likelihood_tab_filename)
 
         if self.validate:
             # recover validation sum tabfile
@@ -3364,8 +3382,9 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         final_round_index = len(log_likelihoods)
         if final_round_index == 0:
-            # This is the case where train-run-round was used for the first round
-            # Sets the log_likelihood temporarily as it would be otherwise
+            # This is the case where train-run-round was used for the first
+            # round sets the log_likelihood temporarily as it would be
+            # otherwise
             log_likelihood = -inf
         if final_round_index > 0:
             log_likelihood = log_likelihoods[-1]
@@ -3379,7 +3398,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                                    for line in validation_sum_tab_file.readlines()]
             validation_likelihood = validation_sums[-1]
             best_validation_likelihood = max(validation_sums)
-            best_validation_index = validation_sums.index(best_validation_likelihood)
+            best_validation_index = validation_sums.index(
+                best_validation_likelihood)
 
 
         old_params_filename = self.make_params_filename(instance_index,
@@ -3498,7 +3518,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
                        genomedata_names_text,
-                       self.distribution, track_indexes_text, self.num_mix_components]
+                       self.distribution, track_indexes_text,
+                       self.num_mix_components]
 
         output_filename = None
 
@@ -3542,7 +3563,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         if self.identify.init or self.posterior.init:
             self.init_shared()
-            self.save_tab_file(self, IDENTIFY_OPTION_TYPES, IDENTIFY_FILEBASENAME)
+            self.save_tab_file(self, IDENTIFY_OPTION_TYPES,
+                               IDENTIFY_FILEBASENAME)
         else:
             self.set_triangulation_filename()
             self.load_identify_options(self.work_dirname)
@@ -3580,7 +3602,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         with Session() as session:
             self.session = session
             with self.open_job_log_file() as self.job_log_file:
-                restartable_jobs = RestartableJobDict(session, self.job_log_file)
+                restartable_jobs = RestartableJobDict(session,
+                                                      self.job_log_file)
 
                 for window_index, window_len in self.window_lens_sorted():
                     for task in tasks:
@@ -3887,8 +3910,8 @@ def parse_options(argv):
     group = train_run.add_argument_group("Intermediate files (train-run)")
     group.add_argument("-o", "--observations", metavar="DIR",
                        help="DEPRECATED - temp files are now used and "
-                       " recommended. Previously would use or create observations in DIR"
-                       " (default %s)" %
+                       "recommended. Previously would use or create "
+                       "observations in DIR (default %s)" %
                        (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
 
     group.add_argument("-r", "--recover", metavar="DIR",
@@ -3944,25 +3967,35 @@ def parse_options(argv):
     tasks.add_parser("train-finish", parents=[train_finish, args])
     tasks.add_parser("train-run-round", parents=[train_run_round, args])
 
-    tasks.add_parser("annotate-init", parents=[identify_init, args, identify_args])
-    tasks.add_parser("annotate-run", parents=[identify_run, args, identify_args])
-    tasks.add_parser("annotate-finish", parents=[identify_finish, args, identify_args])
+    tasks.add_parser("annotate-init", parents=[identify_init, args,
+                                               identify_args])
+    tasks.add_parser("annotate-run", parents=[identify_run, args,
+                                              identify_args])
+    tasks.add_parser("annotate-finish", parents=[identify_finish, args,
+                                                 identify_args])
 
     # posterior and identify take the same options
-    tasks.add_parser("posterior-init", parents=[identify_init, args, identify_args])
-    tasks.add_parser("posterior-run", parents=[identify_run, args, identify_args])
-    tasks.add_parser("posterior-finish", parents=[identify_finish, args, identify_args])
+    tasks.add_parser("posterior-init", parents=[identify_init, args,
+                                                identify_args])
+    tasks.add_parser("posterior-run", parents=[identify_run, args,
+                                               identify_args])
+    tasks.add_parser("posterior-finish", parents=[identify_finish, args,
+                                                  identify_args])
 
     tasks.add_parser("train",
-        parents=[train_init, train_run, train_finish, args])
+                     parents=[train_init, train_run, train_finish, args])
     tasks.add_parser("annotate",
-        parents=[identify_init, identify_run, identify_finish, args, identify_args])
+                     parents=[identify_init, identify_run, identify_finish,
+                              args, identify_args])
     tasks.add_parser("identify",
-        parents=[identify_init, identify_run, identify_finish, args, identify_args])
+                     parents=[identify_init, identify_run, identify_finish,
+                              args, identify_args])
     tasks.add_parser("posterior",
-        parents=[identify_init, identify_run, identify_finish, args, identify_args])
+                     parents=[identify_init, identify_run, identify_finish,
+                              args, identify_args])
     tasks.add_parser("identify+posterior",
-        parents=[identify_init, identify_run, identify_finish, args, identify_args])
+                     parents=[identify_init, identify_run, identify_finish,
+                              args, identify_args])
 
     options = parser.parse_args(argv)
 
