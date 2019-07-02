@@ -1,0 +1,25 @@
+name	value
+distribution	asinh_norm
+dont_train_filename	traindir/auxiliary/dont_train.list
+include_coords_filename	../include-coords.bed
+input_master_filename	traindir/params/input.master
+len_seg_strength	0
+max_frames	2000000
+minibatch_fraction	-1
+num_instances	1
+num_mix_components	1
+num_segs	4
+num_subsegs	1
+output_label	seg
+params_filename	traindir/params/params.params
+resolution	1
+ruler_scale	10
+seg_table_filename	
+segtransition_weight_scale	1.0
+structure_filename	traindir/segway.str
+supervision_filename	
+track_specs	testtrack1
+track_specs	testtrack2
+validation_coords_filename	
+validation_fraction	
+var_floor	
