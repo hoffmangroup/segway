@@ -1002,7 +1002,8 @@ class Runner(object):
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
         if (res.resolution != RESOLUTION and
-            not res.ruler_scale):
+           ("ruler_scale" in options_dict and
+            not options_dict["ruler_scale"])):
             # Set the ruler scale to 10x the non-default value
             res.ruler_scale = res.resolution * 10
         # Else if the ruler is not divisible by the resolution
@@ -1285,7 +1286,6 @@ class Runner(object):
 
     @memoized_property
     def viterbi_filenames(self):
-        self.make_subdir(SUBDIRNAME_VITERBI)
         return self.make_viterbi_filenames(self.work_dirpath)
 
     @memoized_property
@@ -1298,7 +1298,6 @@ class Runner(object):
 
     @memoized_property
     def posterior_filenames(self):
-        self.make_subdir(SUBDIRNAME_POSTERIOR)
         return list(map(self.make_posterior_filename, range(self.num_windows)))
 
     @memoized_property
@@ -3565,13 +3564,12 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.init_shared()
             self.save_tab_file(self, IDENTIFY_OPTION_TYPES,
                                IDENTIFY_FILEBASENAME)
+            self.make_subdir(SUBDIRNAME_VITERBI)
+            self.make_subdir(SUBDIRNAME_POSTERIOR)
         else:
             self.set_triangulation_filename()
             self.load_identify_options(self.work_dirname)
             self.save_gmtk_input()
-
-        filenames = dict(identify=self.viterbi_filenames,
-                         posterior=self.posterior_filenames)
 
         # if output_label == "subseg" or "full", need to catch
         # superlabel and sublabel output from gmtk
@@ -3594,10 +3592,13 @@ to find the winning instance anyway.""" % thread.instance_index)
                        **self.get_posterior_clique_print_ranges())}
 
         tasks = []
+        filenames = {}
         if self.identify.run:
             tasks.append("identify")
+            filenames.update(dict(identify=self.viterbi_filenames))
         if self.posterior.run:
             tasks.append("posterior")
+            filenames.update(dict(posterior=self.posterior_filenames))
 
         with Session() as session:
             self.session = session
