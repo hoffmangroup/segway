@@ -202,6 +202,9 @@ workdir instead.
 ``cmdline/0,1,.../``                                GMTK job shell scripts for a particular training
                                                     instance(0,1,...)
 ``cmdline/identify/``                               GMTK job shell scripts for identification
+``intermediate``                                    files containing best training filenames per instance
+|rarr| ``train_result.``\ \*\ ``.tab``              per instance information containing the filenames of
+                                                    the params resulting in the best likelihood
 ``likelihood/``                                     GMTK's report of the log likelihood for
                                                     the most recent M-step of EM training
 |rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
