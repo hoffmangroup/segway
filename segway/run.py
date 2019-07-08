@@ -891,7 +891,10 @@ class Runner(object):
                         "max_train_rounds": "max_em_iters",
                         "reverse_world": "reverse_worlds",
                         "track": "track_specs",
-                        "trainable_params": "params_filenames"}
+                        "trainable_params": "params_filenames",
+                        "virtual_evidence": "virtual_evidence_filename",
+                        "virtual_evidence_weight": "virtual_evidence_weight",
+                        "track_weight": "track_weight"}
 
     @classmethod
     def fromargs(cls, task_spec, archives, traindir, annotatedir):
@@ -1581,11 +1584,8 @@ class Runner(object):
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
 
         # prevent supervised variable from being inherited from train task
-        # similarly, prevent virtual evidence variable from being
-        # inherited from train task
-        if self.identify.running:
+        if self.identify or self.posterior:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
-            #directives["VIRTUAL_EVIDENCE"] = VIRTUAL_EVIDENCE_NONE
 
         if self.virtual_evidence:
             directives[VIRTUAL_EVIDENCE_LIST_FILENAME] = \
@@ -1599,12 +1599,6 @@ class Runner(object):
         directives["CARD_FRAMEINDEX"] = self.max_frames
         directives["SEGTRANSITION_WEIGHT_SCALE"] = \
             self.segtransition_weight_scale
-
-        if self.model_weight:
-            directives["MODEL_WEIGHT"] = self.model_weight
-
-        directives["VIRTUAL_EVIDENCE_WEIGHT"] = \
-            self.virtual_evidence_weight
 
         res = " ".join(CPP_DIRECTIVE_FMT % item
                        for item in viewitems(directives))
@@ -4006,6 +4000,14 @@ def parse_options(argv):
                        help="exponent for segment transition probability "
                        " (default %f)" % SEGTRANSITION_WEIGHT_SCALE)
 
+    group.add_argument("--track-weight", type=float,
+                       help="exponent for all input track probabilities "
+                       " (default 1)")
+
+    group.add_argument("--virtual-evidence-weight", type=float,
+                       help="exponent for virtual evidence probability "
+                       " (default %f)" % VIRTUAL_EVIDENCE_WEIGHT)
+
     group.add_argument("--reverse-world", action="append", type=int,
                        default=[], metavar="WORLD",
                        help="reverse sequences in concatenated world WORLD"
@@ -4047,14 +4049,6 @@ def parse_options(argv):
     group.add_argument("--virtual-evidence", metavar="FILE",
                        help="virtual evidence with priors for labels at each position in "
                        "FILE (default none)")
-    group.add_argument("--model-weight", type=float,
-                       help="exponent for whole model probability "
-                       "default 1")
-
-    group.add_argument("--virtual-evidence-weight", type=float,
-                       help="exponent for virtual evidence probability "
-                       "default 1")
-
 
     # select coords to identify in the init step
     group = identify_init.add_argument_group("Data selection (idenfity-init)")
@@ -4083,13 +4077,6 @@ def parse_options(argv):
     group.add_argument("--virtual-evidence", metavar="FILE",
                        help="virtual evidence with priors for labels at each position in "
                        "FILE (default none)")
-    group.add_argument("--model-weight", type=float,
-                       help="exponent for whole model probability "
-                       "default 1")
-
-    group.add_argument("--virtual-evidence-weight", type=float,
-                       help="exponent for virtual evidence probability "
-                       "default 1")
 
     # output files are produced by identify-finish
     group = identify_finish.add_argument_group("Output files (identify-finish)")
@@ -4108,40 +4095,46 @@ def parse_options(argv):
     identify_args = tasks.add_parser("", add_help=False)
     identify_args.add_argument("annotatedir", nargs=1)
 
-    tasks.add_parser("train-init", parents=[train_init, args])
-    tasks.add_parser("train-run", parents=[train_run, args])
+    tasks.add_parser("train-init", parents=[train_init, train_init_run, args])
+    tasks.add_parser("train-run", parents=[train_run, train_init_run, args])
     tasks.add_parser("train-finish", parents=[train_finish, args])
-    tasks.add_parser("train-run-round", parents=[train_run_round, args])
+    tasks.add_parser("train-run-round", parents=[train_run_round,
+                                                 train_init_run, args])
 
-    tasks.add_parser("annotate-init", parents=[identify_init, args,
-                                               identify_args])
-    tasks.add_parser("annotate-run", parents=[identify_run, args,
-                                              identify_args])
+    tasks.add_parser("annotate-init",
+                     parents=[identify_init, identify_init_run, args,
+                              identify_args])
+    tasks.add_parser("annotate-run",
+                     parents=[identify_run, identify_init_run, args,
+                              identify_args])
     tasks.add_parser("annotate-finish", parents=[identify_finish, args,
                                                  identify_args])
 
     # posterior and identify take the same options
-    tasks.add_parser("posterior-init", parents=[identify_init, args,
-                                                identify_args])
-    tasks.add_parser("posterior-run", parents=[identify_run, args,
-                                               identify_args])
+    tasks.add_parser("posterior-init",
+                     parents=[identify_init, identify_init_run, args,
+                              identify_args])
+    tasks.add_parser("posterior-run",
+                     parents=[identify_run, identify_init_run, args,
+                              identify_args])
     tasks.add_parser("posterior-finish", parents=[identify_finish, args,
                                                   identify_args])
 
     tasks.add_parser("train",
-                     parents=[train_init, train_run, train_finish, args])
+                     parents=[train_init, train_init_run, train_run,
+                              train_finish, args])
     tasks.add_parser("annotate",
-                     parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                     parents=[identify_init, indenfity_init_run, identify_run,
+                              identify_finish, args, identify_args])
     tasks.add_parser("identify",
-                     parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                     parents=[identify_init, indenfity_init_run, identify_run,
+                              identify_finish, args, identify_args])
     tasks.add_parser("posterior",
-                     parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                     parents=[identify_init, indenfity_init_run, identify_run,
+                              identify_finish, args, identify_args])
     tasks.add_parser("identify+posterior",
-                     parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                     parents=[identify_init, indenfity_init_run, identify_run,
+                              identify_finish, args, identify_args])
 
     options = parser.parse_args(argv)
 
