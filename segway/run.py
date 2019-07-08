@@ -4124,16 +4124,16 @@ def parse_options(argv):
                      parents=[train_init, train_init_run, train_run,
                               train_finish, args])
     tasks.add_parser("annotate",
-                     parents=[identify_init, indenfity_init_run, identify_run,
+                     parents=[identify_init, identify_init_run, identify_run,
                               identify_finish, args, identify_args])
     tasks.add_parser("identify",
-                     parents=[identify_init, indenfity_init_run, identify_run,
+                     parents=[identify_init, identify_init_run, identify_run,
                               identify_finish, args, identify_args])
     tasks.add_parser("posterior",
-                     parents=[identify_init, indenfity_init_run, identify_run,
+                     parents=[identify_init, identify_init_run, identify_run,
                               identify_finish, args, identify_args])
     tasks.add_parser("identify+posterior",
-                     parents=[identify_init, indenfity_init_run, identify_run,
+                     parents=[identify_init, identify_init_run, identify_run,
                               identify_finish, args, identify_args])
 
     options = parser.parse_args(argv)
