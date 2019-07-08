@@ -496,6 +496,23 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
+    if virtual_evidence == "True":
+        virtual_evidence_cells = []
+        zipper = zip(virtual_evidence_coords.split(";"), virtual_evidence_priors.split(";"))
+        for coords, priors in zipper: 
+            virtual_evidence_coords = literal_eval(coords)
+            virtual_evidence_priors = literal_eval(priors)
+
+            num_segs = literal_eval(num_segs)
+
+            cell = make_virtual_evidence_cells(
+                       virtual_evidence_coords, 
+                       virtual_evidence_priors, 
+                       start, end, num_segs)
+            virtual_evidence_cells.append(cell)
+    else:
+        virtual_evidence_cells = None
+
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
                                                continuous_cells,
                                                resolution, distribution,
