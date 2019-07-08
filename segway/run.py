@@ -292,7 +292,7 @@ TRAIN_OPTION_TYPES = \
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
          supervision_filename=str, virtual_evidence_filename = str, 
          minibatch_fraction=float, validation_fraction=float, max_frames = int,
-         validation_coords_filename=str, var_floor=float, model_weight=float)
+         validation_coords_filename=str, var_floor=float)
 
 
 TRAIN_RESULT_TYPES = dict(log_likelihood=float, num_segs=int,
@@ -3622,6 +3622,15 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         track_indexes_text = ",".join(map(str, track_indexes))
         genomedata_names_text = ",".join(genomedata_names)
+
+        if self.virtual_evidence:
+            virtual_evidence_coords = \
+                self.virtual_evidence_coords[(window.world, window.chrom)]
+            virtual_evidence_priors = \
+                self.virtual_evidence_priors[(window.world, window.chrom)]
+        else:
+            virtual_evidence_coords = None
+            virtual_evidence_priors = None
 
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,

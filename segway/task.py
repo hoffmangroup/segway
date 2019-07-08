@@ -491,7 +491,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     (chrom, start, end) = coord
     # Create and save the window
     genomedata_names = genomedata_names.split(",")
-    track_indexes = make_track_indexes(track_indexes)
+    track_indexes = make_track_indexes(track_indexes_text)
 
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
@@ -545,7 +545,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
     # Create and save the window
     genomedata_names = genomedata_names.split(",")
-    track_indexes = make_track_indexes(track_indexes)
+    track_indexes = make_track_indexes(track_indexes_text)
 
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
