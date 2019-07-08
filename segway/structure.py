@@ -34,7 +34,7 @@ class StructureSaver(Saver):
                   "use_dinucleotide", "window_lens", "resolution",
                   "supervision_type", "track_groups",
                   "gmtk_include_filename_relative", "virtual_evidence",
-                  "model_weight", "virtual_evidence_weight"]
+                  "track_weight", "virtual_evidence_weight"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -82,9 +82,7 @@ class StructureSaver(Saver):
         return
 
     def add_virtual_evidence_observation(self, observation_items, next_int_track_index):
-        # VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER = 1 since we are
-        # not normalising against the max length of the data tracks
-        weight_spec = "scale VIRTUAL_EVIDENCE_WEIGHT"
+        weight_spec = self.make_weight_spec(self.virtual_evidence_weight)
 
         # create the supervision label's conditional parents
         # using GMTK specification
@@ -128,18 +126,16 @@ class StructureSaver(Saver):
             # weight scale cannot be more than MAX_WEIGHT_SCALE to avoid
             # artifactual problems
 
-            weight_multiplier = min(max_num_datapoints_track
-                                    / num_datapoints_track, MAX_WEIGHT_SCALE)
-            # weight_scale = 1.0
-            # assert weight_scale == 1.0
+            if self.track_weight:
+                weight_multiplier = self.track_weight
+            else:
+                weight_multiplier = min(max_num_datapoints_track
+                                        / num_datapoints_track, MAX_WEIGHT_SCALE)
 
             conditionalparents_spec = \
                 self.make_conditionalparents_spec(trackname)
 
-            if self.model_weight:
-                weight_spec = "scale MODEL_WEIGHT"
-            else:
-                weight_spec = self.make_weight_spec(weight_multiplier)
+            weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
             # might avoid some extra multiplication in GMTK
