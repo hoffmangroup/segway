@@ -61,6 +61,11 @@ MAX_JOB_ATTEMPTS = 2
 # these settings limit job queueing to 360 at once
 
 
+def is_running_locally():
+    """Returns True if not submitting to a cluster system"""
+    return DRIVER_NAME_OVERRIDE == DRIVER_NAME_LOCAL
+
+
 def get_driver_name(session):
     if DRIVER_NAME_OVERRIDE:
         return DRIVER_NAME_OVERRIDE
@@ -115,6 +120,9 @@ class RestartableJob(object):
     def __repr__(self):
         return "<RestartableJob '%s'>" % self.job_tmpl_factory.template.jobName
 
+    def __lt__(self, other):
+        return self.sort_key < other.sort_key
+
     def run(self):
         job_tmpl_factory = self.job_tmpl_factory
 
@@ -148,7 +156,7 @@ class RestartableJob(object):
         jobname = job_template.jobName
 
         # alert the user if they are running locally
-        if DRIVER_NAME_OVERRIDE == DRIVER_NAME_LOCAL:
+        if is_running_locally():
             job_location = "running locally"
         else:
             job_location = "queued"
@@ -210,12 +218,11 @@ class RestartableJobDict(dict):
         if self.is_sleep_time_gt_min():
             self._queue_unconditional(restartable_job)
         else:
-            sort_key = restartable_job.sort_key
-            heappush(self.unqueued_jobs, (sort_key, restartable_job))
+            heappush(self.unqueued_jobs, restartable_job)
 
     def queue_unqueued_jobs(self):
         while self.unqueued_jobs and self.is_sleep_time_gt_min():
-            self._queue_unconditional(heappop(self.unqueued_jobs)[1])
+            self._queue_unconditional(heappop(self.unqueued_jobs))
 
     def get_job_info_exit_status(self, job_info):
         if job_info.hasSignal:

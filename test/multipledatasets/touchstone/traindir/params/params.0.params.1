@@ -18,10 +18,10 @@ seg_subseg
 seg_seg 
 1 % number parents
 4 4 % cardinalities
-0.00000000000000000e+00 5.00000000000000000e-01 5.00000000000000000e-01 7.25603084950739609e-204 
-5.00000000000000000e-01 0.00000000000000000e+00 3.46439476844436667e-203 5.00000000000000000e-01 
-6.66666666666666630e-01 2.48925534946035117e-164 0.00000000000000000e+00 3.33333333333333370e-01 
-3.53758688898587712e-165 6.66666666666666630e-01 3.33333333333333370e-01 0.00000000000000000e+00 
+0.00000000000000000e+00 5.0000013355(%\d{7}%)e-01 7.15022301988(%\d{6}%)e-16 4.9999986644(%\d{7}%)e-01 
+6.6666636860(%\d{7}%)e-01 0.00000000000000000e+00 3.333332243(%\d{8}%)e-01 4.07009449008(%\d{6}%)e-07 
+6.6404337100(%\d{7}%)e-10 3.3333345981(%\d{7}%)e-01 0.00000000000000000e+00 6.6666653951(%\d{7}%)e-01 
+4.9999982886(%\d{7}%)e-01 3.051060787745(%\d{5}%)e-07 4.9999986603(%\d{7}%)e-01 0.00000000000000000e+00 
 3 
 seg_subseg_subseg 
 2 % number parents
@@ -34,42 +34,52 @@ seg_subseg_subseg
 segCountDown_seg_segTransition 
 2 % number parents
 2 4 3 % cardinalities
-9.89098909890970157e-01 9.89098909893004405e-03 1.01010101009981141e-03 
-9.89098909890977041e-01 9.89098909892319189e-03 1.01010101009981856e-03 
-9.89348745432736765e-01 9.89348745433811169e-03 7.57767112925159685e-04 
-9.89348745432768406e-01 9.89348745431154787e-03 7.57767112920011026e-04 
-9.90099009901014404e-01 9.90099009898555774e-03 0.00000000000000000e+00 
-9.90099009900996641e-01 9.90099009900339069e-03 0.00000000000000000e+00 
-9.90099009901007299e-01 9.90099009899269786e-03 0.00000000000000000e+00 
+9.89098909891015787e-01 9.89098909888557441e-03 1.01010101009859949e-03 
+9.8934874489941(%\d{4}%)e-01 9.8934874490046(%\d{4}%)e-03 7.57767651576(%\d{6}%)e-04 
+9.8934874543253(%\d{4}%)e-01 9.893487454335(%\d{5}%)e-03 7.57767113128(%\d{6}%)e-04 
+9.89098909809553(%\d{3}%)e-01 9.890989098096(%\d{5}%)e-03 1.0101010923498(%\d{4}%)e-03 
+9.90099009900959115e-01 9.90099009904085378e-03 0.00000000000000000e+00 
+9.90099009901005633e-01 9.90099009899438574e-03 0.00000000000000000e+00 
 9.90099009901005522e-01 9.90099009899448289e-03 0.00000000000000000e+00 
+9.900990099010(%\d{5}%)e-01 9.9009900989(%\d{7}%)e-03 0.00000000000000000e+00 
 
 
 % means
-8 
+12 
 0 
-mean_seg0_subseg0_testtrack1A 1 0.0000000000e+00 
+mean_seg0_subseg0_testtrack1A 1 4.4730617322e-13 
 1 
 mean_seg0_subseg0_testtrack2A 1 8.8135629892e-01 
 2 
-mean_seg1_subseg0_testtrack1A 1 8.8135629892e-01 
+mean_seg0_subseg0_testtrack3A 1 8.8135629892e-01 
 3 
-mean_seg1_subseg0_testtrack2A 1 0.0000000000e+00 
+mean_seg1_subseg0_testtrack1A 1 5.0024411280e-09 
 4 
-mean_seg2_subseg0_testtrack1A 1 0.0000000000e+00 
+mean_seg1_subseg0_testtrack2A 1 0.0000000000e+00 
 5 
-mean_seg2_subseg0_testtrack2A 1 0.0000000000e+00 
+mean_seg1_subseg0_testtrack3A 1 0.0000000000e+00 
 6 
-mean_seg3_subseg0_testtrack1A 1 8.8135629892e-01 
+mean_seg2_subseg0_testtrack1A 1 8.8135629892e-01 
 7 
-mean_seg3_subseg0_testtrack2A 1 8.8135629892e-01 
+mean_seg2_subseg0_testtrack2A 1 8.8135629892e-01 
+8 
+mean_seg2_subseg0_testtrack3A 1 8.8135629892e-01 
+9 
+mean_seg3_subseg0_testtrack1A 1 8.8135635853e-01 
+10 
+mean_seg3_subseg0_testtrack2A 1 0.0000000000e+00 
+11 
+mean_seg3_subseg0_testtrack3A 1 0.0000000000e+00 
 
 
 % diagonal covariance matrices
-2 
+3 
 0 
-covar_testtrack1A 1 1.7869253497e-05 
+covar_testtrack1A 1 1.7868786017e-05 
 1 
-covar_testtrack2A 1 1.7869253497e-05 
+covar_testtrack2A 1 1.7868773284e-05 
+2 
+covar_testtrack3A 1 1.7868773284e-05 
 
 
 % dense PMFs
@@ -79,7 +89,7 @@ dpmf_always 1 1.00000000000000000e+00
 
 
 % Components
-8 
+12 
 0 
 1 
 0 mc_asinh_norm_seg0_subseg0_testtrack1A 
@@ -90,32 +100,48 @@ mean_seg0_subseg0_testtrack1A covar_testtrack1A
 mean_seg0_subseg0_testtrack2A covar_testtrack2A 
 2 
 1 
+0 mc_asinh_norm_seg0_subseg0_testtrack3A 
+mean_seg0_subseg0_testtrack3A covar_testtrack3A 
+3 
+1 
 0 mc_asinh_norm_seg1_subseg0_testtrack1A 
 mean_seg1_subseg0_testtrack1A covar_testtrack1A 
-3 
+4 
 1 
 0 mc_asinh_norm_seg1_subseg0_testtrack2A 
 mean_seg1_subseg0_testtrack2A covar_testtrack2A 
-4 
+5 
+1 
+0 mc_asinh_norm_seg1_subseg0_testtrack3A 
+mean_seg1_subseg0_testtrack3A covar_testtrack3A 
+6 
 1 
 0 mc_asinh_norm_seg2_subseg0_testtrack1A 
 mean_seg2_subseg0_testtrack1A covar_testtrack1A 
-5 
+7 
 1 
 0 mc_asinh_norm_seg2_subseg0_testtrack2A 
 mean_seg2_subseg0_testtrack2A covar_testtrack2A 
-6 
+8 
+1 
+0 mc_asinh_norm_seg2_subseg0_testtrack3A 
+mean_seg2_subseg0_testtrack3A covar_testtrack3A 
+9 
 1 
 0 mc_asinh_norm_seg3_subseg0_testtrack1A 
 mean_seg3_subseg0_testtrack1A covar_testtrack1A 
-7 
+10 
 1 
 0 mc_asinh_norm_seg3_subseg0_testtrack2A 
 mean_seg3_subseg0_testtrack2A covar_testtrack2A 
+11 
+1 
+0 mc_asinh_norm_seg3_subseg0_testtrack3A 
+mean_seg3_subseg0_testtrack3A covar_testtrack3A 
 
 
 % Mixtures of components
-8 
+12 
 0 
 1 
 mx_seg0_subseg0_testtrack1A 
@@ -128,32 +154,52 @@ mx_seg0_subseg0_testtrack2A
 mc_asinh_norm_seg0_subseg0_testtrack2A 
 2 
 1 
+mx_seg0_subseg0_testtrack3A 
+1 dpmf_always 
+mc_asinh_norm_seg0_subseg0_testtrack3A 
+3 
+1 
 mx_seg1_subseg0_testtrack1A 
 1 dpmf_always 
 mc_asinh_norm_seg1_subseg0_testtrack1A 
-3 
+4 
 1 
 mx_seg1_subseg0_testtrack2A 
 1 dpmf_always 
 mc_asinh_norm_seg1_subseg0_testtrack2A 
-4 
+5 
+1 
+mx_seg1_subseg0_testtrack3A 
+1 dpmf_always 
+mc_asinh_norm_seg1_subseg0_testtrack3A 
+6 
 1 
 mx_seg2_subseg0_testtrack1A 
 1 dpmf_always 
 mc_asinh_norm_seg2_subseg0_testtrack1A 
-5 
+7 
 1 
 mx_seg2_subseg0_testtrack2A 
 1 dpmf_always 
 mc_asinh_norm_seg2_subseg0_testtrack2A 
-6 
+8 
+1 
+mx_seg2_subseg0_testtrack3A 
+1 dpmf_always 
+mc_asinh_norm_seg2_subseg0_testtrack3A 
+9 
 1 
 mx_seg3_subseg0_testtrack1A 
 1 dpmf_always 
 mc_asinh_norm_seg3_subseg0_testtrack1A 
-7 
+10 
 1 
 mx_seg3_subseg0_testtrack2A 
 1 dpmf_always 
 mc_asinh_norm_seg3_subseg0_testtrack2A 
+11 
+1 
+mx_seg3_subseg0_testtrack3A 
+1 dpmf_always 
+mc_asinh_norm_seg3_subseg0_testtrack3A 
 

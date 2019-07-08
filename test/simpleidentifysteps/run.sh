@@ -29,16 +29,16 @@ SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
     --tracks-from="../tracks.txt" --num-labels=4 \
     "../simpleseg.genomedata" traindir 
 
-segway "$cluster_arg" identify-init  --include-coords="../include-coords.bed" \
+segway "$cluster_arg" annotate-init  --include-coords="../include-coords.bed" \
     "../simpleseg.genomedata" traindir identifydir
     
     
 python${SEGWAY_TEST_PYTHON_VERSION:-""} ../../compare_directory.py ../touchstone_init ./
 
-segway "$cluster_arg" identify-run "../simpleseg.genomedata" traindir identifydir
+segway "$cluster_arg" annotate-run "../simpleseg.genomedata" traindir identifydir
 
 python${SEGWAY_TEST_PYTHON_VERSION:-""} ../../compare_directory.py ../touchstone_run ./
     
-segway "$cluster_arg" identify-finish "../simpleseg.genomedata" traindir identifydir
+segway "$cluster_arg" annotate-finish "../simpleseg.genomedata" traindir identifydir
 
 python${SEGWAY_TEST_PYTHON_VERSION:-""} ../../compare_directory.py ../touchstone_finish ./

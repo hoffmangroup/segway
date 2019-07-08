@@ -1,3 +1,12 @@
+3.0:
+
+2.0.5:
+* segway: fixed bug causing identify to fail with archives of different track numbers
+* segway: fixed python 3 encoding issue arising when --BigBed is selected
+* segway: removed sleeping on main segway process for multiple training instances
+* segway: when running locally segway will no longer initially sleep training threads
+* segway: fix RestartableJob priority sorting when memory requirements match
+
 2.0.4:
 * segway: gaussian mixtures no longer split with only one component
 * segway: priors and mixture components are now derived from previous EM

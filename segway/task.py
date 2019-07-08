@@ -489,27 +489,12 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
     (chrom, start, end) = coord
-    track_indexes = make_track_indexes(track_indexes_text)
+    # Create and save the window
+    genomedata_names = genomedata_names.split(",")
+    track_indexes = make_track_indexes(track_indexes)
 
-    with Genome(genomedata_names) as genome:
-        continuous_cells = genome[chrom][start:end, track_indexes]
-
-    if virtual_evidence == "True":
-        virtual_evidence_cells = []
-        zipper = zip(virtual_evidence_coords.split(";"), virtual_evidence_priors.split(";"))
-        for coords, priors in zipper: 
-            virtual_evidence_coords = literal_eval(coords)
-            virtual_evidence_priors = literal_eval(priors)
-
-            num_segs = literal_eval(num_segs)
-
-            cell = make_virtual_evidence_cells(
-                       virtual_evidence_coords, 
-                       virtual_evidence_priors, 
-                       start, end, num_segs)
-            virtual_evidence_cells.append(cell)
-    else:
-        virtual_evidence_cells = None
+    continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
+                                             chrom, start, end)
 
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
                                                continuous_cells,
@@ -541,12 +526,9 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
     (chrom, start, end) = coord
 
-    # Create a list of a list of tracks ordered based on genomedata archive
-    # specified order (delimited with a ';')
-    track_indexes = [make_track_indexes(genomedata_track_indexes_text)
-                     for genomedata_track_indexes_text
-                     in track_indexes_text.split(';')]
+    # Create and save the window
     genomedata_names = genomedata_names.split(",")
+    track_indexes = make_track_indexes(track_indexes)
 
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
