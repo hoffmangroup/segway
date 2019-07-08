@@ -774,7 +774,7 @@ class Runner(object):
         self.max_split_sequence_length = MAX_SPLIT_SEQUENCE_LENGTH
         self.max_frames = MAX_FRAMES
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
-        self.model_weight = None
+        self.track_weight = None
         self.virtual_evidence_weight = VIRTUAL_EVIDENCE_WEIGHT
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
