@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function
 
 __version__ = "$Revision$"
 
-## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 from collections import deque
 from contextlib import closing
 from functools import partial
@@ -18,8 +18,8 @@ from tempfile import gettempdir
 
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, dstack, empty, finfo, float32, full, invert,
-                   isnan, maximum, mean, sum, vstack, zeros)
+                   column_stack, copy, dstack, empty, finfo, float32, full,
+                   invert, isnan, maximum, sum, vstack, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -323,7 +323,8 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
     return downsampled_input_array, presence_downsampled_input_array
 
 
-def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, num_segs):
+def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution,
+                                                       num_segs):
     """
     Downsample a 1-dimensional list of prior dictionaries to a
     desired resolution by taking the average for all labels
@@ -355,12 +356,14 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
     # first convert the dictionaries of priors to lists
     # however, leave empty dictionaries (no priors specified) as all 0
     # so [{0:0.5, 1:0.2}, {1:0.4}, {}] with num_segs = 5 would become
-    # [[0.5, 0.2, 0.10, 0.10, 0.10], [0.15, 0.4, 0.15, 0.15, 0.15], [0.0 ... 0.0]]
+    # [[0.5, 0.2, 0.10, 0.10, 0.10], [0.15, 0.4, 0.15, 0.15, 0.15],
+    # [0.0 ... 0.0]]
     prior_list = zeros((len(input_array), num_segs))
     for prior_dict_index, prior_dict in enumerate(input_array):
         if any(prior_dict):
             prior_dict_values = list(filter(None, prior_dict))
-            num_prior_labels = len(prior_dict_values) # number of labels with priors
+            # number of labels with priors
+            num_prior_labels = len(prior_dict_values)
             remaining_probability = 1 - sum(prior_dict_values)
 
             if remaining_probability < -0.001:
@@ -513,7 +516,8 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     return res
 
 
-def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors, start, end, num_segs):
+def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors,
+                                start, end, num_segs):
     """
     virtual_evidence_coords: list of tuples (start, end)
     virtual_evidence_priors: list of dictionaries of the format {label: prior}
@@ -524,7 +528,7 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
     virtual_evidence_coords where each cell is the prior data for that region
     """
 
-    res = full((num_segs, (end-start)), None) # zeros(end - start, dtype=DTYPE_OBS_INT)
+    res = full((num_segs, (end-start)), None)
 
     # Get supervision regions that overlap with the start and end coords
     supercontig_coords_labels = \
@@ -622,7 +626,8 @@ def _save_window(float_filename_or_file, int_filename_or_file,
 
     if supervision_data is not None:
         supervision_data, presence_supervision_data = \
-            get_downsampled_supervision_data_and_presence(supervision_data, resolution)
+            get_downsampled_supervision_data_and_presence(supervision_data,
+                                                          resolution)
 
         int_blocks.append(supervision_data)
         int_blocks.append(presence_supervision_data)
