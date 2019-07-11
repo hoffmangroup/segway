@@ -414,7 +414,6 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution,
             for index in range(0, len(presence_array), resolution)
             ]
 
-
     downsampled_prior_array = zeros(calc_downsampled_shape(prior_list,
                                     resolution), prior_list.dtype)
     downsampled_presence_array = zeros(calc_downsampled_shape(presence_array,
@@ -638,8 +637,8 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         for datum in virtual_evidence_data:
             virtual_evidence_datum, presence_virtual_evidence_datum = \
                 get_downsampled_virtual_evidence_data_and_presence(
-                    datum, 
-                    resolution, 
+                    datum,
+                    resolution,
                     num_segs)
             presence_virtual_evidence_data.append(presence_virtual_evidence_datum)
             virtual_evidence_data_array.append(virtual_evidence_datum)
@@ -649,12 +648,10 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_blocks.append(presence_virtual_evidence_data)
 
         # separately save VE priors CPT in a temporary file
-        #flattened_evidence = virtual_evidence_data_array.flatten()
-        #flattened_evidence.tofile(virtual_evidence_filename_or_file)
         for prior in virtual_evidence_data_array:
             for world in prior:
-               virtual_evidence_filename_or_file.write(
-                    ' '.join(['{}'.format(prob) for prob in world])+ '\n')
+                virtual_evidence_filename_or_file.write(
+                    ' '.join(['{}'.format(prob) for prob in world]) + '\n')
 
     if int_blocks:
         if int_blocks[0].ndim == 3:
@@ -665,7 +662,6 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_data = array([], dtype=DTYPE_OBS_INT)
 
     int_data.tofile(int_filename_or_file)
-
 
 def add_starts_ends(new_windows, starts, ends):
     """
@@ -690,7 +686,7 @@ def add_starts_ends(new_windows, starts, ends):
     return new_windows[0]
 
 def generate_coords_from_dict(coords_dict):
-    # use a deque to allow fast insertion/removal at the 
+    # use a deque to allow fast insertion/removal at the
     # beginning and end of the sequence
     for chrom, coords_list in viewitems(coords_dict):
         starts, ends = map(deque, zip(*coords_list))
@@ -834,7 +830,7 @@ class Observations(object):
         """
         Creates set of validation windows using the specified
         validation coordinates.
-        
+
         Returns validation windows
         """
         validation_windows = []
@@ -917,7 +913,6 @@ class Observations(object):
         # remaining windows can be passed into training now
         self.windows = windows
 
-
     def save_window(self, float_filename, int_filename, float_data,
                     seq_data=None, supervision_data=None):
         return _save_window(float_filename, int_filename, float_data,
@@ -975,7 +970,7 @@ class Observations(object):
             self.int_filepaths.append(int_filepath)
 
     def create_validation_filepaths(self):
-        """ Creates a list of observations full filepaths for each 
+        """ Creates a list of observations full filepaths for each
         validation window."""
 
         for window_index, window in enumerate(self.validation_windows):
@@ -987,7 +982,6 @@ class Observations(object):
     def make_seq_cells(self, chromosome, start, end):
         if self.use_dinucleotide:
             return chromosome.seq[start:end]
-
 
     # XXX: Dead code. Observations.save (which calls this function) no longer
     # called. May be used when --observations is re enabled for caching
