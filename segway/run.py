@@ -3708,13 +3708,12 @@ to find the winning instance anyway.""" % thread.instance_index)
 
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
-
-    usage = "%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]" \
-            "GENOMEDATA [GENOMEDATA ...] TRAINDIR [IDENTIFYDIR]"
+    from argparse import ArgumentParser, FileType
 
     version = "%(prog)s {}".format(__version__)
     description = """
-    Semi-automated genome annotation.
+
+    Semi-automated genome annotation. \n\n
     Please see: segway TASK -h, for steps specific to each task"""
 
     citation = """
@@ -3723,8 +3722,24 @@ def parse_options(argv):
     segmentation. Nat Methods 9:473-476.
     http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = ArgumentParser(description=description, usage=usage,
+    parser = ArgumentParser(description=description,
                             epilog=citation)
+
+    subtask_description = """
+    List of available tasks:
+    * train
+    * annotate / [identify]
+    * posterior
+
+    Additionally these tasks are each divided into 3 or 4 subtasks
+    * init
+    * run
+    * finish
+    * run-round (train only)
+    """
+
+    tasks = parser.add_subparsers(title="Segway Tasks", dest="task_spec",
+                                  metavar=subtask_description)
 
     parser.add_argument("--version", action="version", version=version)
 
@@ -3754,9 +3769,6 @@ def parse_options(argv):
     group = parser.add_argument_group("Flags")
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
-
-    tasks = parser.add_subparsers(help="Segway Tasks", dest="task_spec",
-                                  metavar="")
 
     # define steps for each of the three main tasks
     train_init = tasks.add_parser("", add_help=False)
