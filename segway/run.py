@@ -3834,9 +3834,6 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(argv):
     from argparse import ArgumentParser, FileType, RawTextHelpFormatter
 
-    #usage = "%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]" \
-    #        "GENOMEDATA [GENOMEDATA ...] TRAINDIR [IDENTIFYDIR]"
-
     version = "%(prog)s {}".format(__version__)
     description = """
 
