@@ -3832,14 +3832,15 @@ to find the winning instance anyway.""" % thread.instance_index)
 
 
 def parse_options(argv):
-    from argparse import ArgumentParser, FileType
+    from argparse import ArgumentParser, FileType, RawTextHelpFormatter
 
-    usage = "%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]" \
-            "GENOMEDATA [GENOMEDATA ...] TRAINDIR [IDENTIFYDIR]"
+    #usage = "%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]" \
+    #        "GENOMEDATA [GENOMEDATA ...] TRAINDIR [IDENTIFYDIR]"
 
     version = "%(prog)s {}".format(__version__)
     description = """
-    Semi-automated genome annotation.
+
+    Semi-automated genome annotation. \n\n
     Please see: segway TASK -h, for steps specific to each task"""
 
     citation = """
@@ -3848,8 +3849,24 @@ def parse_options(argv):
     segmentation. Nat Methods 9:473-476.
     http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = ArgumentParser(description=description, usage=usage,
+    parser = ArgumentParser(description=description, usage="",
                             epilog=citation)
+
+    subtask_description = """
+    List of available tasks:
+    * train
+    * annotate / [identify]
+    * posterior
+
+    Additionally these tasks are each divided into 3 or 4 subtasks
+    * init
+    * run
+    * finish
+    * run-round (train only)
+    """
+
+    tasks = parser.add_subparsers(title="Segway Tasks", dest="task_spec",
+                                  metavar=subtask_description)
 
     parser.add_argument("--version", action="version", version=version)
 
@@ -3879,9 +3896,6 @@ def parse_options(argv):
     group = parser.add_argument_group("Flags")
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
-
-    tasks = parser.add_subparsers(help="Segway Tasks", dest="task_spec",
-                                  metavar="")
 
     # define steps for each of the three main tasks
     train_init = tasks.add_parser("", add_help=False)
@@ -4060,7 +4074,7 @@ def parse_options(argv):
                        "FILE (default none)")
 
     # select coords to identify in the init step
-    group = identify_init.add_argument_group("Data selection (idenfity-init)")
+    group = identify_init.add_argument_group("Data selection (annotate-init)")
     group.add_argument("--include-coords", metavar="FILE",
                        help="limit to genomic coordinates in"
                        " FILE (default all) (Note: does not apply to"
@@ -4082,13 +4096,13 @@ def parse_options(argv):
                        " (default none)")
 
     group = identify_init_run.add_argument_group("Virtual Evidence "
-                                              "(train-init, train-run)")
+                                              "(annotate-init, annotate-run)")
     group.add_argument("--virtual-evidence", metavar="FILE",
                        help="virtual evidence with priors for labels at each position in "
                        "FILE (default none)")
 
     # output files are produced by identify-finish
-    group = identify_finish.add_argument_group("Output files (identify-finish)")
+    group = identify_finish.add_argument_group("Output files (annotate-finish)")
     group.add_argument("-b", "--bed", metavar="FILE",
                        help="create identification BED track in FILE"
                        " (default WORKDIR/%s)" % BED_FILEBASENAME)
@@ -4129,7 +4143,7 @@ def parse_options(argv):
     tasks.add_parser("posterior-finish", parents=[identify_finish, args,
                                                   identify_args])
 
-    tasks.add_parser("train",
+    tasks.add_parser("train", usage="%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]",
                      parents=[train_init, train_init_run, train_run,
                               train_finish, args])
     tasks.add_parser("annotate",

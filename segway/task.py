@@ -90,7 +90,7 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
                          virtual_evidence_filename_or_file=virtual_evidence_file,
                          num_segs=num_segs)
 
-    return float_observations_filename, int_observations_filename, 
+    return float_observations_filename, int_observations_filename, \
            virtual_evidence_filename
 
 
@@ -109,7 +109,7 @@ def save_temp_observation_filelists(float_observations_filename,
         mkstemp(prefix=EXT_FLOAT + extsep, suffix=extsep + EXT_LIST)
     int_observation_list_fd, int_observation_list_filename = \
         mkstemp(prefix=EXT_INT + extsep, suffix=extsep + EXT_LIST)
-    virtual_evidence_observation_list_fd,
+    virtual_evidence_observation_list_fd,\
         virtual_evidence_observation_list_filename = \
         mkstemp(prefix=EXT_VIRTUAL_EVIDENCE + extsep, suffix=extsep + EXT_LIST)
     # Write out the observation filename to their respective observation list
@@ -152,7 +152,7 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
 
     try:
         # Create the gmtk observation files
-        float_observations_filename, int_observations_filename,
+        float_observations_filename, int_observations_filename, \
             virtual_evidence_filename = \
             save_temp_observations(chromosome_name, start, end,
                                    continuous_cells, resolution, distribution,
@@ -160,7 +160,7 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                                    num_segs)
 
         # Create the gmtk observation file lists
-        float_observation_list_filename, int_observation_list_filename,
+        float_observation_list_filename, int_observation_list_filename, \
             virtual_evidence_list_filename = \
             save_temp_observation_filelists(float_observations_filename,
                                             int_observations_filename,
@@ -661,7 +661,7 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     args = list(args)
 
     # Create placeholder observation lists
-    placeholder_float_list, placeholder_int_list,
+    placeholder_float_list, placeholder_int_list, \
         placeholder_virtual_evidence_list = \
         save_temp_observation_filelists(PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME,
