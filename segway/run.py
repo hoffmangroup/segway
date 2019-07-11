@@ -3832,7 +3832,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
 
 def parse_options(argv):
-    from argparse import ArgumentParser, FileType, RawTextHelpFormatter
+    from argparse import ArgumentParser, FileType
 
     version = "%(prog)s {}".format(__version__)
     description = """
