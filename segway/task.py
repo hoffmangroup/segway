@@ -16,16 +16,15 @@ import re
 import sys
 from tempfile import mkstemp
 
-from genomedata import Genome
-from numpy import argmax, array, column_stack, empty, where, diff, r_, zeros
+from numpy import argmax, array, empty, where, diff, r_, zeros
 import optbuild
 from six.moves import map, range, zip
 
 from .observations import (make_continuous_cells, make_supervision_cells,
                            make_virtual_evidence_cells, _save_window)
 from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
-                    EXT_INT, EXT_LIST, EXT_VIRTUAL_EVIDENCE, extract_superlabel, fill_array,
-                    find_segment_starts, get_label_color, TRAIN_PROG,
+                    EXT_INT, EXT_LIST, EXT_VIRTUAL_EVIDENCE, extract_superlabel,
+                    fill_array, find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
@@ -91,7 +90,8 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
                          virtual_evidence_filename_or_file=virtual_evidence_file,
                          num_segs=num_segs)
 
-    return float_observations_filename, int_observations_filename, virtual_evidence_filename
+    return float_observations_filename, int_observations_filename, 
+           virtual_evidence_filename
 
 
 def save_temp_observation_filelists(float_observations_filename,
@@ -109,7 +109,8 @@ def save_temp_observation_filelists(float_observations_filename,
         mkstemp(prefix=EXT_FLOAT + extsep, suffix=extsep + EXT_LIST)
     int_observation_list_fd, int_observation_list_filename = \
         mkstemp(prefix=EXT_INT + extsep, suffix=extsep + EXT_LIST)
-    virtual_evidence_observation_list_fd, virtual_evidence_observation_list_filename = \
+    virtual_evidence_observation_list_fd,
+        virtual_evidence_observation_list_filename = \
         mkstemp(prefix=EXT_VIRTUAL_EVIDENCE + extsep, suffix=extsep + EXT_LIST)
     # Write out the observation filename to their respective observation list
     # For gmtk observation list files, there may be more than one
@@ -118,7 +119,8 @@ def save_temp_observation_filelists(float_observations_filename,
     # os-level file descriptor
     print_to_fd(float_observation_list_fd, float_observations_filename)
     print_to_fd(int_observation_list_fd, int_observations_filename)
-    print_to_fd(virtual_evidence_observation_list_fd, virtual_evidence_observations_filename)
+    print_to_fd(virtual_evidence_observation_list_fd,
+                virtual_evidence_observations_filename)
 
     return float_observation_list_filename, int_observation_list_filename, \
            virtual_evidence_observation_list_filename
@@ -150,13 +152,16 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
 
     try:
         # Create the gmtk observation files
-        float_observations_filename, int_observations_filename, virtual_evidence_filename = \
+        float_observations_filename, int_observations_filename,
+            virtual_evidence_filename = \
             save_temp_observations(chromosome_name, start, end,
                                    continuous_cells, resolution, distribution,
-                                   supervision_data, virtual_evidence_data, num_segs)
+                                   supervision_data, virtual_evidence_data,
+                                   num_segs)
 
         # Create the gmtk observation file lists
-        float_observation_list_filename, int_observation_list_filename, virtual_evidence_list_filename = \
+        float_observation_list_filename, int_observation_list_filename,
+            virtual_evidence_list_filename = \
             save_temp_observation_filelists(float_observations_filename,
                                             int_observations_filename,
                                             virtual_evidence_filename)
@@ -178,12 +183,12 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
     replace_subsequent_value(gmtk_args, EXT_OPTIONS[EXT_INT],
                              int_observation_list_filename)
 
-    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
+    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT
     cpp_array_index = gmtk_args.index("-cppCommandOptions")
     cppCommand_str = gmtk_args[cpp_array_index + 1]
     # if the placeholder is present, it is replaced. otherwise, the cpp options
     # are unchanged
-    gmtk_args[cpp_array_index + 1] =  cppCommand_str.replace(
+    gmtk_args[cpp_array_index + 1] = cppCommand_str.replace(
                                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
                                     virtual_evidence_list_filename, 1)
 
@@ -480,8 +485,8 @@ def print_to_fd(fd, line):
 def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                            num_labels, num_sublabels, output_label,
                            genomedata_names, distribution, track_indexes_text,
-                           virtual_evidence, virtual_evidence_coords, virtual_evidence_priors,
-                           num_segs, *args):
+                           virtual_evidence, virtual_evidence_coords,
+                           virtual_evidence_priors, num_segs, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
     args = list(args)
@@ -498,16 +503,17 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 
     if virtual_evidence == "True":
         virtual_evidence_cells = []
-        zipper = zip(virtual_evidence_coords.split(";"), virtual_evidence_priors.split(";"))
-        for coords, priors in zipper: 
+        zipper = zip(virtual_evidence_coords.split(";"),
+                     virtual_evidence_priors.split(";"))
+        for coords, priors in zipper:
             virtual_evidence_coords = literal_eval(coords)
             virtual_evidence_priors = literal_eval(priors)
 
             num_segs = literal_eval(num_segs)
 
             cell = make_virtual_evidence_cells(
-                       virtual_evidence_coords, 
-                       virtual_evidence_priors, 
+                       virtual_evidence_coords,
+                       virtual_evidence_priors,
                        start, end, num_segs)
             virtual_evidence_cells.append(cell)
     else:
@@ -534,8 +540,8 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
 def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                          num_labels, num_sublabels, output_label,
                          genomedata_names, distribution, track_indexes_text,
-                         virtual_evidence, virtual_evidence_coords, virtual_evidence_priors,
-                         num_segs, *args):
+                         virtual_evidence, virtual_evidence_coords,
+                         virtual_evidence_priors, num_segs, *args):
     # convert from tuple
     args = list(args)
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
@@ -552,16 +558,17 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
 
     if virtual_evidence == "True":
         virtual_evidence_cells = []
-        zipper = zip(virtual_evidence_coords.split(";"), virtual_evidence_priors.split(";"))
-        for coords, priors in zipper: 
+        zipper = zip(virtual_evidence_coords.split(";"),
+                     virtual_evidence_priors.split(";"))
+        for coords, priors in zipper:
             virtual_evidence_coords = literal_eval(coords)
             virtual_evidence_priors = literal_eval(priors)
 
             num_segs = literal_eval(num_segs)
 
             cell = make_virtual_evidence_cells(
-                       virtual_evidence_coords, 
-                       virtual_evidence_priors, 
+                       virtual_evidence_coords,
+                       virtual_evidence_priors,
                        start, end, num_segs)
             virtual_evidence_cells.append(cell)
     else:
@@ -589,9 +596,8 @@ def run_train(coord, resolution, do_reverse, outfilename,
               genomedata_names, distribution,
               track_indexes,
               is_semisupervised, supervision_coords, supervision_labels,
-              virtual_evidence, virtual_evidence_coords, virtual_evidence_priors,
-              num_segs,
-              *args):
+              virtual_evidence, virtual_evidence_coords,
+              virtual_evidence_priors, num_segs, *args):
 
     # Create and save the train window
     genomedata_names = genomedata_names.split(",")
@@ -630,10 +636,10 @@ def run_train(coord, resolution, do_reverse, outfilename,
         virtual_evidence_priors = literal_eval(virtual_evidence_priors)
 
         num_segs = literal_eval(num_segs)
-       
+
         virtual_evidence_cells = [make_virtual_evidence_cells(
-                                    virtual_evidence_coords, 
-                                    virtual_evidence_priors, 
+                                    virtual_evidence_coords,
+                                    virtual_evidence_priors,
                                     start, end, num_segs)]
     else:
         virtual_evidence_cells = None
@@ -655,7 +661,8 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     args = list(args)
 
     # Create placeholder observation lists
-    placeholder_float_list, placeholder_int_list, placeholder_virtual_evidence_list = \
+    placeholder_float_list, placeholder_int_list,
+        placeholder_virtual_evidence_list = \
         save_temp_observation_filelists(PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME)
@@ -665,10 +672,10 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
                              placeholder_float_list)
     replace_subsequent_value(args, EXT_OPTIONS[EXT_INT], placeholder_int_list)
 
-    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT 
+    # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT
     cpp_array_index = args.index("-cppCommandOptions")
     cppCommand_str = args[cpp_array_index + 1]
-    args[cpp_array_index + 1] =  cppCommand_str.replace(
+    args[cpp_array_index + 1] = cppCommand_str.replace(
                                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
                                     placeholder_virtual_evidence_list, 1)
 
