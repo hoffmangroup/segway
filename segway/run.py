@@ -3846,7 +3846,7 @@ def parse_options(argv):
     segmentation. Nat Methods 9:473-476.
     http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = ArgumentParser(description=description, usage="",
+    parser = ArgumentParser(description=description,
                             epilog=citation)
 
     subtask_description = """
