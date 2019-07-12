@@ -3708,7 +3708,6 @@ to find the winning instance anyway.""" % thread.instance_index)
 
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
-    from argparse import ArgumentParser, FileType
 
     version = "%(prog)s {}".format(__version__)
     description = """
@@ -3722,23 +3721,30 @@ def parse_options(argv):
     segmentation. Nat Methods 9:473-476.
     http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = ArgumentParser(description=description,
+    parser = ArgumentParser(description=description, usage = "",
                             epilog=citation)
 
     subtask_description = """
     List of available tasks:
-    * train
-    * annotate / [identify]
-    * posterior
 
-    Additionally these tasks are each divided into 3 or 4 subtasks
-    * init
-    * run
-    * finish
-    * run-round (train only)
+    train
+    | -- train-init
+    | -- train-run
+    |	| -- train-run-round
+    | -- train-finish
+
+    annotate
+    | -- annotate-init
+    | -- annotate-run
+    | -- annotate-finish
+
+    posterior
+    | -- posterior-init
+    | -- posterior-run
+    | -- posterior-finish
     """
 
-    tasks = parser.add_subparsers(title="Segway Tasks", dest="task_spec",
+    tasks = parser.add_subparsers(title="Segway Commands", dest="task_spec",
                                   metavar=subtask_description)
 
     parser.add_argument("--version", action="version", version=version)
