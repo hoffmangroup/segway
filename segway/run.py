@@ -3709,6 +3709,72 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
 
+    version = "%(prog)s {}".format(__version__)
+    description = """
+
+    Semi-automated genome annotation. \n\n
+    Please see: segway TASK -h, for steps specific to each task"""
+
+    citation = """
+    Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.  2012.
+    Unsupervised pattern discovery in human chromatin structure through genomic
+    segmentation. Nat Methods 9:473-476.
+    http://dx.doi.org/10.1038/nmeth.1937"""
+
+    parser = ArgumentParser(description=description, usage = "",
+                            epilog=citation)
+
+    subtask_description = """
+    List of available tasks:
+
+    train
+    | -- train-init
+    | -- train-run
+    |	| -- train-run-round
+    | -- train-finish
+
+    annotate
+    | -- annotate-init
+    | -- annotate-run
+    | -- annotate-finish
+
+    posterior
+    | -- posterior-init
+    | -- posterior-run
+    | -- posterior-finish
+    """
+
+    tasks = parser.add_subparsers(title="Segway Commands", dest="task_spec",
+                                  metavar=subtask_description)
+
+    parser.add_argument("--version", action="version", version=version)
+
+    # set global options first
+    group = parser.add_argument_group("Technical variables")
+    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
+                       metavar="PROGRESSION",
+                       help="try each float in PROGRESSION as the number "
+                       "of gibibytes of memory to allocate in turn "
+                       "(default %s)" % MEM_USAGE_PROGRESSION)
+
+    group.add_argument("-S", "--split-sequences", metavar="SIZE",
+                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
+                       help="split up sequences that are larger than SIZE "
+                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
+
+    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
+                       metavar="NUM",
+                       help="show messages with verbosity NUM"
+                       " (default %d)" % VERBOSITY)
+
+    group.add_argument("--cluster-opt", action="append", default=[],
+                       metavar="OPT",
+                       help="specify an option to be passed to the "
+                       "cluster manager")
+
+    group = parser.add_argument_group("Flags")
+    group.add_argument("-n", "--dry-run", action="store_true",
+                       help="write all files, but do not run any executables")
 
     # define steps for each of the three main tasks
     train_init = tasks.add_parser("", add_help=False)
