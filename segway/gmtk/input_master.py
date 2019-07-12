@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 from collections import OrderedDict
 
+import numpy
 from numpy import array, ndarray
 
 def array2text(a):
@@ -21,7 +22,8 @@ class InputMaster(list):
 
     def append(self, item):
         if not isinstance(item, Section):
-            raise ValueError("Only section objects may be saved to an InputMaster")
+            raise ValueError("Only section objects may be saved to an "
+                             "InputMaster object")
         list.append(self, item)
 
 
@@ -57,6 +59,7 @@ class InlineSection(Section):
         header = "{}_IN_FILE infile\n\n".format(self.kind())
         return "".join([header, Section.__str__(self)])
 
+
 class FileSection(Section):
     def __init__(self, filename, items):
         raise NotImplementedError("Reading from file is not yet supported")
@@ -74,6 +77,12 @@ class Array(ndarray):
     def __new__(cls, *args, **kwargs):
         return array(*args, **kwargs).view(cls)
 
+    def __str__(self):
+        # 1 dimensional str representation covered here
+        # Multidimensional varies and will be specified in sub classes.
+        assert(len(self.shape) == 1)
+        return " ".join([str(self.size), array2text()])
+
 
 class DenseCPT(Array):
     def __array_finalize__(self, obj):
@@ -84,5 +93,29 @@ class DenseCPT(Array):
         num_parents = str(len(self.shape)-1)
         shape_list = list(map(str, self.shape))
         shape_list.insert(0, num_parents)
+
         shape_line = " ".join(shape_list)
         return "\n".join([shape_line, array2text(self.__array__())])
+
+
+class Mean(Array):
+    def __array_finalize__(self, obj):
+        self.kind = "MEAN"
+        if len(obj.shape) != 1:
+            raise ValueError("Mean object supplied must be one-dimensional")
+
+
+class Covar(Array):
+    def __array_finalize__(self, obj):
+        self.kind = "COVAR"
+        if len(obj.shape) != 1:
+            raise ValueError("COVAR object supplied must be one-dimensional")
+        if numpy.any(obj < 0):
+            raise ValueError("Covariance values may not be less than 0")
+
+
+class DPMF(Array):
+    def __array_finalize__(self, obj):
+        self.kind = "DPMF"
+        if len(obj.shape) != 1:
+            raise ValueError("DPMF object supplied must be one-dimensional")
