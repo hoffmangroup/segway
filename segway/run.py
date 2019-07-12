@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function, with_statement
+from __future__ import (absolute_import, division, print_function,
+                        with_statement)
 
 """
 run: main Segway implementation
@@ -7,10 +8,10 @@ run: main Segway implementation
 
 # Copyright 2008-2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from collections import defaultdict, namedtuple
+from collections import defaultdict
 from contextlib import contextmanager
 from copy import copy
-import csv
+from csv import writer
 from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
@@ -24,7 +25,7 @@ from shutil import copy2
 import stat
 from string import ascii_letters
 import sys
-from threading import Event, Lock, Thread
+from threading import Lock, Thread
 from time import sleep
 from uuid import uuid1
 from warnings import warn
@@ -69,7 +70,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     PREFIX_VALIDATION_OUTPUT_WINNER,
                     PREFIX_VALIDATION_SUM_WINNER,
                     SEG_TABLE_WIDTH,
-                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS,
+                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_INTERMEDIATE,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
@@ -191,6 +192,9 @@ BUNDLE_TRAIN_TASK_KIND = "bundle-train"
 
 TMP_OBS_PROGS = frozenset([VITERBI_PROG, POSTERIOR_PROG])
 
+# supported segway tasks
+TASK_LIST = ["train", "identify", "posterior"]
+
 # extensions and suffixes
 EXT_BEDGRAPH = "bedGraph"
 EXT_BIN = "bin"
@@ -207,7 +211,9 @@ PREFIX_CMDLINE_SHORT = "run"
 PREFIX_CMDLINE_LONG = "details"
 PREFIX_CMDLINE_TOP = "segway"
 PREFIX_TRAIN = "train"
+PREFIX_TRAIN_RESULTS = "train_results"
 PREFIX_POSTERIOR = "posterior%s"
+PREFIX_IDENTIFY = "identify"
 
 PREFIX_VITERBI = "viterbi"
 PREFIX_WINDOW = "window"
@@ -239,6 +245,8 @@ BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
 BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ)
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
+TRAIN_RESULTS_TMPL = extjoin(PREFIX_TRAIN_RESULTS, EXT_TAB, "tmpl")
+IDENTIFY_FILEBASENAME = extjoin(PREFIX_IDENTIFY, EXT_TAB)
 
 SUBDIRNAME_ACC = "accumulators"
 SUBDIRNAME_AUX = "auxiliary"
@@ -251,7 +259,7 @@ SUBDIRNAME_VITERBI = "viterbi"
 
 SUBDIRNAMES_EITHER = [SUBDIRNAME_AUX]
 SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
-                     SUBDIRNAME_PARAMS]
+                     SUBDIRNAME_PARAMS, SUBDIRNAME_INTERMEDIATE]
 
 # job script file permissions: owner has read/write/execute
 # permissions, group/others have read/execute permissions
@@ -270,20 +278,32 @@ TRAIN_FIELDNAMES = ["name", "value"]
 TRAIN_OPTION_TYPES = \
     dict(input_master_filename=str, structure_filename=str,
          params_filename=str, dont_train_filename=str, seg_table_filename=str,
-         distribution=str, len_seg_strength=float,
-         segtransition_weight_scale=float, ruler_scale=int, resolution=int,
-         num_segs=int, num_subsegs=int, output_label=str, track_specs=[str],
-         reverse_worlds=[int], num_mix_components=int)
+         include_coords_filename=str, distribution=str, len_seg_strength=float,
+         num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
+         resolution=int, num_segs=int, num_subsegs=int, output_label=str,
+         track_specs=[str], reverse_worlds=[int], num_mix_components=int,
+         supervision_filename=str, minibatch_fraction=float, max_frames=int,
+         validation_fraction=float, validation_coords_filename=str,
+         var_floor=float)
+
+
+TRAIN_RESULT_TYPES = dict(log_likelihood=float, num_segs=int,
+                          validation_likelihood=float,
+                          input_master_filename=str, params_filename=str,
+                          log_likelihood_filename=str,
+                          validation_output_filename=str,
+                          validation_sum_filename=str)
+
+IDENTIFY_OPTION_TYPES = \
+        dict(include_coords_filename=str, exclude_coords_filename=str,
+             seg_table_filename=str, output_label=str)
+
+SUB_TASK_DELIMITER = "-"
 
 # templates and formats
 RES_OUTPUT_MASTER = "output.master"
 RES_DONT_TRAIN = "dont_train.list"
 RES_SEG_TABLE = "seg_table.tab"
-
-TRAIN_ATTRNAMES = ["input_master_filename", "params_filename",
-                   "log_likelihood_filename", "validation_output_filename",
-                   "validation_sum_filename"]
-LEN_TRAIN_ATTRNAMES = len(TRAIN_ATTRNAMES)
 
 COMMENT_POSTERIOR_TRIANGULATION = \
     "%% triangulation modified for posterior decoding by %s" % __package__
@@ -302,17 +322,11 @@ THREAD_START_SLEEP_TIME = 62  # XXX: this should become an option
 # -gpr option for GMTK when reversing
 REVERSE_GPR = "^0:-1:0"
 
-Results = namedtuple("Results", ["log_likelihood", "num_segs",
-                                 "validation_likelihood",
-                                 "input_master_filename", "params_filename",
-                                 "log_likelihood_filename",
-                                 "validation_output_filename",
-                                 "validation_sum_filename"])
-
 OFFSET_FILENAMES = 3  # where the filenames begin in Results
 OFFSET_VALIDATION_FILENAMES = 6  # where the validation filenames begin
 
-GMTKJT_OUTPUT_PATTERN = "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+GMTKJT_OUTPUT_PATTERN = \
+    "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
 GMTKJT_PATTERN_WINDOW_MATCH_INDEX = 1
 GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX = 2
 
@@ -466,7 +480,46 @@ class Mixin_Lockable(AddableMixin):  # noqa
         self.lock = Lock()
         return AddableMixin.__init__(self, *args, **kwargs)
 
+
 LockableDefaultDict = Mixin_Lockable + defaultdict
+
+
+class TrainInstanceResults():
+    """
+    Each TrainInstanceResults instance stores the filenames from the winning
+    rounds of training for each segway train instance. Additionally contains
+    their log likelihood and validation likelihoods.
+    """
+    def get_filenames(self, validation=False):
+        """
+        Returns a dictionary, where the keys represent runner attributes
+        containing the dst filenames and the values are the source filenames
+        stored in the class. Validation represents whether the validation
+        files exist and need to be copied as well.
+        """
+        res = {"input_master_filename": self.input_master_filename,
+               "params_filename": self.params_filename,
+               "log_likelihood_filename": self.log_likelihood_filename}
+        if validation:
+            res.update({"validation_output_filenames":
+                             self.validation_output_filename,
+                        "validation_sum_filename":
+                             self.validation_sum_filename})
+        return res
+
+    def load_results(self, filename):
+        with open(filename) as resultfile:
+            reader = DictReader(resultfile)
+            for line in reader:
+                name = line["name"]
+                value = line["value"]
+
+                item_type = TRAIN_RESULT_TYPES[name]
+                setattr(self, name, item_type(value))
+
+    def __init__(self, **kwargs):
+        for name, value in kwargs.items():
+            setattr(self, name, value)
 
 
 class TrainThread(Thread):
@@ -478,6 +531,9 @@ class TrainThread(Thread):
         self.session = session
         self.num_segs = num_segs
         self.instance_index = instance_index
+        self.runner.input_master_filename = make_default_filename(
+            InputMasterSaver.resource_name, runner.params_dirpath,
+            instance_index)
 
         Thread.__init__(self)
 
@@ -570,6 +626,7 @@ class Track(object):
     def name(self):
         return quote_trackname(self.name_unquoted)
 
+
 TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
 TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
 
@@ -602,6 +659,7 @@ class TrackGroup(list):
 
     def insert(self, index, item):
         return list.insert(self, index, self._set_group(item))
+
 
 re_num_cliques = re.compile(r"^Number of cliques = (\d+)$")
 re_clique_info = re.compile(r"^Clique information: .*, (\d+) unsigned words ")
@@ -709,31 +767,71 @@ class Runner(object):
 
         # flags
         self.clobber = False
-        # XXX: this should become an int for num_starts
-        self.train = False  # EM train
-        self.posterior = False
-        self.identify = False  # viterbi
+        self.recover_round = False
         self.validate = False
         self.dry_run = False
         self.verbosity = VERBOSITY
 
         self.__dict__.update(kwargs)
 
-    def set_tasks(self, text):
-        tasks = text.split("+")
-        if "train" in tasks and len(tasks) > 1:
-            raise ValueError("train task must be run separately")
-
-        for task in tasks:
-            if task == "train":
-                self.train = True
-            elif (task == "identify" or
-                  task == "annotate"):
-                self.identify = True
-            elif task == "posterior":
-                self.posterior = True
+    class SubTaskSpecification(object):
+        """
+        SubTaskSpecification instance stores the segway task/subtask
+        specification for the current session.
+        """
+        def __init__(self, selected, subtask=None):
+            # Subtask contains the name of the subtask chosen
+            # this time (init, run or finish)
+            if subtask:
+                # set all subtasks to False initially
+                self.init = False
+                self.run = False
+                self.finish = False
+                # Overwrite the selected subtask back to true
+                setattr(self, subtask[0], True)
             else:
-                raise ValueError("unrecognized task: %s" % task)
+                # If no subtask is specified, all subtasks are set to match
+                # the selected boolean variable
+                self.init = selected
+                self.run = selected
+                self.finish = selected
+
+        def __bool__(self):
+            return any([self.init, self.run, self.finish])
+
+        # XXX: This line was added for python 2-3 compatibility
+        # May be removed when python 2 support is dropped
+        __nonzero__ = __bool__
+
+
+    def set_tasks(self, text):
+        """
+        Sets the tasks for Segway to run, as well as determining
+        if any specific steps were specified. Else runs all steps
+        for task.
+        """
+        selected_tasks = text.split("+")
+
+        for task in selected_tasks:
+            task = task.split(SUB_TASK_DELIMITER)
+            task_name = task[0]
+            if task_name == "annotate":
+                task_name = "identify"
+            subtask = task[1:]
+            # Check if multiple subtasks are present,
+            # meaning run-round was chosen
+            if (len(subtask) == 2 and
+               (subtask[0] == "run" and subtask[1] == "round")):
+                self.recover_dirname = self.work_dirname
+                self.recover_round = True
+            elif len(subtask) >= 2:
+                # Otherwise error if more than one subtask was specified
+                raise ValueError("More than one subtask was specified at once")
+            setattr(self, task_name, self.SubTaskSpecification(True, subtask))
+
+        for task in TASK_LIST:
+            if not hasattr(self, task):
+                setattr(self, task, self.SubTaskSpecification(False))
 
     def set_option(self, name, value):
         # want to actually set the Runner option when optparse option
@@ -742,72 +840,62 @@ class Runner(object):
         if value or value == 0:
             setattr(self, name, value)
 
-    options_to_attrs = [("recover", "recover_dirname"),
-                        ("observations", "obs_dirname"),
-                        ("bed", "bed_filename"),
-                        ("semisupervised", "supervision_filename"),
-                        ("bigBed", "bigbed_filename"),
-                        ("include_coords", "include_coords_filename"),
-                        ("exclude_coords", "exclude_coords_filename"),
-                        ("minibatch_fraction",),
-                        ("validation_fraction",),
-                        ("validation_coords", "validation_coords_filename"),
-                        ("num_instances",),
-                        ("verbosity",),
-                        ("split_sequences", "max_split_sequence_length"),
-                        ("clobber",),
-                        ("dry_run",),
-                        ("input_master", "input_master_filename"),
-                        ("structure", "structure_filename"),
-                        ("dont_train", "dont_train_filename"),
-                        ("seg_table", "seg_table_filename"),
-                        ("distribution",),
-                        ("prior_strength", "len_seg_strength"),
-                        ("segtransition_weight_scale",),
-                        ("ruler_scale",),
-                        ("resolution",),
-                        ("var_floor",),
-                        ("mixture_components", "num_mix_components",),
-                        ("num_labels", "num_segs"),
-                        ("num_sublabels", "num_subsegs"),
-                        ("output_label", "output_label"),
-                        ("max_train_rounds", "max_em_iters"),
-                        ("reverse_world", "reverse_worlds"),
-                        ("track", "track_specs")]
+    options_to_attrs = {"recover": "recover_dirname",
+                        "observations": "obs_dirname",
+                        "bed": "bed_filename",
+                        "semisupervised": "supervision_filename",
+                        "bigBed": "bigbed_filename",
+                        "include_coords": "include_coords_filename",
+                        "exclude_coords": "exclude_coords_filename",
+                        "minibatch_fraction": "minibatch_fraction",
+                        "validation_fraction": "validation_fraction",
+                        "validation_coords": "validation_coords_filename",
+                        "num_instances": "num_instances",
+                        "verbosity": "verbosity",
+                        "split_sequences": "max_split_sequence_length",
+                        "clobber": "clobber",
+                        "dry_run": "dry_run",
+                        "input_master": "input_master_filename",
+                        "structure": "structure_filename",
+                        "dont_train": "dont_train_filename",
+                        "seg_table": "seg_table_filename",
+                        "distribution": "distribution",
+                        "prior_strength": "len_seg_strength",
+                        "segtransition_weight_scale":
+                            "segtransition_weight_scale",
+                        "ruler_scale": "ruler_scale",
+                        "resolution": "resolution",
+                        "var_floor": "var_floor",
+                        "mixture_components": "num_mix_components",
+                        "num_labels": "num_segs",
+                        "num_sublabels": "num_subsegs",
+                        "output_label": "output_label",
+                        "max_train_rounds": "max_em_iters",
+                        "reverse_world": "reverse_worlds",
+                        "track": "track_specs",
+                        "trainable_params": "params_filenames"}
 
     @classmethod
-    def fromargs(cls, args):
+    def fromargs(cls, task_spec, archives, traindir, annotatedir):
         """Parses the arguments (not options) that were given to segway"""
         res = cls()
 
-        task_str = args[0]
-        res.set_tasks(task_str)
-
-        # If we're running the training task
-        if res.train:
-            # The genomedata archives are all arguments execept the final
-            # train directory
-            res.genomedata_names = args[1:-1]
-            res.work_dirname = args[-1]
-            # Check that there is at least 3 arguments
-            assert len(args) >= 3
-        # Otherwise
+        if annotatedir:
+            res.work_dirname = annotatedir
         else:
-            # The genomedata archives except the final train directory and
-            # posterior/identify working directory
-            res.genomedata_names = args[1:-2]
-            train_dir_name = args[-2]
-            res.work_dirname = args[-1]
+            res.work_dirname = traindir
 
-            try:
-                res.load_train_options(train_dir_name)
-            except IOError as err:
-                # train.tab use is optional
-                if err.errno != ENOENT:
-                    raise
+        res.genomedata_names = archives
+        res.set_tasks(task_spec)
+
+        try:
+            res.load_train_options(traindir)
+        except IOError as err:
+            # train.tab use is optional
+            if err.errno != ENOENT:
+                raise
 
         return res
-
 
     def from_environment(self):
         # If there is a seed from the environment
@@ -820,7 +908,6 @@ class Runner(object):
 
         # Create a random number generator for this runner
         self.random_state = RandomState(self.random_seed)
-
 
     def add_track_group(self, tracknames):
         tracks = self.tracks
@@ -844,62 +931,79 @@ class Runner(object):
 
         self.track_groups.append(track_group)
 
-
     @classmethod
-    def fromoptions(cls, args, options):
+    def fromoptions(cls, task_spec, archives, traindir, annotatedir, options):
         """This is the usual way a Runner is created.
 
         Calls Runner.fromargs() first.
         """
-        res = cls.fromargs(args)
+
+        res = cls.fromargs(task_spec, archives, traindir, annotatedir)
         res.from_environment()
 
-        # If the observations directory has been specified
-        if options.observations:
-            # Stop segway and show a "not implemented error" with description
-            raise NotImplementedError(
-                "'--observations' option not used: "
-                "Segway only creates observations in a temporary directory"
-            )
+        # Convert the options namespace into a dictionary
+        options_dict = vars(options)
 
-        # Preprocess options
-        # Convert any track files into a list of tracks
-        track_specs = []
-        for file_or_string in options.track:
-            track_specs.extend(file_or_string_to_string_list(file_or_string))
+        # Add all options from this task into the Runner object
+        for option in options_dict.keys():
+            # multiple lists to one
+            if option == "cluster_opt":
+                res.user_native_spec = sum([opt.split(" ")
+                                            for opt in options.cluster_opt], [])
+                # No further processing required on this option, continue
 
-        options.track = track_specs
+            elif option == "mem_usage":
+                mem_usage_list = list(map(float, options.mem_usage.split(",")))
+                # XXX: should do a ceil first?
+                # use int64 in case run.py is run on a 32-bit machine to
+                # control 64-bit compute nodes
+                res.mem_usage_progression = \
+                    (array(mem_usage_list) * GB).astype(int64)
+                # No further processing required on this option, continue
 
-        # Convert labels string into potential slice or an int
-        # If num labels was specified
-        if options.num_labels:
-            options.num_labels = str2slice_or_int(options.num_labels)
+            # If the observations directory has been specified
+            elif (option == "observations"
+                  and options_dict[option]):
+                # Stop segway and show a "not implemented error"
+                # with description
+                raise NotImplementedError(
+                    "'--observations' option not used: "
+                    "Segway only creates observations in a temporary directory"
+                )
 
-        # bulk copy options that need no further processing
-        for option_to_attr in cls.options_to_attrs:
-            try:
-                src, dst = option_to_attr
-            except ValueError:
-                src, = option_to_attr
-                dst = src
+            # All other options need to be processed and saved to Runner
+            # The task_spec and args positional arguents handled in
+            # fromargs above
+            elif not (option == "archives" or option == "task_spec" or
+                      option == "traindir" or option == "annotatedir"):
+                # Preprocess options
+                # Convert any track files into a list of tracks
+                if (option == "track"
+                    and options_dict[option]):
+                    track_specs = []
+                    tracks = options_dict[option]
+                    for file_or_string in tracks:
+                        track_specs.extend(
+                            file_or_string_to_string_list(file_or_string))
 
-            res.set_option(dst, getattr(options, src))
+                    options_dict[option] = track_specs
 
-        # multiple lists to one
-        res.user_native_spec = sum([opt.split(" ")
-                                    for opt in options.cluster_opt], [])
+                # Convert labels string into potential slice or an int
+                # If num labels was specified
+                if (option == "num_labels"
+                    and options_dict[option]):
+                    options.num_labels = str2slice_or_int(options_dict[option])
 
-        mem_usage_list = list(map(float, options.mem_usage.split(",")))
+                # bulk copy options that need no further processing
+                dst = cls.options_to_attrs[option]
 
-        # XXX: should do a ceil first?
-        # use int64 in case run.py is run on a 32-bit machine to control
-        # 64-bit compute nodes
-        res.mem_usage_progression = (array(mem_usage_list) * GB).astype(int64)
+                res.set_option(dst, options_dict[option])
 
         # If the resolution is set to a non-default value
         # And the ruler has not been set from the options
         if (res.resolution != RESOLUTION and
-           not options.ruler_scale):
+           ("ruler_scale" in options_dict and
+            not options_dict["ruler_scale"])):
             # Set the ruler scale to 10x the non-default value
             res.ruler_scale = res.resolution * 10
         # Else if the ruler is not divisible by the resolution
@@ -910,11 +1014,6 @@ class Runner(object):
                              (res.ruler_scale, res.resolution))
 
         res.max_frames = ceildiv(res.max_split_sequence_length, res.resolution)
-
-        # don't change from None if this is false
-        params_filenames = options.trainable_params
-        if params_filenames:
-            res.params_filenames = params_filenames
 
         # track option processing
         for track_spec in res.track_specs:
@@ -956,22 +1055,19 @@ class Runner(object):
             res.validate = True
 
         if (res.validation_fraction and
-            (res.validation_fraction + 
+            (res.validation_fraction +
             res.minibatch_fraction > 1.0)):
             raise ValueError("The sum of the validation and "
                 "minibatch fractions cannot be greater than 1")
 
-        if (res.validate and
-            not res.train):
-            raise NotImplementedError("Using --validation-fraction"
-                " or --validation-coords with tasks other than train"
-                " is not supported")
         return res
 
     @memoized_property
     def triangulation_dirpath(self):
         res = self.work_dirpath / "triangulation"
-        self.make_dir(res)
+        # Check to make sure this wasn't created by an ealier subtask
+        if not Path(res).exists():
+            self.make_dir(res)
 
         return res
 
@@ -1190,7 +1286,6 @@ class Runner(object):
 
     @memoized_property
     def viterbi_filenames(self):
-        self.make_subdir(SUBDIRNAME_VITERBI)
         return self.make_viterbi_filenames(self.work_dirpath)
 
     @memoized_property
@@ -1203,7 +1298,6 @@ class Runner(object):
 
     @memoized_property
     def posterior_filenames(self):
-        self.make_subdir(SUBDIRNAME_POSTERIOR)
         return list(map(self.make_posterior_filename, range(self.num_windows)))
 
     @memoized_property
@@ -1213,6 +1307,10 @@ class Runner(object):
     @memoized_property
     def params_dirpath(self):
         return self.work_dirpath / SUBDIRNAME_PARAMS
+
+    @memoized_property
+    def intermediate_dirpath(self):
+        return self.work_dirpath / SUBDIRNAME_INTERMEDIATE
 
     @memoized_property
     def recover_params_dirpath(self):
@@ -1277,15 +1375,12 @@ class Runner(object):
                                               EXT_TAB,
                                               subdirname=SUBDIRNAME_LOG)
 
-        job_log_file = open(job_log_filename, "w")
+        with open(job_log_filename, "a") as job_log_file:
+            # Print job log header if the file is new
+            if job_log_file.tell() == 0:
+                print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
 
-        # Print job log header
-        print(*JOB_LOG_FIELDNAMES, sep="\t", file=job_log_file)
-
-        yield job_log_file
-
-        job_log_file.close()
-
+            yield job_log_file
 
     @memoized_property
     def use_dinucleotide(self):
@@ -1377,7 +1472,9 @@ class Runner(object):
 
     @memoized_property
     def supervision_type(self):
-        if self.supervision_filename:
+        # Supervision is only used in training
+        # If another task is selected, set to unsupervised
+        if self.supervision_filename and self.train:
             return SUPERVISION_SEMISUPERVISED
         else:
             return SUPERVISION_UNSUPERVISED
@@ -1456,7 +1553,6 @@ class Runner(object):
         if output_params_filename:
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
 
-
         # prevent supervised variable from being inherited from train task
         if self.identify:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
@@ -1486,11 +1582,11 @@ class Runner(object):
 
     def load_validation_log_likelihood(self):
         """
-        Parses gmtkJT output to obtain each window's log probability of evidence 
-        log(prob(E)).
+        Parses gmtkJT output to obtain each window's log probability of
+        evidence log(prob(E)).
 
         Raises error if it is found that the validation task was unsucccessful.
-        
+
         Returns the validation window indices and corresponding likelihoods
         """
         with open(self.validation_output_filename) as infile:
@@ -1508,21 +1604,20 @@ class Runner(object):
                     validation_match.group(GMTKJT_PATTERN_WINDOW_MATCH_INDEX)
                     ))
                 validation_window_likelihoods.append(float(
-                    validation_match.group(GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX)
-                    ))
+                    validation_match.group(
+                        GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX)))
             else:
                 if MSG_SUCCESS not in line:
                     raise RuntimeError("Validation not successful: " + line)
 
-        return validation_window_indices,validation_window_likelihoods
-
+        return validation_window_indices, validation_window_likelihoods
 
     def get_full_validation_output(self, validation_window_indices,
                                    validation_window_likelihoods):
         """
-        Takes as input the validation window indices and corresponding likelihoods
-        and returns an array of tuples where each entry is the validation window
-        index, size, and log likelihood.
+        Takes as input the validation window indices and corresponding
+        likelihoods and returns an array of tuples where each entry is the
+        validation window index, size, and log likelihood.
         """
         full_validation_output = []
         for validation_window_index, validation_window_likelihood \
@@ -1800,6 +1895,7 @@ class Runner(object):
             except OSError as err:
                 if err.errno != ENOENT:
                     raise
+
         try:
             dirpath.makedirs()
         except OSError as err:
@@ -1907,12 +2003,6 @@ class Runner(object):
         #
         # The *semi* part of semi-supervised is that you can do this only at
         # certain positions and leave the rest of the genome unsupervised.
-
-        supervision_type = self.supervision_type
-        if supervision_type == SUPERVISION_UNSUPERVISED:
-            return
-
-        assert supervision_type == SUPERVISION_SEMISUPERVISED
 
         # defaultdict of list of ints
         # key: chrom
@@ -2052,10 +2142,8 @@ class Runner(object):
         return len(tracknames_quoted) != len(frozenset(tracknames_quoted))
 
     def save_gmtk_input(self):
-        # can't run train and identify/posterior in the same run
-        assert not ((self.identify or self.posterior) and self.train)
-
-        self.load_supervision()
+        if self.supervision_type == SUPERVISION_SEMISUPERVISED:
+            self.load_supervision()
         self.set_tracknames()
 
         observations = Observations(self)
@@ -2091,7 +2179,7 @@ class Runner(object):
         self.save_include()
         self.set_params_filename()
         self.save_structure()
-        
+
     def save_window_list(self):
         """Saves the current list of windows to a BED file where the name field
         is the window index that Segway has assigned"""
@@ -2099,19 +2187,21 @@ class Runner(object):
         window_bed_filename = self.make_filename(PREFIX_WINDOW, EXT_BED)
 
         with open(window_bed_filename, "w") as window_bed_file:
-            bed_writer = csv.writer(window_bed_file, delimiter=DELIMITER_BED,
+            bed_writer = writer(window_bed_file, delimiter=DELIMITER_BED,
                     lineterminator="\n")  #NB: csv defaults to dos newlines
             for index, window in enumerate(self.windows):
                 bed_writer.writerow((window.chrom, window.start, window.end,
                                      index))
 
-    def copy_results(self, name, src_filename, dst_filename):
+    def copy_results(self, name, src_filename):
+        dst_filename = getattr(self, name)
+        if dst_filename == src_filename:
+            return
         if dst_filename:
             copy2(src_filename, dst_filename)
         else:
             dst_filename = src_filename
-
-        setattr(self, name, dst_filename)
+            setattr(self, name, dst_filename)
 
     def prog_factory(self, prog):
         """
@@ -2703,8 +2793,8 @@ class Runner(object):
 
         # If a random number generator seed exists
         if self.random_seed:
-            # Create a new random number generator for this instance based on its
-            # own index
+            # Create a new random number generator for this instance based on
+            # its own index
             self.random_seed += instance_index
             self.random_state = RandomState(self.random_seed)
 
@@ -2725,7 +2815,7 @@ class Runner(object):
 
         if round_index == 0:
             # if round > 0, this is set by self.recover_train_instance()
-            self.save_input_master(instance_index, new)
+            self.save_input_master(instance_index)
 
         kwargs = dict(objsNotToTrain=self.dont_train_filename,
                       maxEmIters=1,
@@ -2746,7 +2836,7 @@ class Runner(object):
 
         if self.dry_run:
             self.run_train_round(self.instance_index, round_index, **kwargs)
-            return Results(None, None, None, None, None, None, None, None)
+            return TrainInstanceResults()
 
         return self.progress_train_instance(last_log_likelihood,
                                             log_likelihood,
@@ -2762,13 +2852,18 @@ class Runner(object):
         if (self.validate and
             self.recover_dirname):
             # recover last set of best results
-            result = Results(log_likelihood, self.num_segs,
-                             validation_likelihood,
-                             self.input_master_filename,
-                             self.best_params_filename,
-                             self.log_likelihood_filename,
-                             self.validation_output_winner_filename,
-                             self.validation_sum_winner_filename)
+            result = TrainInstanceResults(log_likelihood=log_likelihood,
+                                   num_segs=self.num_segs,
+                                   validation_likelihood=validation_likelihood,
+                                   input_master_filename=
+                                       self.input_master_filename,
+                                   params_filename=self.best_params_filename,
+                                   log_likelihood_filename=
+                                       self.log_likelihood_filename,
+                                   validation_output_filename=
+                                       self.validation_output_winner_filename,
+                                   validation_sum_filename=
+                                       self.validation_sum_winner_filename)
 
         while (round_index < self.max_em_iters and
                ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
@@ -2803,9 +2898,9 @@ class Runner(object):
                 with open(self.validation_sum_tab_filename, "a") as logfile:
                     logfile.write(str(validation_likelihood) + "\n")
 
-                # if the new validation likelihood is better than our previous best,
-                # choose it as our current winner and update instance's winner files
-                # winning set of results to be passed
+                # if the new validation likelihood is better than our previous
+                # best, choose it as our current winner and update instance's
+                # winner files winning set of results to be passed
                 if validation_likelihood > best_validation_likelihood:
                     copy2(self.validation_output_filename,
                           self.validation_output_winner_filename)
@@ -2813,49 +2908,65 @@ class Runner(object):
                     copy2(self.validation_sum_filename,
                           self.validation_sum_winner_filename)
 
-                    result = Results(log_likelihood, self.num_segs,
-                                     validation_likelihood,
-                                     self.input_master_filename,
-                                     self.last_params_filename,
-                                     self.log_likelihood_filename,
-                                     self.validation_output_winner_filename,
-                                     self.validation_sum_winner_filename)
+                    result = TrainInstanceResults(log_likelihood=log_likelihood,
+                                   num_segs=self.num_segs,
+                                   validation_likelihood=validation_likelihood,
+                                   input_master_filename=
+                                       self.input_master_filename,
+                                   params_filename=self.best_params_filename,
+                                   log_likelihood_filename=
+                                       self.log_likelihood_filename,
+                                   validation_output_filename=
+                                       self.validation_output_winner_filename,
+                                   validation_sum_filename=
+                                       self.validation_sum_winner_filename)
                     best_validation_likelihood = validation_likelihood
 
             round_index += 1
 
         if not self.validate:
-            result = Results(log_likelihood, self.num_segs,
-                             validation_likelihood,
-                             self.input_master_filename,
-                             self.last_params_filename,
-                             self.log_likelihood_filename,
-                             self.validation_output_filename,
-                             self.validation_sum_filename)
+            result = TrainInstanceResults(log_likelihood=log_likelihood,
+                                   num_segs=self.num_segs,
+                                   validation_likelihood=validation_likelihood,
+                                   input_master_filename=
+                                       self.input_master_filename,
+                                   params_filename=self.last_params_filename,
+                                   log_likelihood_filename=
+                                       self.log_likelihood_filename,
+                                   validation_output_filename=
+                                       self.validation_output_winner_filename,
+                                   validation_sum_filename=
+                                       self.validation_sum_winner_filename)
 
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
 
-    def save_train_options(self):
-        filename = self.make_filename(TRAIN_FILEBASENAME)
+    def save_tab_file(self, values, attrs, tab_filename):
+        """
+        Creates a .tab file to store specific variables between steps, such as
+        train results between run and finish, as well as options between
+        steps and tasks, such as between train and identify.
+        """
 
-        with open(filename, "w") as tabfile:
-            writer = ListWriter(tabfile)
+        filename = self.make_filename(tab_filename)
+
+        with open(filename, "w") as tab_file:
+            writer = ListWriter(tab_file, delimiter=DELIMITER_BED)
             writer.writerow(TRAIN_FIELDNAMES)
 
-            for name, typ in sorted(viewitems(TRAIN_OPTION_TYPES)):
-                value = getattr(self, name)
-                if isinstance(typ, list):
+            for name, object_type in sorted(viewitems(attrs)):
+                value = getattr(values, name)
+                if isinstance(object_type, list):
                     for item in value:
                         writer.writerow([name, item])
                 else:
                     writer.writerow([name, value])
 
-    def load_train_options(self, traindirname):
+    def load_train_options(self, train_dirname):
         """
-        load options from training and convert to appropriate type
+        load options from training
         """
-        filename = Path(traindirname) / TRAIN_FILEBASENAME
+        filename = Path(train_dirname) / TRAIN_FILEBASENAME
 
         with open(filename) as tabfile:
             reader = DictReader(tabfile)
@@ -2864,49 +2975,112 @@ class Runner(object):
                 name = row["name"]
                 value = row["value"]
 
-                typ = TRAIN_OPTION_TYPES[name]
-                if isinstance(typ, list):
-                    assert len(typ) == 1
-                    item_typ = typ[0]
-                    getattr(self, name).append(item_typ(value))
-                else:
-                    setattr(self, name, typ(value))
+                # Check if the option is used by identify as well, then ignore
+                is_identify_option = name in IDENTIFY_OPTION_TYPES.keys() and \
+                    (self.identify or self.posterior)
+                if value and not is_identify_option:
+                    row_type = TRAIN_OPTION_TYPES[name]
+                    if isinstance(row_type, list):
+                        assert len(row_type) == 1
+                        item_type = row_type[0]
+                        getattr(self, name).append(item_type(value))
+                    else:
+                        setattr(self, name, row_type(value))
 
-        if self.params_filename is not None:
+        # If we are running identify/posterior and the params filename was
+        # specified during train, save it in params_filenames as well.
+        if self.params_filename is not None and \
+          not self.train:
             self.params_filenames = [self.params_filename]
 
-    def setup_train(self):
+    def load_train_results(self):
+        """
+        Loads the training results in train-finish saved in 
+        SUBDIRNAME_INTERMEDIATE. Stores as a list of TrainInstanceResults in
+        instance_params to select best in finish.
+        """
+
+        pattern = extjoin(PREFIX_TRAIN_RESULTS, "*", EXT_TAB)
+        instance_params = []
+        for filename in Path(self.intermediate_dirpath).files(pattern):
+            # Set variables to none to be overwritten by the tab file contents
+            results = TrainInstanceResults()
+            results.load_results(filename)
+            instance_params.append(results)
+
+        return instance_params
+
+    def load_identify_options(self, identify_dir_name):
+        """
+        load options set in identify-init, stored in the identify.tab file
+        in the main directory.
+        """
+
+        filename = Path(identify_dir_name) / IDENTIFY_FILEBASENAME
+
+        with open(filename) as tabfile:
+            reader = DictReader(tabfile)
+
+            for row in reader:
+                name = row["name"]
+                value = row["value"]
+
+                row_type = IDENTIFY_OPTION_TYPES[name]
+                # Checks if this option was of type list, sets each element to
+                # correct type then
+                if isinstance(row_type, list):
+                    item_type = row_type[0]
+                    getattr(self, name).append(item_type(value))
+                else:
+                    setattr(self, name, row_type(value))
+
+    def init_shared(self):
+        """
+        Perform initialization shared by all of train, posterior and identify.
+        """
+
+        self.make_subdirs(SUBDIRNAMES_EITHER)
+
+        self.save_gmtk_input()
+        self.save_window_list()
+        self.run_triangulate()
+
+    def init_train(self):
         """
         return value: dst_filenames
         """
+
         assert self.num_instances >= 1
+
+        self.init_shared()
+        self.make_subdirs(SUBDIRNAMES_TRAIN)
 
         # save the destination file for input_master as we will be
         # generating new input masters for each start
 
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
+
         input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(self.input_master_filename,
                                    self.params_dirpath, self.clobber)
-
         self.input_master_filename = input_master_filename
 
-        # should I make new parameters in each instance?
+        # save file locations to tab-delimited file
+        self.save_tab_file(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
+
+        # If a single instance is being run, create a single input.master
+        # Else create an input master for each instance
         if not self.instance_make_new_params:
             self.save_input_master()
+        else:
+            for index in range(self.num_instances):
+                self.save_input_master(index, True)
 
-        # save file locations to tab-delimited file
-        self.save_train_options()
 
         if not input_master_filename_is_new:
             # do not overwrite existing file
             input_master_filename = None
-
-        return [input_master_filename, self.params_filename,
-                self.log_likelihood_filename,
-                self.validation_output_filename,
-                self.validation_sum_filename]
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
@@ -2914,18 +3088,41 @@ class Runner(object):
         else:
             return self.run_train_singlethread
 
-    def finish_train(self, instance_params, dst_filenames):
-        if self.instance_make_new_params:
-            self.proc_train_results(instance_params, dst_filenames)
-        elif not self.dry_run:
-            # only one instance
-            assert len(instance_params) == 1
-            # for validate, this is best, not last
-            last_params_filename = instance_params[0].params_filename
-            copy2(last_params_filename, self.params_filename)
+    def finish_train(self, instance_params):
+        """
+        Finds and then copies the best training round and instance to the
+        general files such as params.params, input.master, etc.
+        """
 
-            # always overwrite params.params
-            copy2(last_params_filename, self.make_params_filename())
+        if self.dry_run:
+            return
+
+        # Copy the param from the best round of each training instance
+        for instance in instance_params:
+            # Remove iteration number from end of winning param filename
+            winning_instance_param_filename = \
+                instance.params_filename.rpartition(".")[0]
+            copy2(instance.params_filename, winning_instance_param_filename)
+
+        # finds max log_likelihood for validation or regular
+        if self.validate:
+            max_params = max(instance_params,
+                             key=attrgetter("validation_likelihood"))
+        else:
+            max_params = max(instance_params, key=attrgetter("log_likelihood"))
+
+        src_filenames = max_params.get_filenames(self.validate)
+
+        if None in src_filenames.values():
+            raise RuntimeError("All training instances failed")
+
+        best_params_filename = max_params.params_filename
+
+        for filename in src_filenames:
+            self.copy_results(filename, src_filenames[filename])
+
+        # always overwrite params.params
+        copy2(best_params_filename, self.make_params_filename())
 
     def save_validation_set(self):
         with Session() as session:
@@ -2942,14 +3139,30 @@ class Runner(object):
         self.instance_index = None
 
     def run_train(self):
-        dst_filenames = self.setup_train()
 
-        run_train_func = self.get_thread_run_func()
+        if self.train.init:
+            self.init_train()
+        else:
+            # Reload filenames
+            self.save_gmtk_input()
 
-        # this is where the actual training takes place
-        instance_params = run_train_func(self.num_segs_range)
+        if self.train.run:
+            run_train_func = self.get_thread_run_func()
 
-        self.finish_train(instance_params, dst_filenames)
+            # this is where the actual training takes place
+            instance_params = run_train_func(self.num_segs_range)
+            # write results from each instance to their own file
+            for index, instance_param in enumerate(instance_params):
+                result_filename = make_default_filename \
+                    (TRAIN_RESULTS_TMPL, SUBDIRNAME_INTERMEDIATE, index)
+                self.save_tab_file(instance_param, TRAIN_RESULT_TYPES,
+                                  result_filename)
+
+        elif self.train.finish:
+            instance_params = self.load_train_results()
+
+        if self.train.finish:
+            self.finish_train(instance_params)
 
     def run_train_singlethread(self, num_segs_range):
         # having a single-threaded version makes debugging much easier
@@ -3024,33 +3237,6 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         return instance_params
 
-    def proc_train_results(self, instance_params, dst_filenames):
-        if self.dry_run:
-            return
-
-        # finds the min by info_criterion (maximize log_likelihood)
-        if self.validate:
-            max_params = max(instance_params,
-                             key=attrgetter('validation_likelihood'))
-            check_filenames = max_params[OFFSET_FILENAMES:]
-        else:
-            max_params = max(instance_params)
-            check_filenames = \
-                max_params[OFFSET_FILENAMES:OFFSET_VALIDATION_FILENAMES]
-
-        self.num_segs = max_params.num_segs
-        self.set_triangulation_filename()
-
-        if None in check_filenames:
-            raise ValueError("all training instances failed")
-
-        src_filenames = max_params[OFFSET_FILENAMES:]
-        assert LEN_TRAIN_ATTRNAMES == len(src_filenames) == len(dst_filenames)
-
-        zipper = zip(TRAIN_ATTRNAMES, src_filenames, dst_filenames)
-        for name, src_filename, dst_filename in zipper:
-            self.copy_results(name, src_filename, dst_filename)
-
     def recover_filename(self, resource):
         instance_index = self.instance_index
 
@@ -3066,17 +3252,14 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         new_filename = make_default_filename(resource, self.params_dirpath,
                                              instance_index)
-
         Path(old_filename).copy2(new_filename)
         return new_filename
 
     def recover_train_instance(self, last_log_likelihood, log_likelihood,
-                               validation_likelihood, best_validation_likelihood):
+                               validation_likelihood,
+                               best_validation_likelihood):
         instance_index = self.instance_index
         recover_dirname = self.recover_dirname
-
-        self.input_master_filename = \
-            self.recover_filename(InputMasterSaver.resource_name)
 
         recover_log_likelihood_tab_filepath = \
             Path(self.make_log_likelihood_tab_filename(instance_index,
@@ -3091,6 +3274,17 @@ to find the winning instance anyway.""" % thread.instance_index)
                 Path(self.make_log_likelihood_tab_filename(None,
                                                            recover_dirname))
 
+        if not self.recover_round:
+            # If we are recovering a previous training instance rather than
+            # a round we need to copy the files from the old training directory
+            # into our current one. If just using train-run-round, these will
+            # already be present.
+            self.input_master_filename = \
+                self.recover_filename(InputMasterSaver.resource_name)
+            log_likelihood_tab_filename = self.log_likelihood_tab_filename
+            recover_log_likelihood_tab_filepath.copy2(
+                log_likelihood_tab_filename)
+
         if self.validate:
             # recover validation sum tabfile
             recover_validation_sum_tab_filepath = \
@@ -3100,8 +3294,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                 recover_validation_sum_tab_filepath = \
                     Path(self.make_validation_sum_tab_filename(None,
                                                            recover_dirname))
-            copy2(recover_validation_sum_tab_filepath,
-                  self.validation_sum_tab_filename)
 
             # recover validation output tabfile
             recover_validation_output_tab_filepath = \
@@ -3111,8 +3303,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                 recover_validation_output_tab_filepath = \
                     Path(self.make_validation_output_tab_filename(None,
                                                            recover_dirname))
-            copy2(recover_validation_output_tab_filepath,
-                  self.validation_output_tab_filename)
 
             # recover last validation sum
             recover_validation_sum_filename = \
@@ -3126,8 +3316,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
-            copy2(recover_validation_sum_filename,
-                  self.validation_sum_filename)
 
             # recover last validation output
             recover_validation_output_filename = \
@@ -3141,8 +3329,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
-            copy2(recover_validation_output_filename,
-                  self.validation_output_filename)
 
             # recover validation sum winner
             recover_validation_sum_winner_filename = \
@@ -3156,8 +3342,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
-            copy2(recover_validation_sum_winner_filename,
-                  self.validation_sum_winner_filename)
 
             # recover validation output winner
             recover_validation_output_winner_filename = \
@@ -3171,22 +3355,40 @@ to find the winning instance anyway.""" % thread.instance_index)
                                             None, EXT_LIKELIHOOD,
                                             subdirname=SUBDIRNAME_LIKELIHOOD,
                                             dirname=recover_dirname))
-            copy2(recover_validation_output_winner_filename,
-                  self.validation_output_winner_filename)
+            if not self.recover_round:
+                copy2(recover_validation_sum_tab_filepath,
+                      self.validation_sum_tab_filename)
+                copy2(recover_validation_output_tab_filepath,
+                      self.validation_output_tab_filename)
+                copy2(recover_validation_sum_filename,
+                      self.validation_sum_filename)
+                copy2(recover_validation_output_filename,
+                      self.validation_output_filename)
+                copy2(recover_validation_sum_winner_filename,
+                      self.validation_sum_winner_filename)
+                copy2(recover_validation_output_winner_filename,
+                      self.validation_output_winner_filename)
 
-        with open(recover_log_likelihood_tab_filepath) \
-                as log_likelihood_tab_file:
-            log_likelihoods = [float(line.rstrip())
-                               for line in log_likelihood_tab_file.readlines()]
+        # Check if a round had been finished, and produced a likelihood
+        if recover_log_likelihood_tab_filepath.isfile():
+            with open(recover_log_likelihood_tab_filepath) \
+                    as log_likelihood_tab_file:
+                log_likelihoods = [float(line.rstrip())
+                                   for line in log_likelihood_tab_file.readlines()]
+        else:
+            # Otherwise, set likelihoods to empty
+            log_likelihoods = []
 
         final_round_index = len(log_likelihoods)
+        if final_round_index == 0:
+            # This is the case where train-run-round was used for the first
+            # round sets the log_likelihood temporarily as it would be
+            # otherwise
+            log_likelihood = -inf
         if final_round_index > 0:
             log_likelihood = log_likelihoods[-1]
         if final_round_index > 1:
             last_log_likelihood = log_likelihoods[-2]
-
-        log_likelihood_tab_filename = self.log_likelihood_tab_filename
-        recover_log_likelihood_tab_filepath.copy2(log_likelihood_tab_filename)
 
         if self.validate:
             with open(recover_validation_sum_tab_filepath) \
@@ -3195,7 +3397,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                                    for line in validation_sum_tab_file.readlines()]
             validation_likelihood = validation_sums[-1]
             best_validation_likelihood = max(validation_sums)
-            best_validation_index = validation_sums.index(best_validation_likelihood)
+            best_validation_index = validation_sums.index(
+                best_validation_likelihood)
 
 
         old_params_filename = self.make_params_filename(instance_index,
@@ -3207,12 +3410,16 @@ to find the winning instance anyway.""" % thread.instance_index)
             new_curr_params_filename = extjoin(new_params_filename,
                                                str(round_index))
 
-            Path(old_curr_params_filename).copy2(new_curr_params_filename)
+            if not self.recover_round:
+                Path(old_curr_params_filename).copy2(new_curr_params_filename)
             if self.validate:
                 if round_index == best_validation_index:
                     self.best_params_filename = new_curr_params_filename
 
-        self.last_params_filename = new_curr_params_filename
+        if final_round_index:
+            self.last_params_filename = new_curr_params_filename
+        if self.recover_round:
+            self.max_em_iters = final_round_index + 1
 
         return last_log_likelihood, log_likelihood, final_round_index, \
             validation_likelihood, best_validation_likelihood
@@ -3310,7 +3517,8 @@ to find the winning instance anyway.""" % thread.instance_index)
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
                        genomedata_names_text,
-                       self.distribution, track_indexes_text, self.num_mix_components]
+                       self.distribution, track_indexes_text,
+                       self.num_mix_components]
 
         output_filename = None
 
@@ -3341,27 +3549,27 @@ to find the winning instance anyway.""" % thread.instance_index)
     def is_in_reversed_world(self, window_index):
         return self.windows[window_index].world in self.reverse_worlds
 
-    def setup_identify_posterior(self):
-        self.instance_index = "identify"
-
-        # setup files
-        if not self.input_master_filename:
-            warn("Input master not specified. Generating.")
-            self.save_input_master()
-
     def save_identify_posterior(self):
         for world in range(self.num_worlds):
-            if self.identify:
+            if self.identify.finish:
                 IdentifySaver(self)(world)
 
-            if self.posterior:
+            if self.posterior.finish:
                 PosteriorSaver(self)(world)
 
     def run_identify_posterior(self):
-        self.setup_identify_posterior()
+        self.instance_index = "identify"
 
-        filenames = dict(identify=self.viterbi_filenames,
-                         posterior=self.posterior_filenames)
+        if self.identify.init or self.posterior.init:
+            self.init_shared()
+            self.save_tab_file(self, IDENTIFY_OPTION_TYPES,
+                               IDENTIFY_FILEBASENAME)
+            self.make_subdir(SUBDIRNAME_VITERBI)
+            self.make_subdir(SUBDIRNAME_POSTERIOR)
+        else:
+            self.set_triangulation_filename()
+            self.load_identify_options(self.work_dirname)
+            self.save_gmtk_input()
 
         # if output_label == "subseg" or "full", need to catch
         # superlabel and sublabel output from gmtk
@@ -3384,15 +3592,19 @@ to find the winning instance anyway.""" % thread.instance_index)
                        **self.get_posterior_clique_print_ranges())}
 
         tasks = []
-        if self.identify:
+        filenames = {}
+        if self.identify.run:
             tasks.append("identify")
-        if self.posterior:
+            filenames.update(dict(identify=self.viterbi_filenames))
+        if self.posterior.run:
             tasks.append("posterior")
+            filenames.update(dict(posterior=self.posterior_filenames))
 
         with Session() as session:
             self.session = session
             with self.open_job_log_file() as self.job_log_file:
-                restartable_jobs = RestartableJobDict(session, self.job_log_file)
+                restartable_jobs = RestartableJobDict(session,
+                                                      self.job_log_file)
 
                 for window_index, window_len in self.window_lens_sorted():
                     for task in tasks:
@@ -3422,7 +3634,7 @@ to find the winning instance anyway.""" % thread.instance_index)
 
         cmdline_top_filename = self.make_script_filename(PREFIX_CMDLINE_TOP)
 
-        with open(cmdline_top_filename, "w") as cmdline_top_file:
+        with open(cmdline_top_filename, "a") as cmdline_top_file:
             print(run_msg, file=cmdline_top_file)
             print(file=cmdline_top_file)
             print("cd", maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
@@ -3441,18 +3653,14 @@ to find the winning instance anyway.""" % thread.instance_index)
         """
         # XXXopt: use binary I/O to gmtk rather than ascii for parameters
 
-        # start log files
-        self.make_subdir(SUBDIRNAME_LOG)
+        # start log files, if they weren't already created by an ealier subtask
+        if not Path(self.work_dirpath / SUBDIRNAME_LOG).exists():
+            self.make_subdir(SUBDIRNAME_LOG)
         run_msg = self.make_run_msg()
 
         cmdline_short_filename = \
             self.make_script_filename(PREFIX_CMDLINE_SHORT)
         cmdline_long_filename = self.make_script_filename(PREFIX_CMDLINE_LONG)
-
-        self.make_subdirs(SUBDIRNAMES_EITHER)
-
-        if self.train:
-            self.make_subdirs(SUBDIRNAMES_TRAIN)
 
         # Check if the genomedata archives are compatable with each other
         if not self.check_genomedata_archives():
@@ -3461,39 +3669,25 @@ to find the winning instance anyway.""" % thread.instance_index)
                 "and ends"
             )
 
-        self.save_gmtk_input()
-        self.save_window_list()
-
-        with open(cmdline_short_filename, "w") as self.cmdline_short_file:
-            with open(cmdline_long_filename, "w") as self.cmdline_long_file:
+        with open(cmdline_short_filename, "a") as self.cmdline_short_file:
+            with open(cmdline_long_filename, "a") as self.cmdline_long_file:
                 print(run_msg, file=self.cmdline_short_file)
                 print(run_msg, file=self.cmdline_long_file)
 
-                self.run_triangulate()
-
                 if (self.validate and
-                    self.train):
+                    self.train.init):
                     self.save_validation_set()
 
                 if self.train:
                     self.run_train()
 
                 if self.identify or self.posterior:
-                    if self.supervision_filename:
-                        raise NotImplementedError  # XXX
-
-                    if not self.dry_run:
-                        # resave now that num_segs is determined,
-                        # in case you tested multiple num_segs
-                        self.save_include()
-
                     if self.posterior:
                         if self.recover_dirname:
                             raise NotImplementedError(
                                 "Recovery is not yet supported for the "
                                 "posterior task"
                             )
-
                         if self.num_worlds != 1:
                             raise NotImplementedError(
                                 "Tied tracks are not yet supported for "
@@ -3515,11 +3709,10 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
 
-    usage = "%(prog)s [OPTION]... TASK GENOMEDATA [GENOMEDATA ...] TRAINDIR " \
-            "[IDENTIFYDIR]"
-
     version = "%(prog)s {}".format(__version__)
-    description = "Semi-automated genome annotation"
+    description = """
+    Semi-automated genome annotation.
+    Please see: segway TASK -h, for steps specific to each task"""
 
     citation = """
     Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.  2012.
@@ -3527,13 +3720,75 @@ def parse_options(argv):
     segmentation. Nat Methods 9:473-476.
     http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = ArgumentParser(description=description, usage=usage,
+    parser = ArgumentParser(description=description, usage = "",
                             epilog=citation)
+
+    subtask_description = """
+
+    List of available tasks:
+
+    train
+    | -- train-init
+    | -- train-run
+    |	| -- train-run-round
+    | -- train-finish
+
+    annotate
+    | -- annotate-init
+    | -- annotate-run
+    | -- annotate-finish
+
+    posterior
+    | -- posterior-init
+    | -- posterior-run
+    | -- posterior-finish
+    """
+
+    tasks = parser.add_subparsers(title="Segway Commands", dest="task_spec",
+                                  metavar=subtask_description)
 
     parser.add_argument("--version", action="version", version=version)
 
+    # set global options first
+    group = parser.add_argument_group("Technical variables")
+    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
+                       metavar="PROGRESSION",
+                       help="try each float in PROGRESSION as the number "
+                       "of gibibytes of memory to allocate in turn "
+                       "(default %s)" % MEM_USAGE_PROGRESSION)
+
+    group.add_argument("-S", "--split-sequences", metavar="SIZE",
+                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
+                       help="split up sequences that are larger than SIZE "
+                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
+
+    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
+                       metavar="NUM",
+                       help="show messages with verbosity NUM"
+                       " (default %d)" % VERBOSITY)
+
+    group.add_argument("--cluster-opt", action="append", default=[],
+                       metavar="OPT",
+                       help="specify an option to be passed to the "
+                       "cluster manager")
+
+    group = parser.add_argument_group("Flags")
+    group.add_argument("-n", "--dry-run", action="store_true",
+                       help="write all files, but do not run any executables")
+
+    # define steps for each of the three main tasks
+    train_init = tasks.add_parser("", add_help=False)
+    train_run = tasks.add_parser("", add_help=False)
+    train_finish = tasks.add_parser("", add_help=False)
+    train_run_round = tasks.add_parser("", add_help=False)
+
+    identify_init = tasks.add_parser("", add_help=False)
+    identify_run = tasks.add_parser("", add_help=False)
+    identify_finish = tasks.add_parser("", add_help=False)
+
+    # next two groups of options belong in train-init
     # with OptionGroup(parser, "Data selection") as group:
-    group = parser.add_argument_group("Data selection")
+    group = train_init.add_argument_group("Data selection (train-init)")
     group.add_argument("-t", "--track", action="append", default=[],
                        metavar="TRACK", help="append TRACK to list of tracks"
                        " to use (default all)")
@@ -3577,7 +3832,7 @@ def parse_options(argv):
                        help="Use genomic coordinates in FILE as a validation"
                        " set (default none)")
 
-    group = parser.add_argument_group("Model files")
+    group = train_init.add_argument_group("Model files (train-init)")
     group.add_argument("-i", "--input-master", metavar="FILE",
                        help="use or create input master in FILE"
                        " (default %s)" %
@@ -3606,25 +3861,7 @@ def parse_options(argv):
                        help="semisupervised segmentation with labels in "
                        "FILE (default none)")
 
-    group = parser.add_argument_group("Intermediate files")
-    group.add_argument("-o", "--observations", metavar="DIR",
-                       help="DEPRECATED - temp files are now used and "
-                       " recommended. Previously would use or create observations in DIR"
-                       " (default %s)" %
-                       (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
-
-    group.add_argument("-r", "--recover", metavar="DIR",
-                       help="continue from interrupted run in DIR")
-
-    group = parser.add_argument_group("Output files")
-    group.add_argument("-b", "--bed", metavar="FILE",
-                       help="create identification BED track in FILE"
-                       " (default WORKDIR/%s)" % BED_FILEBASENAME)
-
-    group.add_argument("--bigBed", metavar="FILE",
-                       help="specify layered bigBed filename")
-
-    group = parser.add_argument_group("Modeling variables")
+    group = train_init.add_argument_group("Modeling variables (train-init)")
     group.add_argument("-D", "--distribution", choices=DISTRIBUTIONS,
                        metavar="DIST",
                        help="use DIST distribution"
@@ -3633,7 +3870,7 @@ def parse_options(argv):
     group.add_argument("--mixture-components", type=int,
                          default=NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT,
                          help="Number of Gaussian mixture "
-                         "components (default %d)" 
+                         "components (default %d)"
                          % NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT)
 
     group.add_argument("--num-instances", type=int,
@@ -3648,16 +3885,6 @@ def parse_options(argv):
     group.add_argument("--num-sublabels", type=int, metavar="NUM",
                        help="make NUM segment sublabels"
                        " (default %d)" % NUM_SUBSEGS)
-
-    group.add_argument("--output-label", type=str,
-                       help="in the segmentation file, for each coordinate "
-                       'print only its superlabel ("seg"), only its '
-                       "sublabel (\"subseg\"), or both (\"full\")"
-                       "  (default %s)" % OUTPUT_LABEL)
-
-    group.add_argument("--max-train-rounds", type=int, metavar="NUM",
-                       help="each training instance runs a maximum of NUM"
-                       " rounds (default %d)" % MAX_EM_ITERS)
 
     group.add_argument("--ruler-scale", type=int, metavar="SCALE",
                        help="ruler marking every SCALE bp (default the"
@@ -3686,63 +3913,131 @@ def parse_options(argv):
                          "mixture of Gaussians, default unused, else default %f"
                          % VAR_FLOOR_GMM_DEFAULT)
 
-    group = parser.add_argument_group("Technical variables")
-    group.add_argument("-m", "--mem-usage", default=MEM_USAGE_PROGRESSION,
-                       metavar="PROGRESSION",
-                       help="try each float in PROGRESSION as the number "
-                       "of gibibytes of memory to allocate in turn "
-                       "(default %s)" % MEM_USAGE_PROGRESSION)
-
-    group.add_argument("-S", "--split-sequences", metavar="SIZE",
-                       default=MAX_SPLIT_SEQUENCE_LENGTH, type=int,
-                       help="split up sequences that are larger than SIZE "
-                       "bp (default %s)" % MAX_SPLIT_SEQUENCE_LENGTH)
-
-    group.add_argument("-v", "--verbosity", type=int, default=VERBOSITY,
-                       metavar="NUM",
-                       help="show messages with verbosity NUM"
-                       " (default %d)" % VERBOSITY)
-
-    group.add_argument("--cluster-opt", action="append", default=[],
-                       metavar="OPT",
-                       help="specify an option to be passed to the "
-                       "cluster manager")
-
-    group = parser.add_argument_group("Flags")
+    group = train_init.add_argument_group("Flags (train-init)")
     group.add_argument("-c", "--clobber", action="store_true",
                        help="delete any preexisting files and assumes any "
                        "model files specified in options as output to be "
                        "overwritten")
-    group.add_argument("-n", "--dry-run", action="store_true",
-                       help="write all files, but do not run any"
-                       " executables")
 
+    # Train run is where the train-rounds are calculated
+    group = train_run.add_argument_group("Modeling Variables (train-run)")
+    group.add_argument("--max-train-rounds", type=int, metavar="NUM",
+                       help="each training instance runs a maximum of NUM"
+                       " rounds (default %d)" % MAX_EM_ITERS)
+
+    # Directory would be recovered from train-run
+    group = train_run.add_argument_group("Intermediate files (train-run)")
+    group.add_argument("-o", "--observations", metavar="DIR",
+                       help="DEPRECATED - temp files are now used and "
+                       "recommended. Previously would use or create "
+                       "observations in DIR (default %s)" %
+                       (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
+
+    group.add_argument("-r", "--recover", metavar="DIR",
+                       help="continue from interrupted run in DIR")
+
+    group = identify_init.add_argument_group("Flags (identify-init)")
+    group.add_argument("-c", "--clobber", action="store_true",
+                       help="delete any preexisting files and assumes any "
+                       "model files specified in options as output to be "
+                       "overwritten")
+
+    # select coords to identify in the init step
+    group = identify_init.add_argument_group("Data selection (idenfity-init)")
+    group.add_argument("--include-coords", metavar="FILE",
+                       help="limit to genomic coordinates in"
+                       " FILE (default all) (Note: does not apply to"
+                       " --validation-coords)")
+
+    # exclude goes after all includes
+    group.add_argument("--exclude-coords", metavar="FILE",
+                       help="filter out genomic coordinates in FILE"
+                       " (default none)")
+
+    group.add_argument("--output-label", type=str,
+                       help="in the segmentation file, for each coordinate "
+                       'print only its superlabel ("seg"), only its '
+                       "sublabel (\"subseg\"), or both (\"full\")"
+                       "  (default %s)" % OUTPUT_LABEL)
+
+    group.add_argument("--seg-table", metavar="FILE",
+                       help="load segment hyperparameters from FILE"
+                       " (default none)")
+
+    # output files are produced by identify-finish
+    group = identify_finish.add_argument_group("Output files (identify-finish)")
+    group.add_argument("-b", "--bed", metavar="FILE",
+                       help="create identification BED track in FILE"
+                       " (default WORKDIR/%s)" % BED_FILEBASENAME)
+
+    group.add_argument("--bigBed", metavar="FILE",
+                       help="specify layered bigBed filename")
+
+    args = tasks.add_parser("", add_help=False)
     # Positional arguments
-    parser.add_argument("args", nargs="+")  # "+" for at least 1 arg
+    args.add_argument("archives", nargs="+")  # "+" for at least 1 arg
+    args.add_argument("traindir", nargs=1)
+
+    identify_args = tasks.add_parser("", add_help=False)
+    identify_args.add_argument("annotatedir", nargs=1)
+
+    tasks.add_parser("train-init", parents=[train_init, args])
+    tasks.add_parser("train-run", parents=[train_run, args])
+    tasks.add_parser("train-finish", parents=[train_finish, args])
+    tasks.add_parser("train-run-round", parents=[train_run_round, args])
+
+    tasks.add_parser("annotate-init", parents=[identify_init, args,
+                                               identify_args])
+    tasks.add_parser("annotate-run", parents=[identify_run, args,
+                                              identify_args])
+    tasks.add_parser("annotate-finish", parents=[identify_finish, args,
+                                                 identify_args])
+
+    # posterior and identify take the same options
+    tasks.add_parser("posterior-init", parents=[identify_init, args,
+                                                identify_args])
+    tasks.add_parser("posterior-run", parents=[identify_run, args,
+                                               identify_args])
+    tasks.add_parser("posterior-finish", parents=[identify_finish, args,
+                                                  identify_args])
+
+    tasks.add_parser("train",
+                     parents=[train_init, train_run, train_finish, args])
+    tasks.add_parser("annotate",
+                     parents=[identify_init, identify_run, identify_finish,
+                              args, identify_args])
+    tasks.add_parser("identify",
+                     parents=[identify_init, identify_run, identify_finish,
+                              args, identify_args])
+    tasks.add_parser("posterior",
+                     parents=[identify_init, identify_run, identify_finish,
+                              args, identify_args])
+    tasks.add_parser("identify+posterior",
+                     parents=[identify_init, identify_run, identify_finish,
+                              args, identify_args])
 
     options = parser.parse_args(argv)
 
-    # Separate arguments from options
-    args = options.args  # is a non-iterable Namespace object
-
-    if len(args) < 3:
-        parser.error("Expected at least 3 arguments.")
-
-    if args[0] == "train":
-        if len(args) < 3:
-            parser.error("Expected at least 3 arguments for the train task.")
+    # options is a non-iterable Namespace object
+    # Separate arguments and task_spec from options
+    task_spec = options.task_spec
+    archives = options.archives
+    # Add [0] to unlist directory names
+    traindir = options.traindir[0]
+    if hasattr(options, "annotatedir"):
+        annotatedir = options.annotatedir[0]
     else:
-        if len(args) < 4:
-            parser.error("Expected at least 4 arguments for the identify "
-                         "task.")
+        annotatedir = None
 
-    return options, args
+    return task_spec, options, archives, traindir, annotatedir
 
 
 def main(argv=sys.argv[1:]):
-    options, args = parse_options(argv)
 
-    runner = Runner.fromoptions(args, options)
+    task_spec, options, archives, traindir, annotatedir = parse_options(argv)
+
+    runner = Runner.fromoptions(task_spec, archives,
+                                traindir, annotatedir, options)
 
     return runner()
 

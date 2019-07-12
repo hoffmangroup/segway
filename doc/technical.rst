@@ -111,7 +111,7 @@ script containing the GMTK commands and arguments for job
 Summary reports
 ---------------
 
-The ``jobs.instance.tab`` file contains a tab-delimited file with each job
+The ``jobs.*.tab`` file contains a tab-delimited file with each job
 Segway dispatched for this instance in a different row, reporting on job
 identifier (``jobid``), job name (``jobname``), GMTK program (``prog``), number
 of segment labels (``num_segs``), number of frames (``num_frames``), maximum
@@ -202,6 +202,9 @@ workdir instead.
 ``cmdline/0,1,.../``                                GMTK job shell scripts for a particular training
                                                     instance(0,1,...)
 ``cmdline/identify/``                               GMTK job shell scripts for identification
+``intermediate``                                    files containing best training filenames per instance
+|rarr| ``train_result.``\ \*\ ``.tab``              per instance information containing the filenames of
+                                                    the params resulting in the best likelihood
 ``likelihood/``                                     GMTK's report of the log likelihood for
                                                     the most recent M-step of EM training
 |rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
@@ -218,7 +221,7 @@ workdir instead.
 ``log/``                                            diagnostic information
 |rarr| ``details.sh``                               script file that includes the exact
                                                     command-lines queued by Segway, with wrapper scripts
-|rarr| ``jobs.instance.tab``                        tab-delimeted summary of jobs queued per instance,
+|rarr| ``jobs.``\ \*\ ``.tab``                        tab-delimeted summary of jobs queued per instance,
                                                     including resource informatoin and exit status
 |rarr| ``jt_info.txt``                              log file used by GMTK when creating a junction tree
 |rarr| ``jt_info.posterior.txt``                    log file used by GMTK when creating a junction tree

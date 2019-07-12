@@ -26,7 +26,7 @@ set -x
 
 # Exit true if the first was false
 SEGWAY_RAND_SEED=1498730685 segway "$cluster_arg" \
-    --include-coords="../include-coords.bed" \
+    train --include-coords="../include-coords.bed" \
     --tracks-from="../tracks.txt" --num-labels=4 \
     --input-master="../input.master" \
-    train "../simplebadinput.genomedata" traindir || { exit 0; }
+    "../simplebadinput.genomedata" traindir || { exit 0; }
