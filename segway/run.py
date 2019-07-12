@@ -3711,8 +3711,7 @@ def parse_options(argv):
 
     version = "%(prog)s {}".format(__version__)
     description = """
-
-    Semi-automated genome annotation. \n\n
+    Semi-automated genome annotation.
     Please see: segway TASK -h, for steps specific to each task"""
 
     citation = """
