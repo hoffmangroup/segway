@@ -22,7 +22,7 @@ class InputMaster(list):
 
     def append(self, item):
         if not isinstance(item, Section):
-            raise ValueError("Only section objects may be saved to an "
+            raise ValueError("Only Section objects may be saved to an "
                              "InputMaster object")
         list.append(self, item)
 
@@ -66,11 +66,40 @@ class FileSection(Section):
 
 
 class Object(str):
-    def __new__(cls, content, kind):
+    def __new__(cls, content, kind = None):
         return str.__new__(cls, content)
 
     def __init__(self, content, kind):
         self.kind = kind
+
+
+class MC(Object):
+    def __init__(self, content):
+        self.kind = "MC"
+
+
+class DeterministicCPT(list):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.kind = "DETERMINISTIC_CPT"
+
+        if len(self) != int(self[0]) + 3:
+            raise ValueError("DeterministicCPT has a length of {} when {} was "
+                             "expected".format(len(self), int(self[0]) + 3))
+
+    def __str__(self):
+        output = map(str, self)
+
+        return " ".join(output)
+
+
+class NameCollection(list):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, *kwargs)
+        self.kind = "NAME_COLLECTION"
+
+    def __str__(self):
+        return "\n".join([str(len(self))] + [str(item) for item in self])
 
 
 class Array(ndarray):
@@ -80,8 +109,8 @@ class Array(ndarray):
     def __str__(self):
         # 1 dimensional str representation covered here
         # Multidimensional varies and will be specified in sub classes.
-        assert(len(self.shape) == 1)
-        return " ".join([str(self.size), array2text()])
+        assert(len(self.shape) <= 1)
+        return " ".join([str(self.size), array2text(self)])
 
 
 class DenseCPT(Array):
@@ -95,20 +124,20 @@ class DenseCPT(Array):
         shape_list.insert(0, num_parents)
 
         shape_line = " ".join(shape_list)
-        return "\n".join([shape_line, array2text(self.__array__())])
+        return "\n".join([shape_line, array2text(self)])
 
 
 class Mean(Array):
     def __array_finalize__(self, obj):
         self.kind = "MEAN"
-        if len(obj.shape) != 1:
+        if obj.ndim != 1:
             raise ValueError("Mean object supplied must be one-dimensional")
 
 
 class Covar(Array):
     def __array_finalize__(self, obj):
         self.kind = "COVAR"
-        if len(obj.shape) != 1:
+        if obj.ndim != 1:
             raise ValueError("COVAR object supplied must be one-dimensional")
         if numpy.any(obj < 0):
             raise ValueError("Covariance values may not be less than 0")
@@ -117,5 +146,5 @@ class Covar(Array):
 class DPMF(Array):
     def __array_finalize__(self, obj):
         self.kind = "DPMF"
-        if len(obj.shape) != 1:
+        if obj.ndim != 1:
             raise ValueError("DPMF object supplied must be one-dimensional")

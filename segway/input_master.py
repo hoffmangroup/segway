@@ -24,7 +24,7 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED, USE_MFSDG)
-from .gmtk/input_master import array2text
+from .gmtk.input_master import array2text
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
 # scalars and vectors in the parameter output. By default in newer (> 1.14)
