@@ -53,6 +53,11 @@ class Section(OrderedDict):
                 assert section_kind == obj.kind
         return section_kind
 
+    def update(self, new_object):
+        if new_object.kind != self.kind:
+            raise ValueError("Kind doesn't match error")
+        super().update(new_object)
+
 
 class InlineSection(Section):
     def __str__(self):
@@ -79,13 +84,32 @@ class MC(Object):
 
 
 class DeterministicCPT(list):
+    """
+    This object will use DT to specify the deterministic relationship between
+    parent(s) DT object(s) and their child random variable
+
+    input is a list in the following order:
+    [num_parents, [parent_card, ...], self_card, child_name]
+
+    For cardinalities and number of parents, object supports str or int
+    The child name must be a str.
+
+    TODO: If possible, ensure child is in fact a DT object. 
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.kind = "DETERMINISTIC_CPT"
 
-        if len(self) != int(self[0]) + 3:
+        # The first element gives number of parents
+        # Check if it is given as int and check list length, otherwise assume
+        # It is a variable and pass
+        if (self[0] is int and
+            len(self) != self[0] + 3):
             raise ValueError("DeterministicCPT has a length of {} when {} was "
-                             "expected".format(len(self), int(self[0]) + 3))
+                             "expected".format(len(self), self[0] + 3))
+        if self[-1] != str:
+            raise ValueError("Final list element is the child variable name, "
+                             "must be a str")
 
     def __str__(self):
         output = map(str, self)
@@ -94,6 +118,12 @@ class DeterministicCPT(list):
 
 
 class NameCollection(list):
+    """
+    Name collections allow for the user to more easily specify large numbers
+    of gmtk objects together at once.
+
+    Input is list of all names in the collection
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, *kwargs)
         self.kind = "NAME_COLLECTION"
@@ -108,7 +138,8 @@ class Array(ndarray):
 
     def __str__(self):
         # 1 dimensional str representation covered here
-        # Multidimensional varies and will be specified in sub classes.
+        # Multidimensional vary between kinds and will have to be specified
+        # in specific sub classes.
         assert(len(self.shape) <= 1)
         return " ".join([str(self.size), array2text(self)])
 
