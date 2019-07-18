@@ -94,7 +94,7 @@ class DeterministicCPT(list):
     For cardinalities and number of parents, object supports str or int
     The child name must be a str.
 
-    TODO: If possible, ensure child is in fact a DT object. 
+    TODO: If possible, ensure child is in fact a DT object. Difficult
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
