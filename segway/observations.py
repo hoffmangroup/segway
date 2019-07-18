@@ -631,7 +631,7 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_blocks.append(supervision_data)
         int_blocks.append(presence_supervision_data)
 
-    if virtual_evidence_data is not None:
+    if virtual_evidence_data:
         presence_virtual_evidence_data = []
         virtual_evidence_data_array = []
         for datum in virtual_evidence_data:
@@ -643,8 +643,10 @@ def _save_window(float_filename_or_file, int_filename_or_file,
             presence_virtual_evidence_data.append(presence_virtual_evidence_datum)
             virtual_evidence_data_array.append(virtual_evidence_datum)
         # save presence data into int blocks
-        virtual_evidence_data_array = dstack(virtual_evidence_data_array).transpose((0,2,1))
-        presence_virtual_evidence_data = vstack(presence_virtual_evidence_data).T
+        virtual_evidence_data_array = \
+            dstack(virtual_evidence_data_array).transpose((0,2,1))
+        presence_virtual_evidence_data = \
+            vstack(presence_virtual_evidence_data).T
         int_blocks.append(presence_virtual_evidence_data)
 
         # separately save VE priors CPT in a temporary file
