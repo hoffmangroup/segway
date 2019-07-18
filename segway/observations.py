@@ -327,7 +327,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
 def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
                                                        num_segs):
     """
-    Downsample a 1-dimensional list of prior dictionaries to a
+    Downsample a 2-dimensional array of label probabilities to a
     desired resolution by taking the average for all labels
     over the positions with priors.
     For example, the 10-position frame
@@ -346,8 +346,6 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
 
     Downsampled input array is an array of arrays where each element
     is the vector of priors for the given downsampled position.
-
-    Only downsamples 1D lists of dictionaries of priors.
 
     There is the possibility that there will be a 'remainder'
     subarray. For that case, we choose to take its average (same as above)
