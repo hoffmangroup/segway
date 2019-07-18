@@ -787,7 +787,6 @@ class VirtualEvidenceSpec(ParamSpec):
         return self.object_tmpl % (self.num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME, self.num_segs)
 
     def generate_objects(self):
-        #if self.virtual_evidence:
         yield self.make_virtual_evidence_spec()
 
 

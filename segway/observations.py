@@ -654,10 +654,7 @@ def _save_window(float_filename_or_file, int_filename_or_file,
                     ' '.join(['{}'.format(prob) for prob in world]) + '\n')
 
     if int_blocks:
-        if int_blocks[0].ndim == 3:
-            int_data = dstack(int_blocks)
-        else:
-            int_data = column_stack(int_blocks)
+        int_data = column_stack(int_blocks)
     else:
         int_data = array([], dtype=DTYPE_OBS_INT)
 
