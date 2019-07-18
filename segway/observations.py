@@ -323,7 +323,8 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
     return downsampled_input_array, presence_downsampled_input_array
 
 
-def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution,
+
+def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
                                                        num_segs):
     """
     Downsample a 1-dimensional list of prior dictionaries to a
@@ -353,34 +354,9 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution,
     and append it to the end of our array of downsampled priors.
     """
 
-    # first convert the dictionaries of priors to lists
-    # however, leave empty dictionaries (no priors specified) as all 0
-    # so [{0:0.5, 1:0.2}, {1:0.4}, {}] with num_segs = 5 would become
-    # [[0.5, 0.2, 0.10, 0.10, 0.10], [0.15, 0.4, 0.15, 0.15, 0.15],
-    # [0.0 ... 0.0]]
-    prior_list = zeros((len(input_array), num_segs))
-    for prior_dict_index, prior_dict in enumerate(input_array):
-        if any(prior_dict):
-            prior_dict_values = list(filter(None, prior_dict))
-            # number of labels with priors
-            num_prior_labels = len(prior_dict_values)
-            remaining_probability = 1 - sum(prior_dict_values)
-
-            if remaining_probability < -0.001:
-                raise ValueError("Priors must sum to 1.0 at every position")
-
-            # divide remaining probability uniformly amongst the remaining labels
-            uniform_prior = remaining_probability / (num_segs-num_prior_labels)
-
-            for label in range(num_segs):
-                if not prior_dict[label]:
-                    prior_list[prior_dict_index][label] = uniform_prior
-                else:
-                    prior_list[prior_dict_index][label] = prior_dict_values[label]
-
     uniform_prior_vector = array([1.0/num_segs] * num_segs)
 
-    presence_array = array([1 if any(prior_dict) else 0 for prior_dict in input_array],
+    presence_array = array([1 if any(priors) else 0 for priors in prior_list],
                                dtype=DTYPE_OBS_INT)
 
     if resolution == 1:
@@ -391,7 +367,7 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution,
         # our "downsampled" prior array at resolution 1 is just the
         # vector of priors defined by the user at every position
         # with uniform priors filled in at all other positions
-        prior_array = zeros((len(input_array), num_segs))
+        prior_array = zeros((len(prior_list), num_segs))
         for prior_list_index, prior_vector in enumerate(prior_list):
             if 0.999 <= sum(prior_vector) <= 1.001:
                 prior_array[prior_list_index] = prior_vector
@@ -515,6 +491,47 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     return res
 
 
+def fill_virtual_evidence_cells(input_array, num_segs):
+    """
+    For genomic positions which have at least one, but not all priors specified,
+    this function will apply a uniform prior to all remaining labels.
+    Indexes where no prior was ever specified will remain zero for downsampling
+
+    Example:
+    INPUT:
+    [[0.5, 0.2, None, None, None],
+     [None, 0.4, None, None, None],
+     [None, None, None, None, None]]
+
+    OUTPUT: 
+    [[0.5, 0.2, 0.10, 0.10, 0.10],
+     [0.15, 0.4, 0.15, 0.15, 0.15],
+     [0.0 ... 0.0]]
+    """
+
+    prior_list = zeros((len(input_array), num_segs))
+    for prior_dict_index, prior_dict in enumerate(input_array):
+        if any(prior_dict):
+            prior_dict_values = list(filter(None, prior_dict))
+            # number of labels with priors
+            num_prior_labels = len(prior_dict_values)
+            remaining_probability = 1 - sum(prior_dict_values)
+
+            if remaining_probability < -0.001:
+                raise ValueError("Priors must sum to 1.0 at every position")
+
+            # divide remaining probability uniformly amongst the remaining labels
+            uniform_prior = remaining_probability / (num_segs-num_prior_labels)
+
+            for label in range(num_segs):
+                if not prior_dict[label]:
+                    prior_list[prior_dict_index][label] = uniform_prior
+                else:
+                    prior_list[prior_dict_index][label] = prior_dict_values[label]
+
+    return prior_list
+
+
 def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors,
                                 start, end, num_segs):
     """
@@ -542,7 +559,11 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
         res[label][(label_start - start):(label_end - start)] = \
             list(data.values()) * ((label_end - start)-(label_start - start))
 
-    return res.transpose()
+    # For coords which had at least one label supplied, fill remaining labels
+    # with uniform remaining probability
+    res = fill_virtual_evidence_cells(res.transpose(), num_segs)
+
+    return res
 
 
 def make_continuous_cells(track_indexes, genomedata_names,
