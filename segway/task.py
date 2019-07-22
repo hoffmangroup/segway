@@ -142,6 +142,22 @@ def replace_subsequent_value(input_list, query, new):
         # Do nothing
         pass
 
+def prepare_virtual_evidence(start, end, num_segs, virtual_evidence_coords,
+                             virtual_evidence_priors):
+    virtual_evidence_cells = []
+    zipper = zip(virtual_evidence_coords.split(";"),
+                 virtual_evidence_priors.split(";"))
+    for coords, priors in zipper:
+        virtual_evidence_coords = literal_eval(coords)
+        virtual_evidence_priors = literal_eval(priors)
+
+        cell = make_virtual_evidence_cells(
+                   virtual_evidence_coords,
+                   virtual_evidence_priors,
+                   start, end, num_segs)
+        virtual_evidence_cells.append(cell)
+
+    return virtual_evidence_cells
 
 def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                               continuous_cells, resolution, distribution,
@@ -501,21 +517,11 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
+    num_segs = literal_eval(num_segs)
     if virtual_evidence == "True":
-        virtual_evidence_cells = []
-        zipper = zip(virtual_evidence_coords.split(";"),
-                     virtual_evidence_priors.split(";"))
-        for coords, priors in zipper:
-            virtual_evidence_coords = literal_eval(coords)
-            virtual_evidence_priors = literal_eval(priors)
-
-            num_segs = literal_eval(num_segs)
-
-            cell = make_virtual_evidence_cells(
-                       virtual_evidence_coords,
-                       virtual_evidence_priors,
-                       start, end, num_segs)
-            virtual_evidence_cells.append(cell)
+        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_segs,
+                                                          virtual_evidence_coords,
+                                                          virtual_evidence_priors)
     else:
         virtual_evidence_cells = None
 
@@ -556,21 +562,11 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
+    num_segs = literal_eval(num_segs)
     if virtual_evidence == "True":
-        virtual_evidence_cells = []
-        zipper = zip(virtual_evidence_coords.split(";"),
-                     virtual_evidence_priors.split(";"))
-        for coords, priors in zipper:
-            virtual_evidence_coords = literal_eval(coords)
-            virtual_evidence_priors = literal_eval(priors)
-
-            num_segs = literal_eval(num_segs)
-
-            cell = make_virtual_evidence_cells(
-                       virtual_evidence_coords,
-                       virtual_evidence_priors,
-                       start, end, num_segs)
-            virtual_evidence_cells.append(cell)
+        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_segs,
+                                                          virtual_evidence_coords,
+                                                          virtual_evidence_priors)
     else:
         virtual_evidence_cells = None
 
@@ -631,16 +627,11 @@ def run_train(coord, resolution, do_reverse, outfilename,
         # Otherwise ignore supervision
         supervision_cells = None
 
+    num_segs = literal_eval(num_segs)
     if virtual_evidence == "True":
-        virtual_evidence_coords = literal_eval(virtual_evidence_coords)
-        virtual_evidence_priors = literal_eval(virtual_evidence_priors)
-
-        num_segs = literal_eval(num_segs)
-
-        virtual_evidence_cells = [make_virtual_evidence_cells(
-                                    virtual_evidence_coords,
-                                    virtual_evidence_priors,
-                                    start, end, num_segs)]
+        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_segs,
+                                                          virtual_evidence_coords,
+                                                          virtual_evidence_priors)
     else:
         virtual_evidence_cells = None
 
