@@ -330,9 +330,13 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
     Downsample a 2-dimensional array of label probabilities to a
     desired resolution by taking the average for all labels
     over the positions with priors.
-    For example, the 10-position frame
-    [{0:0.5, 1:0.2}, {1:0.4}, {}, ..., {}]
-    downsampled to resolution 10 is [{0:0.4, 1:0.3, 2:0.3}]
+    For example, the 3-position frame
+
+    [[0.5, 0.2, 0.3],
+     [0.3, 0.4, 0.3],
+     [0.0, 0.0, 0.0]]
+
+    downsampled to resolution 3 is [{0:0.4, 1:0.3, 2:0.3}]
     since for label 0 we take mean(0.5, 0.3) = 0.4
           for label 1 we take mean(0.2, 0.4) = 0.3
           for label 2 we take mean(0.3, 0.3) = 0.3
