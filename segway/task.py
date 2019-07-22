@@ -583,9 +583,6 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     del continuous_cells
     gc.collect()
 
-    import pdb
-    pdb.set_trace()
-
     with files_to_remove(temp_filenames):
         output = VITERBI_PROG.getoutput(*args)
 

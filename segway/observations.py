@@ -402,8 +402,7 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
         # in each resolution-length partition, we cannot have more positions
         # with priors defined than we have positions
         assert(number_priors_defined <= resolution)
-        downsampled_presence_array[index] = \
-            number_priors_defined
+        downsampled_presence_array[index] = number_priors_defined
 
         # take the sum of the given priors for each label over the position axis
         sum_prior_vector = sum(input_partition, axis=0)
