@@ -354,14 +354,12 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
 
     uniform_prior_vector = array([1.0/num_segs] * num_segs)
 
+    # take the presence to be 1 at every position the user has defined
+    # any priors and 0 otherwise
     presence_array = array([1 if any(priors) else 0 for priors in prior_list],
                                dtype=DTYPE_OBS_INT)
 
     if resolution == 1:
-        # at resolution==1, it suffices to take the presence to be 1
-        # at every position the user has defined any priors
-        # and 0 otherwise
-
         # our "downsampled" prior array at resolution 1 is just the
         # vector of priors defined by the user at every position
         # with uniform priors filled in at all other positions
@@ -507,13 +505,13 @@ def fill_virtual_evidence_cells(input_array, num_segs):
      [0.0 ... 0.0]]
     """
 
-    prior_list = zeros((len(input_array), num_segs))
-    for prior_dict_index, prior_dict in enumerate(input_array):
-        if any(prior_dict):
-            prior_dict_values = list(filter(None, prior_dict))
+    prior_array = zeros((len(input_array), num_segs))
+    for prior_coordinate, prior_list in enumerate(input_array):
+        if any(prior_list != None):
+            prior_list_values = list(filter(None, prior_list))
             # number of labels with priors
-            num_prior_labels = len(prior_dict_values)
-            remaining_probability = 1 - sum(prior_dict_values)
+            num_prior_labels = len(prior_list_values)
+            remaining_probability = 1 - sum(prior_list_values)
 
             if remaining_probability < -EPSILON:
                 raise ValueError("Priors must sum to 1.0 at every position")
@@ -522,12 +520,12 @@ def fill_virtual_evidence_cells(input_array, num_segs):
             uniform_prior = remaining_probability / (num_segs-num_prior_labels)
 
             for label in range(num_segs):
-                if not prior_dict[label]:
-                    prior_list[prior_dict_index][label] = uniform_prior
+                if not prior_list[label]:
+                    prior_array[prior_coordinate][label] = uniform_prior
                 else:
-                    prior_list[prior_dict_index][label] = prior_dict_values[label]
+                    prior_array[prior_coordinate][label] = prior_list_values[label]
 
-    return prior_list
+    return prior_array
 
 
 def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors,
