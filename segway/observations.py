@@ -367,9 +367,9 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
         # with uniform priors filled in at all other positions
         prior_array = zeros((len(prior_list), num_segs))
         for prior_list_index, prior_vector in enumerate(prior_list):
-            if 0.999 <= sum(prior_vector) <= 1.001:
+            if abs(sum(prior_vector) - 1) < EPSILON:
                 prior_array[prior_list_index] = prior_vector
-            elif sum(prior_vector) == 0.0:
+            elif abs(sum(prior_vector)) < EPSILON:
                 prior_array[prior_list_index] = uniform_prior_vector
             else:
                 raise ValueError("Priors must sum to 1.0 at every position")
@@ -515,7 +515,7 @@ def fill_virtual_evidence_cells(input_array, num_segs):
             num_prior_labels = len(prior_dict_values)
             remaining_probability = 1 - sum(prior_dict_values)
 
-            if remaining_probability < -0.001:
+            if remaining_probability < -EPSILON:
                 raise ValueError("Priors must sum to 1.0 at every position")
 
             # divide remaining probability uniformly amongst the remaining labels
