@@ -142,8 +142,10 @@ def replace_subsequent_value(input_list, query, new):
         # Do nothing
         pass
 
-def prepare_virtual_evidence(start, end, num_labels, virtual_evidence_coords,
-                             virtual_evidence_priors):
+def prepare_virtual_evidence(virtual_evidence, start, end, num_labels,
+                             virtual_evidence_coords, virtual_evidence_priors):
+    if virtual_evidence == "False":
+        return None
     virtual_evidence_cells = []
     zipper = zip(virtual_evidence_coords.split(";"),
                  virtual_evidence_priors.split(";"))
@@ -502,7 +504,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                            num_labels, num_sublabels, output_label,
                            genomedata_names, distribution, track_indexes_text,
                            virtual_evidence, virtual_evidence_coords,
-                           virtual_evidence_priors, num_labels, *args):
+                           virtual_evidence_priors, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
     args = list(args)
@@ -518,12 +520,10 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                              chrom, start, end)
 
     num_labels = literal_eval(num_labels)
-    if virtual_evidence == "True":
-        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_labels,
-                                                          virtual_evidence_coords,
-                                                          virtual_evidence_priors)
-    else:
-        virtual_evidence_cells = None
+    virtual_evidence_cells = prepare_virtual_evidence(virtual_evidence,
+                                                      start, end, num_labels,
+                                                      virtual_evidence_coords,
+                                                      virtual_evidence_priors)
 
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
                                                continuous_cells,
@@ -547,7 +547,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                          num_labels, num_sublabels, output_label,
                          genomedata_names, distribution, track_indexes_text,
                          virtual_evidence, virtual_evidence_coords,
-                         virtual_evidence_priors, num_labels, *args):
+                         virtual_evidence_priors, *args):
     # convert from tuple
     args = list(args)
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
@@ -563,12 +563,10 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                                              chrom, start, end)
 
     num_labels = literal_eval(num_labels)
-    if virtual_evidence == "True":
-        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_labels,
-                                                          virtual_evidence_coords,
-                                                          virtual_evidence_priors)
-    else:
-        virtual_evidence_cells = None
+    virtual_evidence_cells = prepare_virtual_evidence(virtual_evidence,
+                                                      start, end, num_labels,
+                                                      virtual_evidence_coords,
+                                                      virtual_evidence_priors)
 
     temp_filenames = prepare_gmtk_observations(args, chrom, start, end,
                                                continuous_cells,
@@ -628,12 +626,10 @@ def run_train(coord, resolution, do_reverse, outfilename,
         supervision_cells = None
 
     num_labels = literal_eval(num_labels)
-    if virtual_evidence == "True":
-        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_labels,
-                                                          virtual_evidence_coords,
-                                                          virtual_evidence_priors)
-    else:
-        virtual_evidence_cells = None
+    virtual_evidence_cells = prepare_virtual_evidence(virtual_evidence,
+                                                      start, end, num_labels,
+                                                      virtual_evidence_coords,
+                                                      virtual_evidence_priors)
 
     temp_filenames = prepare_gmtk_observations(gmtk_args, chrom, start,
                                                end, continuous_cells,

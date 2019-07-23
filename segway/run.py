@@ -3642,7 +3642,6 @@ to find the winning instance anyway.""" % thread.instance_index)
                        self.virtual_evidence,
                        virtual_evidence_coords,
                        virtual_evidence_priors,
-                       self.num_segs,  # need number of segments to unpack VE priors later 
                        self.num_mix_components,]
 
         output_filename = None
