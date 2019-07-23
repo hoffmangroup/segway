@@ -325,7 +325,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
 
 
 def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
-                                                       num_segs):
+                                                       num_labels):
     """
     Downsample a 2-dimensional array of label probabilities to a
     desired resolution by taking the average for all labels
@@ -356,7 +356,7 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
     and append it to the end of our array of downsampled priors.
     """
 
-    uniform_prior_vector = array([1.0/num_segs] * num_segs)
+    uniform_prior_vector = array([1.0/num_labels] * num_labels)
 
     # take the presence to be 1 at every position the user has defined
     # any priors and 0 otherwise
@@ -367,7 +367,7 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
         # our "downsampled" prior array at resolution 1 is just the
         # vector of priors defined by the user at every position
         # with uniform priors filled in at all other positions
-        prior_array = zeros((len(prior_list), num_segs))
+        prior_array = zeros((len(prior_list), num_labels))
         for prior_list_index, prior_vector in enumerate(prior_list):
             if abs(sum(prior_vector) - 1) < EPSILON:
                 prior_array[prior_list_index] = prior_vector
@@ -490,7 +490,7 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     return res
 
 
-def fill_virtual_evidence_cells(input_array, num_segs):
+def fill_virtual_evidence_cells(input_array, num_labels):
     """
     For genomic positions which have at least one, but not all priors specified,
     this function will apply a uniform prior to all remaining labels.
@@ -508,7 +508,7 @@ def fill_virtual_evidence_cells(input_array, num_segs):
      [0.0 ... 0.0]]
     """
 
-    prior_array = zeros((len(input_array), num_segs))
+    prior_array = zeros((len(input_array), num_labels))
     for prior_coordinate, prior_list in enumerate(input_array):
         if any(prior_list != None):
             prior_list_values = list(filter(None, prior_list))
@@ -520,9 +520,9 @@ def fill_virtual_evidence_cells(input_array, num_segs):
                 raise ValueError("Priors must sum to 1.0 at every position")
 
             # divide remaining probability uniformly amongst the remaining labels
-            uniform_prior = remaining_probability / (num_segs-num_prior_labels)
+            uniform_prior = remaining_probability / (num_labels-num_prior_labels)
 
-            for label in range(num_segs):
+            for label in range(num_labels):
                 if not prior_list[label]:
                     prior_array[prior_coordinate][label] = uniform_prior
                 else:
@@ -532,7 +532,7 @@ def fill_virtual_evidence_cells(input_array, num_segs):
 
 
 def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors,
-                                start, end, num_segs):
+                                start, end, num_labels):
     """
     virtual_evidence_coords: list of tuples (start, end)
     virtual_evidence_priors: list of dictionaries of the format {label: prior}
@@ -543,7 +543,7 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
     virtual_evidence_coords where each cell is the prior data for that region
     """
 
-    res = full((num_segs, (end-start)), None)
+    res = full((num_labels, (end-start)), None)
 
     # Get supervision regions that overlap with the start and end coords
     supercontig_coords_labels = \
@@ -560,7 +560,7 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
 
     # For coords which had at least one label supplied, fill remaining labels
     # with uniform remaining probability
-    res = fill_virtual_evidence_cells(res.transpose(), num_segs)
+    res = fill_virtual_evidence_cells(res.transpose(), num_labels)
 
     return res
 
@@ -600,7 +600,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
 def _save_window(float_filename_or_file, int_filename_or_file, 
                  float_data, resolution, distribution, seq_data=None,
                  supervision_data=None, virtual_evidence_data=None,
-                 virtual_evidence_filename_or_file=None, num_segs=None):
+                 virtual_evidence_filename_or_file=None, num_labels=None):
     # called by task.py as well as observation.py
 
     # input function in GMTK_ObservationMatrix.cc:
@@ -659,7 +659,7 @@ def _save_window(float_filename_or_file, int_filename_or_file,
                 get_downsampled_virtual_evidence_data_and_presence(
                     datum,
                     resolution,
-                    num_segs)
+                    num_labels)
             presence_virtual_evidence_data.append(presence_virtual_evidence_datum)
             virtual_evidence_data_array.append(virtual_evidence_datum)
         # save presence data into int blocks

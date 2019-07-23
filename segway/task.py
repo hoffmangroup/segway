@@ -68,7 +68,7 @@ def mkstemp_observation(chromosome_name, start, end, suffix):
 
 def save_temp_observations(chromosome_name, start, end, continuous_cells,
                            resolution, distribution, supervision_data,
-                           virtual_evidence_data, num_segs):
+                           virtual_evidence_data, num_labels):
     """Returns a tuple (float_obs, int_obs) of temporary filepaths for the
     int/float observation filenames unique to this process"""
 
@@ -88,7 +88,7 @@ def save_temp_observations(chromosome_name, start, end, continuous_cells,
                          seq_data=None, supervision_data=supervision_data,
                          virtual_evidence_data=virtual_evidence_data,
                          virtual_evidence_filename_or_file=virtual_evidence_file,
-                         num_segs=num_segs)
+                         num_labels=num_labels)
 
     return float_observations_filename, int_observations_filename, \
            virtual_evidence_filename
@@ -142,7 +142,7 @@ def replace_subsequent_value(input_list, query, new):
         # Do nothing
         pass
 
-def prepare_virtual_evidence(start, end, num_segs, virtual_evidence_coords,
+def prepare_virtual_evidence(start, end, num_labels, virtual_evidence_coords,
                              virtual_evidence_priors):
     virtual_evidence_cells = []
     zipper = zip(virtual_evidence_coords.split(";"),
@@ -154,7 +154,7 @@ def prepare_virtual_evidence(start, end, num_segs, virtual_evidence_coords,
         cell = make_virtual_evidence_cells(
                    virtual_evidence_coords,
                    virtual_evidence_priors,
-                   start, end, num_segs)
+                   start, end, num_labels)
         virtual_evidence_cells.append(cell)
 
     return virtual_evidence_cells
@@ -162,7 +162,7 @@ def prepare_virtual_evidence(start, end, num_segs, virtual_evidence_coords,
 def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                               continuous_cells, resolution, distribution,
                               supervision_data=None, virtual_evidence_data=None,
-                              num_segs=None):
+                              num_labels=None):
     """Returns a list of filepaths to observation files created for gmtk
     and modifies the necessary arguments (args) for running gmtk"""
 
@@ -173,7 +173,7 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
             save_temp_observations(chromosome_name, start, end,
                                    continuous_cells, resolution, distribution,
                                    supervision_data, virtual_evidence_data,
-                                   num_segs)
+                                   num_labels)
 
         # Create the gmtk observation file lists
         float_observation_list_filename, int_observation_list_filename, \
@@ -502,7 +502,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                            num_labels, num_sublabels, output_label,
                            genomedata_names, distribution, track_indexes_text,
                            virtual_evidence, virtual_evidence_coords,
-                           virtual_evidence_priors, num_segs, *args):
+                           virtual_evidence_priors, num_labels, *args):
     # XXX: this whole function is duplicative of run_viterbi_save_bed
     # and needs to be reduced convert from tuple
     args = list(args)
@@ -517,9 +517,9 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
-    num_segs = literal_eval(num_segs)
+    num_labels = literal_eval(num_labels)
     if virtual_evidence == "True":
-        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_segs,
+        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_labels,
                                                           virtual_evidence_coords,
                                                           virtual_evidence_priors)
     else:
@@ -529,7 +529,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                                continuous_cells,
                                                resolution, distribution,
                                                None, virtual_evidence_cells,
-                                               num_segs)
+                                               num_labels)
     # remove from memory
     del continuous_cells
     gc.collect()
@@ -547,7 +547,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                          num_labels, num_sublabels, output_label,
                          genomedata_names, distribution, track_indexes_text,
                          virtual_evidence, virtual_evidence_coords,
-                         virtual_evidence_priors, num_segs, *args):
+                         virtual_evidence_priors, num_labels, *args):
     # convert from tuple
     args = list(args)
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
@@ -562,9 +562,9 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
     continuous_cells = make_continuous_cells(track_indexes, genomedata_names,
                                              chrom, start, end)
 
-    num_segs = literal_eval(num_segs)
+    num_labels = literal_eval(num_labels)
     if virtual_evidence == "True":
-        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_segs,
+        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_labels,
                                                           virtual_evidence_coords,
                                                           virtual_evidence_priors)
     else:
@@ -574,7 +574,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                                                continuous_cells,
                                                resolution, distribution,
                                                None, virtual_evidence_cells,
-                                               num_segs)
+                                               num_labels)
     # remove from memory
     del continuous_cells
     gc.collect()
@@ -593,7 +593,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
               track_indexes,
               is_semisupervised, supervision_coords, supervision_labels,
               virtual_evidence, virtual_evidence_coords,
-              virtual_evidence_priors, num_segs, *args):
+              virtual_evidence_priors, num_labels, *args):
 
     # Create and save the train window
     genomedata_names = genomedata_names.split(",")
@@ -627,9 +627,9 @@ def run_train(coord, resolution, do_reverse, outfilename,
         # Otherwise ignore supervision
         supervision_cells = None
 
-    num_segs = literal_eval(num_segs)
+    num_labels = literal_eval(num_labels)
     if virtual_evidence == "True":
-        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_segs,
+        virtual_evidence_cells = prepare_virtual_evidence(start, end, num_labels,
                                                           virtual_evidence_coords,
                                                           virtual_evidence_priors)
     else:
@@ -640,7 +640,7 @@ def run_train(coord, resolution, do_reverse, outfilename,
                                                resolution, distribution,
                                                supervision_cells,
                                                virtual_evidence_cells,
-                                               num_segs)
+                                               num_labels)
     del continuous_cells
     gc.collect()
 
