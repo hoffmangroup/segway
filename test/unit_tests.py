@@ -4,10 +4,10 @@ from os.path import isfile, sep
 from tempfile import gettempdir
 import unittest
 
-from numpy import empty
+from numpy import array, empty
 
 from segway.observations import merge_windows
-from segway.task import prepare_gmtk_observations
+from segway.task import prepare_gmtk_observations, prepare_virtual_evidence
 from segway._util import EXT_INT, EXT_FLOAT, EXT_VIRTUAL_EVIDENCE
 
 
@@ -100,6 +100,29 @@ class TestTask(unittest.TestCase):
         remove(float_obs_filename)
         remove(virtual_evidence_filename)
 
+
+class TestVirtualEvidence(unittest.TestCase):
+
+    def test_overlapping_labels(self):
+        virtual_evidence_priors = "[{0: 0.9}, {0: 0.7}]"
+        virtual_evidence_coords = "[(0, 100), (50, 150)]"
+
+        with self.assertRaises(ValueError):
+            prepare_virtual_evidence(1, 0, 800, 6,
+                                     virtual_evidence_coords,
+                                     virtual_evidence_priors)
+
+    def test_zero_prob(self):
+        virtual_evidence_priors = "[{1: 0.8}, {0: 0}]"
+        virtual_evidence_coords = "[(0, 4), (4, 5)]"
+
+        prepared = prepare_virtual_evidence(1, 0, 5, 3,
+                                            virtual_evidence_coords,
+                                            virtual_evidence_priors)
+        expected = array([[0.1, 0.9, 0.1], [0.1, 0.9, 0.1], [0.1, 0.9, 0.1],
+                          [0.1, 0.9, 0.1], [0, 0.5, 0.5]])
+
+        self.assertEqual(prepared, expected)
 
 if __name__ == "__main__":
     unittest.main()

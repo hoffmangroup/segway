@@ -544,7 +544,7 @@ def fill_virtual_evidence_cells(input_array, num_labels):
                 if not prior_list[label]:
                     prior_array[prior_coordinate][label] = uniform_prior
                 else:
-                    prior_array[prior_coordinate][label] = prior_list_values[label]
+                    prior_array[prior_coordinate][label] = prior_list[label]
 
     return prior_array
 
@@ -557,10 +557,11 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
     start: int
     end: int
 
-    returns a 1-dimensional numpy.ndarray for the region specified by
+    returns a 2-dimensional numpy.ndarray for the region specified by
     virtual_evidence_coords where each cell is the prior data for that region
     """
-
+    import pdb
+    pdb.set_trace()
     res = full((num_labels, (end-start)), None)
 
     # Get supervision regions that overlap with the start and end coords
