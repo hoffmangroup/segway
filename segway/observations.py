@@ -323,9 +323,61 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
     return downsampled_input_array, presence_downsampled_input_array
 
 
+def downsample_presence_array(presence_array, resolution):
+    """
+    Downsamples a 1D presence array given the specified resolution.
+    Sums the presence across bins given the resolution size, so
+    [0, 1, 1, 1, 0, 0] for resolution == 3 becomes
+    [2, 1]
+    """
+    downsampled_presence_array = [sum(presence_array[index:index+resolution])
+            for index in range(0, len(presence_array), resolution)
+            ]
 
-def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
-                                                       num_labels):
+    return downsampled_presence_array
+
+
+def downsample_prior_array(raw_prior_array, resolution, uniform_prior_vector):
+    """
+    Downsamples a 2D array of priors. Takes the average for all labels defined,
+    uses a uniform prior if none are.
+    """
+    # split input_array into subarrays of length resolution.
+    # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6]] for resolution == 3
+    resolution_partitioned_prior_list = (
+            raw_prior_array[index:index+resolution]
+            for index in range(0, len(raw_prior_array), resolution)
+            )
+
+    # Empty array to be filled with mean values for priors for each bin
+    downsampled_prior_array = zeros(calc_downsampled_shape(raw_prior_array,
+                                    resolution), raw_prior_array.dtype)
+
+    # For each input partition, calculate the mean prior for each label
+    # if no priors given, use a uniform prior
+    for index, input_partition in enumerate(resolution_partitioned_prior_list):
+        # if no priors are defined in this partition,
+        # (meaning input_partition will be entirely composed of 0's)
+        # set the mean vector to be uniform
+        if not input_partition.any():
+            downsampled_prior_array[index] = uniform_prior_vector
+        else:
+            # Remove any rows which don't contain priors
+            defined_priors = input_partition[input_partition.any(1)]
+            # take the mean of the given priors for each label over the
+            # position axis
+            sum_prior_vector = mean(input_partition, axis=0)
+            # if priors are defined, check that the mean across
+            # defined positions sums to 1
+            if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
+                downsampled_prior_array[index] = mean_prior_vector
+            else:
+                raise ValueError("Priors must sum to 1.0 at every position")
+
+    return downsampled_prior_array
+
+def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
+                                                       resolution, num_labels):
     """
     Downsample a 2-dimensional array of label probabilities to a
     desired resolution by taking the average for all labels
@@ -336,7 +388,7 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
      [0.3, 0.4, 0.3],
      [0.0, 0.0, 0.0]]
 
-    downsampled to resolution 3 is [{0:0.4, 1:0.3, 2:0.3}]
+    downsampled to resolution 3 is [0.4, 0.3, 0.3]
     since for label 0 we take mean(0.5, 0.3) = 0.4
           for label 1 we take mean(0.2, 0.4) = 0.3
           for label 2 we take mean(0.3, 0.3) = 0.3
@@ -360,15 +412,15 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
 
     # take the presence to be 1 at every position the user has defined
     # any priors and 0 otherwise
-    presence_array = array([1 if any(priors) else 0 for priors in prior_list],
+    presence_array = array([1 if any(priors) else 0 for priors in raw_prior_array],
                                dtype=DTYPE_OBS_INT)
 
     if resolution == 1:
         # our "downsampled" prior array at resolution 1 is just the
         # vector of priors defined by the user at every position
         # with uniform priors filled in at all other positions
-        prior_array = zeros((len(prior_list), num_labels))
-        for prior_list_index, prior_vector in enumerate(prior_list):
+        prior_array = zeros((len(raw_prior_array), num_labels))
+        for prior_list_index, prior_vector in enumerate(raw_prior_array):
             if abs(sum(prior_vector) - 1) < EPSILON:
                 prior_array[prior_list_index] = prior_vector
             elif abs(sum(prior_vector)) < EPSILON:
@@ -378,46 +430,12 @@ def get_downsampled_virtual_evidence_data_and_presence(prior_list, resolution,
 
         return prior_array, presence_array
 
-    # split input_array into subarrays of length resolution.
-    # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
-    resolution_partitioned_prior_list = (
-            prior_list[index:index+resolution]
-            for index in range(0, len(prior_list), resolution)
-            )
+    downsampled_prior_array = downsample_prior_array(raw_prior_array,
+                                                     resolution,
+                                                     uniform_prior_vector)
+    downsampled_presence_array = downsample_presence_array(presence_array,
+                                                           resolution)
 
-    resolution_partitioned_presence_array = [
-            presence_array[index:index+resolution]
-            for index in range(0, len(presence_array), resolution)
-            ]
-
-    downsampled_prior_array = zeros(calc_downsampled_shape(prior_list,
-                                    resolution), prior_list.dtype)
-    downsampled_presence_array = zeros(calc_downsampled_shape(presence_array,
-                                             resolution), dtype=DTYPE_OBS_INT)
-    # For each input partition, calculate the mean prior for each label
-    # if no priors given, use a uniform prior
-    for index, input_partition in enumerate(resolution_partitioned_prior_list):
-        # get the number of priors defined in the input partition
-        number_priors_defined = sum(resolution_partitioned_presence_array[index])
-        # in each resolution-length partition, we cannot have more positions
-        # with priors defined than we have positions
-        assert(number_priors_defined <= resolution)
-        downsampled_presence_array[index] = number_priors_defined
-
-        # take the sum of the given priors for each label over the position axis
-        sum_prior_vector = sum(input_partition, axis=0)
-        # if no priors are defined in this partition,
-        # set the mean vector to be uniform
-        if number_priors_defined == 0:
-            downsampled_prior_array[index] = uniform_prior_vector
-        else:
-            # if priors are defined, check that the mean across
-            # defined positions sums to 1
-            mean_prior_vector = sum_prior_vector / number_priors_defined
-            if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
-                downsampled_prior_array[index] = mean_prior_vector
-            else:
-                raise ValueError("Priors must sum to 1.0 at every position")
 
     return downsampled_prior_array, downsampled_presence_array
 
