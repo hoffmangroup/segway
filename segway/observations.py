@@ -19,7 +19,7 @@ from tempfile import gettempdir
 from genomedata import Genome
 from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
                    column_stack, copy, dstack, empty, finfo, float32, full,
-                   invert, isnan, maximum, sum, vstack, zeros)
+                   invert, isnan, maximum, mean, sum, vstack, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -366,7 +366,7 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_prior_vector):
             defined_priors = input_partition[input_partition.any(1)]
             # take the mean of the given priors for each label over the
             # position axis
-            sum_prior_vector = mean(input_partition, axis=0)
+            mean_prior_vector = mean(defined_priors, axis=0)
             # if priors are defined, check that the mean across
             # defined positions sums to 1
             if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
