@@ -7,7 +7,7 @@ import unittest
 from numpy import empty
 
 from segway.observations import merge_windows
-from segway.task import prepare_gmtk_observations
+from segway.task import prepare_gmtk_observations, prepare_virtual_evidence
 from segway._util import EXT_INT, EXT_FLOAT, EXT_VIRTUAL_EVIDENCE
 
 
@@ -99,6 +99,17 @@ class TestTask(unittest.TestCase):
         remove(int_obs_filename)
         remove(float_obs_filename)
         remove(virtual_evidence_filename)
+
+
+class TestVirtualEvidence(unittest.TestCase):
+    def test_overlap(self):
+        virtual_evidence_coords = "[(0, 100), (50, 150)]"
+        virtual_evidence_priors = "[{0: 0.6}, {1: 0.3}]"
+
+        with self.assertRaises(ValueError):
+            prepare_virtual_evidence(1, 0, 800, 4,
+                                     virtual_evidence_coords,
+                                     virtual_evidence_priors)
 
 
 if __name__ == "__main__":
