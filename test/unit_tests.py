@@ -4,7 +4,7 @@ from os.path import isfile, sep
 from tempfile import gettempdir
 import unittest
 
-from numpy import empty
+from numpy import array, empty
 
 from segway.observations import merge_windows
 from segway.task import prepare_gmtk_observations, prepare_virtual_evidence
@@ -110,6 +110,15 @@ class TestVirtualEvidence(unittest.TestCase):
             prepare_virtual_evidence(1, 0, 800, 4,
                                      virtual_evidence_coords,
                                      virtual_evidence_priors)
+
+    def test_zero_labels(self):
+        virtual_evidence_coords = "[(0, 4), (4, 5)]"
+        virtual_evidence_priors = "[{1: 0.8}, {0: 0}]"
+
+        expected = prepare_virtual_evidence(1, 0, 5, 3,
+                                           virtual_evidence_coords,
+                                           virtual_evidence_priors)
+        self.assertTrue((expected[0][4] == array([0, 0.5, 0.5])).all())
 
 
 if __name__ == "__main__":
