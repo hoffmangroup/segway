@@ -104,7 +104,7 @@ class TestTask(unittest.TestCase):
 class TestVirtualEvidence(unittest.TestCase):
     def test_overlap(self):
         virtual_evidence_coords = "[(0, 100), (50, 150)]"
-        virtual_evidence_priors = "[{0: 0.6}, {1: 0.3}]"
+        virtual_evidence_priors = "[{0: 0.6}, {0: 0.3}]"
 
         with self.assertRaises(ValueError):
             prepare_virtual_evidence(1, 0, 800, 4,

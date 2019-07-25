@@ -541,10 +541,10 @@ def fill_virtual_evidence_cells(input_array, num_labels):
             uniform_prior = remaining_probability / (num_labels-num_prior_labels)
 
             for label in range(num_labels):
-                if not prior_list[label]:
+                if prior_list[label] == None:
                     prior_array[prior_coordinate][label] = uniform_prior
                 else:
-                    prior_array[prior_coordinate][label] = prior_list_values[label]
+                    prior_array[prior_coordinate][label] = prior_list[label]
 
     return prior_array
 
