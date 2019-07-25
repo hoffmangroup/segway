@@ -531,7 +531,7 @@ def fill_virtual_evidence_cells(input_array, num_labels):
         if any(prior_list != None):
             prior_list_values = list(filter(None, prior_list))
             # number of labels with priors
-            num_prior_labels = len(prior_list_values)
+            num_prior_labels = sum(prior_list != None)
             remaining_probability = 1 - sum(prior_list_values)
 
             if remaining_probability < -EPSILON:
