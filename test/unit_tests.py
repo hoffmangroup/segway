@@ -4,9 +4,9 @@ from os.path import isfile, sep
 from tempfile import gettempdir
 import unittest
 
-from numpy import array, empty
+from numpy import allclose, array, empty
 
-from segway.observations import merge_windows
+from segway.observations import merge_windows, get_downsampled_virtual_evidence_data_and_presence
 from segway.task import prepare_gmtk_observations, prepare_virtual_evidence
 from segway._util import EXT_INT, EXT_FLOAT, EXT_VIRTUAL_EVIDENCE
 
@@ -102,27 +102,50 @@ class TestTask(unittest.TestCase):
 
 
 class TestVirtualEvidence(unittest.TestCase):
+    def test_proper_downsampling(self):
+        virtual_evidence_coords = "[(0, 4), (0, 2), (2, 4)]"
+        virtual_evidence_priors = "[{0: 0.1}, {1: 0.5}, {2: 0.7}]"
+
+        raw = prepare_virtual_evidence(1, 0, 5, 4,
+                                       virtual_evidence_coords,
+                                       virtual_evidence_priors)
+        expected = array([[0.1, 0.5, 0.2, 0.2], [0.1, 0.5, 0.2, 0.2],
+                          [0.1, 0.1, 0.7, 0.1], [0.1, 0.1, 0.7, 0.1],
+                          [0, 0, 0, 0]])
+        self.assertTrue(allclose(raw, expected))
+
+        downsampled, presence = get_downsampled_virtual_evidence_data_and_presence(
+            raw, resolution=5, num_labels=4)
+        self.assertTrue(allclose(downsampled, array([0.1, 0.3, 0.45, 0.15])))
+        print(presence)
 
     def test_overlapping_labels(self):
         virtual_evidence_priors = "[{0: 0.9}, {0: 0.7}]"
         virtual_evidence_coords = "[(0, 100), (50, 150)]"
 
         with self.assertRaises(ValueError):
-            prepare_virtual_evidence(1, 0, 800, 6,
+            prepare_virtual_evidence(1, 0, 800, 4,
                                      virtual_evidence_coords,
                                      virtual_evidence_priors)
 
-    def test_zero_prob(self):
-        virtual_evidence_priors = "[{1: 0.8}, {0: 0}]"
+    def test_zero_labels(self):
         virtual_evidence_coords = "[(0, 4), (4, 5)]"
+        virtual_evidence_priors = "[{1: 0.8}, {0: 0}]"
 
-        prepared = prepare_virtual_evidence(1, 0, 5, 3,
-                                            virtual_evidence_coords,
-                                            virtual_evidence_priors)
-        expected = array([[0.1, 0.9, 0.1], [0.1, 0.9, 0.1], [0.1, 0.9, 0.1],
-                          [0.1, 0.9, 0.1], [0, 0.5, 0.5]])
+        expected = prepare_virtual_evidence(1, 0, 5, 3,
+                                           virtual_evidence_coords,
+                                           virtual_evidence_priors)
+        self.assertTrue((expected[4] == array([0, 0.5, 0.5])).all())
 
-        self.assertEqual(prepared, expected)
+    def test_priors_over_one(self):
+        virtual_evidence_coords = "[(0, 4), (2, 5)]"
+        virtual_evidence_priors = "[{1: 0.8}, {0: 0.7}]"
+
+        with self.assertRaises(ValueError):
+            prepare_virtual_evidence(1, 0, 10, 4,
+                                     virtual_evidence_coords,
+                                     virtual_evidence_priors)
+
 
 if __name__ == "__main__":
     unittest.main()

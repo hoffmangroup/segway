@@ -146,18 +146,13 @@ def prepare_virtual_evidence(virtual_evidence, start, end, num_labels,
                              virtual_evidence_coords, virtual_evidence_priors):
     if virtual_evidence == "False":
         return None
-    virtual_evidence_cells = []
-    zipper = zip(virtual_evidence_coords.split(";"),
-                 virtual_evidence_priors.split(";"))
-    for coords, priors in zipper:
-        virtual_evidence_coords = literal_eval(coords)
-        virtual_evidence_priors = literal_eval(priors)
+    virtual_evidence_coords = literal_eval(virtual_evidence_coords)
+    virtual_evidence_priors = literal_eval(virtual_evidence_priors)
 
-        cell = make_virtual_evidence_cells(
-                   virtual_evidence_coords,
-                   virtual_evidence_priors,
-                   start, end, num_labels)
-        virtual_evidence_cells.append(cell)
+    virtual_evidence_cells = make_virtual_evidence_cells(
+               virtual_evidence_coords,
+               virtual_evidence_priors,
+               start, end, num_labels)
 
     return virtual_evidence_cells
 
