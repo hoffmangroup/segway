@@ -14,7 +14,8 @@ from subprocess import Popen
 from threading import Lock
 from time import sleep
 
-from .common import _JobTemplateFactory, make_native_spec
+from .common import (get_job_max_query_lifetime,_JobTemplateFactory,
+                     make_native_spec)
 
 # Allow this to throw an error if the environment variable is not an integer
 MAX_PARALLEL_JOBS = int(environ.get("SEGWAY_NUM_LOCAL_JOBS", 32))

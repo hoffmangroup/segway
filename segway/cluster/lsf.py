@@ -13,8 +13,8 @@ from path import path
 
 from .._configparser import OneSectionRawConfigParser
 from .._util import ceildiv, data_filename
-from .common import BASH_CMD, _JobTemplateFactory, make_native_spec, \
-    NULL_FILENAME
+from .common import (BASH_CMD, get_job_max_query_lifetime, _JobTemplateFactory,
+                     make_native_spec, NULL_FILENAME)
 
 # use SI (not binary) prefixes. I can't find any documentation for
 # this but Tim Cutts seems to assume this is how it works

@@ -17,6 +17,12 @@ from .._util import data_filename, KB, MB
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
                     + OptionBuilder_ShortOptWithSpace)() # do not run
 
+# CLEAN_PERIOD in lsb.params, after which jobs are removed from
+# mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
+# error
+# XXX: check lsb.params for real value of CLEAN_PERIOD
+CLEAN_SAFE_TIME = int(3600 * 0.9)
+
 # guard space to prevent going over mem_requested allocation
 MEM_GUARD = 10*MB
 
@@ -122,6 +128,14 @@ def calc_mem_limit(mem_usage):
     amount of memory allowed to be used (less than that requested)
     """
     return int(mem_usage - MEM_GUARD)
+
+
+def get_job_max_query_lifetime():
+    """
+    Get the maximum time in seconds a job's status can be queried (by DRMAA)
+    """
+    return CLEAN_SAFE_TIME
+
 
 def main(args=sys.argv[1:]):
     pass
