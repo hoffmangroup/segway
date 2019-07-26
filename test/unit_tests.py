@@ -120,7 +120,7 @@ class TestVirtualEvidence(unittest.TestCase):
         print(presence)
 
     def test_overlapping_labels(self):
-        virtual_evidence_priors = "[{0: 0.9}, {0: 0.7}]"
+        virtual_evidence_priors = "[{0: 0.2}, {0: 0.7}]"
         virtual_evidence_coords = "[(0, 100), (50, 150)]"
 
         with self.assertRaises(ValueError):

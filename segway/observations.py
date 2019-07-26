@@ -560,8 +560,6 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
     returns a 2-dimensional numpy.ndarray for the region specified by
     virtual_evidence_coords where each cell is the prior data for that region
     """
-    import pdb
-    pdb.set_trace()
     res = full((num_labels, (end-start)), None)
 
     # Get supervision regions that overlap with the start and end coords
