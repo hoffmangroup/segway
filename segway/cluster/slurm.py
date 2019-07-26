@@ -23,7 +23,7 @@ NATIVE_SPEC_DEFAULT = dict(
     share=True  # Allow job allocation to be shared on nodes
 )
 
-SLURM_SAFE_JOB_AGE = int(300 * 0.9)  # Slurm minimum job age is 300
+CLEAN_SAFE_TIME = int(300 * 0.9)  # Slurm minimum job age is 300
 
 
 class JobTemplateFactory(_JobTemplateFactory):
@@ -48,7 +48,7 @@ def make_native_spec(*args, **kwargs):
 
 
 def get_job_max_query_lifetime():
-    return SLURM_SAFE_JOB_AGE
+    return CLEAN_SAFE_TIME
 
 
 def make_single_res_req(name, mem):

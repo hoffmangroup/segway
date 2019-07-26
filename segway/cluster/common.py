@@ -21,7 +21,7 @@ NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
 # mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
 # error
 # XXX: check lsb.params for real value of CLEAN_PERIOD
-DEFAULT_CLEAN_SAFE_TIME = int(3600 * 0.9)
+CLEAN_SAFE_TIME = int(3600 * 0.9)
 
 # guard space to prevent going over mem_requested allocation
 MEM_GUARD = 10*MB
@@ -134,7 +134,7 @@ def get_job_max_query_lifetime():
     """
     Get the maximum time in seconds a job's status can be queried (by DRMAA)
     """
-    return DEFAULT_CLEAN_SAFE_TIME
+    return CLEAN_SAFE_TIME
 
 
 def main(args=sys.argv[1:]):
