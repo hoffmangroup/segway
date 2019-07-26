@@ -10,7 +10,8 @@ from resource import getrlimit, RLIMIT_STACK
 import sys
 
 from .._util import MB
-from .common import _JobTemplateFactory, make_native_spec
+from .common import (get_job_max_query_lifetime, _JobTemplateFactory,
+                     make_native_spec)
 
 # qsub -w: switches off job validation
 # qsub -j: switches off merging output and error

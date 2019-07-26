@@ -9,7 +9,8 @@ from math import ceil
 import sys
 
 from .._util import MB
-from .common import _JobTemplateFactory, make_native_spec, NULL_FILENAME
+from .common import (get_job_max_query_lifetime, _JobTemplateFactory,
+                     make_native_spec, NULL_FILENAME)
 
 # pbs_drmaa requires that keep_completed be set on the server or queue
 # level in order to keep job information and allow its inspection
