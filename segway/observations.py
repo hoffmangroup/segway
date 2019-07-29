@@ -535,7 +535,8 @@ def fill_virtual_evidence_cells(input_array, num_labels):
             remaining_probability = 1 - sum(prior_list_values)
 
             if remaining_probability < -EPSILON:
-                raise ValueError("Priors must sum to 1.0 at every position")
+                raise ValueError("Priors must sum to 1.0 or less at every "
+                                 "position")
 
             # divide remaining probability uniformly amongst the remaining labels
             uniform_prior = remaining_probability / (num_labels-num_prior_labels)
@@ -668,29 +669,18 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_blocks.append(supervision_data)
         int_blocks.append(presence_supervision_data)
 
-    if virtual_evidence_data:
-        presence_virtual_evidence_data = []
-        virtual_evidence_data_array = []
-        for datum in virtual_evidence_data:
-            virtual_evidence_datum, presence_virtual_evidence_datum = \
-                get_downsampled_virtual_evidence_data_and_presence(
-                    datum,
-                    resolution,
-                    num_labels)
-            presence_virtual_evidence_data.append(presence_virtual_evidence_datum)
-            virtual_evidence_data_array.append(virtual_evidence_datum)
-        # save presence data into int blocks
-        virtual_evidence_data_array = \
-            dstack(virtual_evidence_data_array).transpose((0,2,1))
-        presence_virtual_evidence_data = \
-            vstack(presence_virtual_evidence_data).T
+    if virtual_evidence_data is not None:
+        virtual_evidence_data_array, presence_virtual_evidence_data = \
+            get_downsampled_virtual_evidence_data_and_presence(
+                virtual_evidence_data,
+                resolution,
+                num_labels)
         int_blocks.append(presence_virtual_evidence_data)
 
         # separately save VE priors CPT in a temporary file
         for prior in virtual_evidence_data_array:
-            for world in prior:
-                virtual_evidence_filename_or_file.write(
-                    ' '.join(['{}'.format(prob) for prob in world]) + '\n')
+            virtual_evidence_filename_or_file.write(
+                ' '.join(['{}'.format(prob) for prob in prior]) + '\n')
 
     if int_blocks:
         int_data = column_stack(int_blocks)
