@@ -3723,7 +3723,7 @@ def parse_options(argv):
     segmentation. Nat Methods 9:473-476.
     http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = ArgumentParser(description=description, usage = usage,
+    parser = ArgumentParser(description=description, usage=usage,
                             epilog=citation)
 
     parser.add_argument("--version", action="version", version=version)
@@ -3755,8 +3755,8 @@ def parse_options(argv):
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
 
-    tasks = parser.add_subparsers(title="Segway Commands", dest="task_spec",
-                                  metavar=subtask_description)
+    tasks = parser.add_subparsers(help="Segway Tasks", dest="task_spec",
+                                  metavar="")
 
     # define steps for each of the three main tasks
     train_init = tasks.add_parser("", add_help=False)
