@@ -362,6 +362,9 @@ def get_downsampled_virtual_evidence_data_and_presence(input_array, resolution, 
             num_prior_labels = len(prior_dict) # number of labels with priors
             remaining_probability = 1 - sum(list(prior_dict.values()))
 
+            # ensure that the leftover probability to be distributed is positive
+            assert(remaining_probability > -EPSILON)
+
             # divide remaining probability uniformly amongst the remaining labels
             uniform_prior = remaining_probability / (num_segs-num_prior_labels)
 

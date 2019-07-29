@@ -42,7 +42,7 @@ NA_FACTORY = constant("NA")
 # mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
 # error
 # XXX: check lsb.params for real value of CLEAN_PERIOD
-CLEAN_SAFE_TIME = int(3600 * 0.9)
+CLEAN_SAFE_TIME = int(300 * 0.9)
 
 # min time to wait between checking job status
 # XXX: should be an option
