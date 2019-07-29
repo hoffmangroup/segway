@@ -3936,14 +3936,14 @@ def parse_options(argv):
     group.add_argument("-r", "--recover", metavar="DIR",
                        help="continue from interrupted run in DIR")
 
-    group = identify_init.add_argument_group("Flags (identify-init)")
+    group = identify_init.add_argument_group("Flags (annotate-init)")
     group.add_argument("-c", "--clobber", action="store_true",
                        help="delete any preexisting files and assumes any "
                        "model files specified in options as output to be "
                        "overwritten")
 
     # select coords to identify in the init step
-    group = identify_init.add_argument_group("Data selection (idenfity-init)")
+    group = identify_init.add_argument_group("Data selection (annotate-init)")
     group.add_argument("--include-coords", metavar="FILE",
                        help="limit to genomic coordinates in"
                        " FILE (default all) (Note: does not apply to"
@@ -3965,7 +3965,7 @@ def parse_options(argv):
                        " (default none)")
 
     # output files are produced by identify-finish
-    group = identify_finish.add_argument_group("Output files (identify-finish)")
+    group = identify_finish.add_argument_group("Output files (annotate-finish)")
     group.add_argument("-b", "--bed", metavar="FILE",
                        help="create identification BED track in FILE"
                        " (default WORKDIR/%s)" % BED_FILEBASENAME)
