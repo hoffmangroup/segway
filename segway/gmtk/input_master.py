@@ -78,11 +78,6 @@ class Object(str):
         self.kind = kind
 
 
-class MC(Object):
-    def __init__(self, content):
-        self.kind = "MC"
-
-
 class DeterministicCPT(list):
     """
     This object will use DT to specify the deterministic relationship between
