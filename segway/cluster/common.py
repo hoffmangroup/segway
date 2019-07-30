@@ -130,13 +130,6 @@ def calc_mem_limit(mem_usage):
     return int(mem_usage - MEM_GUARD)
 
 
-def get_job_max_query_lifetime():
-    """
-    Get the maximum time in seconds a job's status can be queried (by DRMAA)
-    """
-    return CLEAN_SAFE_TIME
-
-
 def main(args=sys.argv[1:]):
     pass
 

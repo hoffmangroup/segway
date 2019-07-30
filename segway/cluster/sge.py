@@ -10,7 +10,7 @@ from resource import getrlimit, RLIMIT_STACK
 import sys
 
 from .._util import MB
-from .common import (get_job_max_query_lifetime, _JobTemplateFactory,
+from .common import (CLEAN_SAFE_TIME, _JobTemplateFactory,
                      make_native_spec)
 
 # qsub -w: switches off job validation
@@ -48,6 +48,14 @@ class JobTemplateFactory(_JobTemplateFactory):
 def make_single_res_req(name, mem):
     # round up to the next mebibyte
     return "%s=%dM" % (name, ceil(mem / MB))
+
+
+def get_job_max_query_lifetime():
+    """
+    Get the maximum time in seconds a job's status can be queried (by DRMAA)
+    """
+    return CLEAN_SAFE_TIME
+
 
 def main(args=sys.argv[1:]):
     pass
