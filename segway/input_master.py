@@ -757,7 +757,7 @@ class DPMFParamSpec(DenseCPTParamSpec):
             # with the same amount of mixture components
             object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
                         "DirichletConst %s ${weights}" % GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
-            weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
+            weights = (" " + str(round(1.0 / self.num_mix_components, 12)))*self.num_mix_components
             substitute = Template(object_tmpl).substitute
             data = self.make_data()
             for mapping in self.generate_tmpl_mappings():
