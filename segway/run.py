@@ -3712,7 +3712,8 @@ def parse_options(argv):
     version = "%(prog)s {}".format(__version__)
     description = """
     Segmentation and automated genome annotation.
-    Please see: segway TASK -h, for steps specific to each task"""
+
+    Use segway COMMAND -h, for help specific to each command"""
 
     citation = """
     Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.  2012.
@@ -3725,26 +3726,23 @@ def parse_options(argv):
 
     subtask_description = """
 
-    List of available tasks:
 
     train
     - train-init
     - train-run
     -- train-run-round
     - train-finish
-
     annotate
     - annotate-init
     - annotate-run
     - annotate-finish
-
     posterior
     - posterior-init
     - posterior-run
     - posterior-finish
     """
 
-    tasks = parser.add_subparsers(title="Segway Commands", dest="task_spec",
+    tasks = parser.add_subparsers(title="commands", dest="task_spec",
                                   metavar=subtask_description)
 
     parser.add_argument("--version", action="version", version=version)
