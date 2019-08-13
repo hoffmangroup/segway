@@ -3191,8 +3191,8 @@ class Runner(object):
                 if self.random_seed:
                     # Create a new random number generator for this instance based on its
                     # own index
-                    self.random_seed += index
-                    self.random_state = RandomState(self.random_seed)
+                    instance_random_seed = self.random_seed + index
+                    self.random_state = RandomState(instance_random_seed)
 
                 self.save_input_master(index, True)
 
