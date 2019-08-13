@@ -3715,13 +3715,15 @@ def parse_options(argv):
 
     Use segway COMMAND -h, for help specific to each command"""
 
+    usage = "segway [global_args] COMMAND [args]..."
+
     citation = """
     Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.  2012.
     Unsupervised pattern discovery in human chromatin structure through genomic
     segmentation. Nat Methods 9:473-476.
     http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = ArgumentParser(description=description, usage = "",
+    parser = ArgumentParser(description=description, usage = usage,
                             epilog=citation)
 
     subtask_description = """
@@ -3979,40 +3981,55 @@ def parse_options(argv):
     identify_args = tasks.add_parser("", add_help=False)
     identify_args.add_argument("annotatedir", nargs=1)
 
-    tasks.add_parser("train-init", parents=[train_init, args])
-    tasks.add_parser("train-run", parents=[train_run, args])
-    tasks.add_parser("train-finish", parents=[train_finish, args])
-    tasks.add_parser("train-run-round", parents=[train_run_round, args])
+    tasks.add_parser("train-init", parents=[train_init, args],
+                     usage = "segway train-init [args] GENOMEDATA TRAINDIR")
+    tasks.add_parser("train-run", parents=[train_run, args],
+                     usage = "segway train-run [args] GENOMEDATA TRAINDIR")
+    tasks.add_parser("train-finish", parents=[train_finish, args],
+                     usage = "segway train-finish [args] GENOMEDATA TRAINDIR")
+    tasks.add_parser("train-run-round", parents=[train_run_round, args],
+                     usage = "segway train-run-round [args] GENOMEDATA TRAINDIR")
 
     tasks.add_parser("annotate-init", parents=[identify_init, args,
-                                               identify_args])
+                                               identify_args],
+                     usage = "segway annotate-init [args] GENOMEDATA TRAINDIR ANNOTATEDIR")
     tasks.add_parser("annotate-run", parents=[identify_run, args,
-                                              identify_args])
+                                              identify_args],
+                     usage = "segway annotate-run [args] GENOMEDATA TRAINDIR ANNOTATEDIR")
     tasks.add_parser("annotate-finish", parents=[identify_finish, args,
-                                                 identify_args])
+                                                 identify_args],
+                     usage = "segway annotate-finish [args] GENOMEDATA TRAINDIR ANNOTATEDIR")
 
     # posterior and identify take the same options
     tasks.add_parser("posterior-init", parents=[identify_init, args,
-                                                identify_args])
+                                                identify_args],
+                     usage = "segway posterior-init [args] GENOMEDATA TRAINDIR POSTDIR")
     tasks.add_parser("posterior-run", parents=[identify_run, args,
-                                               identify_args])
+                                               identify_args],
+                     usage = "segway posterior-run [args] GENOMEDATA TRAINDIR POSTDIR")
     tasks.add_parser("posterior-finish", parents=[identify_finish, args,
-                                                  identify_args])
+                                                  identify_args],
+                     usage = "segway posterior-finish [args] GENOMEDATA TRAINDIR POSTDIR")
 
     tasks.add_parser("train",
-                     parents=[train_init, train_run, train_finish, args])
+                     parents=[train_init, train_run, train_finish, args],
+                     usage="segway train [args] GENOMEDATA TRAINDIR")
     tasks.add_parser("annotate",
                      parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                              args, identify_args],
+                     usage="segway annotate [args] GENOMEDATA TRAINDIR ANNOTATEDIR")
     tasks.add_parser("identify",
                      parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                              args, identify_args],
+                     usage="segway identify [args] GENOMEDATA TRAINDIR ANNOTATEDIR")
     tasks.add_parser("posterior",
                      parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                              args, identify_args],
+                     usage="segway posterior [args] GENOMEDATA TRAINDIR POSTDIR")
     tasks.add_parser("identify+posterior",
                      parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                              args, identify_args],
+                     usage="segway identify+posterior [args] GENOMEDATA TRAINDIR ANNOTATEDIR")
 
     options = parser.parse_args(argv)
 
