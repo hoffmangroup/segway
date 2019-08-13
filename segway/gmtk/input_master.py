@@ -4,6 +4,15 @@ from collections import OrderedDict
 import numpy
 from numpy import array, ndarray
 
+DENSE_CPT_KIND = "DENSE_CPT"
+MEAN_KIND = "MEAN"
+COVAR_KIND = "COVAR"
+DPMF_KIND = "DPMF"
+NAME_COLLECTION_KIND = "NAME_COLLECTION"
+DETERMINISTIC_CPT = "DETERMINISTIC_CPT"
+
+INFILE_TMPL = "{}_IN_FILE infile\n\n"
+
 def array2text(a):
     ndim = a.ndim
     if ndim == 1:
@@ -54,14 +63,14 @@ class Section(OrderedDict):
         return section_kind
 
     def update(self, new_object):
-        if new_object.kind != self.kind:
+        if new_object.kind != self.kind():
             raise ValueError("Kind doesn't match error")
         super().update(new_object)
 
 
 class InlineSection(Section):
     def __str__(self):
-        header = "{}_IN_FILE infile\n\n".format(self.kind())
+        header = INFILE_TMPL.format(self.kind())
         return "".join([header, Section.__str__(self)])
 
 
@@ -93,11 +102,11 @@ class DeterministicCPT(list):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.kind = "DETERMINISTIC_CPT"
+        self.kind = DETERMINISTIC_CPT_KIND
 
         # The first element gives number of parents
         # Check if it is given as int and check list length, otherwise assume
-        # It is a variable and pass
+        # it is a variable and pass
         if (self[0] is int and
             len(self) != self[0] + 3):
             raise ValueError("DeterministicCPT has a length of {} when {} was "
@@ -121,7 +130,7 @@ class NameCollection(list):
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, *kwargs)
-        self.kind = "NAME_COLLECTION"
+        self.kind = NAME_COLLECTION_KIND
 
     def __str__(self):
         return "\n".join([str(len(self))] + [str(item) for item in self])
@@ -141,7 +150,7 @@ class Array(ndarray):
 
 class DenseCPT(Array):
     def __array_finalize__(self, obj):
-        self.kind = "DENSE_CPT"
+        self.kind = DENSE_CPT_KIND
 
     def __str__(self):
         # Find the number of parents, their cardinalities and this cardinality
@@ -155,14 +164,14 @@ class DenseCPT(Array):
 
 class Mean(Array):
     def __array_finalize__(self, obj):
-        self.kind = "MEAN"
+        self.kind = MEAN_KIND
         if obj.ndim != 1:
             raise ValueError("Mean object supplied must be one-dimensional")
 
 
 class Covar(Array):
     def __array_finalize__(self, obj):
-        self.kind = "COVAR"
+        self.kind = COVAR_KIND
         if obj.ndim != 1:
             raise ValueError("COVAR object supplied must be one-dimensional")
         if numpy.any(obj < 0):
@@ -171,6 +180,6 @@ class Covar(Array):
 
 class DPMF(Array):
     def __array_finalize__(self, obj):
-        self.kind = "DPMF"
+        self.kind = DPMF_KIND
         if obj.ndim != 1:
             raise ValueError("DPMF object supplied must be one-dimensional")
