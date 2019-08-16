@@ -1,0 +1,51 @@
+DENSE_CPT_IN_FILE infile
+
+2
+0
+example_cpt
+1 1 2
+0.5 0.5
+1
+two_dimensional_cpt
+1 2 2
+0.25 0.25
+0.25 0.25
+DT_IN_FILE infile
+
+1
+0
+example_generic_object
+basic decision string
+MEAN_IN_FILE infile
+
+3
+0
+mean_duplication
+1 1.0
+1
+mean_no_CNV
+1 0
+2
+mean_deletion
+1 -1.0
+COVAR_IN_FILE infile
+
+1
+0
+logR
+1 0.04
+NAME_COLLECTION_IN_FILE infile
+
+1
+0
+collection_CNV
+3
+mx_deletion
+mx_normal
+mx_duplication
+DETERMINISTIC_CPT_IN_FILE infile
+
+1
+0
+frameIndex_ruler
+1 2000000 2 map_seg_segCountDown
