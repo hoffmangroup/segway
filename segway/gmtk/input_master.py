@@ -9,7 +9,7 @@ MEAN_KIND = "MEAN"
 COVAR_KIND = "COVAR"
 DPMF_KIND = "DPMF"
 NAME_COLLECTION_KIND = "NAME_COLLECTION"
-DETERMINISTIC_CPT = "DETERMINISTIC_CPT"
+DETERMINISTIC_CPT_KIND = "DETERMINISTIC_CPT"
 
 INFILE_TMPL = "{}_IN_FILE infile\n\n"
 
@@ -63,8 +63,9 @@ class Section(OrderedDict):
         return section_kind
 
     def update(self, new_object):
-        if new_object.kind != self.kind():
-            raise ValueError("Kind doesn't match error")
+        for item in new_object:
+            if item[1].kind != self.kind():
+                raise ValueError("Kind doesn't match error")
         super().update(new_object)
 
 
@@ -106,12 +107,12 @@ class DeterministicCPT(list):
 
         # The first element gives number of parents
         # Check if it is given as int and check list length, otherwise assume
-        # it is a variable and pass
+        # It is a variable and pass
         if (self[0] is int and
             len(self) != self[0] + 3):
             raise ValueError("DeterministicCPT has a length of {} when {} was "
                              "expected".format(len(self), self[0] + 3))
-        if self[-1] != str:
+        if type(self[-1]) != str:
             raise ValueError("Final list element is the child variable name, "
                              "must be a str")
 

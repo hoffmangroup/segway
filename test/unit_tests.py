@@ -4,11 +4,17 @@ from os.path import isfile, sep
 from tempfile import gettempdir
 import unittest
 
-from numpy import empty
+from numpy import array, ndarray, empty
+from path import Path
 
 from segway.observations import merge_windows
 from segway.task import prepare_gmtk_observations
 from segway._util import EXT_INT, EXT_FLOAT
+
+from segway.gmtk.input_master import (Covar, DenseCPT, DeterministicCPT,
+                                      InlineSection,
+                                      InputMaster, Mean, NameCollection, 
+                                      Object)
 
 
 class TestObservations(unittest.TestCase):
@@ -84,6 +90,27 @@ class TestTask(unittest.TestCase):
         remove(int_obs_list_filename)
         remove(int_obs_filename)
         remove(float_obs_filename)
+
+
+class TestGMTK(unittest.TestCase):
+    def test_input_master(self):
+        input_master = InputMaster([InlineSection([("example_cpt", DenseCPT([[0.5, 0.5]]))])])
+        input_master[0].update([("two_dimensional_cpt", DenseCPT([[0.25, 0.25], [0.25, 0.25]]))])
+        input_master.append(InlineSection([("example_generic_object", Object("basic decision string", "DT"))]))
+        input_master.append(InlineSection([("mean_duplication", Mean([1.0])),
+                                           ("mean_no_CNV", Mean([0])),
+                                           ("mean_deletion", Mean([-1.0]))]))
+
+        input_master.append(InlineSection([("logR", Covar([0.04]))]))
+
+        input_master.append(InlineSection([("collection_CNV", NameCollection(["mx_deletion", "mx_normal", "mx_duplication"]))]))
+
+        input_master.append(InlineSection([("frameIndex_ruler", DeterministicCPT([1, 2000000, 2, "map_seg_segCountDown"]))]))
+
+        test_master = Path("sample_input.master")
+        with open(test_master) as sample_master:
+            expected = sample_master.read().rstrip()
+        self.assertEqual(str(input_master), expected)
 
 
 if __name__ == "__main__":
