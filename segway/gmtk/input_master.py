@@ -23,9 +23,16 @@ def array2text(a):
 
 class InputMaster(list):
     """
-    Master class which contains a list of sections a is able to write them
-    out to file properly.
+    Master class which contains a list of all sections present in the input
+    master and is able to responsible for creating their string representation.
     """
+    def __init__(self, *args, **kwargs):
+        for item in args:
+            if not isinstance(item, Section):
+                raise ValueError("Only Section objects may be saved to an "
+                                 "InputMaster object")
+        super().__init__([*args], **kwargs)
+
     def __str__(self):
         return "\n".join([str(item) for item in self])
 

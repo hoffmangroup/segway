@@ -94,7 +94,7 @@ class TestTask(unittest.TestCase):
 
 class TestGMTK(unittest.TestCase):
     def test_input_master(self):
-        input_master = InputMaster([InlineSection([("example_cpt", DenseCPT([[0.5, 0.5]]))])])
+        input_master = InputMaster(InlineSection([("example_cpt", DenseCPT([[0.5, 0.5]]))]))
         input_master[0].update([("two_dimensional_cpt", DenseCPT([[0.25, 0.25], [0.25, 0.25]]))])
         input_master.append(InlineSection([("example_generic_object", Object("basic decision string", "DT"))]))
         input_master.append(InlineSection([("mean_duplication", Mean([1.0])),
