@@ -11,7 +11,7 @@ DPMF_KIND = "DPMF"
 NAME_COLLECTION_KIND = "NAME_COLLECTION"
 DETERMINISTIC_CPT_KIND = "DETERMINISTIC_CPT"
 
-INFILE_TMPL = "{}_IN_FILE infile\n\n"
+INLINE_TMPL = "{}_IN_FILE inline\n\n"
 
 def array2text(a):
     ndim = a.ndim
@@ -78,7 +78,7 @@ class Section(OrderedDict):
 
 class InlineSection(Section):
     def __str__(self):
-        header = INFILE_TMPL.format(self.kind())
+        header = INLINE_TMPL.format(self.kind())
         return "".join([header, Section.__str__(self)])
 
 
