@@ -34,7 +34,7 @@ class InputMaster(list):
         super().__init__([*args], **kwargs)
 
     def __str__(self):
-        return "\n".join([str(item) for item in self])
+        return "\n\n".join([str(item) for item in self])
 
     def append(self, item):
         if not isinstance(item, Section):
