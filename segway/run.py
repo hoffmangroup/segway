@@ -93,6 +93,7 @@ NUM_SUBSEGS = 1
 OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
+DEFAULT_JOBS_PER_BATCH = 1
 CARD_SUPERVISIONLABEL_NONE = -1
 MINIBATCH_DEFAULT = -1
 VAR_FLOOR_GMM_DEFAULT = 0.00001
@@ -755,6 +756,7 @@ class Runner(object):
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
+        self.jobs_per_batch = DEFAULT_JOBS_PER_BATCH
         self.max_split_sequence_length = MAX_SPLIT_SEQUENCE_LENGTH
         self.max_frames = MAX_FRAMES
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
@@ -2473,6 +2475,13 @@ class Runner(object):
         make_acc_filename_custom = partial(self.make_acc_filename,
                                            instance_index)
 
+        ### TO DO
+        # get number of batch jobs per round with jobs_per_batch jobs in each job
+        # append sub jobs to a batch job script until counter is reached
+        # if counter is not reached yet, do not submit yet
+        # if counter is reached, submit batch job as usual
+        # with 1 job per batch, recover usual behavior
+
         for window_index, window_len in train_windows:
             acc_filename = make_acc_filename_custom(window_index)
             kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
@@ -2995,7 +3004,7 @@ class Runner(object):
 
     def load_train_results(self):
         """
-        Loads the training results in train-finish saved in 
+        Loads the training results in train-finish saved in
         SUBDIRNAME_INTERMEDIATE. Stores as a list of TrainInstanceResults in
         instance_params to select best in finish.
         """
@@ -3914,6 +3923,11 @@ def parse_options(argv):
                        "recommended. Previously would use or create "
                        "observations in DIR (default %s)" %
                        (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
+
+    group = train_run.add_argument_group("Number of jobs per batch job script")
+    group.add_argument("--jobs-per-batch", metavar="DIR",
+                       help="Number of jobs per batch job script (default %s)"
+                       % DEFAULT_JOBS_PER_BATCH)
 
     group.add_argument("-r", "--recover", metavar="DIR",
                        help="continue from interrupted run in DIR")
