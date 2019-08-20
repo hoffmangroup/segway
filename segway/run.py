@@ -756,7 +756,7 @@ class Runner(object):
         self.len_seg_strength = PRIOR_STRENGTH
         self.distribution = DISTRIBUTION_DEFAULT
         self.max_em_iters = MAX_EM_ITERS
-        self.jobs_per_batch = DEFAULT_JOBS_PER_BATCH
+        self.max_jobs_per_batch = DEFAULT_JOBS_PER_BATCH
         self.max_split_sequence_length = MAX_SPLIT_SEQUENCE_LENGTH
         self.max_frames = MAX_FRAMES
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
@@ -2476,7 +2476,14 @@ class Runner(object):
                                            instance_index)
 
         ### TO DO
-        # get number of batch jobs per round with jobs_per_batch jobs in each job
+        # get number of batch jobs per round with up to max_jobs_per_batch jobs in each job
+        batch_jobs_per_round = math.ceil(len(train_windows)/self.max_jobs_per_batch)
+
+        # split number of jobs (one per train window) into batch_jobs_per_round batches
+        # then calculate number of jobs per batch
+        # this accounts for a 'remainder' batch job which could have less than max_jobs_per_batch subjobs
+        jobs_per_batch = [len(job_subset) for job_subset in array_split(len(train_windows), batch_jobs_per_round)]
+
         # append sub jobs to a batch job script until counter is reached
         # if counter is not reached yet, do not submit yet
         # if counter is reached, submit batch job as usual
