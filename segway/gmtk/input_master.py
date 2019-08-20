@@ -50,6 +50,21 @@ class Section(OrderedDict):
     keys are set to represent the object names, while their values will be a
     subclass of object.
     """
+    def __init__(self, *args, **kwargs):
+        kind = None
+        for item in args:
+            if (not type(item) is tuple or
+                not len(item) == 2 or
+                not type(item[0]) is str):
+                raise ValueError("Section arguments must be tuple of length 2 "
+                                 "with a str object name as the first")
+            if not kind:
+                kind = item[1].kind
+            else:
+                if not item[1].kind == kind:
+                    raise ValueError("Object has incorrect kind")
+        super().__init__([*args], **kwargs)
+
     def __str__(self):
         section_objects = []
         section_objects.append(str(len(self)))
@@ -72,7 +87,7 @@ class Section(OrderedDict):
     def update(self, new_object):
         for item in new_object:
             if item[1].kind != self.kind():
-                raise ValueError("Kind doesn't match error")
+                raise ValueError("Object has incorrect kind")
         super().update(new_object)
 
 

@@ -1,4 +1,4 @@
-DENSE_CPT_IN_FILE infile
+DENSE_CPT_IN_FILE inline
 
 2
 0
@@ -10,13 +10,13 @@ two_dimensional_cpt
 1 2 2
 0.25 0.25
 0.25 0.25
-DT_IN_FILE infile
+DT_IN_FILE inline
 
 1
 0
 example_generic_object
 basic decision string
-MEAN_IN_FILE infile
+MEAN_IN_FILE inline
 
 3
 0
@@ -28,13 +28,13 @@ mean_no_CNV
 2
 mean_deletion
 1 -1.0
-COVAR_IN_FILE infile
+COVAR_IN_FILE inline
 
 1
 0
 logR
 1 0.04
-NAME_COLLECTION_IN_FILE infile
+NAME_COLLECTION_IN_FILE inline
 
 1
 0
@@ -43,7 +43,7 @@ collection_CNV
 mx_deletion
 mx_normal
 mx_duplication
-DETERMINISTIC_CPT_IN_FILE infile
+DETERMINISTIC_CPT_IN_FILE inline
 
 1
 0
