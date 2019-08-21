@@ -2536,6 +2536,13 @@ class Runner(object):
         # if total_num_subjobs_in_batch is reached, submit batch job as usual
         # with max_jobs_per_batch=1 (default), recover usual unbatched behavior
         for batch_index, train_windows_in_batch in enumerate(train_windows_per_batch):
+
+            # accumulate the maximum number of frames for a job in the batch
+            # for batched jobs, this ensures that memory for the final batch job submission
+            # is calculated based on the largest job in the batch
+            # for unbatched jobs, there is no change
+            max_num_frames = 0
+
             total_num_subjobs_in_batch = len(train_windows_in_batch)
             for subjob_index, train_window in enumerate(train_windows_in_batch):
                 window_index, window_len = train_window
@@ -2550,10 +2557,10 @@ class Runner(object):
                 if self.is_in_reversed_world(window_index):
                     kwargs_window["gpr"] = REVERSE_GPR
 
-                num_frames = self.window_lens[window_index]
+                max_num_frames = max(max_num_frames, self.window_lens[window_index])
 
                 restartable_job = self.queue_train(instance_index, round_index,
-                                                   window_index, num_frames,
+                                                   window_index, max_num_frames,
                                                    subjob_index, total_num_subjobs_in_batch,
                                                    batch_index,
                                                    **kwargs_window)
