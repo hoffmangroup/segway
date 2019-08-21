@@ -19,7 +19,7 @@ from functools import partial
 from itertools import count, product
 from math import ceil, ldexp
 from os import (environ, extsep, fdopen, open as os_open, O_WRONLY, O_CREAT,
-                O_SYNC, O_TRUNC)
+                O_SYNC, O_TRUNC, O_APPEND)
 import re
 from shutil import copy2
 import stat
@@ -31,7 +31,7 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (append, arcsinh, array, empty, finfo, float32, int64, inf,
+from numpy import (append, arcsinh, array, array_split, empty, finfo, float32, int64, inf,
                    square, vstack, zeros)
 from numpy.random import RandomState
 from operator import attrgetter
@@ -265,6 +265,7 @@ SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
 # job script file permissions: owner has read/write/execute
 # permissions, group/others have read/execute permissions
 JOB_SCRIPT_FILE_OPEN_FLAGS = O_WRONLY | O_CREAT | O_SYNC | O_TRUNC
+JOB_SCRIPT_FILE_APPEND_FLAGS = O_WRONLY | O_APPEND  | O_SYNC
 JOB_SCRIPT_FILE_PERMISSIONS = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP \
                               | stat.S_IROTH | stat.S_IXOTH
 
@@ -873,6 +874,7 @@ class Runner(object):
                         "num_sublabels": "num_subsegs",
                         "output_label": "output_label",
                         "max_train_rounds": "max_em_iters",
+                        "jobs_per_batch": "max_jobs_per_batch",
                         "reverse_world": "reverse_worlds",
                         "track": "track_specs",
                         "trainable_params": "params_filenames"}
@@ -2311,7 +2313,7 @@ class Runner(object):
         return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
     def queue_task(self, prog, kwargs, job_name, num_frames,
-                   output_filename=None, prefix_args=[]):
+                   output_filename=None, job_index=None, total_num_jobs=None, prefix_args=[]):
         """ Returns a restartable job object to run segway-task """
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
@@ -2325,17 +2327,39 @@ class Runner(object):
         shell_job_name = extsep.join([job_name, EXT_SH])
         job_script_filename = self.job_script_dirpath() / shell_job_name
 
-        job_script_fd = os_open(job_script_filename,
-                                JOB_SCRIPT_FILE_OPEN_FLAGS,
-                                JOB_SCRIPT_FILE_PERMISSIONS)
-        with fdopen(job_script_fd, "w") as job_script_file:
-            print("#!/usr/bin/env bash", file=job_script_file)
-            # this doesn't include use of segway-wrapper, which takes the
-            # memory usage as an argument, and may be run multiple times
-            self.log_cmdline(gmtk_cmdline, args, job_script_file)
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and job_index!=0:
+            job_script_fd = os_open(job_script_filename,
+                                    JOB_SCRIPT_FILE_APPEND_FLAGS,
+                                    JOB_SCRIPT_FILE_PERMISSIONS)
+
+            # if this is the first job in the batch, then the job script file
+            # will not exist yet. fdopen in 'append' mode cannot create new files!
+            with fdopen(job_script_fd, "a") as job_script_file:
+                # this doesn't include use of segway-wrapper, which takes the
+                # memory usage as an argument, and may be run multiple times
+                self.log_cmdline(gmtk_cmdline, args, job_script_file)
+        else:
+            job_script_fd = os_open(job_script_filename,
+                                    JOB_SCRIPT_FILE_OPEN_FLAGS,
+                                    JOB_SCRIPT_FILE_PERMISSIONS)
+            with fdopen(job_script_fd, "w") as job_script_file:
+                print("#!/usr/bin/env bash", file=job_script_file)
+                # this doesn't include use of segway-wrapper, which takes the
+                # memory usage as an argument, and may be run multiple times
+                self.log_cmdline(gmtk_cmdline, args, job_script_file)
+
 
         if self.dry_run:
             return None
+
+        # if we are batching jobs and have not reached the required
+        # number of subjobs yet, return
+        # if we are not batching jobs or have reached the required
+        # number of subjobs, submit the job
+
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH:
+            if not(job_index+1 == total_num_jobs):
+                return None
 
         session = self.session
         job_tmpl = session.createJobTemplate()
@@ -2386,7 +2410,8 @@ class Runner(object):
                               mem_usage_key)
 
     def queue_train(self, instance_index, round_index, window_index,
-                    num_frames=0, **kwargs):
+                    num_frames=0, job_index=None, total_num_jobs=None,
+                    batch_index=None, **kwargs):
         """this calls Runner.queue_task()
 
         if num_frames is not specified, then it is set to 0, where
@@ -2396,8 +2421,12 @@ class Runner(object):
 
         kwargs["inputMasterFile"] = self.input_master_filename
 
-        name = self.make_job_name_train(instance_index, round_index,
-                                        window_index)
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH:
+            name = self.make_job_name_train(instance_index, round_index,
+                                            "batch" + str(batch_index))
+        else:
+            name = self.make_job_name_train(instance_index, round_index,
+                                            window_index)
 
         segway_task_path = find_executable("segway-task")
         segway_task_verb = "run"
@@ -2462,6 +2491,7 @@ class Runner(object):
         prefix_args.extend(additional_prefix_args)
 
         return self.queue_task(self.train_prog, kwargs, name, num_frames,
+                               job_index=job_index, total_num_jobs=total_num_jobs,
                                prefix_args=prefix_args
                                )
 
@@ -2476,36 +2506,41 @@ class Runner(object):
                                            instance_index)
 
         ### TO DO
+        num_train_windows = len(train_windows)
+        train_windows_indices = list(range(num_train_windows))
         # get number of batch jobs per round with up to max_jobs_per_batch jobs in each job
-        batch_jobs_per_round = math.ceil(len(train_windows)/self.max_jobs_per_batch)
+        batch_jobs_per_round = ceil(num_train_windows/self.max_jobs_per_batch)
 
-        # split number of jobs (one per train window) into batch_jobs_per_round batches
-        # then calculate number of jobs per batch
-        # this accounts for a 'remainder' batch job which could have less than max_jobs_per_batch subjobs
-        jobs_per_batch = [len(job_subset) for job_subset in array_split(len(train_windows), batch_jobs_per_round)]
+        # split train_windows into batch_jobs_per_round batches
+        train_windows_per_batch = array_split(train_windows, batch_jobs_per_round)
 
         # append sub jobs to a batch job script until counter is reached
         # if counter is not reached yet, do not submit yet
         # if counter is reached, submit batch job as usual
         # with 1 job per batch, recover usual behavior
+        for batch_index, train_windows_per_batch in enumerate(train_windows_per_batch):
+            total_num_jobs = len(train_windows_per_batch)
+            for job_index, train_window in enumerate(train_windows_per_batch):
+                window_index, window_len = train_window
+                acc_filename = make_acc_filename_custom(window_index)
+                kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
+                                     **kwargs)
 
-        for window_index, window_len in train_windows:
-            acc_filename = make_acc_filename_custom(window_index)
-            kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
-                                 **kwargs)
+                # -dirichletPriors T only on the first window
+                if window_index == 0:
+                    kwargs_window["dirichletPriors"] = "T"
 
-            # -dirichletPriors T only on the first window
-            kwargs_window["dirichletPriors"] = (window_index == 0)
+                if self.is_in_reversed_world(window_index):
+                    kwargs_window["gpr"] = REVERSE_GPR
 
-            if self.is_in_reversed_world(window_index):
-                kwargs_window["gpr"] = REVERSE_GPR
+                num_frames = self.window_lens[window_index]
 
-            num_frames = self.window_lens[window_index]
-
-            restartable_job = self.queue_train(instance_index, round_index,
-                                               window_index, num_frames,
-                                               **kwargs_window)
-            res.queue(restartable_job)
+                restartable_job = self.queue_train(instance_index, round_index,
+                                                   window_index, num_frames,
+                                                   job_index, total_num_jobs,
+                                                   batch_index,
+                                                   **kwargs_window)
+                res.queue(restartable_job)
 
         return res
 
@@ -2593,7 +2628,7 @@ class Runner(object):
                        ]
 
         return self.queue_task(self.train_prog, kwargs, name, num_frames,
-                               prefix_args=prefix_args
+                               prefix_args=prefix_args,
                                )
 
     def queue_validate(self, input_params_filename, instance_index,
@@ -3923,6 +3958,12 @@ def parse_options(argv):
                        help="each training instance runs a maximum of NUM"
                        " rounds (default %d)" % MAX_EM_ITERS)
 
+    group = train_run.add_argument_group("Number of jobs per batch job script")
+    group.add_argument("--jobs-per-batch", type=int, metavar="DIR",
+                       help="Number of jobs per batch job script (default %s)"
+                       % DEFAULT_JOBS_PER_BATCH)
+
+
     # Directory would be recovered from train-run
     group = train_run.add_argument_group("Intermediate files (train-run)")
     group.add_argument("-o", "--observations", metavar="DIR",
@@ -3930,11 +3971,6 @@ def parse_options(argv):
                        "recommended. Previously would use or create "
                        "observations in DIR (default %s)" %
                        (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
-
-    group = train_run.add_argument_group("Number of jobs per batch job script")
-    group.add_argument("--jobs-per-batch", metavar="DIR",
-                       help="Number of jobs per batch job script (default %s)"
-                       % DEFAULT_JOBS_PER_BATCH)
 
     group.add_argument("-r", "--recover", metavar="DIR",
                        help="continue from interrupted run in DIR")
