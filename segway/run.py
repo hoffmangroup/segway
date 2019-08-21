@@ -2510,7 +2510,7 @@ class Runner(object):
                                            instance_index)
 
         num_train_windows = len(train_windows)
-        train_windows_indices = list(range(num_train_windows))
+
         # compute the number of batch jobs per round with up to
         # max_jobs_per_batch jobs in each job
         batch_jobs_per_round = ceil(num_train_windows/self.max_jobs_per_batch)
