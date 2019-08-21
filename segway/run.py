@@ -2327,7 +2327,9 @@ class Runner(object):
         shell_job_name = extsep.join([job_name, EXT_SH])
         job_script_filename = self.job_script_dirpath() / shell_job_name
 
-        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and subjob_index!=0:
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and \
+                subjob_index!=0 and \
+                subjob_index is not None:
             job_script_fd = os_open(job_script_filename,
                                     JOB_SCRIPT_FILE_APPEND_FLAGS,
                                     JOB_SCRIPT_FILE_PERMISSIONS)
@@ -2357,7 +2359,7 @@ class Runner(object):
         # if we are not batching jobs or have reached the required
         # number of subjobs, submit the job
 
-        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH:
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and subjob_index is not None:
             if not(subjob_index+1 == total_num_subjobs_in_batch):
                 return None
 
@@ -2421,7 +2423,7 @@ class Runner(object):
 
         kwargs["inputMasterFile"] = self.input_master_filename
 
-        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH:
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and subjob_index is not None:
             name = self.make_job_name_train(instance_index, round_index,
                                             "batch" + str(batch_index))
         else:
@@ -2512,7 +2514,8 @@ class Runner(object):
         batch_jobs_per_round = ceil(num_train_windows/self.max_jobs_per_batch)
 
         # split train_windows into batch_jobs_per_round batches
-        train_windows_per_batch = array_split(train_windows, batch_jobs_per_round)
+        train_windows_per_batch = array_split(train_windows, \
+                list(range(self.max_jobs_per_batch, self.max_jobs_per_batch*batch_jobs_per_round, self.max_jobs_per_batch)))
 
         # append sub jobs to a batch job script until counter is reached
         # if counter is not reached yet, do not submit yet
@@ -2521,9 +2524,9 @@ class Runner(object):
 
         # if max_jobs_per_batch is 1 (default) then this is the same as
         # unbatched behavior
-        for batch_index, train_windows_per_batch in enumerate(train_windows_per_batch):
-            total_num_subjobs_in_batch = len(train_windows_per_batch)
-            for subjob_index, train_window in enumerate(train_windows_per_batch):
+        for batch_index, train_windows_in_batch in enumerate(train_windows_per_batch):
+            total_num_subjobs_in_batch = len(train_windows_in_batch)
+            for subjob_index, train_window in enumerate(train_windows_in_batch):
                 window_index, window_len = train_window
                 acc_filename = make_acc_filename_custom(window_index)
                 kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
