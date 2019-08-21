@@ -2526,13 +2526,11 @@ class Runner(object):
                            self.max_jobs_per_batch * batch_jobs_per_round,
                            self.max_jobs_per_batch)))
 
-        # append sub jobs to a batch job script until counter is reached
-        # if counter is not reached yet, do not submit yet
-        # if counter is reached, submit batch job as usual
-        # with 1 job per batch, recover usual behavior
-
-        # if max_jobs_per_batch is 1 (default) then this is the same as
-        # unbatched behavior
+        # append sub jobs to a batch job script until subjob_index
+        # reaches the total number of jobs expected in the batch (total_num_subjobs_in_batch)
+        # if total_num_subjobs_in_batch is not reached yet, do not submit yet
+        # if total_num_subjobs_in_batch is reached, submit batch job as usual
+        # with max_jobs_per_batch=1 (default), recover usual unbatched behavior
         for batch_index, train_windows_in_batch in enumerate(train_windows_per_batch):
             total_num_subjobs_in_batch = len(train_windows_in_batch)
             for subjob_index, train_window in enumerate(train_windows_in_batch):
