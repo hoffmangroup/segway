@@ -2514,8 +2514,17 @@ class Runner(object):
         batch_jobs_per_round = ceil(num_train_windows/self.max_jobs_per_batch)
 
         # split train_windows into batch_jobs_per_round batches
+        # by specifying indices at which to split train_windows
+        # for example, 14 train windows with max_jobs_per_batch=3
+        # would have 5=14//3 batch_jobs_per_round
+        # and would be split at indices [3, 3*5, 3] = [3, 6, 9, 12]
+        # resulting in the following train window split:
+        # >>> np.array_split(list(range(14)), [3,6,9,12])
+        # [array([0, 1, 2]), array([3, 4, 5]), array([6, 7, 8]), array([ 9, 10, 11]), array([12, 13])]
         train_windows_per_batch = array_split(train_windows, \
-                list(range(self.max_jobs_per_batch, self.max_jobs_per_batch*batch_jobs_per_round, self.max_jobs_per_batch)))
+                list(range(self.max_jobs_per_batch,
+                           self.max_jobs_per_batch * batch_jobs_per_round,
+                           self.max_jobs_per_batch)))
 
         # append sub jobs to a batch job script until counter is reached
         # if counter is not reached yet, do not submit yet
