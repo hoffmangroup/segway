@@ -3982,9 +3982,10 @@ def parse_options(argv):
                        help="each training instance runs a maximum of NUM"
                        " rounds (default %d)" % MAX_EM_ITERS)
 
-    group = train_run.add_argument_group("Number of jobs per batch job script")
-    group.add_argument("--jobs-per-batch", type=int, metavar="DIR",
-                       help="Number of jobs per batch job script (default %s)"
+    group = train_run.add_argument_group("Number of train jobs per batch")
+    group.add_argument("--jobs-per-batch", type=int, metavar="NUM",
+                       help="each training instance submits a maximum of NUM"
+                       " train jobs per batch job (default %s)"
                        % DEFAULT_JOBS_PER_BATCH)
 
 
