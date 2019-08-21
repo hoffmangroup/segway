@@ -2313,7 +2313,7 @@ class Runner(object):
         return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
     def queue_task(self, prog, kwargs, job_name, num_frames,
-                   output_filename=None, job_index=None, total_num_jobs=None, prefix_args=[]):
+                   output_filename=None, subjob_index=None, total_num_subjobs_in_batch=None, prefix_args=[]):
         """ Returns a restartable job object to run segway-task """
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
@@ -2327,7 +2327,7 @@ class Runner(object):
         shell_job_name = extsep.join([job_name, EXT_SH])
         job_script_filename = self.job_script_dirpath() / shell_job_name
 
-        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and job_index!=0:
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and subjob_index!=0:
             job_script_fd = os_open(job_script_filename,
                                     JOB_SCRIPT_FILE_APPEND_FLAGS,
                                     JOB_SCRIPT_FILE_PERMISSIONS)
@@ -2358,7 +2358,7 @@ class Runner(object):
         # number of subjobs, submit the job
 
         if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH:
-            if not(job_index+1 == total_num_jobs):
+            if not(subjob_index+1 == total_num_subjobs_in_batch):
                 return None
 
         session = self.session
@@ -2410,7 +2410,7 @@ class Runner(object):
                               mem_usage_key)
 
     def queue_train(self, instance_index, round_index, window_index,
-                    num_frames=0, job_index=None, total_num_jobs=None,
+                    num_frames=0, subjob_index=None, total_num_subjobs_in_batch=None,
                     batch_index=None, **kwargs):
         """this calls Runner.queue_task()
 
@@ -2491,7 +2491,7 @@ class Runner(object):
         prefix_args.extend(additional_prefix_args)
 
         return self.queue_task(self.train_prog, kwargs, name, num_frames,
-                               job_index=job_index, total_num_jobs=total_num_jobs,
+                               subjob_index=subjob_index, total_num_subjobs_in_batch=total_num_subjobs_in_batch,
                                prefix_args=prefix_args
                                )
 
@@ -2505,10 +2505,10 @@ class Runner(object):
         make_acc_filename_custom = partial(self.make_acc_filename,
                                            instance_index)
 
-        ### TO DO
         num_train_windows = len(train_windows)
         train_windows_indices = list(range(num_train_windows))
-        # get number of batch jobs per round with up to max_jobs_per_batch jobs in each job
+        # compute the number of batch jobs per round with up to
+        # max_jobs_per_batch jobs in each job
         batch_jobs_per_round = ceil(num_train_windows/self.max_jobs_per_batch)
 
         # split train_windows into batch_jobs_per_round batches
@@ -2518,9 +2518,12 @@ class Runner(object):
         # if counter is not reached yet, do not submit yet
         # if counter is reached, submit batch job as usual
         # with 1 job per batch, recover usual behavior
+
+        # if max_jobs_per_batch is 1 (default) then this is the same as
+        # unbatched behavior
         for batch_index, train_windows_per_batch in enumerate(train_windows_per_batch):
-            total_num_jobs = len(train_windows_per_batch)
-            for job_index, train_window in enumerate(train_windows_per_batch):
+            total_num_subjobs_in_batch = len(train_windows_per_batch)
+            for subjob_index, train_window in enumerate(train_windows_per_batch):
                 window_index, window_len = train_window
                 acc_filename = make_acc_filename_custom(window_index)
                 kwargs_window = dict(trrng=window_index, storeAccFile=acc_filename,
@@ -2537,7 +2540,7 @@ class Runner(object):
 
                 restartable_job = self.queue_train(instance_index, round_index,
                                                    window_index, num_frames,
-                                                   job_index, total_num_jobs,
+                                                   subjob_index, total_num_subjobs_in_batch,
                                                    batch_index,
                                                    **kwargs_window)
                 res.queue(restartable_job)
