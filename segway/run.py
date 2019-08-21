@@ -31,8 +31,8 @@ from uuid import uuid1
 from warnings import warn
 
 from genomedata import Genome
-from numpy import (append, arcsinh, array, array_split, empty, finfo, float32, int64, inf,
-                   square, vstack, zeros)
+from numpy import (append, arcsinh, array, array_split, empty,
+                   finfo, float32, int64, inf, square, vstack, zeros)
 from numpy.random import RandomState
 from operator import attrgetter
 from optplus import str2slice_or_int
@@ -2313,7 +2313,8 @@ class Runner(object):
         return self.calc_tmp_usage_obs(num_frames, prog) + TMP_USAGE_BASE
 
     def queue_task(self, prog, kwargs, job_name, num_frames,
-                   output_filename=None, subjob_index=None, total_num_subjobs_in_batch=None, prefix_args=[]):
+                   output_filename=None, subjob_index=None,
+                   total_num_subjobs_in_batch=None, prefix_args=[]):
         """ Returns a restartable job object to run segway-task """
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
@@ -2423,7 +2424,8 @@ class Runner(object):
 
         kwargs["inputMasterFile"] = self.input_master_filename
 
-        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and subjob_index is not None:
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and
+            subjob_index is not None:
             name = self.make_job_name_train(instance_index, round_index,
                                             "batch" + str(batch_index))
         else:
@@ -2520,14 +2522,16 @@ class Runner(object):
         # and would be split at indices [3, 3*5, 3] = [3, 6, 9, 12]
         # resulting in the following train window split:
         # >>> np.array_split(list(range(14)), [3,6,9,12])
-        # [array([0, 1, 2]), array([3, 4, 5]), array([6, 7, 8]), array([ 9, 10, 11]), array([12, 13])]
+        # [array([0, 1, 2]), array([3, 4, 5]), array([6, 7, 8]),
+        #  array([ 9, 10, 11]), array([12, 13])]
         train_windows_per_batch = array_split(train_windows, \
                 list(range(self.max_jobs_per_batch,
                            self.max_jobs_per_batch * batch_jobs_per_round,
                            self.max_jobs_per_batch)))
 
         # append sub jobs to a batch job script until subjob_index
-        # reaches the total number of jobs expected in the batch (total_num_subjobs_in_batch)
+        # reaches the total number of jobs expected in the batch
+        # (total_num_subjobs_in_batch)
         # if total_num_subjobs_in_batch is not reached yet, do not submit yet
         # if total_num_subjobs_in_batch is reached, submit batch job as usual
         # with max_jobs_per_batch=1 (default), recover usual unbatched behavior
@@ -2641,7 +2645,7 @@ class Runner(object):
                        ]
 
         return self.queue_task(self.train_prog, kwargs, name, num_frames,
-                               prefix_args=prefix_args,
+                               prefix_args=prefix_args
                                )
 
     def queue_validate(self, input_params_filename, instance_index,
