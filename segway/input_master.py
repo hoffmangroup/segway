@@ -813,6 +813,9 @@ class InputMasterSaver(Saver):
 
         include_filename = self.gmtk_include_filename_relative
 
+        import pdb
+        pdb.set_trace()
+
         dt_spec = DTParamSpec(self)
 
         dense_cpt_spec = DenseCPTParamSpec(self)

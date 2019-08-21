@@ -91,6 +91,25 @@ frame: 0 {
 
       weight: scale 1.000000;
    }
+
+#if VIRTUAL_EVIDENCE==1
+   variable: virtualEvidence {
+       type : discrete observed value 1 cardinality CARD_BOOLEAN;
+
+       switchingparents: presence__virtualEvidence(0) using mapping("internal:copyParent");
+
+       conditionalparents: seg(0) using VirtualEvidenceCPT("seg_virtualEvidence") | seg(0) using VirtualEvidenceCPT("seg_virtualEvidence");
+
+       weight: scale 1.000000;
+   }
+
+   variable: presence__virtualEvidence {
+     type: discrete observed 6:6 cardinality CARD_PRESENCE;
+
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
+   }
+#endif /* VIRTUAL_EVIDENCE==1 */
+
 }
 
 frame: 1 {
@@ -205,6 +224,25 @@ frame: 1 {
 
       weight: scale 1.000000;
    }
+
+#if VIRTUAL_EVIDENCE==1
+   variable: virtualEvidence {
+       type : discrete observed value 1 cardinality CARD_BOOLEAN;
+
+       switchingparents: presence__virtualEvidence(0) using mapping("internal:copyParent");
+
+       conditionalparents: seg(0) using VirtualEvidenceCPT("seg_virtualEvidence") | seg(0) using VirtualEvidenceCPT("seg_virtualEvidence");
+
+       weight: scale 1.000000;
+   }
+
+   variable: presence__virtualEvidence {
+     type: discrete observed 6:6 cardinality CARD_PRESENCE;
+
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
+   }
+#endif /* VIRTUAL_EVIDENCE==1 */
+
 }
 
 chunk 1:1
