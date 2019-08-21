@@ -2424,7 +2424,7 @@ class Runner(object):
 
         kwargs["inputMasterFile"] = self.input_master_filename
 
-        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and
+        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and \
             subjob_index is not None:
             name = self.make_job_name_train(instance_index, round_index,
                                             "batch" + str(batch_index))
