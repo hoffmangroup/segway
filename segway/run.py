@@ -19,7 +19,7 @@ from functools import partial
 from itertools import count, product
 from math import ceil, ldexp
 from os import (environ, extsep, fdopen, open as os_open, O_WRONLY, O_CREAT,
-                O_SYNC, O_TRUNC, O_APPEND)
+                O_SYNC, O_TRUNC, O_RDONLY)
 import re
 from shutil import copy2
 import stat
@@ -265,7 +265,7 @@ SUBDIRNAMES_TRAIN = [SUBDIRNAME_ACC, SUBDIRNAME_LIKELIHOOD,
 # job script file permissions: owner has read/write/execute
 # permissions, group/others have read/execute permissions
 JOB_SCRIPT_FILE_OPEN_FLAGS = O_WRONLY | O_CREAT | O_SYNC | O_TRUNC
-JOB_SCRIPT_FILE_APPEND_FLAGS = O_WRONLY | O_APPEND  | O_SYNC
+JOB_SCRIPT_FILE_READ_FLAGS = O_RDONLY | O_SYNC
 JOB_SCRIPT_FILE_PERMISSIONS = stat.S_IRWXU | stat.S_IRGRP | stat.S_IXGRP \
                               | stat.S_IROTH | stat.S_IXOTH
 
@@ -2314,7 +2314,9 @@ class Runner(object):
 
     def queue_task(self, prog, kwargs, job_name, num_frames,
                    output_filename=None, subjob_index=None,
-                   total_num_subjobs_in_batch=None, prefix_args=[]):
+                   total_num_subjobs_in_batch=None,
+                   batch_name=None, subjob_filenames=None,
+                   prefix_args=[]):
         """ Returns a restartable job object to run segway-task """
         gmtk_cmdline = prog.build_cmdline(options=kwargs)
 
@@ -2328,29 +2330,21 @@ class Runner(object):
         shell_job_name = extsep.join([job_name, EXT_SH])
         job_script_filename = self.job_script_dirpath() / shell_job_name
 
-        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and \
-                subjob_index!=0 and \
-                subjob_index is not None:
-            job_script_fd = os_open(job_script_filename,
-                                    JOB_SCRIPT_FILE_APPEND_FLAGS,
-                                    JOB_SCRIPT_FILE_PERMISSIONS)
+        job_script_fd = os_open(job_script_filename,
+                                JOB_SCRIPT_FILE_OPEN_FLAGS,
+                                JOB_SCRIPT_FILE_PERMISSIONS)
 
-            # if this is the first job in the batch, then the job script file
-            # will not exist yet. fdopen in 'append' mode cannot create new files!
-            with fdopen(job_script_fd, "a") as job_script_file:
-                # this doesn't include use of segway-wrapper, which takes the
-                # memory usage as an argument, and may be run multiple times
-                self.log_cmdline(gmtk_cmdline, args, job_script_file)
-        else:
-            job_script_fd = os_open(job_script_filename,
-                                    JOB_SCRIPT_FILE_OPEN_FLAGS,
-                                    JOB_SCRIPT_FILE_PERMISSIONS)
-            with fdopen(job_script_fd, "w") as job_script_file:
+        with fdopen(job_script_fd, "w") as job_script_file:
+            # if this is the first job in the batch or segway is unbatched,
+            # then write the shebang line
+            if (self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and \
+                    subjob_index==0) or \
+                    (self.max_jobs_per_batch == DEFAULT_JOBS_PER_BATCH):
                 print("#!/usr/bin/env bash", file=job_script_file)
-                # this doesn't include use of segway-wrapper, which takes the
-                # memory usage as an argument, and may be run multiple times
-                self.log_cmdline(gmtk_cmdline, args, job_script_file)
 
+            # this doesn't include use of segway-wrapper, which takes the
+            # memory usage as an argument, and may be run multiple times
+            self.log_cmdline(gmtk_cmdline, args, job_script_file)
 
         if self.dry_run:
             return None
@@ -2363,6 +2357,28 @@ class Runner(object):
         if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and subjob_index is not None:
             if not(subjob_index+1 == total_num_subjobs_in_batch):
                 return None
+            else:
+                # first create batch job script name
+                shell_batch_job_name = extsep.join([batch_name, EXT_SH])
+                batch_job_script_filename = self.job_script_dirpath() / shell_batch_job_name
+
+                batch_job_script_fd = os_open(batch_job_script_filename,
+                                        JOB_SCRIPT_FILE_OPEN_FLAGS,
+                                        JOB_SCRIPT_FILE_PERMISSIONS)
+
+
+                # now open each subjob's job script and read it into the
+                # batch job script all at once
+                with fdopen(batch_job_script_fd, "w") as batch_job_script_file:
+                    for subjob_filename in subjob_filenames:
+                        subjob_script_fd = os_open(subjob_filename,
+                                                JOB_SCRIPT_FILE_READ_FLAGS,
+                                                JOB_SCRIPT_FILE_PERMISSIONS)
+                        with fdopen(subjob_script_fd, "r") as subjob_script_file:
+                            batch_job_script_file.write(subjob_script_file.read())
+
+                job_name = batch_name
+                job_script_filename = batch_job_script_filename
 
         session = self.session
         job_tmpl = session.createJobTemplate()
@@ -2414,7 +2430,7 @@ class Runner(object):
 
     def queue_train(self, instance_index, round_index, window_index,
                     num_frames=0, subjob_index=None, total_num_subjobs_in_batch=None,
-                    batch_index=None, **kwargs):
+                    batch_name=None, subjob_filenames=None, **kwargs):
         """this calls Runner.queue_task()
 
         if num_frames is not specified, then it is set to 0, where
@@ -2424,13 +2440,8 @@ class Runner(object):
 
         kwargs["inputMasterFile"] = self.input_master_filename
 
-        if self.max_jobs_per_batch != DEFAULT_JOBS_PER_BATCH and \
-            subjob_index is not None:
-            name = self.make_job_name_train(instance_index, round_index,
-                                            "batch" + str(batch_index))
-        else:
-            name = self.make_job_name_train(instance_index, round_index,
-                                            window_index)
+        name = self.make_job_name_train(instance_index, round_index,
+                                        window_index)
 
         segway_task_path = find_executable("segway-task")
         segway_task_verb = "run"
@@ -2496,6 +2507,7 @@ class Runner(object):
 
         return self.queue_task(self.train_prog, kwargs, name, num_frames,
                                subjob_index=subjob_index, total_num_subjobs_in_batch=total_num_subjobs_in_batch,
+                               batch_name=batch_name, subjob_filenames=subjob_filenames,
                                prefix_args=prefix_args
                                )
 
@@ -2537,11 +2549,26 @@ class Runner(object):
         # with max_jobs_per_batch=1 (default), recover usual unbatched behavior
         for batch_index, train_windows_in_batch in enumerate(train_windows_per_batch):
 
+            batch_name = self.make_job_name_train(instance_index, round_index,
+                                                  "batch" + str(batch_index))
+
             # accumulate the maximum number of frames for a job in the batch
             # for batched jobs, this ensures that memory for the final batch job submission
             # is calculated based on the largest job in the batch
             # for unbatched jobs, there is no change
             max_num_frames = 0
+
+            train_window_indices_in_batch = [_window_index for _window_index,_ in \
+                                             train_windows_in_batch]
+
+            # now recreate the filenames corresponding to the train windows in this batch
+            subjob_filenames = []
+            for train_window_index_in_batch in train_window_indices_in_batch:
+                name = self.make_job_name_train(instance_index, round_index,
+                                                train_window_index_in_batch)
+                shell_job_name = extsep.join([name, EXT_SH])
+                job_script_filename = self.job_script_dirpath() / shell_job_name
+                subjob_filenames.append(job_script_filename)
 
             total_num_subjobs_in_batch = len(train_windows_in_batch)
             for subjob_index, train_window in enumerate(train_windows_in_batch):
@@ -2562,7 +2589,8 @@ class Runner(object):
                 restartable_job = self.queue_train(instance_index, round_index,
                                                    window_index, max_num_frames,
                                                    subjob_index, total_num_subjobs_in_batch,
-                                                   batch_index,
+                                                   batch_name,
+                                                   subjob_filenames,
                                                    **kwargs_window)
                 res.queue(restartable_job)
 
