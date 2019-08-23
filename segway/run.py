@@ -3711,9 +3711,7 @@ def parse_options(argv):
 
     version = "%(prog)s {}".format(__version__)
     description = """
-    Segmentation and automated genome annotation.
-
-    Use segway COMMAND -h, for help specific to each command"""
+    Segmentation and automated genome annotation."""
 
     usage = "segway [global_args] COMMAND [args]..."
 
@@ -3727,24 +3725,24 @@ def parse_options(argv):
                             epilog=citation)
 
     subtask_description = """
+train
+- train-init
+- train-run
+-- train-run-round
+- train-finish
+annotate
+- annotate-init
+- annotate-run
+- annotate-finish
+posterior
+- posterior-init
+- posterior-run
+- posterior-finish
 
-
-    train
-    - train-init
-    - train-run
-    -- train-run-round
-    - train-finish
-    annotate
-    - annotate-init
-    - annotate-run
-    - annotate-finish
-    posterior
-    - posterior-init
-    - posterior-run
-    - posterior-finish
+Use `segway COMMAND --help`, for help specific to each command.
     """
 
-    tasks = parser.add_subparsers(title="commands", dest="task_spec",
+    tasks = parser.add_subparsers(title="list of commands", dest="task_spec",
                                   metavar=subtask_description)
 
     parser.add_argument("--version", action="version", version=version)
