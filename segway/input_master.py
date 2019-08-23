@@ -259,8 +259,7 @@ class ParamSpec(object):
 
 class DTParamSpec(ParamSpec):
     type_name = "DT"
-    copy_attrs = ParamSpec.copy_attrs + ["seg_countdowns_initial",
-                                         "supervision_type"]
+    copy_attrs = ["num_segs", "seg_countdowns_initial", "supervision_type"]
 
     def make_segCountDown_tree_spec(self, resourcename):  # noqa
         num_segs = self.num_segs
