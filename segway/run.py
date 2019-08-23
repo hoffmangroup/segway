@@ -3725,19 +3725,21 @@ def parse_options(argv):
                             epilog=citation)
 
     subtask_description = """
-train
-- train-init
-- train-run
--- train-run-round
-- train-finish
-annotate
-- annotate-init
-- annotate-run
-- annotate-finish
-posterior
-- posterior-init
-- posterior-run
-- posterior-finish
+train			Runs gmtkEMtrain on specified genomedata archive(s)
+- train-init		Sets up directory structure and generates all gmtk input files
+- train-run		Runs training to completion or to a specified number of iterations
+-- train-run-round	Runs a single round of training
+- train-finish		Selects best training instance and generates output master and params files
+
+annotate		Runs gmtkViterbi on given archives and training directory, provides labels to entire genome
+- annotate-init		Sets up directory structure and generates all gmtk input files
+- annotate-run		Submits jobs to Viterbi
+- annotate-finish	Compiles all viterbi output files together into a single bed file for all labels
+
+posterior		Runs gmtkJT and produces prior probability of each label at each index
+- posterior-init	Sets up directory structure and generates all gmtk input files
+- posterior-run		Submits jonbs to JT
+- posterior-finish	Compiles all output posterior files, and produces a bed file for each label
 
 Use `segway COMMAND --help`, for help specific to each command.
     """
