@@ -66,11 +66,16 @@ If you want to use Segway with your cluster, you will need the
 ``drmaa>=0.4a3`` Python package.
 
 You need either Sun Grid Engine (SGE; now called Oracle Grid Engine),
-Platform Load Sharing Facility (LSF) and FedStage DRMAA for LSF, or
-Torque/PBS/PBS Pro (experimental).
+Platform Load Sharing Facility (LSF) and FedStage DRMAA for LSF, Slurm workload
+manager, or Torque/PBS/PBS Pro (experimental).
 
 If FedStage DRMAA for LSF is installed, Segway should be ready to go
 on LSF out of the box.
+
+If you are using the Slurm workload manager with versions past 18, it is
+recommended you install a DRMAA driver based on an updated fork since the
+original implementation is no longer updated or maintained. We currently test
+our Slurm support using https://github.com/natefoo/slurm-drmaa.
 
 If you are using SGE, someone with cluster manager privileges on your
 cluster must have Segway installed within their PYTHONPATH or
