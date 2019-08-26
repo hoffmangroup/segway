@@ -2358,7 +2358,17 @@ class Runner(object):
             if not(subjob_index+1 == total_num_subjobs_in_batch):
                 return None
             else:
-                # first create batch job script name
+
+                batch_job_commands = []
+                # read all subjob commands into one large array
+                for subjob_filename in subjob_filenames:
+                    subjob_script_fd = os_open(subjob_filename,
+                                            JOB_SCRIPT_FILE_READ_FLAGS,
+                                            JOB_SCRIPT_FILE_PERMISSIONS)
+                    with fdopen(subjob_script_fd, "r") as subjob_script_file:
+                        subjob_commands = subjob_script_file.read()
+                        batch_job_commands.append(subjob_commands)
+
                 shell_batch_job_name = extsep.join([batch_name, EXT_SH])
                 batch_job_script_filename = self.job_script_dirpath() / shell_batch_job_name
 
@@ -2366,16 +2376,9 @@ class Runner(object):
                                         JOB_SCRIPT_FILE_OPEN_FLAGS,
                                         JOB_SCRIPT_FILE_PERMISSIONS)
 
-
-                # now open each subjob's job script and read it into the
-                # batch job script all at once
+                # now read each subjob's command into the batch job script all at once
                 with fdopen(batch_job_script_fd, "w") as batch_job_script_file:
-                    for subjob_filename in subjob_filenames:
-                        subjob_script_fd = os_open(subjob_filename,
-                                                JOB_SCRIPT_FILE_READ_FLAGS,
-                                                JOB_SCRIPT_FILE_PERMISSIONS)
-                        with fdopen(subjob_script_fd, "r") as subjob_script_file:
-                            batch_job_script_file.write(subjob_script_file.read())
+                    batch_job_script_file.writelines(batch_job_commands)
 
                 job_name = batch_name
                 job_script_filename = batch_job_script_filename
