@@ -344,7 +344,7 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_prior_vector):
     """
     # split input_array into subarrays of length resolution.
     # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6]] for resolution == 3
-    resolution_partitioned_prior_list = (
+    resolution_partitioned_prior_gen = (
             raw_prior_array[index:index+resolution]
             for index in range(0, len(raw_prior_array), resolution)
             )
@@ -355,7 +355,7 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_prior_vector):
 
     # For each input partition, calculate the mean prior for each label
     # if no priors given, use a uniform prior
-    for index, input_partition in enumerate(resolution_partitioned_prior_list):
+    for index, input_partition in enumerate(resolution_partitioned_prior_gen):
         # if no priors are defined in this partition,
         # (meaning input_partition will be entirely composed of 0's)
         # set the mean vector to be uniform
