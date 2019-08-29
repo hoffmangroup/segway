@@ -94,18 +94,18 @@ class TestTask(unittest.TestCase):
 
 class TestGMTK(unittest.TestCase):
     def test_input_master(self):
-        input_master = InputMaster(InlineSection(("example_cpt", DenseCPT([[0.5, 0.5]]))))
-        input_master[0].update([("two_dimensional_cpt", DenseCPT([[0.25, 0.25], [0.25, 0.25]]))])
-        input_master.append(InlineSection(("example_generic_object", Object("basic decision string", "DT"))))
-        input_master.append(InlineSection(("mean_duplication", Mean([1.0])),
-                                           ("mean_no_CNV", Mean([0])),
-                                           ("mean_deletion", Mean([-1.0]))))
+        input_master = InputMaster(InlineSection(DenseCPT("example_cpt", [[0.5, 0.5]])), InlineSection(Object("example_generic_object", "basic decision string", "DT")))
+        input_master["DENSE_CPT"].update(DenseCPT("two_dimensional_cpt", [[0.25, 0.25], [0.25, 0.25]]))
+        input_master.update(InlineSection(Object("example_generic_object2", "basic decision string", "DT")))
+        input_master.update(InlineSection(Mean("mean_duplication", [1.0]),
+                                          Mean("mean_no_CNV", [0]),
+                                          Mean("mean_deletion", [-1.0])))
 
-        input_master.append(InlineSection(("logR", Covar([0.04]))))
+        input_master.update(InlineSection(Covar("logR", [0.04])))
 
-        input_master.append(InlineSection(("collection_CNV", NameCollection(["mx_deletion", "mx_normal", "mx_duplication"]))))
+        input_master.update(InlineSection(NameCollection("collection_CNV", ["mx_deletion", "mx_normal", "mx_duplication"])))
 
-        input_master.append(InlineSection(("frameIndex_ruler", DeterministicCPT([1, 2000000, 2, "map_seg_segCountDown"]))))
+        input_master.update(InlineSection(DeterministicCPT("frameIndex_ruler", [1, 2000000, 2, "map_seg_segCountDown"])))
 
         test_master = Path("sample_input.master")
         with open(test_master) as sample_master:

@@ -13,9 +13,12 @@ two_dimensional_cpt
 
 DT_IN_FILE inline
 
-1
+2
 0
 example_generic_object
+basic decision string
+1
+example_generic_object2
 basic decision string
 
 MEAN_IN_FILE inline

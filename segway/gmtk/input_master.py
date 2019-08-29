@@ -21,7 +21,7 @@ def array2text(a):
         delimiter = "\n" * (ndim - 1)
         return delimiter.join(array2text(row) for row in a)
 
-class InputMaster(list):
+class InputMaster(OrderedDict):
     """
     Master class which contains a list of all sections present in the input
     master and is able to responsible for creating their string representation.
@@ -31,16 +31,27 @@ class InputMaster(list):
             if not isinstance(item, Section):
                 raise ValueError("Only Section objects may be saved to an "
                                  "InputMaster object")
-        super().__init__([*args], **kwargs)
+            # Check if kind of section does not exist in master already
+            # If it does, add new information to the end of it
+            if not item.kind() in self:
+                self[item.kind()] = item
+            else:
+                self[item.kind()].update(item)
 
     def __str__(self):
-        return "\n\n".join([str(item) for item in self])
+        return "\n\n".join([str(item) for item in self.values()])
 
-    def append(self, item):
-        if not isinstance(item, Section):
-            raise ValueError("Only Section objects may be saved to an "
-                             "InputMaster object")
-        list.append(self, item)
+    def update(self, *args, **kwargs):
+        for item in args:
+            if not isinstance(item, Section):
+                raise ValueError("Only Section objects may be saved to an "
+                                 "InputMaster object")
+            # Check if kind of section does not exist in master already
+            # If it does, add new information to the end of it
+            if not item.kind() in self:
+                self[item.kind()] = item
+            else:
+                self[item.kind()].update(item)
 
 
 class Section(OrderedDict):
@@ -53,17 +64,12 @@ class Section(OrderedDict):
     def __init__(self, *args, **kwargs):
         kind = None
         for item in args:
-            if (not type(item) is tuple or
-                not len(item) == 2 or
-                not type(item[0]) is str):
-                raise ValueError("Section arguments must be tuple of length 2 "
-                                 "with a str object name as the first")
             if not kind:
-                kind = item[1].kind
+                kind = item.kind
             else:
-                if not item[1].kind == kind:
+                if not item.kind == kind:
                     raise ValueError("Object has incorrect kind")
-        super().__init__([*args], **kwargs)
+            self[item.name] = item
 
     def __str__(self):
         section_objects = []
@@ -84,11 +90,14 @@ class Section(OrderedDict):
                 assert section_kind == obj.kind
         return section_kind
 
-    def update(self, new_object):
-        for item in new_object:
-            if item[1].kind != self.kind():
+    def update(self, *args, **kwargs):
+        for item in args:
+            if isinstance(item, Section):
+                super().update(item)
+            elif item.kind != self.kind():
                 raise ValueError("Object has incorrect kind")
-        super().update(new_object)
+            else:
+                self[item.name] = item
 
 
 class InlineSection(Section):
@@ -103,11 +112,12 @@ class FileSection(Section):
 
 
 class Object(str):
-    def __new__(cls, content, kind = None):
+    def __new__(cls, name, content, kind = None):
         return str.__new__(cls, content)
 
-    def __init__(self, content, kind):
+    def __init__(self, name, content, kind):
         self.kind = kind
+        self.name = name
 
 
 class DeterministicCPT(list):
@@ -123,7 +133,8 @@ class DeterministicCPT(list):
 
     TODO: If possible, ensure child is in fact a DT object. Difficult
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name, *args, **kwargs):
+        self.name = name
         super().__init__(*args, **kwargs)
         self.kind = DETERMINISTIC_CPT_KIND
 
@@ -151,7 +162,8 @@ class NameCollection(list):
 
     Input is list of all names in the collection
     """
-    def __init__(self, *args, **kwargs):
+    def __init__(self, name, *args, **kwargs):
+        self.name = name
         super().__init__(*args, *kwargs)
         self.kind = NAME_COLLECTION_KIND
 
@@ -160,8 +172,10 @@ class NameCollection(list):
 
 
 class Array(ndarray):
-    def __new__(cls, *args, **kwargs):
-        return array(*args, **kwargs).view(cls)
+    def __new__(cls, name, *args, **kwargs):
+        new_array = array(*args, **kwargs).view(cls)
+        new_array.name = name
+        return new_array
 
     def __str__(self):
         # 1 dimensional str representation covered here
