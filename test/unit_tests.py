@@ -12,7 +12,7 @@ from segway.task import prepare_gmtk_observations
 from segway._util import EXT_INT, EXT_FLOAT
 
 from segway.gmtk.input_master import (Covar, DenseCPT, DeterministicCPT,
-                                      InlineSection,
+                                      DENSE_CPT_KIND, InlineSection,
                                       InputMaster, Mean, NameCollection, 
                                       Object)
 
@@ -95,7 +95,7 @@ class TestTask(unittest.TestCase):
 class TestGMTK(unittest.TestCase):
     def test_input_master(self):
         input_master = InputMaster(InlineSection(DenseCPT("example_cpt", [[0.5, 0.5]])), InlineSection(Object("example_generic_object", "basic decision string", "DT")))
-        input_master["DENSE_CPT"].update(DenseCPT("two_dimensional_cpt", [[0.25, 0.25], [0.25, 0.25]]))
+        input_master[DENSE_CPT_KIND].update(DenseCPT("two_dimensional_cpt", [[0.25, 0.25], [0.25, 0.25]]))
         input_master.update(InlineSection(Object("example_generic_object2", "basic decision string", "DT")))
         input_master.update(InlineSection(Mean("mean_duplication", [1.0]),
                                           Mean("mean_no_CNV", [0]),
