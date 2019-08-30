@@ -13,6 +13,10 @@ DETERMINISTIC_CPT_KIND = "DETERMINISTIC_CPT"
 
 INLINE_TMPL = "{}_IN_FILE inline\n\n"
 
+#KIND_TO_CLS = {"DENSE_CPT": DenseCPT, "MEAN": Mean, "COVAR": Covar,
+#               "DPMF": DPMF, "NAME_COLLECTION": NameCollection,
+#               "DETERMINISTIC_CPT": DeterministicCPT}
+
 def array2text(a):
     ndim = a.ndim
     if ndim == 1:
@@ -34,7 +38,7 @@ class InputMaster(OrderedDict):
             # Check if kind of section does not exist in master already
             # If it does, add new information to the end of it
             if not item.kind() in self:
-                self[item.kind()] = item
+                self[item.kind()] = InlineSection(item)
             else:
                 self[item.kind()].update(item)
 
@@ -53,6 +57,19 @@ class InputMaster(OrderedDict):
             else:
                 self[item.kind()].update(item)
 
+#    def __setitem__(self, key, value):
+#        if key in self:
+#            something = 1
+
+    def __getitem__(self, key):
+        try:
+            return super().__getitem__(key) 
+        except KeyError:
+            return self.__missing__(key)
+
+    def __missing__(self, key):
+        self[key] = InlineSection()
+        return self[key]
 
 class Section(OrderedDict):
     """
@@ -99,6 +116,10 @@ class Section(OrderedDict):
             else:
                 self[item.name] = item
 
+    def __setitem__(self, key, value):
+        cls = type(self[0])
+        new_item = cls(key, value)
+
 
 class InlineSection(Section):
     def __str__(self):
@@ -112,7 +133,7 @@ class FileSection(Section):
 
 
 class Object(str):
-    def __new__(cls, name, content, kind = None):
+    def __new__(cls, _name, content, _kind):
         return str.__new__(cls, content)
 
     def __init__(self, name, content, kind):
