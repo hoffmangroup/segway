@@ -44,7 +44,7 @@ EXT_BED = "bed"
 EXT_LIST = "list"
 EXT_INT = "int"
 EXT_FLOAT = "float32"
-EXT_VIRTUAL_EVIDENCE = "virtual_evidence"
+EXT_VIRTUAL_EVIDENCE = "ve"
 EXT_GZ = "gz"
 EXT_MASTER = "master"
 EXT_PARAMS = "params"
@@ -72,12 +72,6 @@ PREFIX_VALIDATION_SUM_WINNER = "validation.sum.winner"
 PREFIX_VALIDATION_SUM = "validation.sum"
 PREFIX_VALIDATION_OUTPUT_WINNER = "validation.output.winner"
 PREFIX_VALIDATION_OUTPUT = "validation.output"
-
-# define the delimiter for the prior string specification
-# between different label:prior pairs
-VIRTUAL_EVIDENCE_PRIOR_DELIMITER = ','
-# define the delimiter for each label:prior pair
-VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER = ':'
 
 VIRTUAL_EVIDENCE_LIST_FILENAME = "VIRTUAL_EVIDENCE_LIST_FILENAME"
 # cppCommandOption which will be replaced in GMTK commands 
