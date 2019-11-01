@@ -63,8 +63,9 @@ JITTER_ORDERS_MAGNITUDE = 5  # log10(2**5) = 1.5 decimal orders of magnitude
 
 DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
                                      DISTRIBUTION_ASINH_NORMAL])
-
-PYTHON2_NUM_ROUNDING_DIGITS = 12
+# Precision to round input master means to, allows consistency between Pythons
+# Can be removed once Python 2 support is dropped
+NROUND_DIGITS = 12
 
 
 def vstack_tile(array_like, *reps):
@@ -760,7 +761,7 @@ class DPMFParamSpec(DenseCPTParamSpec):
             object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
                         "DirichletConst %s ${weights}" % GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
             weights = (" " + str(round(1.0 / self.num_mix_components, 
-                       PYTHON2_NUM_ROUNDING_DIGITS)))*self.num_mix_components
+                       NROUND_DIGITS)))*self.num_mix_components
             substitute = Template(object_tmpl).substitute
             data = self.make_data()
             for mapping in self.generate_tmpl_mappings():
