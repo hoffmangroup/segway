@@ -290,8 +290,8 @@ TRAIN_OPTION_TYPES = \
          num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
-         supervision_filename=str, virtual_evidence_filename = str, 
-         minibatch_fraction=float, validation_fraction=float, max_frames = int,
+         supervision_filename=str, virtual_evidence_filename=str, 
+         minibatch_fraction=float, validation_fraction=float, max_frames=int,
          validation_coords_filename=str, var_floor=float)
 
 
@@ -705,7 +705,6 @@ class Runner(object):
         self.seg_table_filename = None
         self.supervision_filename = None
         self.virtual_evidence_filename = None
-        self.new_virtual_evidence_filename = None
 
         self.params_filename = None  # actual params filename for this instance
         self.params_filenames = []  # list of possible params filenames
@@ -2136,8 +2135,8 @@ class Runner(object):
         # value: list of tuples (start, end)
         virtual_evidence_coords = defaultdict(list)
 
-        with open(self.virtual_evidence_filename) as VE_file:
-            for datum in read_native(VE_file):
+        with open(self.virtual_evidence_filename) as ve_file:
+            for datum in read_native(ve_file):
                 chrom = datum.chrom
                 start = datum.chromStart
                 end = datum.chromEnd
@@ -2906,7 +2905,7 @@ class Runner(object):
         # If a random number generator seed exists
         if self.random_seed:
             # Create a new random number generator for this instance based on
-            # its own index
+            # its own index, so that each is different and consistent
             self.random_seed += instance_index
             self.random_state = RandomState(self.random_seed)
 
