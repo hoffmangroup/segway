@@ -51,7 +51,7 @@ DIM_TRACK = 1  # Dimension in numpy array for track data
 # epsilon to use when comparing two values
 EPSILON = finfo(float32).eps
 
-LOCATION_AXIS = 1
+POSITION_AXIS = 1
 PRIOR_AXIS = 0
 
 
@@ -366,7 +366,7 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_prior_vector):
             downsampled_prior_array[index] = uniform_prior_vector
         else:
             # Remove any rows which don't contain priors
-            defined_priors = input_partition[input_partition.any(LOCATION_AXIS)]
+            defined_priors = input_partition[input_partition.any(POSITION_AXIS)]
             # take the mean of the given priors for each label over the
             # position axis
             mean_prior_vector = mean(defined_priors, axis=PRIOR_AXIS)
