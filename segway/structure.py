@@ -18,7 +18,6 @@ from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
 MAX_WEIGHT_SCALE = 25
 
 SUPERVISIONLABEL_WEIGHT_MULTIPLIER = 1
-VIRTUAL_EVIDENCE_WEIGHT_MULTIPLIER = 1
 
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))

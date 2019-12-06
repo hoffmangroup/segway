@@ -304,7 +304,7 @@ TRAIN_RESULT_TYPES = dict(log_likelihood=float, num_segs=int,
 
 IDENTIFY_OPTION_TYPES = \
     	dict(include_coords_filename=str, exclude_coords_filename=str,
-             seg_table_filename=str, output_label=str, virtual_evidence_filename = str)
+             seg_table_filename=str, output_label=str, virtual_evidence_filename=str)
 
 SUB_TASK_DELIMITER = "-"
 

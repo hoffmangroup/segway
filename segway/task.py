@@ -197,8 +197,8 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                              int_observation_list_filename)
 
     # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT
-    cpp_array_index = gmtk_args.index("-cppCommandOptions")
-    cppCommand_str = gmtk_args[cpp_array_index + 1]
+    cpp_command_options_index = gmtk_args.index("-cppCommandOptions") + 1
+    cpp_command_str = gmtk_args[cpp_command_options_index]
     # if the placeholder is present, it is replaced. otherwise, the cpp options
     # are unchanged
     gmtk_args[cpp_array_index + 1] = cppCommand_str.replace(
