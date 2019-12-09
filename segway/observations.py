@@ -17,9 +17,10 @@ import sys
 from tempfile import gettempdir
 
 from genomedata import Genome
-from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, dstack, empty, finfo, float32, full,
-                   invert, isnan, maximum, mean, sum, vstack, zeros)
+from numpy import (absolute, add, append, arange, arcsinh, argmax, array,
+                   bincount, clip, column_stack, copy, dstack, empty, finfo,
+                   float32, full, invert, isnan, maximum, mean, sum, vstack,
+                   zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -351,7 +352,7 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
             )
 
     # Empty array to be filled with mean values for priors for each bin
-    downsampled_prior_array = empty(calc_downsampled_shape(raw_prior_array,
+    res = empty(calc_downsampled_shape(raw_prior_array,
                                     resolution), raw_prior_array.dtype)
 
     # For each input partition, calculate the mean prior for each label
@@ -361,8 +362,9 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
         # (meaning input_partition will be entirely composed of 0's)
         # set the mean vector to be uniform
         if not input_partition.any():
-            downsampled_prior_array[index] = uniform_priors
+            res[index] = uniform_priors
         else:
+
             # Remove any rows which don't contain priors
             defined_priors = input_partition[input_partition.any(POSITION_AXIS)]
             # take the mean of the given priors for each label over the
@@ -371,11 +373,11 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
             # if priors are defined, check that the mean across
             # defined positions sums to 1
             if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
-                downsampled_prior_array[index] = mean_prior_vector
+                res[index] = mean_prior_vector
             else:
                 raise ValueError("Priors must sum to 1.0 at every position")
 
-    return downsampled_prior_array
+    return res
 
 def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
                                                        resolution, num_labels):
@@ -422,9 +424,9 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
         # with uniform priors filled in at all other positions
         prior_array = zeros((len(raw_prior_array), num_labels))
         for prior_list_index, prior_vector in enumerate(raw_prior_array):
-            if abs(sum(prior_vector) - 1) < EPSILON:
+            if absolute(prior_vector.sum() - 1) < EPSILON:
                 prior_array[prior_list_index] = prior_vector
-            elif abs(sum(prior_vector)) < EPSILON:
+            elif prior_vector.sum() == 0:
                 prior_array[prior_list_index] = uniform_priors
             else:
                 raise ValueError("Priors must sum to 1.0 at every position")
@@ -509,7 +511,7 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     return res
 
 
-def fill_virtual_evidence_cells(input_array, num_labels):
+def fill_virtual_evidence_cells(prior_input_array, num_labels):
     """
     For genomic positions which have at least one, but not all priors specified,
     this function will apply a uniform prior to all remaining labels.
@@ -527,11 +529,13 @@ def fill_virtual_evidence_cells(input_array, num_labels):
      [0.0 ... 0.0]]
     """
 
-    prior_array = zeros((len(input_array), num_labels))
-    for prior_coordinate, prior_list in enumerate(input_array):
-        num_prior_labels = sum(prior_list != None)
+    prior_array = zeros((len(prior_input_array), num_labels))
+    for index, prior_input in enumerate(prior_input_array):
+        # Only priors which were specified in the input file will be set
+        # Unset labels will still be none
+        num_prior_labels = sum(prior_input != None)
         if num_prior_labels:
-            prior_list_values = list(filter(None, prior_list))
+            prior_list_values = list(filter(None, prior_input))
             # number of labels with priors
             remaining_probability = 1 - sum(prior_list_values)
 
@@ -540,22 +544,19 @@ def fill_virtual_evidence_cells(input_array, num_labels):
                                  "position")
 
             # divide remaining probability uniformly amongst the remaining labels
-            uniform_prior = remaining_probability / (num_labels-num_prior_labels)
+            prior_input[prior_input == None] = (remaining_probability /
+                                                (num_labels-num_prior_labels))
 
-            for label in range(num_labels):
-                if prior_list[label] == None:
-                    prior_array[prior_coordinate][label] = uniform_prior
-                else:
-                    prior_array[prior_coordinate][label] = prior_list[label]
+            prior_array[index] = prior_input
 
     return prior_array
 
 
-def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors,
+def make_virtual_evidence_cells(coords, priors,
                                 start, end, num_labels):
     """
-    virtual_evidence_coords: list of tuples (start, end)
-    virtual_evidence_priors: list of dictionaries of the format {label: prior}
+    coords: list of tuples (start, end)
+    priors: list of dictionaries of the format {label: prior}
     start: int
     end: int
 
@@ -566,16 +567,16 @@ def make_virtual_evidence_cells(virtual_evidence_coords, virtual_evidence_priors
 
     # Get supervision regions that overlap with the start and end coords
     supercontig_coords_labels = \
-        intersect_regions(start, end, virtual_evidence_coords,
-                          virtual_evidence_priors)
+        intersect_regions(start, end, coords, priors)
 
-    for label_start, label_end, data in supercontig_coords_labels:
-        label = list(data.keys())[0]
+    for label_start, label_end, prior_dict in supercontig_coords_labels:
+        label = list(prior_dict.keys())[0]
         # copy data to all positions
-        if any(res[label][(label_start - start):(label_end - start)]):
-            raise ValueError("VE label overlaps")
+        if res[label][(label_start - start):(label_end - start)].any():
+            raise ValueError("VE label {} overlaps in coordinates {}-{}".format(label,
+                             label_start, label_end))
         res[label][(label_start - start):(label_end - start)] = \
-            list(data.values()) * ((label_end - start)-(label_start - start))
+            list(prior_dict.values()) * ((label_end - start)-(label_start - start))
 
     # For coords which had at least one label supplied, fill remaining labels
     # with uniform remaining probability
@@ -679,9 +680,7 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_blocks.append(presence_virtual_evidence_data)
 
         # separately save VE priors CPT in a temporary file
-        for prior in virtual_evidence_data_array:
-            virtual_evidence_filename_or_file.write(
-                ' '.join(['{}'.format(prob) for prob in prior]) + '\n')
+        virtual_evidence_data_array.tofile(virtual_evidence_filename_or_file)
 
     if int_blocks:
         int_data = column_stack(int_blocks)
