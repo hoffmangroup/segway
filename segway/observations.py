@@ -333,14 +333,12 @@ def downsample_presence_array(presence_array, resolution):
     [0, 1, 1, 1, 0, 0] for resolution == 3 becomes
     [2, 1]
     """
-    downsampled_presence_array = [sum(presence_array[index:index+resolution])
+    return [sum(presence_array[index:index+resolution])
             for index in range(0, len(presence_array), resolution)
             ]
 
-    return downsampled_presence_array
 
-
-def downsample_prior_array(raw_prior_array, resolution, uniform_prior_vector):
+def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
     """
     Downsamples a 2D array of priors. Takes the average for all labels defined,
     uses a uniform prior if none are.
@@ -363,7 +361,7 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_prior_vector):
         # (meaning input_partition will be entirely composed of 0's)
         # set the mean vector to be uniform
         if not input_partition.any():
-            downsampled_prior_array[index] = uniform_prior_vector
+            downsampled_prior_array[index] = uniform_priors
         else:
             # Remove any rows which don't contain priors
             defined_priors = input_partition[input_partition.any(POSITION_AXIS)]
@@ -411,7 +409,7 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
     and append it to the end of our array of downsampled priors.
     """
 
-    uniform_prior_vector = array([1.0/num_labels] * num_labels)
+    uniform_priors = array([1.0/num_labels] * num_labels)
 
     # take the presence to be 1 at every position the user has defined
     # any priors and 0 otherwise
@@ -427,7 +425,7 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
             if abs(sum(prior_vector) - 1) < EPSILON:
                 prior_array[prior_list_index] = prior_vector
             elif abs(sum(prior_vector)) < EPSILON:
-                prior_array[prior_list_index] = uniform_prior_vector
+                prior_array[prior_list_index] = uniform_priors
             else:
                 raise ValueError("Priors must sum to 1.0 at every position")
 
@@ -435,7 +433,7 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
 
     downsampled_prior_array = downsample_prior_array(raw_prior_array,
                                                      resolution,
-                                                     uniform_prior_vector)
+                                                     uniform_priors)
     downsampled_presence_array = downsample_presence_array(presence_array,
                                                            resolution)
 
