@@ -351,7 +351,7 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
             )
 
     # Empty array to be filled with mean values for priors for each bin
-    downsampled_prior_array = zeros(calc_downsampled_shape(raw_prior_array,
+    downsampled_prior_array = empty(calc_downsampled_shape(raw_prior_array,
                                     resolution), raw_prior_array.dtype)
 
     # For each input partition, calculate the mean prior for each label
