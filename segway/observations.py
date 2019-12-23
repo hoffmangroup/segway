@@ -25,6 +25,7 @@ from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
 from tabdelim import ListWriter
+from warnings import warn, Warning
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
@@ -54,6 +55,12 @@ EPSILON = finfo(float32).eps
 
 PRIOR_AXIS = 0
 POSITION_AXIS = 1
+
+class PriorSizeWarning(Warning):
+    """
+    Custom warning raised when priors submitted by the user sum to greater
+    than one.
+    """
 
 
 class NoData(object):
@@ -373,10 +380,9 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
 
             # if priors are defined, check that the mean across
             # defined positions sums to 1
-            if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
-                res[index] = mean_prior_vector
-            else:
-                raise ValueError("Priors must sum to 1.0 at every position")
+            if sum(mean_prior_vector) > 1:
+                warn("Prior labels sum to {} in resolution index {}".format(mean_prior_vector, index), PriorSizeWarning)
+            res[index] = mean_prior_vector
 
     return res
 
@@ -424,12 +430,12 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
         # with uniform priors filled in at all other positions
         prior_array = zeros((len(raw_prior_array), num_labels))
         for prior_list_index, prior_vector in enumerate(raw_prior_array):
-            if absolute(prior_vector.sum() - 1) < EPSILON:
-                prior_array[prior_list_index] = prior_vector
-            elif prior_vector.sum() == 0:
+            if prior_vector.sum() == 0:
                 prior_array[prior_list_index] = uniform_priors
             else:
-                raise ValueError("Priors must sum to 1.0 at every position")
+                if prior_vector.sum() > 1:
+                    warn("Prior labels sum to {} in index {}".format(prior_vector.sum(), prior_list_index), PriorSizeWarning)
+                prior_array[prior_list_index] = prior_vector
 
         return prior_array, presence_array
 
@@ -536,12 +542,12 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
         num_prior_labels = sum(prior_input != None)
         if num_prior_labels:
             prior_list_values = list(filter(None, prior_input))
-            # number of labels with priors
-            remaining_probability = 1 - sum(prior_list_values)
 
-            if remaining_probability < -EPSILON:
-                raise ValueError("Priors must sum to 1.0 or less at every "
-                                 "position")
+            # Check if priors should be treated as ratios or percentages
+            if sum(prior_list_values) < 1:
+                remaining_probability = 1 - sum(prior_list_values)
+            else:
+                remaining_probability = 0
 
             # divide remaining probability uniformly amongst the remaining labels
             prior_input[prior_input == None] = (remaining_probability /
@@ -560,8 +566,9 @@ def make_virtual_evidence_cells(coords, priors,
     start: int
     end: int
 
-    returns a 2-dimensional numpy.ndarray for the region specified by
-    virtual_evidence_coords where each cell is the prior data for that region
+    returns a 2-dimensional numpy.ndarray for the section of DNA bounded by
+    start and end where each cell is the prior data for each label of each
+    region inside the section.
     """
     res = full((num_labels, (end-start)), None)
 
@@ -580,6 +587,7 @@ def make_virtual_evidence_cells(coords, priors,
 
     # For coords which had at least one label supplied, fill remaining labels
     # with uniform remaining probability
+    # Transpose res to have positions as rows and labels as columns
     res = fill_virtual_evidence_cells(res.transpose(), num_labels)
 
     return res
