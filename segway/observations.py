@@ -52,8 +52,8 @@ DIM_TRACK = 1  # Dimension in numpy array for track data
 # epsilon to use when comparing two values
 EPSILON = finfo(float32).eps
 
-POSITION_AXIS = 1
 PRIOR_AXIS = 0
+POSITION_AXIS = 1
 
 
 class NoData(object):
@@ -364,12 +364,13 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
         if not input_partition.any():
             res[index] = uniform_priors
         else:
-
             # Remove any rows which don't contain priors
             defined_priors = input_partition[input_partition.any(POSITION_AXIS)]
+
             # take the mean of the given priors for each label over the
             # position axis
             mean_prior_vector = mean(defined_priors, axis=PRIOR_AXIS)
+
             # if priors are defined, check that the mean across
             # defined positions sums to 1
             if abs(sum(mean_prior_vector) - 1.0) < EPSILON:
@@ -415,8 +416,7 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
 
     # take the presence to be 1 at every position the user has defined
     # any priors and 0 otherwise
-    presence_array = array([1 if any(priors) else 0 for priors in raw_prior_array],
-                               dtype=DTYPE_OBS_INT)
+    presence_array = raw_prior_axis.any(axis=POSITION_AXIS).astype(DTYPE_OBS_INT)
 
     if resolution == 1:
         # our "downsampled" prior array at resolution 1 is just the
