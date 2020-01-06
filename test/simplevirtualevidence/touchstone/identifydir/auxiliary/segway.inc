@@ -59,11 +59,6 @@
 #define SUPERVISIONLABEL_RANGE_SIZE 0
 #endif
 
-% virtual evidence boolean
-#ifndef VIRTUAL_EVIDENCE
-#define VIRTUAL_EVIDENCE 0
-#endif
-
 % AA .. TT
 #define CARD_DINUCLEOTIDE 16
 
