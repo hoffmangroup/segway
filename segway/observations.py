@@ -389,16 +389,6 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
     Downsample a 2-dimensional array of label probabilities to a
     desired resolution by taking the average for all labels
     over the positions with priors.
-    For example, the 3-position frame
-
-    [[0.5, 0.2, 0.3],
-     [0.3, 0.4, 0.3],
-     [0.0, 0.0, 0.0]]
-
-    downsampled to resolution 3 is [0.4, 0.3, 0.3]
-    since for label 0 we take mean(0.5, 0.3) = 0.4
-          for label 1 we take mean(0.2, 0.4) = 0.3
-          for label 2 we take mean(0.3, 0.3) = 0.3
 
     If no priors are specified then the average prior is uniform.
 
@@ -413,6 +403,17 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
     There is the possibility that there will be a 'remainder'
     subarray. For that case, we choose to take its average (same as above)
     and append it to the end of our array of downsampled priors.
+
+    For example, the 3-position frame
+
+    [[0.5, 0.2, 0.3],
+     [0.3, 0.4, 0.3],
+     [0.0, 0.0, 0.0]]
+
+    downsampled to resolution 3 is [0.4, 0.3, 0.3]
+    since for label 0 we take mean(0.5, 0.3) = 0.4
+          for label 1 we take mean(0.2, 0.4) = 0.3
+          for label 2 we take mean(0.3, 0.3) = 0.3
     """
 
     uniform_priors = array([1.0/num_labels] * num_labels)
@@ -563,8 +564,8 @@ def make_virtual_evidence_cells(coords, priors,
     start: int
     end: int
 
-    returns a 2-dimensional numpy.ndarray for the section of DNA bounded by
-    start and end where each cell is the prior data for each label of each
+    returns a 2-dimensional numpy.ndarray for the section of the array bounded
+    by start and end where each cell is the prior data for each label of each
     region inside the section.
     """
     res = full((num_labels, (end-start)), None)
@@ -584,7 +585,7 @@ def make_virtual_evidence_cells(coords, priors,
 
     # For coords which had at least one label supplied, fill remaining labels
     # with uniform remaining probability
-    # Transpose res to have positions as rows and labels as columns
+    # Transpose the priors so that it has positions as rows and labels as columns
     res = fill_virtual_evidence_cells(res.transpose(), num_labels)
 
     return res
