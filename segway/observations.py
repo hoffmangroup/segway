@@ -17,10 +17,10 @@ import sys
 from tempfile import gettempdir
 
 from genomedata import Genome
-from numpy import (absolute, add, append, arange, arcsinh, argmax, array,
+from numpy import (absolute, add, any, append, arange, arcsinh, argmax, array,
                    bincount, clip, column_stack, copy, dstack, empty, finfo,
                    float32, full, invert, isnan, maximum, mean, sum, vstack,
-                   zeros)
+                   where, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -375,10 +375,6 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
             # position axis
             mean_prior_vector = mean(defined_priors, axis=PRIOR_AXIS)
 
-            # if priors are defined, check that the mean across
-            # defined positions sums to 1
-            if sum(mean_prior_vector) > 1:
-                warn("Prior labels sum to {} in resolution index {}".format(mean_prior_vector, index), PriorSizeWarning)
             res[index] = mean_prior_vector
 
     return res
@@ -431,8 +427,6 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
             if prior_vector.sum() == 0:
                 prior_array[prior_list_index] = uniform_priors
             else:
-                if prior_vector.sum() > 1:
-                    warn("Prior labels sum to {} in index {}".format(prior_vector.sum(), prior_list_index), PriorSizeWarning)
                 prior_array[prior_list_index] = prior_vector
 
         return prior_array, presence_array
@@ -555,6 +549,13 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
 
     return prior_array
 
+def check_is_close(priors, start):
+    if any(priors < 0):
+        raise ValueError("Priors may not be negative")
+    over_indexes = where(priors.sum(axis=POSITION_AXIS) > 1)[0] + start
+    if over_indexes.any():
+        warn("Prior labels sum to greater than one in on genomic indexes {}".format(over_indexes),
+             PriorSizeWarning)
 
 def make_virtual_evidence_cells(coords, priors,
                                 start, end, num_labels):
@@ -587,6 +588,8 @@ def make_virtual_evidence_cells(coords, priors,
     # with uniform remaining probability
     # Transpose the priors so that it has positions as rows and labels as columns
     res = fill_virtual_evidence_cells(res.transpose(), num_labels)
+
+    check_is_close(res, start)
 
     return res
 
@@ -663,8 +666,6 @@ def _save_window(float_filename_or_file, int_filename_or_file,
             float_data = downsample_add(float_data, resolution)
             float_data /= num_datapoints_min_1
 
-        import pdb
-        pdb.set_trace()
         float_data.tofile(float_filename_or_file)
 
     if seq_data is not None:
