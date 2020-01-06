@@ -6,7 +6,8 @@ import unittest
 
 from numpy import allclose, array, empty
 
-from segway.observations import merge_windows, get_downsampled_virtual_evidence_data_and_presence
+from segway.observations import (merge_windows, PriorSizeWarning,
+                                 get_downsampled_virtual_evidence_data_and_presence)
 from segway.task import prepare_gmtk_observations, prepare_virtual_evidence
 from segway._util import EXT_INT, EXT_FLOAT, EXT_VIRTUAL_EVIDENCE
 
@@ -137,11 +138,20 @@ class TestVirtualEvidence(unittest.TestCase):
                                            virtual_evidence_priors)
         self.assertTrue((expected[4] == array([0, 0.5, 0.5])).all())
 
+    def test_negative_priors(self):
+        virtual_evidence_coords = "[(0, 4), (2, 5)]"
+        virtual_evidence_priors = "[{1: -0.8}, {0: 0.7}]"
+
+        with self.assertRaises(ValueError):
+            prepare_virtual_evidence(1, 0, 10, 4,
+                                     virtual_evidence_coords,
+                                     virtual_evidence_priors)
+
     def test_priors_over_one(self):
         virtual_evidence_coords = "[(0, 4), (2, 5)]"
         virtual_evidence_priors = "[{1: 0.8}, {0: 0.7}]"
 
-        with self.assertRaises(ValueError):
+        with self.assertWarns(PriorSizeWarning):
             prepare_virtual_evidence(1, 0, 10, 4,
                                      virtual_evidence_coords,
                                      virtual_evidence_priors)
