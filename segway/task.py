@@ -201,7 +201,7 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
     cpp_command_str = gmtk_args[cpp_command_options_index]
     # if the placeholder is present, it is replaced. otherwise, the cpp options
     # are unchanged
-    gmtk_args[cpp_array_index + 1] = cppCommand_str.replace(
+    gmtk_args[cpp_command_options_index] = cpp_command_str.replace(
                                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
                                     virtual_evidence_list_filename, 1)
 
@@ -655,12 +655,13 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     replace_subsequent_value(args, EXT_OPTIONS[EXT_INT], placeholder_int_list)
 
     # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT
-    cpp_array_index = args.index("-cppCommandOptions")
-    cppCommand_str = args[cpp_array_index + 1]
-    args[cpp_array_index + 1] = cppCommand_str.replace(
+    cpp_command_options_index = args.index("-cppCommandOptions") + 1
+    cpp_command_str = args[cpp_command_options_index]
+    # if the placeholder is present, it is replaced. otherwise, the cpp options
+    # are unchanged
+    args[cpp_command_options_index] = cpp_command_str.replace(
                                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
                                     placeholder_virtual_evidence_list, 1)
-
     # Run EM bundling
     with files_to_remove([placeholder_float_list, placeholder_int_list]):
         TRAIN_PROG.getoutput(*args)

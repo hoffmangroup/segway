@@ -75,8 +75,6 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
                     VALIDATE_PROG, VITERBI_PROG,
-                    VIRTUAL_EVIDENCE_PRIOR_DELIMITER,
-                    VIRTUAL_EVIDENCE_PRIOR_ASSIGNMENT_DELIMITER,
                     VIRTUAL_EVIDENCE_LIST_FILENAME,
                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 from .version import __version__

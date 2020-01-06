@@ -25,7 +25,7 @@ from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
 from tabdelim import ListWriter
-from warnings import warn, Warning
+from warnings import warn
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
@@ -422,7 +422,7 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
 
     # take the presence to be 1 at every position the user has defined
     # any priors and 0 otherwise
-    presence_array = raw_prior_axis.any(axis=POSITION_AXIS).astype(DTYPE_OBS_INT)
+    presence_array = raw_prior_array.any(axis=POSITION_AXIS).astype(DTYPE_OBS_INT)
 
     if resolution == 1:
         # our "downsampled" prior array at resolution 1 is just the
