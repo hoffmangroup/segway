@@ -665,6 +665,8 @@ def _save_window(float_filename_or_file, int_filename_or_file,
             float_data = downsample_add(float_data, resolution)
             float_data /= num_datapoints_min_1
 
+        import pdb
+        pdb.set_trace()
         float_data.tofile(float_filename_or_file)
 
     if seq_data is not None:
@@ -688,7 +690,10 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_blocks.append(presence_virtual_evidence_data)
 
         # separately save VE priors CPT in a temporary file
-        virtual_evidence_data_array.tofile(virtual_evidence_filename_or_file)
+        # done using write instead of ndarray.tofile since it must be ASCII
+        for prior in virtual_evidence_data_array:
+            virtual_evidence_filename_or_file.write(
+                ' '.join(['{}'.format(prob) for prob in prior]) + '\n')
 
     if int_blocks:
         int_data = column_stack(int_blocks)
