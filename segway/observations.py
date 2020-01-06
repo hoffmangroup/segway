@@ -549,8 +549,8 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
 
     return prior_array
 
-def check_is_close(priors, reference):
-    over_indexes = where(priors.sum(axis=POSITION_AXIS) > reference)[0]
+def check_is_close(prior_sums, reference):
+    over_indexes = where(prior_sums > reference)[0]
     if over_indexes.any():
         return over_indexes
     return False
@@ -590,7 +590,7 @@ def make_virtual_evidence_cells(coords, priors,
     if any(res < 0):
         raise ValueError("Priors may not be negative")
 
-    close_indexes = check_is_close(res, 1.0)
+    close_indexes = check_is_close(res.sum(axis=POSITION_AXIS), 1.0)
     if close_indexes:
         warn("Prior labels sum to greater than one in on genomic indexes {}".format(over_indexes = start),
              PriorSizeWarning)
