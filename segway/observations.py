@@ -50,9 +50,6 @@ ORD_t = ord("t")
 
 DIM_TRACK = 1  # Dimension in numpy array for track data
 
-# epsilon to use when comparing two values
-EPSILON = finfo(float32).eps
-
 PRIOR_AXIS = 0
 POSITION_AXIS = 1
 
