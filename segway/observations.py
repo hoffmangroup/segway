@@ -688,7 +688,8 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_blocks.append(presence_virtual_evidence_data)
 
         # separately save VE priors CPT in a temporary file
-        # done using write instead of ndarray.tofile since it must be ASCII
+        # done using write since ndarray.tofile does not format correctly
+        # Produces error: observation file 0 '/tmp/segway.qvHHEnnQV4/ve.gradckoq.list' segment 0: couldn't read 0'th item in frame 0
         for prior in virtual_evidence_data_array:
             virtual_evidence_filename_or_file.write(
                 ' '.join(['{}'.format(prob) for prob in prior]) + '\n')
