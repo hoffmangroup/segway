@@ -151,10 +151,16 @@ class TestVirtualEvidence(unittest.TestCase):
         virtual_evidence_coords = "[(0, 4), (2, 5)]"
         virtual_evidence_priors = "[{1: 0.8}, {0: 0.7}]"
 
-        with self.assertWarns(PriorSizeWarning):
-            prepare_virtual_evidence(1, 0, 10, 4,
-                                     virtual_evidence_coords,
-                                     virtual_evidence_priors)
+        # Only python 3 supports assetWarns, passes if there is an
+        # AttributeError in python 2
+        # Should be dropped once python 2 support is
+        try:
+            with self.assertWarns(PriorSizeWarning):
+                prepare_virtual_evidence(1, 0, 10, 4,
+                                         virtual_evidence_coords,
+                                         virtual_evidence_priors)
+        except AttributeError:
+            pass
 
 
 if __name__ == "__main__":

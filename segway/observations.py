@@ -550,7 +550,7 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
     return prior_array
 
 def check_is_close(prior_sums, reference):
-    return (prior_sums - reference) <= 0
+    return all((prior_sums - reference) <= 0)
 
 def make_virtual_evidence_cells(coords, priors,
                                 start, end, num_labels):
