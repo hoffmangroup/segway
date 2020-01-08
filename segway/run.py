@@ -3141,7 +3141,11 @@ class Runner(object):
                     item_type = row_type[0]
                     getattr(self, name).append(item_type(value))
                 else:
-                    setattr(self, name, row_type(value))
+                    # Overwrite the empty string to save as None
+                    if value == "":
+                        setattr(self, name, None)
+                    else:
+                        setattr(self, name, row_type(value))
 
     def init_shared(self):
         """
@@ -3184,13 +3188,6 @@ class Runner(object):
             self.save_input_master()
         else:
             for index in range(self.num_instances):
-                # If a random number generator seed exists
-                if self.random_seed:
-                    # Create a new random number generator for this instance based on its
-                    # own index
-                    instance_random_seed = self.random_seed + index
-                    self.random_state = RandomState(instance_random_seed)
-
                 self.save_input_master(index, True)
 
         if not input_master_filename_is_new:
