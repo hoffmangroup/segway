@@ -591,7 +591,7 @@ def make_virtual_evidence_cells(coords, priors,
         raise ValueError("Priors may not be negative")
 
     close_indexes = check_is_close(res.sum(axis=POSITION_AXIS), 1.0)
-    if close_indexes:
+    if any(close_indexes):
         warn("Prior labels sum to greater than one in on genomic indexes {}".format(close_indexes + start),
              PriorSizeWarning)
 
