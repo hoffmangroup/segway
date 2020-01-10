@@ -15,20 +15,21 @@ from operator import itemgetter
 from os import extsep
 import sys
 from tempfile import gettempdir
+from warnings import warn
 
 from genomedata import Genome
 from numpy import (add, any, append, arange, arcsinh, argmax, array,
                    bincount, clip, column_stack, copy, empty, full, invert,
                    isnan, maximum, mean, sum, where, zeros)
+from numpy import sum as numpy_sum
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
 from tabdelim import ListWriter
-from warnings import warn
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
-                    get_chrom_coords, make_prefix_fmt,
+                    get_chrom_coords, make_prefix_fmt, SegwayWarning,
                     SUPERVISION_LABEL_OFFSET, USE_MFSDG, Window)
 
 # number of frames in a segment must be at least number of frames in model
@@ -52,10 +53,9 @@ DIM_TRACK = 1  # Dimension in numpy array for track data
 PRIOR_AXIS = 0
 POSITION_AXIS = 1
 
-class PriorSizeWarning(Warning):
+class VirtualEvidenceWarning(SegwayWarning):
     """
-    Custom warning raised when priors submitted by the user sum to greater
-    than one.
+    User-supplied priors sum to greater than one.
     """
 
 
@@ -288,7 +288,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
         return input_array, presence_array
 
     # split input_array into subarrays of length resolution.
-    # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
+    # e.g. [1, 1, 3, 4, 5, 6] to [[1, 1, 3], [4, 5, 6] for resolution == 3
     resolution_partitioned_input_array = (
             input_array[index:index+resolution]
             for index in range(0, len(input_array), resolution)
@@ -312,7 +312,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
         #   setting count of 0 to 0 will force argmax to default to
         #   the nonzero mode.
         #
-        # 2) the case of all 0's (no nonzero mode):
+        # 2) the case of all 0s (no nonzero mode):
         #   >we want the mode to be 0.
         #   setting count of 0 to 0 will return an argmax of 0 since
         #   there are no other numbers to choose.
@@ -337,9 +337,8 @@ def downsample_presence_array(presence_array, resolution):
     [0, 1, 1, 1, 0, 0] for resolution == 3 becomes
     [2, 1]
     """
-    return [sum(presence_array[index:index+resolution])
-            for index in range(0, len(presence_array), resolution)
-            ]
+    return [numpy_sum(presence_array[index:index+resolution])
+            for index in range(0, len(presence_array), resolution)]
 
 
 def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
@@ -351,18 +350,17 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
     # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6]] for resolution == 3
     resolution_partitioned_prior_gen = (
             raw_prior_array[index:index+resolution]
-            for index in range(0, len(raw_prior_array), resolution)
-            )
+            for index in range(0, len(raw_prior_array), resolution))
 
     # Empty array to be filled with mean values for priors for each bin
     res = empty(calc_downsampled_shape(raw_prior_array,
-                                    resolution), raw_prior_array.dtype)
+                                       resolution), raw_prior_array.dtype)
 
     # For each input partition, calculate the mean prior for each label
     # if no priors given, use a uniform prior
     for index, input_partition in enumerate(resolution_partitioned_prior_gen):
         # if no priors are defined in this partition,
-        # (meaning input_partition will be entirely composed of 0's)
+        # (meaning input_partition will be entirely composed of 0s)
         # set the mean vector to be uniform
         if not input_partition.any():
             res[index] = uniform_priors
@@ -530,13 +528,13 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
     for index, prior_input in enumerate(prior_input_array):
         # Only priors which were specified in the input file will be set
         # Unset labels will still be none
-        num_prior_labels = sum(prior_input != None)
+        num_prior_labels = numpy_sum(prior_input != None)
         if num_prior_labels:
             prior_list_values = list(filter(None, prior_input))
 
             # Check if priors should be treated as ratios or percentages
-            if sum(prior_list_values) < 1:
-                remaining_probability = 1 - sum(prior_list_values)
+            if numpy_sum(prior_list_values) < 1:
+                remaining_probability = 1 - numpy_sum(prior_list_values)
             else:
                 remaining_probability = 0
 

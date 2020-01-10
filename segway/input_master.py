@@ -63,8 +63,10 @@ JITTER_ORDERS_MAGNITUDE = 5  # log10(2**5) = 1.5 decimal orders of magnitude
 
 DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
                                      DISTRIBUTION_ASINH_NORMAL])
-# Precision to round input master means to, allows consistency between Pythons
-# Can be removed once Python 2 support is dropped
+
+# Number of digits for rounding input.master means.
+# This allows consistency between Python 2 and Python 3
+# TODO[PY2-EOL]: remove
 ROUND_NDIGITS = 12
 
 
@@ -760,8 +762,9 @@ class DPMFParamSpec(DenseCPTParamSpec):
             # with the same amount of mixture components
             object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
                         "DirichletConst %s ${weights}" % GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
-            weights = (" " + str(round(1.0 / self.num_mix_components, 
-                       ROUND_NDIGITS)))*self.num_mix_components
+            component_weight = round(1.0 / self.num_mix_components,
+                                     ROUND_NDIGITS)
+            weights = (" " + component_weight) * self.num_mix_components
             substitute = Template(object_tmpl).substitute
             data = self.make_data()
             for mapping in self.generate_tmpl_mappings():

@@ -16,7 +16,6 @@ import re
 from string import Template
 import sys
 
-
 import colorbrewer
 from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
                     zeros)
@@ -74,6 +73,7 @@ PREFIX_VALIDATION_OUTPUT_WINNER = "validation.output.winner"
 PREFIX_VALIDATION_OUTPUT = "validation.output"
 
 VIRTUAL_EVIDENCE_LIST_FILENAME = "VIRTUAL_EVIDENCE_LIST_FILENAME"
+
 # cppCommandOption which will be replaced in GMTK commands 
 # by the actual names of the temporary filelists once they are created
 VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER = "VE_PLACEHOLDER"
@@ -494,6 +494,12 @@ def save_template(filename, resource, mapping, dirname=None, clobber=False,
         save_substituted_resource(filename, resource, mapping)
 
     return filename, is_new
+
+
+class SegwayWarning(Warning):
+    """
+    Parent class for all custom warnings raised by Segway.
+    """
 
 
 class memoized_property(object):  # noqa

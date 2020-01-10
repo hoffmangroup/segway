@@ -657,6 +657,7 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT
     cpp_command_options_index = args.index("-cppCommandOptions") + 1
     cpp_command_str = args[cpp_command_options_index]
+
     # if the placeholder is present, it is replaced. otherwise, the cpp options
     # are unchanged
     args[cpp_command_options_index] = cpp_command_str.replace(
