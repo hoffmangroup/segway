@@ -3186,6 +3186,13 @@ class Runner(object):
             self.save_input_master()
         else:
             for index in range(self.num_instances):
+                # If a random number generator seed exists
+                if self.random_seed:
+                    # Create a new random number generator for this instance based on its
+                    # own index
+                    instance_random_seed = self.random_seed + index
+                    self.random_state = RandomState(instance_random_seed)
+
                 self.save_input_master(index, True)
 
         if not input_master_filename_is_new:
