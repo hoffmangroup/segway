@@ -17,10 +17,9 @@ import sys
 from tempfile import gettempdir
 
 from genomedata import Genome
-from numpy import (absolute, add, any, append, arange, arcsinh, argmax, array,
-                   bincount, clip, column_stack, copy, dstack, empty, finfo,
-                   float32, full, invert, isnan, maximum, mean, sum, vstack,
-                   where, zeros)
+from numpy import (add, any, append, arange, arcsinh, argmax, array,
+                   bincount, clip, column_stack, copy, empty, full, invert,
+                   isnan, maximum, mean, sum, where, zeros)
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip

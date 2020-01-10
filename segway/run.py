@@ -2116,7 +2116,7 @@ class Runner(object):
         # have to be replaced before running.
         if not Path(self.virtual_evidence_filename).exists():
            if self.train.run:
-               raise FileNotFoundError("Could not locate virtual evidence file: %s"
+               raise IOError("Could not locate virtual evidence file: %s"
                                        % (self.virtual_evidence_filename))
            elif self.train.init or self.identify.init or self.posterior.init:
                 warn("Virtual evidence file provided does not exist."
