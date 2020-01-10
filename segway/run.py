@@ -1588,8 +1588,6 @@ class Runner(object):
             directives[VIRTUAL_EVIDENCE_LIST_FILENAME] = \
                 VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER
             directives["VIRTUAL_EVIDENCE"] = 1
-        else:
-            directives["VIRTUAL_EVIDENCE"] = VIRTUAL_EVIDENCE_NONE
 
         directives["CARD_SEG"] = self.num_segs
         directives["CARD_SUBSEG"] = self.num_subsegs
