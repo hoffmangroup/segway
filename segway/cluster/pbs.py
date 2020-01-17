@@ -9,7 +9,8 @@ from math import ceil
 import sys
 
 from .._util import MB
-from .common import _JobTemplateFactory, make_native_spec, NULL_FILENAME
+from .common import (CLEAN_SAFE_TIME, _JobTemplateFactory,
+                     make_native_spec, NULL_FILENAME)
 
 # pbs_drmaa requires that keep_completed be set on the server or queue
 # level in order to keep job information and allow its inspection
@@ -46,8 +47,17 @@ def make_single_res_req(name, mem):
     # http://www.clusterresources.com/torquedocs21/2.1jobsubmission.shtml#size
     return "%s=%dmb" % (name, ceil(mem / MB))
 
+
+def get_job_max_query_lifetime():
+    """
+    Get the maximum time in seconds a job's status can be queried (by DRMAA)
+    """
+    return CLEAN_SAFE_TIME
+
+
 def main(args=sys.argv[1:]):
     pass
+
 
 if __name__ == "__main__":
     sys.exit(main())

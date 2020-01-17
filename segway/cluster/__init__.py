@@ -38,12 +38,6 @@ DONE = JobState.DONE
 
 NA_FACTORY = constant("NA")
 
-# CLEAN_PERIOD in lsb.params, after which jobs are removed from
-# mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
-# error
-# XXX: check lsb.params for real value of CLEAN_PERIOD
-CLEAN_SAFE_TIME = int(3600 * 0.9)
-
 # min time to wait between checking job status
 # XXX: should be an option
 try:
@@ -95,6 +89,7 @@ with Session() as _session:
 driver = __import__(driver_name, globals(), locals(), [driver_name], 1)
 JobTemplateFactory = driver.JobTemplateFactory
 make_native_spec = driver.make_native_spec
+get_job_max_query_lifetime = driver.get_job_max_query_lifetime
 
 
 class RestartableJob(object):
@@ -181,15 +176,15 @@ class RestartableJobDict(dict):
     def calc_sleep_time(self):
         # it's not a good idea to keep increasing the amount of sleep
         # time just because you have completed jobs. The problem is
-        # that this can result in it taking more than 3600 seconds to
-        # check a job again
+        # that this can result in it taking more than
+        # 'get_job_max_query_lifetime' seconds to check a job again
 
         # XXX: we should calculate this against the maximum number of
         # submitted jobs rather than the current number. But for now
         # we should just stick to MIN_JOB_WAIT_SLEEP_TIME
 
         # +1 is to avoid dividing by zero when len(self) is 0
-        clean_safe_sleep_time = CLEAN_SAFE_TIME / (len(self) + 1)
+        clean_safe_sleep_time = get_job_max_query_lifetime() / (len(self) + 1)
 
         return min(clean_safe_sleep_time, MAX_JOB_WAIT_SLEEP_TIME)
 

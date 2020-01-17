@@ -13,8 +13,8 @@ from path import path
 
 from .._configparser import OneSectionRawConfigParser
 from .._util import ceildiv, data_filename
-from .common import BASH_CMD, _JobTemplateFactory, make_native_spec, \
-    NULL_FILENAME
+from .common import (BASH_CMD, CLEAN_SAFE_TIME, _JobTemplateFactory,
+                     make_native_spec, NULL_FILENAME)
 
 # use SI (not binary) prefixes. I can't find any documentation for
 # this but Tim Cutts seems to assume this is how it works
@@ -103,8 +103,17 @@ class JobTemplateFactory(_JobTemplateFactory):
 
         return " ".join([self.native_spec, res_spec])
 
+
+def get_job_max_query_lifetime():
+    """
+    Get the maximum time in seconds a job's status can be queried (by DRMAA)
+    """
+    return CLEAN_SAFE_TIME
+
+
 def main(args=sys.argv[1:]):
     pass
+
 
 if __name__ == "__main__":
     sys.exit(main())
