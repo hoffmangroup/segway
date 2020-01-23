@@ -6,7 +6,7 @@ import unittest
 
 from numpy import allclose, array, empty
 
-from segway.observations import (merge_windows, PriorSizeWarning,
+from segway.observations import (merge_windows, VirtualEvidenceWarning,
                                  get_downsampled_virtual_evidence_data_and_presence)
 from segway.task import prepare_gmtk_observations, prepare_virtual_evidence
 from segway._util import EXT_INT, EXT_FLOAT, EXT_VIRTUAL_EVIDENCE
@@ -155,7 +155,7 @@ class TestVirtualEvidence(unittest.TestCase):
         # AttributeError in python 2
         # Should be dropped once python 2 support is
         try:
-            with self.assertWarns(PriorSizeWarning):
+            with self.assertWarns(VirtualEvidenceWarning):
                 prepare_virtual_evidence(1, 0, 10, 4,
                                          virtual_evidence_coords,
                                          virtual_evidence_priors)

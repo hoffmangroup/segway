@@ -68,9 +68,9 @@ frame: 0 {
       weight: scale 1.000000;
    }
 
-#if VIRTUAL_EVIDENCE==1
+#ifdef VIRTUAL_EVIDENCE
    variable: virtualEvidence {
-       type : discrete observed value 1 cardinality CARD_BOOLEAN;
+       type: discrete observed value 1 cardinality CARD_BOOLEAN;
 
        switchingparents: presence__virtualEvidence(0) using mapping("internal:copyParent");
 
@@ -177,9 +177,9 @@ frame: 1 {
       weight: scale 1.000000;
    }
 
-#if VIRTUAL_EVIDENCE==1
+#ifdef VIRTUAL_EVIDENCE
    variable: virtualEvidence {
-       type : discrete observed value 1 cardinality CARD_BOOLEAN;
+       type: discrete observed value 1 cardinality CARD_BOOLEAN;
 
        switchingparents: presence__virtualEvidence(0) using mapping("internal:copyParent");
 
