@@ -155,14 +155,14 @@ DENSE_CPT_IN_FILE inline
 MEAN_IN_FILE inline
 8
 
-0 mean_seg0_subseg0_h3k27me3 1 0.417616645793
-1 mean_seg0_subseg0_h3k36me3 1 0.635449749781
-2 mean_seg1_subseg0_h3k27me3 1 0.355308589268
-3 mean_seg1_subseg0_h3k36me3 1 0.610938096234
-4 mean_seg2_subseg0_h3k27me3 1 0.389463478506
-5 mean_seg2_subseg0_h3k36me3 1 0.660630971037
-6 mean_seg3_subseg0_h3k27me3 1 0.441974399929
-7 mean_seg3_subseg0_h3k36me3 1 0.609361935269
+0 mean_seg0_subseg0_h3k27me3 1 0.420327223918
+1 mean_seg0_subseg0_h3k36me3 1 0.539856171942
+2 mean_seg1_subseg0_h3k27me3 1 0.461859474982
+3 mean_seg1_subseg0_h3k36me3 1 0.521306927852
+4 mean_seg2_subseg0_h3k27me3 1 0.349173464446
+5 mean_seg2_subseg0_h3k36me3 1 0.517750642049
+6 mean_seg3_subseg0_h3k27me3 1 0.403478643204
+7 mean_seg3_subseg0_h3k36me3 1 0.619652975345
 
 COVAR_IN_FILE inline
 2
