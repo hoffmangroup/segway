@@ -74,7 +74,9 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     SUPERVISION_LABEL_OFFSET,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED, USE_MFSDG,
-                    VALIDATE_PROG, VITERBI_PROG)
+                    VALIDATE_PROG, VITERBI_PROG,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 from .version import __version__
 
 # set once per file run
@@ -87,6 +89,7 @@ DISTRIBUTIONS = [DISTRIBUTION_NORM, DISTRIBUTION_GAMMA,
 DISTRIBUTION_DEFAULT = DISTRIBUTION_ASINH_NORMAL
 
 NUM_GAUSSIAN_MIX_COMPONENTS_DEFAULT = 1
+
 MIN_NUM_SEGS = 2
 NUM_SEGS = MIN_NUM_SEGS
 NUM_SUBSEGS = 1
@@ -94,6 +97,7 @@ OUTPUT_LABEL = "seg"
 RULER_SCALE = 10
 MAX_EM_ITERS = 100
 CARD_SUPERVISIONLABEL_NONE = -1
+VIRTUAL_EVIDENCE_NONE = -1
 MINIBATCH_DEFAULT = -1
 VAR_FLOOR_GMM_DEFAULT = 0.00001
 
@@ -148,6 +152,8 @@ LOG_LIKELIHOOD_DIFF_FRAC = 1e-5
 NUM_SEQ_COLS = 2   # dinucleotide, presence_dinucleotide
 
 NUM_SUPERVISION_COLS = 2  # supervision_data, presence_supervision_data
+
+NUM_VIRTUAL_EVIDENCE_COLS = 1  # presence virtual evidence data
 
 MAX_SPLIT_SEQUENCE_LENGTH = 2000000  # 2 million
 MAX_FRAMES = MAX_SPLIT_SEQUENCE_LENGTH
@@ -282,9 +288,9 @@ TRAIN_OPTION_TYPES = \
          num_instances=int, segtransition_weight_scale=float, ruler_scale=int,
          resolution=int, num_segs=int, num_subsegs=int, output_label=str,
          track_specs=[str], reverse_worlds=[int], num_mix_components=int,
-         supervision_filename=str, minibatch_fraction=float, max_frames=int,
-         validation_fraction=float, validation_coords_filename=str,
-         var_floor=float)
+         supervision_filename=str, virtual_evidence_filename=str, 
+         minibatch_fraction=float, validation_fraction=float, max_frames=int,
+         validation_coords_filename=str, var_floor=float)
 
 
 TRAIN_RESULT_TYPES = dict(log_likelihood=float, num_segs=int,
@@ -295,8 +301,8 @@ TRAIN_RESULT_TYPES = dict(log_likelihood=float, num_segs=int,
                           validation_sum_filename=str)
 
 IDENTIFY_OPTION_TYPES = \
-        dict(include_coords_filename=str, exclude_coords_filename=str,
-             seg_table_filename=str, output_label=str)
+    	dict(include_coords_filename=str, exclude_coords_filename=str,
+             seg_table_filename=str, output_label=str, virtual_evidence_filename=str)
 
 SUB_TASK_DELIMITER = "-"
 
@@ -311,6 +317,7 @@ COMMENT_POSTERIOR_TRIANGULATION = \
 RESOLUTION = 1
 
 SEGTRANSITION_WEIGHT_SCALE = 1.0
+VIRTUAL_EVIDENCE_WEIGHT = 1.0
 
 DIRPATH_WORK_DIR_HELP = Path("WORKDIR")
 DIRPATH_AUX = DIRPATH_WORK_DIR_HELP / SUBDIRNAME_AUX
@@ -629,10 +636,12 @@ class Track(object):
 
 TRACK_DINUCLEOTIDE = Track("dinucleotide", is_data=False)
 TRACK_SUPERVISIONLABEL = Track("supervisionLabel", is_data=False)
+TRACK_VIRTUAL_EVIDENCE = Track("virtualEvidence", is_data=False)
 
 EXCLUDE_TRACKNAME_LIST = [
     TRACK_DINUCLEOTIDE.name_unquoted,
-    TRACK_SUPERVISIONLABEL.name_unquoted
+    TRACK_SUPERVISIONLABEL.name_unquoted,
+    TRACK_VIRTUAL_EVIDENCE.name_unquoted 
 ]
 
 
@@ -693,6 +702,7 @@ class Runner(object):
         self.job_log_filename = None
         self.seg_table_filename = None
         self.supervision_filename = None
+        self.virtual_evidence_filename = None
 
         self.params_filename = None  # actual params filename for this instance
         self.params_filenames = []  # list of possible params filenames
@@ -726,6 +736,9 @@ class Runner(object):
         self.supervision_coords = None
         self.supervision_labels = None
 
+        self.virtual_evidence_coords = None
+        self.virtual_evidence_priors = None
+
         self.card_supervision_label = -1
 
         # tracks: list: all the tracks used
@@ -758,6 +771,8 @@ class Runner(object):
         self.max_split_sequence_length = MAX_SPLIT_SEQUENCE_LENGTH
         self.max_frames = MAX_FRAMES
         self.segtransition_weight_scale = SEGTRANSITION_WEIGHT_SCALE
+        self.track_weight = None
+        self.virtual_evidence_weight = VIRTUAL_EVIDENCE_WEIGHT
         self.ruler_scale = RULER_SCALE
         self.resolution = RESOLUTION
         self.reverse_worlds = []  # XXXopt: this should be a set
@@ -873,7 +888,10 @@ class Runner(object):
                         "max_train_rounds": "max_em_iters",
                         "reverse_world": "reverse_worlds",
                         "track": "track_specs",
-                        "trainable_params": "params_filenames"}
+                        "trainable_params": "params_filenames",
+                        "virtual_evidence": "virtual_evidence_filename",
+                        "virtual_evidence_weight": "virtual_evidence_weight",
+                        "track_weight": "track_weight"}
 
     @classmethod
     def fromargs(cls, task_spec, archives, traindir, annotatedir):
@@ -1397,6 +1415,8 @@ class Runner(object):
             res += NUM_SEQ_COLS
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
             res += NUM_SUPERVISION_COLS
+        if self.virtual_evidence:
+            res += NUM_VIRTUAL_EVIDENCE_COLS
 
         return res
 
@@ -1480,6 +1500,13 @@ class Runner(object):
             return SUPERVISION_UNSUPERVISED
 
     @memoized_property
+    def virtual_evidence(self):
+        if self.virtual_evidence_filename is not None:
+            return True
+        else:
+            return False
+
+    @memoized_property
     def world_track_indexes(self):
         """
         Track indexes for a particular world.
@@ -1554,8 +1581,13 @@ class Runner(object):
             directives["OUTPUT_PARAMS_FILENAME"] = output_params_filename
 
         # prevent supervised variable from being inherited from train task
-        if self.identify:
+        if self.identify or self.posterior:
             directives["CARD_SUPERVISIONLABEL"] = CARD_SUPERVISIONLABEL_NONE
+
+        if self.virtual_evidence:
+            directives[VIRTUAL_EVIDENCE_LIST_FILENAME] = \
+                VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER
+            directives["VIRTUAL_EVIDENCE"] = 1
 
         directives["CARD_SEG"] = self.num_segs
         directives["CARD_SUBSEG"] = self.num_subsegs
@@ -1986,7 +2018,7 @@ class Runner(object):
         else:
             input_master_filename = self.input_master_filename
 
-        self.input_master_filename, input_master_filename_is_new = \
+        _, input_master_filename_is_new = \
             InputMasterSaver(self)(input_master_filename, self.params_dirpath,
                                    self.clobber, instance_index)
 
@@ -2061,6 +2093,67 @@ class Runner(object):
         self.tracks.append(TRACK_SUPERVISIONLABEL)
         self.card_supervision_label = (max_supervision_label + 1 +
                                        SUPERVISION_LABEL_OFFSET)
+
+    def load_virtual_evidence(self):
+        # Virtual evidence adds one additional binary node C to the DBN structure
+        # at every frame. A CPT is defined for C such that P(C|A=a) is the probability
+        # that the parent A (segment label) is a particular value 'a' at a given frame.
+        # Specifically, C exists only to constrain the parent (segment label) to be a 
+        # particular value (supervised label) with the specified prior probability.
+        # From the Segway application's point of view, nothing more changes
+        # other than the virtual evidence files need to be passed forwards to GMTK,
+        # which does all the magic here.
+        #
+        # It is possible to specify virtual evidence for some positions and not others.
+        # This is handled using a presence variable for virtual evidence, which behaves
+        # identically to other presence variables in Segway.
+        if not self.virtual_evidence:
+            return
+
+        # Check if file supplied during init exists, warn if not saying it will
+        # have to be replaced before running.
+        if not Path(self.virtual_evidence_filename).exists():
+           if self.train.run:
+               raise IOError("Could not locate virtual evidence file: %s"
+                                       % (self.virtual_evidence_filename))
+           elif self.train.init or self.identify.init or self.posterior.init:
+                warn("Virtual evidence file provided does not exist."
+                     " A new one will need to be supplied by --virtual-evidence"
+                     " during train-run for Segway to be able to apply it to the model")
+           return
+        # defaultdict of list of dictionaries of the format {label: prior} 
+        # key: chrom
+        # value: list of dictionaries of the format {label: prior}
+        virtual_evidence_priors = defaultdict(list)
+
+        # defaultdict of lists of tuples
+        # key: chrom
+        # value: list of tuples (start, end)
+        virtual_evidence_coords = defaultdict(list)
+
+        with open(self.virtual_evidence_filename) as ve_file:
+            for datum in read_native(ve_file):
+                chrom = datum.chrom
+                start = datum.chromStart
+                end = datum.chromEnd
+                label = datum.name
+                prior = datum.score
+
+                # Check if a world was specified for this prior
+                if hasattr(datum, "strand"):
+                    worlds = [int(datum.strand)]
+                # Otherwise apply it to all worlds be trained on
+                else:
+                    worlds = range(self.num_worlds)
+
+                for world in worlds:
+                    virtual_evidence_coords[(world, chrom)].append(
+                        (start, end))
+                    virtual_evidence_priors[(world, chrom)].append(
+                        {int(label): float(prior)})
+
+        self.virtual_evidence_coords = virtual_evidence_coords
+        self.virtual_evidence_priors = virtual_evidence_priors
 
     def set_supervision_label_range_size(self, new_extension):
         """This function takes a new label extension new_extension,
@@ -2144,6 +2237,7 @@ class Runner(object):
     def save_gmtk_input(self):
         if self.supervision_type == SUPERVISION_SEMISUPERVISED:
             self.load_supervision()
+        self.load_virtual_evidence()
         self.set_tracknames()
 
         observations = Observations(self)
@@ -2440,13 +2534,26 @@ class Runner(object):
                 supervision_coords = None
                 supervision_labels = None
 
+            if self.virtual_evidence:
+                virtual_evidence_coords = \
+                    self.virtual_evidence_coords[(window.world, window.chrom)]
+                virtual_evidence_priors = \
+                    self.virtual_evidence_priors[(window.world, window.chrom)]
+            else:
+                virtual_evidence_coords = None
+                virtual_evidence_priors = None
+
             additional_prefix_args = [
                genomedata_names_text,
                self.distribution,
                track_indexes_text,
                is_semisupervised,
                supervision_coords,
-               supervision_labels
+               supervision_labels,
+               self.virtual_evidence,
+               virtual_evidence_coords,
+               virtual_evidence_priors,
+               self.num_segs # need number of segments to unpack VE priors later
             ]
 
         prefix_args = [segway_task_path,
@@ -2794,7 +2901,7 @@ class Runner(object):
         # If a random number generator seed exists
         if self.random_seed:
             # Create a new random number generator for this instance based on
-            # its own index
+            # its own index, so that each is different and consistent
             self.random_seed += instance_index
             self.random_state = RandomState(self.random_seed)
 
@@ -3032,7 +3139,11 @@ class Runner(object):
                     item_type = row_type[0]
                     getattr(self, name).append(item_type(value))
                 else:
-                    setattr(self, name, row_type(value))
+                    # Overwrite the empty string to save as None
+                    if value == "":
+                        setattr(self, name, None)
+                    else:
+                        setattr(self, name, row_type(value))
 
     def init_shared(self):
         """
@@ -3075,8 +3186,14 @@ class Runner(object):
             self.save_input_master()
         else:
             for index in range(self.num_instances):
-                self.save_input_master(index, True)
+                # If a random number generator seed exists
+                if self.random_seed:
+                    # Create a new random number generator for this instance based on its
+                    # own index
+                    instance_random_seed = self.random_seed + index
+                    self.random_state = RandomState(instance_random_seed)
 
+                self.save_input_master(index, True)
 
         if not input_master_filename_is_new:
             # do not overwrite existing file
@@ -3511,6 +3628,15 @@ to find the winning instance anyway.""" % thread.instance_index)
         track_indexes_text = ",".join(map(str, track_indexes))
         genomedata_names_text = ",".join(genomedata_names)
 
+        if self.virtual_evidence:
+            virtual_evidence_coords = \
+                self.virtual_evidence_coords[(window.world, window.chrom)]
+            virtual_evidence_priors = \
+                self.virtual_evidence_priors[(window.world, window.chrom)]
+        else:
+            virtual_evidence_coords = None
+            virtual_evidence_priors = None
+
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
                        output_filename, window.chrom,
@@ -3518,7 +3644,10 @@ to find the winning instance anyway.""" % thread.instance_index)
                        self.num_segs, self.num_subsegs, self.output_label,
                        genomedata_names_text,
                        self.distribution, track_indexes_text,
-                       self.num_mix_components]
+                       self.virtual_evidence,
+                       virtual_evidence_coords,
+                       virtual_evidence_priors,
+                       self.num_mix_components,]
 
         output_filename = None
 
@@ -3700,7 +3829,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # XXX: register atexit for cleanup_resources
 
         work_dirname = self.work_dirname
-        if not Path(work_dirname).isdir():
+        if not Path(work_dirname).isdir() or self.clobber:
             self.make_dir(work_dirname, self.clobber)
 
         self.run(*args, **kwargs)
@@ -3709,12 +3838,10 @@ to find the winning instance anyway.""" % thread.instance_index)
 def parse_options(argv):
     from argparse import ArgumentParser, FileType
 
-    usage = "%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]" \
-            "GENOMEDATA [GENOMEDATA ...] TRAINDIR [IDENTIFYDIR]"
-
     version = "%(prog)s {}".format(__version__)
     description = """
-    Semi-automated genome annotation.
+
+    Semi-automated genome annotation. \n\n
     Please see: segway TASK -h, for steps specific to each task"""
 
     citation = """
@@ -3723,8 +3850,24 @@ def parse_options(argv):
     segmentation. Nat Methods 9:473-476.
     http://dx.doi.org/10.1038/nmeth.1937"""
 
-    parser = ArgumentParser(description=description, usage=usage,
+    parser = ArgumentParser(description=description, usage = "",
                             epilog=citation)
+
+    subtask_description = """
+    List of available tasks:
+    * train
+    * annotate / [identify]
+    * posterior
+
+    Additionally these tasks are each divided into 3 or 4 subtasks
+    * init
+    * run
+    * finish
+    * run-round (train only)
+    """
+
+    tasks = parser.add_subparsers(title="Segway Tasks", dest="task_spec",
+                                  metavar=subtask_description)
 
     parser.add_argument("--version", action="version", version=version)
 
@@ -3755,18 +3898,17 @@ def parse_options(argv):
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
 
-    tasks = parser.add_subparsers(help="Segway Tasks", dest="task_spec",
-                                  metavar="")
-
     # define steps for each of the three main tasks
     train_init = tasks.add_parser("", add_help=False)
     train_run = tasks.add_parser("", add_help=False)
     train_finish = tasks.add_parser("", add_help=False)
     train_run_round = tasks.add_parser("", add_help=False)
+    train_init_run = tasks.add_parser("", add_help=False)
 
     identify_init = tasks.add_parser("", add_help=False)
     identify_run = tasks.add_parser("", add_help=False)
     identify_finish = tasks.add_parser("", add_help=False)
+    identify_init_run = tasks.add_parser("", add_help=False)
 
     # next two groups of options belong in train-init
     # with OptionGroup(parser, "Data selection") as group:
@@ -3882,6 +4024,14 @@ def parse_options(argv):
                        help="exponent for segment transition probability "
                        " (default %f)" % SEGTRANSITION_WEIGHT_SCALE)
 
+    group.add_argument("--track-weight", type=float,
+                       help="exponent for all input track probabilities "
+                       " (default 1)")
+
+    group.add_argument("--virtual-evidence-weight", type=float,
+                       help="exponent for virtual evidence probability "
+                       " (default %f)" % VIRTUAL_EVIDENCE_WEIGHT)
+
     group.add_argument("--reverse-world", action="append", type=int,
                        default=[], metavar="WORLD",
                        help="reverse sequences in concatenated world WORLD"
@@ -3918,14 +4068,14 @@ def parse_options(argv):
     group.add_argument("-r", "--recover", metavar="DIR",
                        help="continue from interrupted run in DIR")
 
-    group = identify_init.add_argument_group("Flags (identify-init)")
-    group.add_argument("-c", "--clobber", action="store_true",
-                       help="delete any preexisting files and assumes any "
-                       "model files specified in options as output to be "
-                       "overwritten")
+    group = train_init_run.add_argument_group("Virtual Evidence "
+                                              "(train-init, train-run)")
+    group.add_argument("--virtual-evidence", metavar="FILE",
+                       help="virtual evidence with priors for labels at each position in "
+                       "FILE (default none)")
 
     # select coords to identify in the init step
-    group = identify_init.add_argument_group("Data selection (idenfity-init)")
+    group = identify_init.add_argument_group("Data selection (annotate-init)")
     group.add_argument("--include-coords", metavar="FILE",
                        help="limit to genomic coordinates in"
                        " FILE (default all) (Note: does not apply to"
@@ -3946,8 +4096,14 @@ def parse_options(argv):
                        help="load segment hyperparameters from FILE"
                        " (default none)")
 
+    group = identify_init_run.add_argument_group("Virtual Evidence "
+                                              "(annotate-init, annotate-run)")
+    group.add_argument("--virtual-evidence", metavar="FILE",
+                       help="virtual evidence with priors for labels at each position in "
+                       "FILE (default none)")
+
     # output files are produced by identify-finish
-    group = identify_finish.add_argument_group("Output files (identify-finish)")
+    group = identify_finish.add_argument_group("Output files (annotate-finish)")
     group.add_argument("-b", "--bed", metavar="FILE",
                        help="create identification BED track in FILE"
                        " (default WORKDIR/%s)" % BED_FILEBASENAME)
@@ -3963,40 +4119,46 @@ def parse_options(argv):
     identify_args = tasks.add_parser("", add_help=False)
     identify_args.add_argument("annotatedir", nargs=1)
 
-    tasks.add_parser("train-init", parents=[train_init, args])
-    tasks.add_parser("train-run", parents=[train_run, args])
+    tasks.add_parser("train-init", parents=[train_init, train_init_run, args])
+    tasks.add_parser("train-run", parents=[train_run, train_init_run, args])
     tasks.add_parser("train-finish", parents=[train_finish, args])
-    tasks.add_parser("train-run-round", parents=[train_run_round, args])
+    tasks.add_parser("train-run-round", parents=[train_run_round,
+                                                 train_init_run, args])
 
-    tasks.add_parser("annotate-init", parents=[identify_init, args,
-                                               identify_args])
-    tasks.add_parser("annotate-run", parents=[identify_run, args,
-                                              identify_args])
+    tasks.add_parser("annotate-init",
+                     parents=[identify_init, identify_init_run, args,
+                              identify_args])
+    tasks.add_parser("annotate-run",
+                     parents=[identify_run, identify_init_run, args,
+                              identify_args])
     tasks.add_parser("annotate-finish", parents=[identify_finish, args,
                                                  identify_args])
 
     # posterior and identify take the same options
-    tasks.add_parser("posterior-init", parents=[identify_init, args,
-                                                identify_args])
-    tasks.add_parser("posterior-run", parents=[identify_run, args,
-                                               identify_args])
+    tasks.add_parser("posterior-init",
+                     parents=[identify_init, identify_init_run, args,
+                              identify_args])
+    tasks.add_parser("posterior-run",
+                     parents=[identify_run, identify_init_run, args,
+                              identify_args])
     tasks.add_parser("posterior-finish", parents=[identify_finish, args,
                                                   identify_args])
 
-    tasks.add_parser("train",
-                     parents=[train_init, train_run, train_finish, args])
+    tasks.add_parser("train", usage="%(prog)s [GLOBAL_OPTION] TASK [TASK_OPTION]",
+                     parents=[train_init, train_init_run, train_run,
+                              train_finish, args])
     tasks.add_parser("annotate",
-                     parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                     parents=[identify_init, identify_init_run, identify_run,
+                              identify_finish, args, identify_args])
     tasks.add_parser("identify",
-                     parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                     parents=[identify_init, identify_init_run, identify_run,
+                              identify_finish, args, identify_args])
     tasks.add_parser("posterior",
-                     parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                     parents=[identify_init, identify_init_run, identify_run,
+                              identify_finish, args, identify_args])
     tasks.add_parser("identify+posterior",
-                     parents=[identify_init, identify_run, identify_finish,
-                              args, identify_args])
+                     parents=[identify_init, identify_init_run, identify_run,
+                              identify_finish, args, identify_args])
 
     options = parser.parse_args(argv)
 
@@ -4015,7 +4177,6 @@ def parse_options(argv):
 
 
 def main(argv=sys.argv[1:]):
-
     task_spec, options, archives, traindir, annotatedir = parse_options(argv)
 
     runner = Runner.fromoptions(task_spec, archives,

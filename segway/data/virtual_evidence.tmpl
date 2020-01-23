@@ -1,0 +1,18 @@
+#ifdef VIRTUAL_EVIDENCE
+   variable: virtualEvidence {
+       type: discrete observed value 1 cardinality CARD_BOOLEAN;
+
+       switchingparents: presence__virtualEvidence(0) using mapping("internal:copyParent");
+
+       conditionalparents: $conditionalparents_spec;
+
+       weight: $weight_spec;
+   }
+
+   variable: presence__virtualEvidence {
+     type: discrete observed $presence_index:$presence_index cardinality CARD_PRESENCE;
+
+     conditionalparents: CONDITIONALPARENTS_PRESENCE;
+   }
+#endif /* VIRTUAL_EVIDENCE==1 */
+

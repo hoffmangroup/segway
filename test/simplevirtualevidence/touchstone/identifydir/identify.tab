@@ -1,0 +1,6 @@
+name	value
+exclude_coords_filename	
+include_coords_filename	../include-coords.bed
+output_label	seg
+seg_table_filename	
+virtual_evidence_filename	

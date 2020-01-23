@@ -30,11 +30,11 @@ Number of separators = 0
 Number of cliques = 1
 == Clique number: 0, root/right-interface clique, root/right-interface clique, leaf/left-interface clique
 Clique information: 9 packed bits, 1 unsigned words (0 splits), weight = 2.283301, jt_weight = 1.000000
-14 Nodes: frameIndex(1)[200000],segCountDown(1)[2],seg(1)[4],presence__testtrack1(1)[11],testtrack1(1),presence__testtrack2(1)[11],testtrack2(1),alwaysTrue(1)[2],presence__supervisionLabel(1)[11],supervisionLabel(1)[5],ruler(2)[2],segCountDown(2)[2],segTransition(2)[3],seg(2)[4]
-12 Assigned: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),alwaysTrue(1),presence__supervisionLabel(1),supervisionLabel(1),ruler(2),segCountDown(2),segTransition(2),seg(2)
+14 Nodes: (%((frameIndex\(1\)\[200000\],?)|(segCountDown\(1\)\[2\],?)|(seg\(1\)\[4\],?)|(presence__testtrack1\(1\)\[11\],?)|(testtrack1\(1\),?)|(presence__testtrack2\(1\)\[11\],?)|(testtrack2\(1\),?)|(alwaysTrue\(1\)\[2\],?)|(presence__supervisionLabel\(1\)\[11\],?)|(supervisionLabel\(1\)\[5\],?)|(ruler\(2\)\[2\],?)|(segCountDown\(2\)\[2\],?)|(segTransition\(2\)\[3\],?)|(seg\(2\)\[4\],?)){14}%)
+12 Assigned: (%((frameIndex\(1\),?)|(presence__testtrack1\(1\),?)|(testtrack1\(1\),?)|(presence__testtrack2\(1\),?)|(testtrack2\(1\),?)|(alwaysTrue\(1\),?)|(presence__supervisionLabel\(1\),?)|(supervisionLabel\(1\),?)|(ruler\(2\),?)|(segCountDown\(2\),?)|(segTransition\(2\),?)|(seg\(2\))){12}%)
 12 Assigned Sorted: presence__testtrack1(1)[11],testtrack1(1),presence__testtrack2(1)[11],testtrack2(1),frameIndex(1)[200000],presence__supervisionLabel(1)[11],supervisionLabel(1)[5],alwaysTrue(1)[2],ruler(2)[2],segTransition(2)[3],seg(2)[4],segCountDown(2)[2]
 12 Dispositions: 0 0 0 0 0 0 0 0 0 0 0 0
-12 Assigned Prob: frameIndex(1),presence__testtrack1(1),testtrack1(1),presence__testtrack2(1),testtrack2(1),alwaysTrue(1),presence__supervisionLabel(1),supervisionLabel(1),ruler(2),segCountDown(2),segTransition(2),seg(2)
+12 Assigned Prob: (%((frameIndex\(1\),?)|(presence__testtrack1\(1\),?)|(testtrack1\(1\),?)|(presence__testtrack2\(1\),?)|(testtrack2\(1\),?)|(alwaysTrue\(1\),?)|(presence__supervisionLabel\(1\),?)|(supervisionLabel\(1\),?)|(ruler\(2\),?)|(segCountDown\(2\),?)|(segTransition\(2\),?)|(seg\(2\))){12}%)
 13 Cum Assigned Prob: (%((segCountDown\(0\),?)|(seg\(0\),?)|(presence__testtrack1\(0\),?)|(testtrack1\(0\),?)|(presence__testtrack2\(0\),?)|(testtrack2\(0\),?)|(alwaysTrue\(0\),?)|(presence__supervisionLabel\(0\),?)|(supervisionLabel\(0\),?)|(ruler\(1\),?)|(segCountDown\(1\),?)|(segTransition\(1\),?)|(seg\(1\),?)){13}%)
 2 Union Incomming Seps: segCountDown(1),seg(1)
 0 Unassigned Iterated: 
