@@ -32,7 +32,8 @@ class StructureSaver(Saver):
     copy_attrs = ["num_track_groups", "num_datapoints",
                   "use_dinucleotide", "window_lens", "resolution",
                   "supervision_type", "track_groups",
-                  "gmtk_include_filename_relative"]
+                  "gmtk_include_filename_relative", "virtual_evidence",
+                  "track_weight", "virtual_evidence_weight"]
 
     def make_weight_spec(self, multiplier):
         resolution = self.resolution
@@ -79,6 +80,23 @@ class StructureSaver(Saver):
                         weight_spec=weight_spec)
         return
 
+    def add_virtual_evidence_observation(self, observation_items, next_int_track_index):
+        weight_spec = self.make_weight_spec(self.virtual_evidence_weight)
+
+        # create the supervision label's conditional parents
+        # using GMTK specification
+        spec = 'seg(0) using VirtualEvidenceCPT("seg_virtualEvidence")'
+        conditionalparents_spec = " | ".join([spec] * (self.resolution+1))
+
+        # the index of the presence block is just 'next_int_track_index'
+        # since VE only adds one int block and writes prior observations
+        # in a separate file
+        add_observation(observation_items, "virtual_evidence.tmpl",
+                        presence_index=next_int_track_index, 
+                        conditionalparents_spec=conditionalparents_spec,
+                        weight_spec=weight_spec)
+        return
+
     def make_mapping(self):
         num_track_groups = self.num_track_groups
         num_datapoints = self.num_datapoints
@@ -107,13 +125,15 @@ class StructureSaver(Saver):
             # weight scale cannot be more than MAX_WEIGHT_SCALE to avoid
             # artifactual problems
 
-            weight_multiplier = min(max_num_datapoints_track
-                                    / num_datapoints_track, MAX_WEIGHT_SCALE)
-            # weight_scale = 1.0
-            # assert weight_scale == 1.0
+            if self.track_weight:
+                weight_multiplier = self.track_weight
+            else:
+                weight_multiplier = min(max_num_datapoints_track
+                                        / num_datapoints_track, MAX_WEIGHT_SCALE)
 
             conditionalparents_spec = \
                 self.make_conditionalparents_spec(trackname)
+
             weight_spec = self.make_weight_spec(weight_multiplier)
 
             # XXX: should avoid a weight line at all when weight_scale == 1.0
@@ -139,6 +159,10 @@ class StructureSaver(Saver):
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
             self.add_supervision_observation(observation_items, next_int_track_index)
             next_int_track_index += 2
+
+        #if self.virtual_evidence:
+        self.add_virtual_evidence_observation(observation_items, next_int_track_index)
+        next_int_track_index += 1 # only adds one int block--presence data
 
         assert observation_items  # must be at least one track
         observations = "\n".join(observation_items)

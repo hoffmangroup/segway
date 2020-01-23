@@ -6,7 +6,7 @@ from __future__ import absolute_import, division, print_function
 
 __version__ = "$Revision$"
 
-## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 from collections import deque
 from contextlib import closing
 from functools import partial
@@ -15,10 +15,13 @@ from operator import itemgetter
 from os import extsep
 import sys
 from tempfile import gettempdir
+from warnings import warn
 
 from genomedata import Genome
-from numpy import (add, append, arange, arcsinh, argmax, array, bincount, clip,
-                   column_stack, copy, empty, invert, isnan, maximum, zeros)
+from numpy import (add, any, append, arange, arcsinh, argmax, array,
+                   bincount, clip, column_stack, copy, empty, full, invert,
+                   isnan, maximum, mean, sum, where, zeros)
+from numpy import sum as numpy_sum
 from path import Path
 from six import viewitems
 from six.moves import map, range, StringIO, zip
@@ -26,7 +29,7 @@ from tabdelim import ListWriter
 
 from ._util import (ceildiv, copy_attrs, DISTRIBUTION_ASINH_NORMAL,
                     DTYPE_OBS_INT, EXT_FLOAT, EXT_INT, extjoin,
-                    get_chrom_coords, make_prefix_fmt,
+                    get_chrom_coords, make_prefix_fmt, SegwayWarning,
                     SUPERVISION_LABEL_OFFSET, USE_MFSDG, Window)
 
 # number of frames in a segment must be at least number of frames in model
@@ -46,6 +49,14 @@ ORD_g = ord("g")
 ORD_t = ord("t")
 
 DIM_TRACK = 1  # Dimension in numpy array for track data
+
+PRIOR_AXIS = 0
+POSITION_AXIS = 1
+
+class VirtualEvidenceWarning(SegwayWarning):
+    """
+    User-supplied priors sum to greater than one.
+    """
 
 
 class NoData(object):
@@ -277,7 +288,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
         return input_array, presence_array
 
     # split input_array into subarrays of length resolution.
-    # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6] for resolution == 3
+    # e.g. [1, 1, 3, 4, 5, 6] to [[1, 1, 3], [4, 5, 6] for resolution == 3
     resolution_partitioned_input_array = (
             input_array[index:index+resolution]
             for index in range(0, len(input_array), resolution)
@@ -301,7 +312,7 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
         #   setting count of 0 to 0 will force argmax to default to
         #   the nonzero mode.
         #
-        # 2) the case of all 0's (no nonzero mode):
+        # 2) the case of all 0s (no nonzero mode):
         #   >we want the mode to be 0.
         #   setting count of 0 to 0 will return an argmax of 0 since
         #   there are no other numbers to choose.
@@ -317,6 +328,114 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
             resolution_sized_subarray_bincount[mode]
 
     return downsampled_input_array, presence_downsampled_input_array
+
+
+def downsample_presence_array(presence_array, resolution):
+    """
+    Downsamples a 1D presence array given the specified resolution.
+    Sums the presence across bins given the resolution size, so
+    [0, 1, 1, 1, 0, 0] for resolution == 3 becomes
+    [2, 1]
+    """
+    return [numpy_sum(presence_array[index:index+resolution])
+            for index in range(0, len(presence_array), resolution)]
+
+
+def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
+    """
+    Downsamples a 2D array of priors. Takes the average for all labels defined,
+    uses a uniform prior if none are.
+    """
+    # split input_array into subarrays of length resolution.
+    # e.g. [1,1,3,4,5,6] to [[1,1,3],[4,5,6]] for resolution == 3
+    resolution_partitioned_prior_gen = (
+            raw_prior_array[index:index+resolution]
+            for index in range(0, len(raw_prior_array), resolution))
+
+    # Empty array to be filled with mean values for priors for each bin
+    res = empty(calc_downsampled_shape(raw_prior_array,
+                                       resolution), raw_prior_array.dtype)
+
+    # For each input partition, calculate the mean prior for each label
+    # if no priors given, use a uniform prior
+    for index, input_partition in enumerate(resolution_partitioned_prior_gen):
+        # if no priors are defined in this partition,
+        # (meaning input_partition will be entirely composed of 0s)
+        # set the mean vector to be uniform
+        if not input_partition.any():
+            res[index] = uniform_priors
+        else:
+            # Remove any rows which don't contain priors
+            defined_priors = input_partition[input_partition.any(POSITION_AXIS)]
+
+            # take the mean of the given priors for each label over the
+            # position axis
+            mean_prior_vector = mean(defined_priors, axis=PRIOR_AXIS)
+
+            res[index] = mean_prior_vector
+
+    return res
+
+def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
+                                                       resolution, num_labels):
+    """
+    Downsample a 2-dimensional array of label probabilities to a
+    desired resolution by taking the average for all labels
+    over the positions with priors.
+
+    If no priors are specified then the average prior is uniform.
+
+    This function returns a tuple (where each element is an array) of
+    the form: [downsampled input array], [presence of downsampled
+    input array] where 'presence' is the count of evidence-specified positions
+    in each subpartition.
+
+    Downsampled input array is an array of arrays where each element
+    is the vector of priors for the given downsampled position.
+
+    There is the possibility that there will be a 'remainder'
+    subarray. For that case, we choose to take its average (same as above)
+    and append it to the end of our array of downsampled priors.
+
+    For example, the 3-position frame
+
+    [[0.5, 0.2, 0.3],
+     [0.3, 0.4, 0.3],
+     [0.0, 0.0, 0.0]]
+
+    downsampled to resolution 3 is [0.4, 0.3, 0.3]
+    since for label 0 we take mean(0.5, 0.3) = 0.4
+          for label 1 we take mean(0.2, 0.4) = 0.3
+          for label 2 we take mean(0.3, 0.3) = 0.3
+    """
+
+    uniform_priors = array([1.0/num_labels] * num_labels)
+
+    # take the presence to be 1 at every position the user has defined
+    # any priors and 0 otherwise
+    presence_array = raw_prior_array.any(axis=POSITION_AXIS).astype(DTYPE_OBS_INT)
+
+    if resolution == 1:
+        # our "downsampled" prior array at resolution 1 is just the
+        # vector of priors defined by the user at every position
+        # with uniform priors filled in at all other positions
+        prior_array = zeros((len(raw_prior_array), num_labels))
+        for prior_list_index, prior_vector in enumerate(raw_prior_array):
+            if prior_vector.sum() == 0:
+                prior_array[prior_list_index] = uniform_priors
+            else:
+                prior_array[prior_list_index] = prior_vector
+
+        return prior_array, presence_array
+
+    downsampled_prior_array = downsample_prior_array(raw_prior_array,
+                                                     resolution,
+                                                     uniform_priors)
+    downsampled_presence_array = downsample_presence_array(presence_array,
+                                                           resolution)
+
+
+    return downsampled_prior_array, downsampled_presence_array
 
 
 def make_dinucleotide_int_data(seq):
@@ -387,6 +506,93 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
     return res
 
 
+def fill_virtual_evidence_cells(prior_input_array, num_labels):
+    """
+    For genomic positions which have at least one, but not all priors specified,
+    this function will apply a uniform prior to all remaining labels.
+    Indexes where no prior was ever specified will remain zero for downsampling
+
+    Example:
+    INPUT:
+    [[0.5, 0.2, None, None, None],
+     [None, 0.4, None, None, None],
+     [None, None, None, None, None]]
+
+    OUTPUT: 
+    [[0.5, 0.2, 0.10, 0.10, 0.10],
+     [0.15, 0.4, 0.15, 0.15, 0.15],
+     [0.0 ... 0.0]]
+    """
+
+    prior_array = zeros((len(prior_input_array), num_labels))
+    for index, prior_input in enumerate(prior_input_array):
+        # Only priors which were specified in the input file will be set
+        # Unset labels will still be none
+        num_prior_labels = numpy_sum(prior_input != None)
+        if num_prior_labels:
+            prior_list_values = list(filter(None, prior_input))
+
+            # Check if priors should be treated as ratios or percentages
+            if numpy_sum(prior_list_values) < 1:
+                remaining_probability = 1 - numpy_sum(prior_list_values)
+            else:
+                remaining_probability = 0
+
+            # divide remaining probability uniformly amongst the remaining labels
+            prior_input[prior_input == None] = (remaining_probability /
+                                                (num_labels-num_prior_labels))
+
+            prior_array[index] = prior_input
+
+    return prior_array
+
+def check_is_close(prior_sums, reference):
+    return all((prior_sums - reference) <= 0)
+
+def make_virtual_evidence_cells(coords, priors,
+                                start, end, num_labels):
+    """
+    coords: list of tuples (start, end)
+    priors: list of dictionaries of the format {label: prior}
+    start: int
+    end: int
+
+    returns a 2-dimensional numpy.ndarray for the section of the array bounded
+    by start and end where each cell is the prior data for each label of each
+    region inside the section.
+    """
+    res = full((num_labels, (end-start)), None)
+
+    # Get supervision regions that overlap with the start and end coords
+    supercontig_coords_labels = \
+        intersect_regions(start, end, coords, priors)
+
+    for label_start, label_end, prior_dict in supercontig_coords_labels:
+        label = list(prior_dict.keys())[0]
+        # copy data to all positions
+        if res[label][(label_start - start):(label_end - start)].any():
+            raise ValueError("VE label {} overlaps in coordinates {}-{}".format(label,
+                             label_start, label_end))
+        res[label][(label_start - start):(label_end - start)] = \
+            list(prior_dict.values()) * ((label_end - start)-(label_start - start))
+
+    # For coords which had at least one label supplied, fill remaining labels
+    # with uniform remaining probability
+    # Transpose the priors so that it has positions as rows and labels as columns
+    res = fill_virtual_evidence_cells(res.transpose(), num_labels)
+
+    if any(res < 0):
+        raise ValueError("Priors may not be negative")
+
+    is_close = check_is_close(res.sum(axis=POSITION_AXIS), 1.0)
+    if not is_close:
+        close_indexes = where(res.sum(axis=POSITION_AXIS) > 1.0)[0]
+        warn("Prior labels sum to greater than one in on genomic indexes {}".format(close_indexes + start),
+             VirtualEvidenceWarning)
+
+    return res
+
+
 def make_continuous_cells(track_indexes, genomedata_names,
                           chromosome_name, start, end):
     """
@@ -419,8 +625,10 @@ def make_continuous_cells(track_indexes, genomedata_names,
     return continuous_cells
 
 
-def _save_window(float_filename_or_file, int_filename_or_file, float_data, resolution,
-                 distribution, seq_data=None, supervision_data=None):
+def _save_window(float_filename_or_file, int_filename_or_file, 
+                 float_data, resolution, distribution, seq_data=None,
+                 supervision_data=None, virtual_evidence_data=None,
+                 virtual_evidence_filename_or_file=None, num_labels=None):
     # called by task.py as well as observation.py
 
     # input function in GMTK_ObservationMatrix.cc:
@@ -465,10 +673,26 @@ def _save_window(float_filename_or_file, int_filename_or_file, float_data, resol
 
     if supervision_data is not None:
         supervision_data, presence_supervision_data = \
-            get_downsampled_supervision_data_and_presence(supervision_data, resolution)
+            get_downsampled_supervision_data_and_presence(supervision_data,
+                                                          resolution)
 
         int_blocks.append(supervision_data)
         int_blocks.append(presence_supervision_data)
+
+    if virtual_evidence_data is not None:
+        virtual_evidence_data_array, presence_virtual_evidence_data = \
+            get_downsampled_virtual_evidence_data_and_presence(
+                virtual_evidence_data,
+                resolution,
+                num_labels)
+        int_blocks.append(presence_virtual_evidence_data)
+
+        # separately save VE priors CPT in a temporary file
+        # done using write since ndarray.tofile does not format correctly
+        # Produces error: observation file 0 '/tmp/segway.qvHHEnnQV4/ve.gradckoq.list' segment 0: couldn't read 0'th item in frame 0
+        for prior in virtual_evidence_data_array:
+            virtual_evidence_filename_or_file.write(
+                ' '.join(['{}'.format(prob) for prob in prior]) + '\n')
 
     if int_blocks:
         int_data = column_stack(int_blocks)
@@ -476,7 +700,6 @@ def _save_window(float_filename_or_file, int_filename_or_file, float_data, resol
         int_data = array([], dtype=DTYPE_OBS_INT)
 
     int_data.tofile(int_filename_or_file)
-
 
 def add_starts_ends(new_windows, starts, ends):
     """
@@ -501,7 +724,7 @@ def add_starts_ends(new_windows, starts, ends):
     return new_windows[0]
 
 def generate_coords_from_dict(coords_dict):
-    # use a deque to allow fast insertion/removal at the 
+    # use a deque to allow fast insertion/removal at the
     # beginning and end of the sequence
     for chrom, coords_list in viewitems(coords_dict):
         starts, ends = map(deque, zip(*coords_list))
@@ -520,7 +743,7 @@ class Observations(object):
                   "use_dinucleotide", "world_track_indexes",
                   "world_genomedata_names", "clobber",
                   "num_worlds", "validation_fraction", "validate",
-                  "validation_coords"]
+                  "validation_coords", "virtual_evidence"]
 
     def __init__(self, runner):
         copy_attrs(runner, self, self.copy_attrs)
@@ -645,7 +868,7 @@ class Observations(object):
         """
         Creates set of validation windows using the specified
         validation coordinates.
-        
+
         Returns validation windows
         """
         validation_windows = []
@@ -728,7 +951,6 @@ class Observations(object):
         # remaining windows can be passed into training now
         self.windows = windows
 
-
     def save_window(self, float_filename, int_filename, float_data,
                     seq_data=None, supervision_data=None):
         return _save_window(float_filename, int_filename, float_data,
@@ -786,7 +1008,7 @@ class Observations(object):
             self.int_filepaths.append(int_filepath)
 
     def create_validation_filepaths(self):
-        """ Creates a list of observations full filepaths for each 
+        """ Creates a list of observations full filepaths for each
         validation window."""
 
         for window_index, window in enumerate(self.validation_windows):
@@ -798,7 +1020,6 @@ class Observations(object):
     def make_seq_cells(self, chromosome, start, end):
         if self.use_dinucleotide:
             return chromosome.seq[start:end]
-
 
     # XXX: Dead code. Observations.save (which calls this function) no longer
     # called. May be used when --observations is re enabled for caching
