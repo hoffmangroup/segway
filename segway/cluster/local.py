@@ -14,7 +14,8 @@ from subprocess import Popen
 from threading import Lock
 from time import sleep
 
-from .common import _JobTemplateFactory, make_native_spec
+from .common import (CLEAN_SAFE_TIME, _JobTemplateFactory,
+                     make_native_spec)
 
 # Allow this to throw an error if the environment variable is not an integer
 MAX_PARALLEL_JOBS = int(environ.get("SEGWAY_NUM_LOCAL_JOBS", 32))
@@ -196,6 +197,14 @@ class JobTemplateFactory(_JobTemplateFactory):
 
     def make_native_spec(self):
         return ""
+
+
+def get_job_max_query_lifetime():
+    """
+    Get the maximum time in seconds a job's status can be queried (by DRMAA)
+    """
+    return CLEAN_SAFE_TIME
+
 
 ## here only for imports:
 make_native_spec

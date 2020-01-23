@@ -1,4 +1,6 @@
 3.0:
+* segway: added cluster specific max job polling times (thanks to Rachel Chan
+  for diagnosis)
 
 2.0.5:
 * segway: fixed bug causing identify to fail with archives of different track numbers

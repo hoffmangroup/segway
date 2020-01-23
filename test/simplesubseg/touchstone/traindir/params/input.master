@@ -122,6 +122,14 @@ CARD_SUPERVISIONLABEL CARD_SEG CARD_BOOLEAN
 map_supervisionLabel_seg_alwaysTrue
 #endif
 
+#if VIRTUAL_EVIDENCE == 1
+VE_CPT_IN_FILE inline
+1
+
+0 seg_virtualEvidence 1 2 2 VIRTUAL_EVIDENCE_LIST_FILENAME nfs:2 nis:0 fmt:ascii END
+
+#endif
+
 #ifndef INPUT_PARAMS_FILENAME
 
 DENSE_CPT_IN_FILE inline

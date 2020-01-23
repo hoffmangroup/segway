@@ -103,6 +103,14 @@ CARD_SUPERVISIONLABEL CARD_SEG CARD_BOOLEAN
 map_supervisionLabel_seg_alwaysTrue
 #endif
 
+#if VIRTUAL_EVIDENCE == 1
+VE_CPT_IN_FILE inline
+1
+
+0 seg_virtualEvidence 1 4 2 VIRTUAL_EVIDENCE_LIST_FILENAME nfs:4 nis:0 fmt:ascii END
+
+#endif
+
 #ifndef INPUT_PARAMS_FILENAME
 
 DENSE_CPT_IN_FILE inline
@@ -147,14 +155,14 @@ DENSE_CPT_IN_FILE inline
 MEAN_IN_FILE inline
 8
 
-0 mean_seg0_subseg0_h3k27me3 1 0.494367795107
-1 mean_seg0_subseg0_h3k36me3 1 0.535856438541
-2 mean_seg1_subseg0_h3k27me3 1 0.423091259383
-3 mean_seg1_subseg0_h3k36me3 1 0.479812957934
-4 mean_seg2_subseg0_h3k27me3 1 0.475467231322
-5 mean_seg2_subseg0_h3k36me3 1 0.529879495599
-6 mean_seg3_subseg0_h3k27me3 1 0.403791197908
-7 mean_seg3_subseg0_h3k36me3 1 0.672190428624
+0 mean_seg0_subseg0_h3k27me3 1 0.446591351929
+1 mean_seg0_subseg0_h3k36me3 1 0.614836736569
+2 mean_seg1_subseg0_h3k27me3 1 0.459066861175
+3 mean_seg1_subseg0_h3k36me3 1 0.588981643538
+4 mean_seg2_subseg0_h3k27me3 1 0.478233980475
+5 mean_seg2_subseg0_h3k36me3 1 0.556547491752
+6 mean_seg3_subseg0_h3k27me3 1 0.357493747623
+7 mean_seg3_subseg0_h3k36me3 1 0.677516916081
 
 COVAR_IN_FILE inline
 2
