@@ -3853,23 +3853,24 @@ def parse_options(argv):
                             epilog=citation)
 
     subtask_description = """
-train                   Runs gmtkEMtrain on specified genomedata archives
-- train-init            Sets up directory structure and generates all gmtk input files
-- train-run             Runs training to completion or to a specified number of iterations
--- train-run-round      Runs a single round of training
-- train-finish          Selects best training instance and generates output master and params files
+train                   run EM training on specified genomedata archives
+- train-init		set up directory structure and generates all input files
+- train-run		run training to completion or to a specified number of iterations
+-- train-run-round	run a single round of training
+- train-finish		select best training instance and generate output master and params files
 
-annotate                Runs gmtkViterbi on given archives and training directory, provides labels to entire genome
-- annotate-init         Sets up directory structure and generates all gmtk input files
-- annotate-run          Submits jobs to Viterbi
-- annotate-finish       Compiles all viterbi output files together into a single bed file for all labels
+annotate		annotate data from given archives and training directory, provide labels to entire genome
+- annotate-init		set up directory structure and generate all input files
+- annotate-run		produce labels for entire genome
+- annotate-finish	compile all output files together into a single bed file for all labels
 
-posterior               Runs gmtkJT and produces prior probability of each label at each index
-- posterior-init        Sets up directory structure and generates all gmtk input files
-- posterior-run         Submits jonbs to JT
-- posterior-finish      Compiles all output posterior files, and produces a bed file for each label
+posterior		produce prior probability of each label at each index
+- posterior-init	set up directory structure and generate all input files
+- posterior-run		produce posteriors for each label for each genomic index, given input files from init
+- posterior-finish	compile all output posterior files, and produce a bed file for each label
 
 Use `segway COMMAND --help` for help specific to command COMMAND.
+
     """
 
     tasks = parser.add_subparsers(title="list of commands", dest="task_spec",
