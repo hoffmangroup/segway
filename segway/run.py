@@ -3853,7 +3853,7 @@ def parse_options(argv):
                             epilog=citation)
 
     subtask_description = """
-train                   Runs gmtkEMtrain on specified genomedata archive(s)
+train                   Runs gmtkEMtrain on specified genomedata archives
 - train-init            Sets up directory structure and generates all gmtk input files
 - train-run             Runs training to completion or to a specified number of iterations
 -- train-run-round      Runs a single round of training
@@ -3869,7 +3869,7 @@ posterior               Runs gmtkJT and produces prior probability of each label
 - posterior-run         Submits jonbs to JT
 - posterior-finish      Compiles all output posterior files, and produces a bed file for each label
 
-Use `segway COMMAND --help`, for help specific to each command.
+Use `segway COMMAND --help` for help specific to command COMMAND.
     """
 
     tasks = parser.add_subparsers(title="list of commands", dest="task_spec",
