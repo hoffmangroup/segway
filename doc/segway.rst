@@ -18,7 +18,7 @@ Segway can be installed with the command::
 Alternatively without Bioconda, the following prerequisites must be
 installed for Segway:
 
-You need Python 2.7.
+You need Python 2.7, or Python 3.6 or later versions.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
 <http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.4.tar.gz>.
@@ -379,6 +379,62 @@ using the equations |mu| = *k*\ |theta| and |sigma|:sup:`2` = *k*\
 values is less well-understood. I recommend the use of ``asinh_norm``
 in most cases.
 
+Virtual Evidence
+----------------
+To use virtual evidence [pearl1988]_ in Segway, the user
+specifies a prior probability that a genomic region has a particularly labelled
+state. In this sense, virtual evidence is a form of semi-supervised learning. 
+
+Users supplying virtual evidence while running an entire task together (for
+example, **train** or **annotate**) will supply the virtual evidence file with
+:option:`--virtual-evidence`. Users supplying virtual evidence while running
+steps for a task one at a time will need to specify
+:option:`--virtual-evidence` during the init step in order to properly generate
+the input files such as input.master and the triangulation file. During
+**annotate** and **posterior** a file can be supplied with the
+:option:`--virtual-evidence` option to the init step however it may not be
+changed during run.
+
+The virtual evidence file supplied to :option:`--virtual-evidence` should be of
+BED3+2, tab-delimited, format where the 4th column is the label index and the
+fifth column is the prior. For example,
+
+::
+
+chr1	0	1000	0	0.9
+
+will specify a prior probabilty of 0.9 on label 0 for the region of chr1 from 0
+to 1000.
+
+If running on multiple concatenated segmentations (worlds), the VE file is in
+BED3+3 format instead, and the world number must be specified for each row in
+the last column. If this is omitted and a BED3+2 file is submitted instead, the
+virtual evidence will be applied to all worlds instead.  For example, with two
+worlds,
+
+::
+
+chr1	0	1000	0	0.9	0
+
+chr1	0	1000	1	0.05	1
+
+These examples specify prior probabilities over the region of chr1 from 0 to
+1000 for both worlds.  A prior probability of 0.9 on label 0 for the first
+world and a prior probability of 0.05 on label 1 for the second world.
+
+At positions for which some labels are given a prior by the user but
+other labels not, the remaining probability is uniformly distributed
+amongst the leftover labels. For example, with 4 labels:
+
+::
+
+chr1 0 1000 0 0.4
+
+all labels but label 0 would be given a prior probability of
+(1-0.4)/3=0.2.
+
+.. [pearl1988] Pearl, Judea. "Probabilistic reasoning in intelligent systems. 1988." San Mateo, CA: Kaufmann 23: 33-34.
+
 .. _model-customization:
 
 Model Customization
@@ -602,7 +658,6 @@ and your ruler is set so it won't allow a transition to occur on `20`
 then your jobs will terminate with a 'zero clique' error. To resolve this,
 either avoid having directly adjacent superivison labels or, if possible,
 set `--ruler-scale=1` and run Segway again.
-
 
 General options
 ---------------
