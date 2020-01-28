@@ -3847,27 +3847,27 @@ def parse_options(argv):
     Citation: Hoffman MM, Buske OJ, Wang J, Weng Z, Bilmes J, Noble WS.  2012.
     Unsupervised pattern discovery in human chromatin structure through genomic
     segmentation. Nat Methods 9:473-476.
-    http://dx.doi.org/10.1038/nmeth.1937"""
+    https://doi.org/10.1038/nmeth.1937"""
 
     parser = ArgumentParser(description=description, usage = usage,
                             epilog=citation)
 
     subtask_description = """
-train                   run EM training on specified genomedata archives
-- train-init		set up directory structure and generates all input files
-- train-run		run training to completion or to a specified number of iterations
--- train-run-round	run a single round of training
-- train-finish		select best training instance and generate output master and params files
+train                   create a model with learned parameters
+- train-init            prepare initial models for parallel training
+- train-run             train initial models to completion criterion, in parallel
+-- train-run-round      train models for one round, in parallel
+- train-finish          select best model and prepare for `annotate` 
 
-annotate		annotate data from given archives and training directory, provide labels to entire genome
-- annotate-init		set up directory structure and generate all input files
-- annotate-run		produce labels for entire genome
-- annotate-finish	compile all output files together into a single bed file for all labels
+annotate                label a genome using a model
+- annotate-init         prepare for parallel annotation
+- annotate-run          annotate the genome, in parallel
+- annotate-finish       concatenate parallel annotation results
 
-posterior		produce prior probability of each label at each index
-- posterior-init	set up directory structure and generate all input files
-- posterior-run		produce posteriors for each label for each genomic index, given input files from init
-- posterior-finish	compile all output posterior files, and produce a bed file for each label
+posterior               infer posterior probabilities of each label across a genome
+- posterior-init        prepare for parallel posterior inference
+- posterior-run         infer posterior probabilities, in parallel
+- posterior-finish      concatenate parallel posterior inference results
 
 Use `segway COMMAND --help` for help specific to command COMMAND.
 
