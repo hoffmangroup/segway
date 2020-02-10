@@ -1,6 +1,9 @@
 3.0:
+* segway: added modular interface for each task. subtasks include init, run, finish,
+  and run-round for training specifically
 * segway: added cluster specific max job polling times (thanks to Rachel Chan
   for diagnosis)
+* segway: added virtual evidence as an option to the Segway model
 
 2.0.5:
 * segway: fixed bug causing identify to fail with archives of different track numbers
