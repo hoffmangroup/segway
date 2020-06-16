@@ -129,8 +129,6 @@ def main():
           long_description=long_description,
           install_requires=install_requires,
           zip_safe=False, # XXX: change back, this is just for better tracebacks
-
-          # XXX: this should be based off of __file__ instead
           packages=find_packages("."),
           include_package_data=True,
           entry_points=entry_points
