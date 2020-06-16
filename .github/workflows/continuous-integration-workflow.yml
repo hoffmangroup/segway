@@ -20,7 +20,7 @@ jobs:
       - uses: actions/checkout@v2
       - name: Build repository
         run: |
-          python${SEGWAY_TEST_PYTHON_VERSION} -m pip install --no-cache-dir .
+          python${SEGWAY_TEST_PYTHON_VERSION} -m pip install --verbose .
           pip list
       - name: Run tests
         run: |
