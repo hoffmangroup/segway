@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 """segway: a way to segment the genome
 
 Segway is a tool for easy pattern discovery and identification in
@@ -66,28 +65,6 @@ install_requires = ["genomedata>=1.4.2", "autolog>=0.2.0",
                     "colorbrewer>=0.2.0", "drmaa>=0.4a3", "six"]
 
 
-def hg_id(mgr, kind):
-    return mgr._invoke("id", "--%s" % kind).strip()
-
-
-def calc_version(mgr, options):
-    # If the current version is a development version (modified or on an
-    # untagged changeset)
-    current_version = mgr.get_current_version()
-    if current_version.endswith("dev"):
-        # Return a custom version string based on changset id
-        id_num = hg_id(mgr, "num")
-        id_id = hg_id(mgr, "id")
-        id_id = id_id.replace("+", "p")
-
-        # "rel" always comes after r, so new numbering system is preserved
-        # XXX: after 1.2.0 is released, we can change rel back to r
-        return "%s.dev-rel%s-hg%s" % (__version__, id_num, id_id)
-    # Otherwise return the current tagged version
-    else:
-        return current_version
-
-
 def check_gmtk_version():
     """ Checks if the supported minimum GMTK version is installed """
     # Typical expected output from "gmtkPrint -version":
@@ -151,13 +128,9 @@ def main():
           classifiers=classifiers,
           long_description=long_description,
           install_requires=install_requires,
-          setup_requires=["hgtools"],
           zip_safe=False, # XXX: change back, this is just for better tracebacks
-
-          # XXX: this should be based off of __file__ instead
           packages=find_packages("."),
           include_package_data=True,
-          use_vcs_version={"version_handler": calc_version},
           entry_points=entry_points
           )
 
