@@ -1,8 +1,13 @@
 name: Build and Test
 
-# Workflow is triggered for every pull request on and push to any branch
+# Workflow is triggered only on push to the master branch or a pull request to
+# the master branch
 
-on: [push, pull_request]
+on:
+  push:
+      branches: [ master ]
+  pull_request:
+      branches: [ master ]
 
 jobs:
   build-and-test:
