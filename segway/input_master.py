@@ -491,6 +491,41 @@ class DenseCPTParamSpec(TableParamSpec):
             yield self.make_dense_cpt_seg_dinucleotide_spec()
 
 
+class DirichletTabParamSpec(TableParamSpec):
+    type_name = "DIRICHLET_TAB"
+    copy_attrs = TableParamSpec.copy_attrs \
+        + ["len_seg_strength", "num_bases", "card_seg_countdown",
+           "num_mix_components"]
+
+    def make_table_spec(self, name, table):
+        dirichlet_name = self.make_dirichlet_name(name)
+
+        return TableParamSpec.make_table_spec(self, dirichlet_name, table,
+                                              table.ndim)
+
+    def make_dirichlet_table(self):
+        probs = self.make_dense_cpt_segCountDown_seg_segTransition()
+
+        # XXX: the ratio is not exact as num_bases is not the same as
+        # the number of base-base transitions. It is surely close
+        # enough, though
+        total_pseudocounts = self.len_seg_strength * self.num_bases
+        divisor = self.card_seg_countdown * self.num_segs
+        pseudocounts_per_row = total_pseudocounts / divisor
+
+        # astype(int) means flooring the floats
+        pseudocounts = (probs * pseudocounts_per_row).astype(int)
+
+        return pseudocounts
+
+    def generate_objects(self):
+        # XXX: these called functions have confusing/duplicative names
+        if self.len_seg_strength > 0:
+            dirichlet_table = self.make_dirichlet_table()
+            yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
+                                   dirichlet_table)
+
+
 class NameCollectionParamSpec(ParamSpec):
     type_name = "NAME_COLLECTION"
     header_tmpl = "collection_seg_${track} ${fullnum_subsegs}"
@@ -821,6 +856,11 @@ class InputMasterSaver(Saver):
         include_filename = self.gmtk_include_filename_relative
 
         dt_spec = DTParamSpec(self)
+
+        if self.len_seg_strength > 0:
+            dirichlet_spec = DirichletTabParamSpec(self)
+        else:
+            dirichlet_spec = ""
 
         dense_cpt_spec = DenseCPTParamSpec(self)
 
