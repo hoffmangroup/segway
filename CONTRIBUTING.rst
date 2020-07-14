@@ -20,7 +20,7 @@ We ask that when you post your issue that you include the following information:
 Submitting Contributions
 ------------------------
 
-The best way to submit contributions to Segway is through the pull request feature on Bitbucket. To perform a pull request on Bitbucket, first fork (or sync your repo if you have already forked) your own copy of Segway on Bitbucket. Commit any set of changes to your own Segway repository on Bitbucket and then submit a pull request from the web interface. If the pull request is intended to address an existing issue, please add the issue number in your pull request message or subject along with a helpful description of the changes involved. We request that changes submitted have clear commit messages since these are often referred to when addressing bugs in the future. See `A Note About Commit Messages`_ for a quick overview of what would ideally be expected.
+The best way to submit contributions to Segway is through the pull request feature on Github. To perform a pull request on Github, first fork (or sync your repo if you have already forked) your own copy of Segway on Github. Commit any set of changes to your own Segway repository on Github and then submit a pull request from the web interface. If the pull request is intended to address an existing issue, please add the issue number in your pull request message or subject along with a helpful description of the changes involved. We request that changes submitted have clear commit messages since these are often referred to when addressing bugs in the future. See `A Note About Commit Messages`_ for a quick overview of what would ideally be expected.
 
 Coding Style
 ------------
@@ -29,8 +29,8 @@ We ask that all code submissions follow the `PEP 8`_ python coding guidelines an
 In addition we recommend that you use the `flake8`_ tool to check your
 contributions with the added option of "--max-complexity=10".
 
-.. _issue tracker: https://bitbucket.org/hoffmanlab/segway/issues/
-.. _pull requests: https://bitbucket.org/hoffmanlab/segway/pull-requests
+.. _issue tracker: https://github.com/hoffmangroup/segway/issues/
+.. _pull requests: https://github.com/hoffmangroup/segway/pull-requests
 .. _PEP 8: https://www.python.org/dev/peps/pep-0008/
 .. _A Note About Commit Messages: http://tbaggery.com/2008/04/19/a-note-about-git-commit-messages.html
 .. _flake8: https://pypi.python.org/pypi/flake8

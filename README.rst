@@ -52,4 +52,4 @@ FITNESS FOR A PARTICULAR PURPOSE.
 
 Contact
 =======
-Please let us <segway-users at uw dot edu> know if you have any comments on the installation or use of Segway, or file an issue on Bitbucket <https://bitbucket.org/hoffmanlab/segway/issues>.
+Please let us <segway-users at uw dot edu> know if you have any comments on the installation or use of Segway, or file an issue on Github <https://github.com/hoffmangroup/segway/issues>.

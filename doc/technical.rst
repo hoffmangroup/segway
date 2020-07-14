@@ -41,7 +41,7 @@ interface. We have only tested it against Sun Grid Engine and Platform
 LSF, but it should be possible to work with other DRMAA-compatible
 distributed computing systems, such as PBS Pro, PBS/TORQUE, Condor, or
 GridWay. If you are interested in using one of these systems, please
-open an issue on Bitbucket <https://bitbucket.org/hoffmanlab/segway/issues?status=new&status=open> to correct all the fine details. A standalone
+open an issue on Github <https://github.com/hoffmangroup/segway/issues/new> to correct all the fine details. A standalone
 option exists when you set the `SEGWAY_CLUSTER` environment variable to `local`. Try
 installing the free Open Grid Scheduler on your workstation if you want to run Segway
 without a full clustering system.
