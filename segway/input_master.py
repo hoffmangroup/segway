@@ -428,5 +428,69 @@ class DTParamSpec(ParamSpec):
             yield data_string("map_supervisionLabel_seg_alwaysTrue_supervised.dt.txt")  # noqa
         else:
             assert supervision_type == SUPERVISION_UNSUPERVISED
+                                                                  
+                                                                  
+class InputMasterSaver(Saver):
+    resource_name = "input.master.tmpl"
+    copy_attrs = ["num_bases", "num_segs", "num_subsegs",
+                  "num_track_groups", "card_seg_countdown",
+                  "seg_countdowns_initial", "seg_table", "distribution",
+                  "len_seg_strength", "resolution", "random_state", "supervision_type",
+                  "use_dinucleotide", "mins", "means", "vars",
+                  "gmtk_include_filename_relative", "track_groups",
+                  "num_mix_components", "virtual_evidence"] 
 
+        def make_mapping(self):
+        # the locals of this function are used as the template mapping
+        # use caution before deleting or renaming any variables
+        # check that they are not used in the input.master template
+        param_spec = ParamSpec(self)
+        num_free_params = 0
 
+        num_segs = self.num_segs
+        num_subsegs = self.num_subsegs
+        num_track_groups = self.num_track_groups
+        fullnum_subsegs = num_segs * num_subsegs
+
+        include_filename = self.gmtk_include_filename_relative
+
+        dt_spec = DTParamSpec(self)
+
+        distribution = self.distribution
+        if distribution in DISTRIBUTIONS_LIKE_NORM:
+            mean_spec = param_spec.generate_mean_objects()
+
+            if COVAR_TIED:
+                pass
+            else:
+                covar_spec = param_spec.generate_covar_objects()
+
+            mc_spec = param_spec.generate_mc_objects()
+
+            if COVAR_TIED:
+                num_free_params += (fullnum_subsegs + 1) * num_track_groups
+            else:
+                num_free_params += (fullnum_subsegs * 2) * num_track_groups
+
+        elif distribution == DISTRIBUTION_GAMMA:
+            mean_spec = ""
+            covar_spec = ""
+
+            # XXX: another option is to calculate an ML estimate for
+            # the gamma distribution rather than the ML estimate for the
+            # mean and converting
+  
+            mc_spec = param_spec.generate_mc_objects()
+
+            num_free_params += (fullnum_subsegs * 2) * num_track_groups
+        else:
+            raise ValueError("distribution %s not supported" % distribution)
+
+        mx_spec = param_spec.generate_mx_objects()
+        name_collection_spec = param_spec.generate_name_collection()
+        card_seg = num_segs
+        dpmf_spec = param_spec.generate_dpmf_objects()
+
+        return locals()  # dict of vars set in this function
+
+        
