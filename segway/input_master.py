@@ -1,6 +1,4 @@
-#!/usr/bin/env python
 from __future__ import absolute_import, division
-
 """input_master.py: write input master files
 """
 
@@ -23,8 +21,12 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     resource_substitute, Saver, SEGWAY_ENCODING,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
-                    SUPERVISION_SUPERVISED, USE_MFSDG)
-from .gmtk.input_master import array2text
+                    SUPERVISION_SUPERVISED, USE_MFSDG,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME)
+
+from .gen_gmtk_params import InputMaster, NameCollection, DenseCPT, \
+    DeterministicCPT, DPMF, MC, MX, Covar, Mean, generate_gmtk_obj_names
+
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
 # scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -64,11 +66,26 @@ JITTER_ORDERS_MAGNITUDE = 5  # log10(2**5) = 1.5 decimal orders of magnitude
 DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
                                      DISTRIBUTION_ASINH_NORMAL])
 
+# Number of digits for rounding input.master means.
+# This allows consistency between Python 2 and Python 3
+# TODO[PY2-EOL]: remove
+ROUND_NDIGITS = 12
+
+input_master = InputMaster()
 
 def vstack_tile(array_like, *reps):
     reps = list(reps) + [1]
 
     return tile(array_like, reps)
+
+
+def array2text(a):
+    ndim = a.ndim
+    if ndim == 1:
+        return " ".join(map(str, a))
+    else:
+        delimiter = "\n" * (ndim - 1)
+        return delimiter.join(array2text(row) for row in a)
 
 
 def make_spec(name, iterable):
@@ -85,7 +102,7 @@ def make_spec(name, iterable):
 
     all_lines = header_lines + indexed_items
 
-    # In Python 2, convert from unicode to bytes to prevent 
+    # In Python 2, convert from unicode to bytes to prevent
     # __str__method from being called twice
     # Specifically in the string template standard library provided by Python
     # 2, there is a call to a string escape sequence + tuple, e.g.:
@@ -150,12 +167,34 @@ class ParamSpec(object):
     type_name = None
     object_tmpl = None
     copy_attrs = ["distribution", "mins", "num_segs", "num_subsegs",
-                  "num_track_groups", "track_groups", "num_mix_components"]
+                  "num_track_groups", "track_groups", "num_mix_components",
+                  "means", "vars", "num_mix_components", "random_state", "tracks"]
 
+    jitter_std_bound = 0.2
+    track_names = []
     def __init__(self, saver):
         # copy all variables from saver that it copied from Runner
         # XXX: override in subclasses to only copy subset
         copy_attrs(saver, self, self.copy_attrs)
+        self.track_names = [] 
+        #print(self.tracks)
+        for track in self.tracks:
+        #    print(track)
+            self.track_names.append(track.name)
+        #print("track_names", self.track_names)
+
+    def make_segnames(self):
+        return format_indexed_strs("seg", self.num_segs)
+
+    def make_subsegnames(self):
+        return format_indexed_strs("subseg", self.num_subsegs)
+
+    def make_data(self):
+        """
+        override this in subclasses
+        returns: container indexed by (seg_index, subseg_index, track_index)
+        """
+        return None
 
     def get_track_lt_min(self, track_index):
         """
@@ -181,11 +220,11 @@ class ParamSpec(object):
         assert min_track_f32 - float32(ABSOLUTE_FUDGE) != min_track_f32
         return min_track - ABSOLUTE_FUDGE
 
-    def make_segnames(self):
-        return format_indexed_strs("seg", self.num_segs)
-
-    def make_subsegnames(self):
-        return format_indexed_strs("subseg", self.num_subsegs)
+    # def make_segnames(self):
+    #     return format_indexed_strs("seg", self.num_segs)
+    #
+    # def make_subsegnames(self):
+    #     return format_indexed_strs("subseg", self.num_subsegs)
 
     def get_template_component_suffix(self, component_number):
         """Returns the subsitution for the component suffix in the GMTK model
@@ -199,6 +238,7 @@ class ParamSpec(object):
         # need segnames because in the tied covariance case, the
         # segnames are replaced by "any" (see .make_covar_spec()),
         # and only one mapping is produced
+        #print("gen tmpl mapping used")
         num_subsegs = self.num_subsegs
 
         track_groups = self.track_groups
@@ -223,19 +263,19 @@ class ParamSpec(object):
                                index=track_offset,
                                distribution=self.distribution)
 
-    def make_data(self):
-        """
-        override this in subclasses
-
-        returns: container indexed by (seg_index, subseg_index, track_index)
-        """
-        return None
+    # def make_data(self):
+    #     """
+    #     override this in subclasses
+    #     returns: container indexed by (seg_index, subseg_index, track_index)
+    #     """
+    #     return None
 
     def generate_objects(self):
         """
         returns: iterable of strs containing GMTK parameter objects starting
         with names
         """
+        #print("gen objs being used")
         substitute = Template(self.object_tmpl).substitute
 
         data = self.make_data()
@@ -256,10 +296,223 @@ class ParamSpec(object):
     def __str__(self):
         return make_spec(self.type_name, self.generate_objects())
 
+    def generate_name_collection(self):
+        collection_names = generate_gmtk_obj_names(obj="col",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+        names = generate_gmtk_obj_names("mx_name",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+        num_tracks = len(self.track_names)
+        len_name_group = int(len(names) / num_tracks)
+        name_groups = [names[i:i + len_name_group] for i in range(0, len(names), len_name_group)]
+        for group_index in range(len(name_groups)):
+            name_col = NameCollection(collection_names[group_index],
+                                      name_groups[group_index])
+            input_master.update(name_col)
+
+        return input_master.generate_name_col()
+
+    def make_mean_data(self):
+        num_segs = self.num_segs
+        num_subsegs = self.num_subsegs
+        means = self.means  # indexed by track_index
+
+        # maximum likelihood, adjusted by no more than 0.2*sd
+        stds = sqrt(self.vars)
+
+        # tile the means of each track (num_segs, num_subsegs times)
+        means_tiled = vstack_tile(means, num_segs, num_subsegs)
+        stds_tiled = vstack_tile(stds, num_segs, num_subsegs)
+
+        jitter_std_bound = self.jitter_std_bound
+        noise = self.random_state.uniform(-jitter_std_bound,
+                jitter_std_bound, stds_tiled.shape)
+
+        return means_tiled + (stds_tiled * noise)
+
+    def generate_mean_objects(self):
+        names = generate_gmtk_obj_names("mean",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components) 
+        means = self.make_mean_data().tolist()
+        for i in range(len(names)):
+            mean_obj = Mean(names[i], means[i])
+            input_master.update(mean_obj)
+         
+        return input_master.generate_mean()
+
+    def generate_covar_objects(self):
+        if not COVAR_TIED:
+            names = generate_gmtk_obj_names("covar",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+        else:
+            names = generate_gmtk_obj_names("tied_covar",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+        covars = self.vars.tolist()
+        for i in range(len(names)):
+            covar_obj = Covar(names[i], covars[i])
+            input_master.update(covar_obj)
+
+        return input_master.generate_covar()
+
+    def generate_real_mat_objects(self):
+        pass
+
+    def generate_mc_objects(self):
+        if self.distribution in DISTRIBUTIONS_LIKE_NORM:
+            if USE_MFSDG:
+                # TODO
+                option = "mc_missing"
+            else:
+                option = "mc_diag"
+            names = generate_gmtk_obj_names(option,
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+            covars = list(input_master.covar.values())* (self.num_segs * self.num_subsegs)
+            #print(input_master.mean.values(), covars)
+            for i in range(len(names)):
+                mc_obj = MC(name=names[i], dim=1, type="COMPONENT_TYPE_DIAG_GAUSSIAN",
+                            mean=list(input_master.mean.values())[i], covar=covars[i])
+                input_master.update(mc_obj)
+             
+
+        elif self.distribution == DISTRIBUTION_GAMMA:
+            option = "mc_gamma"
+            names = generate_gmtk_obj_names(option,
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+            gamma_scale = generate_gmtk_obj_names("gammascale",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+
+            gamma_shape = generate_gmtk_obj_names("gammashape",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+
+            for i in range(len(names)):
+                mc_obj = MC(name=names[i], dim=1, type="COMPONENT_TYPE_GAMMA",
+                            gamma_shape=gamma_shape[i], gamma_scale=gamma_scale[i])
+                input_master.update(mc_obj)
+        return input_master.generate_mc()
+
+    def generate_mx_objects(self):
+        names = generate_gmtk_obj_names("mx",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                num_mix_components=self.num_mix_components)
+
+        #mc_names = []
+        #for key in input_master.mc:
+        #    mc_names.append(input_master.mc[key].name)
+        #print("mc names", mc_names)
+        mc_obj = list(input_master.mc.values())
+        #dpmf_names = []
+        #for key in input_master.dpmf:
+        #    dpmf_names.append(input_master.dpmf[key].name)
+        dpmf_obj = list(input_master.dpmf.values())
+        multiple = int(len(names)/len(dpmf_obj))
+        dpmf_obj *= multiple
+        #print("mx dpmf", dpmf_obj)
+        for i in range(len(names)):
+           # print('index', i)
+            mx_obj = MX(name=names[i], dim=1, dpmf=dpmf_obj[i],
+                        components=mc_obj[i])
+            input_master.update(mx_obj)
+        return input_master.generate_mx()
+
+    def generate_dpmf_objects(self):
+        names = generate_gmtk_obj_names("dpmf",
+                track_names=self.track_names, num_segs=self.num_segs,
+                num_subsegs=self.num_subsegs, distribution=self.distribution,
+                                    num_mix_components=self.num_mix_components)
+        #print("dpmf_names", names)
+        #print(self.num_mix_components)
+        if self.num_mix_components == 1:
+           # print("if dpmf")
+            dpmf_obj = DPMF(names[0], 1.0)
+           # print("create dpmf", dpmf_obj)
+            input_master.update(dpmf_obj)
+        else:
+            dpmf_values = str(round(1.0 / self.num_mix_components,
+                                    ROUND_NDIGITS))
+           # print("else dpmf")
+            for i in range(len(names)):
+                dpmf_obj = DPMF(names[i], dpmf_values[i])
+                input_master.update(dpmf_obj)
+        return input_master.generate_dpmf()
+
+    def generate_ve(self):
+        pass
+
+    def make_start_seg(self):
+        name = "start_seg"
+        card = self.num_segs
+        prob = fill_array(1.0 / self.num_segs, self.num_segs)
+        start_seg = DenseCPT(name=name, cardinality=card, prob=prob)
+        input_master.update(start_seg)
+
+    def make_seg_subseg(self):
+        name = "seg_subseg"
+        parent_card = self.num_segs  # TODO check
+        card = self.num_subseg  # TODO check
+        prob = fill_array(1.0 / self.num_subsegs, (self.num_segs,
+                                                   self.num_subsegs))
+        seg_subseg = DenseCPT(name=name, parent_card=parent_card,
+                              cardinality=card, prob=prob)
+        input_master.update(seg_subseg)
+
+
+    def make_seg_seg(self):
+        name = "seg_seg"
+        parent_card = self.num_segs  # TODO check
+        card = self.num_segs  # TODO check
+        prob = make_zero_diagonal_table(self.num_segs)
+        # TODO check
+        seg_seg = DenseCPT(name, parent_card, card, prob)
+
+        input_master.update(seg_seg)
+
+    def make_seg_subseg_subseg(self):
+        name = "seg_subseg_subseg"
+        # parent_card =
+        cpt_seg = make_zero_diagonal_table(self.num_subsegs)
+        cpt = vstack_tile(cpt_seg, self.num_segs, 1)
+
+        seg_subseg_subseg = DenseCPT()
+
+    def make_dinucleotide_table_row(self):
+        pass
+
+    def make_seg_dinucleotide(self):
+        pass
+
+    def make_segCountDown_seg_segTransition(self):
+        name = "segCountDown_seg_segTransition"
+        # parent_card =
+        # card =
+        pass
+
+
+    def generate_objects(self):
+        pass
+
 
 class DTParamSpec(ParamSpec):
     type_name = "DT"
-    copy_attrs = ["num_segs", "seg_countdowns_initial", "supervision_type"]
+    copy_attrs = ParamSpec.copy_attrs + ["seg_countdowns_initial",
+                                         "supervision_type"]
 
     def make_segCountDown_tree_spec(self, resourcename):  # noqa
         num_segs = self.num_segs
@@ -300,6 +553,24 @@ class DTParamSpec(ParamSpec):
             yield data_string("map_supervisionLabel_seg_alwaysTrue_supervised.dt.txt")  # noqa
         else:
             assert supervision_type == SUPERVISION_UNSUPERVISED
+
+
+class VirtualEvidenceSpec(ParamSpec):
+    type_name = "VE_CPT"
+
+    # According to GMTK specification (tksrc/GMTK_VECPT.cc)
+    # this should be of the format: 
+    # CPT_name num_par par_card self_card VE_CPT_FILE
+    # nfs:nfloats nis:nints ... fmt:obsformat ... END
+    object_tmpl = "seg_virtualEvidence 1 %s 2 %s nfs:%s nis:0 fmt:ascii END"
+    copy_attrs = ParamSpec.copy_attrs + ["virtual_evidence", "num_segs"]
+
+    def make_virtual_evidence_spec(self):
+        return self.object_tmpl % (self.num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME, self.num_segs)
+
+    def generate_objects(self):
+        yield self.make_virtual_evidence_spec()
+
 
 
 class TableParamSpec(ParamSpec):
@@ -390,6 +661,7 @@ class TableParamSpec(ParamSpec):
         return "dirichlet_%s" % name
 
 
+
 class DenseCPTParamSpec(TableParamSpec):
     type_name = "DENSE_CPT"
     copy_attrs = TableParamSpec.copy_attrs \
@@ -476,136 +748,6 @@ class DenseCPTParamSpec(TableParamSpec):
             yield self.make_dense_cpt_seg_dinucleotide_spec()
 
 
-class NameCollectionParamSpec(ParamSpec):
-    type_name = "NAME_COLLECTION"
-    header_tmpl = "collection_seg_${track} ${fullnum_subsegs}"
-    row_tmpl = "mx_${seg}_${subseg}_${track}"
-
-    def generate_objects(self):
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
-        track_groups = self.track_groups
-
-        substitute_header = Template(self.header_tmpl).substitute
-        substitute_row = Template(self.row_tmpl).substitute
-
-        fullnum_subsegs = num_segs * num_subsegs
-
-        for track_group in track_groups:
-            head_trackname = track_group[0].name
-
-            # XXX: rename in template: track -> head_trackname
-            mapping = dict(track=head_trackname,
-                           fullnum_subsegs=fullnum_subsegs)
-
-            rows = [substitute_header(mapping)]
-            for seg_index in range(num_segs):
-                seg = "seg%d" % seg_index
-
-                for subseg_index in range(num_subsegs):
-                    subseg = "subseg%d" % subseg_index
-                    mapping = dict(seg=seg, subseg=subseg,
-                                   track=head_trackname)
-
-                    rows.append(substitute_row(mapping))
-
-            yield "\n".join(rows)
-
-
-class MeanParamSpec(ParamSpec):
-    type_name = "MEAN"
-    object_tmpl = "mean_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
-    jitter_std_bound = 0.2
-
-    copy_attrs = ParamSpec.copy_attrs + ["means", "num_mix_components", "random_state", "vars"]
-
-    def make_data(self):
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
-        means = self.means  # indexed by track_index
-
-        # maximum likelihood, adjusted by no more than 0.2*sd
-        stds = sqrt(self.vars)
-
-        # tile the means of each track (num_segs, num_subsegs times)
-        means_tiled = vstack_tile(means, num_segs, num_subsegs)
-        stds_tiled = vstack_tile(stds, num_segs, num_subsegs)
-
-        jitter_std_bound = self.jitter_std_bound
-        noise = self.random_state.uniform(-jitter_std_bound,
-                jitter_std_bound, stds_tiled.shape)
-
-        return means_tiled + (stds_tiled * noise)
-
-
-    def generate_objects(self):
-        """
-        returns: iterable of strs containing gmtk parameter objects starting
-        with names
-        """
-        substitute = Template(self.object_tmpl).substitute
-
-        for component in range(self.num_mix_components):
-            data = self.make_data()
-            for mapping in self.generate_tmpl_mappings():
-                track_index = mapping["track_index"]
-                if self.distribution == DISTRIBUTION_GAMMA:
-                    mapping["min_track"] = self.get_track_lt_min(track_index)
-                if data is not None:
-                    seg_index = mapping["seg_index"]
-                    subseg_index = mapping["subseg_index"]
-                    mapping["datum"] = data[seg_index, subseg_index, track_index]
-                    mapping["track"] = mapping["track"]
-                    mapping["component_suffix"] = \
-                        self.get_template_component_suffix(component)
-
-                    mapping["datum"] = mapping["datum"]
-                    yield substitute(mapping)
-
-
-class CovarParamSpec(ParamSpec):
-    type_name = "COVAR"
-    object_tmpl = "covar_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
-
-    copy_attrs = ParamSpec.copy_attrs + ["num_mix_components", "vars"]
-
-    def make_data(self):
-        return vstack_tile(self.vars, self.num_segs, self.num_subsegs)
-    
-    def generate_objects(self):
-        """
-        returns: iterable of strs containing gmtk parameter objects starting
-        with names
-        """
-        substitute = Template(self.object_tmpl).substitute
-        for component in range(self.num_mix_components):
-            data = self.make_data()
-            for mapping in self.generate_tmpl_mappings():
-                track_index = mapping["track_index"]
-                if self.distribution == DISTRIBUTION_GAMMA:
-                    mapping["min_track"] = self.get_track_lt_min(track_index)
-                if data is not None:
-                    seg_index = mapping["seg_index"]
-                    subseg_index = mapping["subseg_index"]
-                    mapping["datum"] = data[seg_index, subseg_index, track_index]
-                    mapping["track"] = mapping["track"]
-                    mapping["component_suffix"] = \
-                        self.get_template_component_suffix(component)
-
-                    mapping["datum"] = mapping["datum"]
-                    yield substitute(mapping)
-    
-
-class TiedCovarParamSpec(CovarParamSpec):
-    object_tmpl = "covar_${track}${component_suffix} 1 ${datum}"
-
-    def make_segnames(self):
-        return ["any"]
-
-    def make_subsegnames(self):
-        return ["any"]
-
-
 class RealMatParamSpec(ParamSpec):
     type_name = "REAL_MAT"
 
@@ -646,123 +788,6 @@ class GammaRealMatParamSpec(RealMatParamSpec):
             shape = jitter(shapes[track_index], self.random_state)
             yield substitute_shape(dict(datum=shape, **mapping))
 
-
-class MCParamSpec(ParamSpec):
-    type_name = "MC"
-
-
-class NormMCParamSpec(MCParamSpec):
-    copy_attrs = ParamSpec.copy_attrs + ["num_mix_components"]
-
-    if USE_MFSDG:
-        # dimensionality component_type name mean covar weights
-        object_tmpl = "1 COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN" \
-            " mc_${distribution}_${seg}_${subseg}_${track}" \
-            " mean_${seg}_${subseg}_${track} covar_${seg}_${subseg}_${track}" \
-            " matrix_weightscale_1x1"
-    else:
-        # dimensionality component_type name mean covar
-        object_tmpl = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-            " mc_${distribution}_${seg}_${subseg}_${track}${component_suffix}" \
-            " mean_${seg}_${subseg}_${track}${component_suffix} covar_${track}${component_suffix}"
-
-    def generate_objects(self):
-        """
-        returns: iterable of strs containing gmtk parameter objects starting
-        with names
-        """
-        substitute = Template(self.object_tmpl).substitute
-        for component in range(self.num_mix_components):
-            for mapping in self.generate_tmpl_mappings():
-                track_index = mapping["track_index"]
-                if self.distribution == DISTRIBUTION_GAMMA:
-                    mapping["min_track"] = self.get_track_lt_min(track_index)
-                mapping["track"] = mapping["track"]
-                mapping["component_suffix"] = \
-                    self.get_template_component_suffix(component)
-
-                yield substitute(mapping)
-
-
-class GammaMCParamSpec(MCParamSpec):
-    object_tmpl = "1 COMPONENT_TYPE_GAMMA mc_gamma_${seg}_${subseg}_${track}" \
-        " ${min_track} gammascale_${seg}_${subseg}_${track}" \
-        " gammashape_${seg}_${subseg}_${track}"
-
-
-class MXParamSpec(ParamSpec):
-    type_name = "MX"
-    def generate_objects(self):
-        """
-        returns: iterable of strs containing gmtk parameter objects starting
-        with names
-        """
-        object_tmpl = "1 mx_${seg}_${subseg}_${track} ${num_mix_components} "
-
-        # If the number of mixture components is one
-        if self.num_mix_components == 1:
-            # Set the dense probabily mass function containing component
-            # responsibilites to be set to always 1 for 1 component
-            object_tmpl += "dpmf_always"
-        # Otherwise set the dense probability mass function based on number
-        # of components from the GMTK DPMF definition
-        else:
-            object_tmpl += "dpmf_${seg}_${subseg}_${track}"
-
-        for component in range(self.num_mix_components):
-            add = " mc_${distribution}_${seg}_${subseg}_${track}%s" % (
-                self.get_template_component_suffix(component))
-            object_tmpl += add
-        substitute = Template(object_tmpl).substitute
-
-        data = self.make_data()
-        for mapping in self.generate_tmpl_mappings():
-            track_index = mapping["track_index"]
-            mapping["num_mix_components"] = self.num_mix_components
-            if self.distribution == DISTRIBUTION_GAMMA:
-                mapping["min_track"] = self.get_track_lt_min(track_index)
-            if data is not None:
-                seg_index = mapping["seg_index"]
-                subseg_index = mapping["subseg_index"]
-                mapping["datum"] = data[seg_index, subseg_index, track_index]
-            yield substitute(mapping)
-
-class DPMFParamSpec(DenseCPTParamSpec):
-    type_name = "DPMF"
-    copy_attrs = ParamSpec.copy_attrs + ["num_mix_components"]
-
-    def generate_objects(self):
-        """
-        returns: iterable of strs containing gmtk parameter objects starting
-        with names
-        """
-        # If the number of mixture components is one
-        if self.num_mix_components == 1:
-            # Create a dense probability mass function of one value of 1
-            # to fix the number of mixture components to one
-            yield "dpmf_always 1 1.0"
-        # Otherwise
-        else:
-            # Create a dense probability mass function of dirichlet constants
-            # with the same amount of mixture components
-            object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
-                        "DirichletConst %s ${weights}" % GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
-            weights = (" " + str(1.0 / self.num_mix_components))*self.num_mix_components
-            substitute = Template(object_tmpl).substitute
-            data = self.make_data()
-            for mapping in self.generate_tmpl_mappings():
-                mapping["weights"] = weights
-                track_index = mapping["track_index"]
-                mapping["num_mix_components"] = self.num_mix_components
-                if self.distribution == DISTRIBUTION_GAMMA:
-                    mapping["min_track"] = self.get_track_lt_min(track_index)
-
-                if data is not None:
-                    seg_index = mapping["seg_index"]
-                    subseg_index = mapping["subseg_index"]
-                    mapping["datum"] = data[seg_index, subseg_index, track_index]
-                yield substitute(mapping)
-
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
     copy_attrs = ["num_bases", "num_segs", "num_subsegs",
@@ -770,12 +795,14 @@ class InputMasterSaver(Saver):
                   "seg_countdowns_initial", "seg_table", "distribution",
                   "len_seg_strength", "resolution", "random_state", "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
-                  "gmtk_include_filename_relative", "track_groups","num_mix_components"] 
+                  "gmtk_include_filename_relative", "track_groups",
+                  "num_mix_components", "virtual_evidence", "tracks"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
         # use caution before deleting or renaming any variables
         # check that they are not used in the input.master template
+        param_spec = ParamSpec(self)
         num_free_params = 0
 
         num_segs = self.num_segs
@@ -787,33 +814,35 @@ class InputMasterSaver(Saver):
 
         dt_spec = DTParamSpec(self)
 
+        #if self.len_seg_strength > 0:
+        #    dirichlet_spec = DirichletTabParamSpec(self)
+        #else:
+        #    dirichlet_spec = ""
+
         dense_cpt_spec = DenseCPTParamSpec(self)
 
         # seg_seg
         num_free_params += fullnum_subsegs * (fullnum_subsegs - 1)
-
+       
         # segCountDown_seg_segTransition
         num_free_params += fullnum_subsegs
-
+        name_collection_spec = param_spec.generate_name_collection()
         distribution = self.distribution
         if distribution in DISTRIBUTIONS_LIKE_NORM:
-            mean_spec = MeanParamSpec(self)
-            if COVAR_TIED:
-                covar_spec = TiedCovarParamSpec(self)
-            else:
-                covar_spec = CovarParamSpec(self)
-
+            mean_spec = param_spec.generate_mean_objects()
+            covar_spec = param_spec.generate_covar_objects()
             if USE_MFSDG:
                 real_mat_spec = RealMatParamSpec(self)
             else:
                 real_mat_spec = ""
 
-            mc_spec = NormMCParamSpec(self)
+            mc_spec = param_spec.generate_mc_objects()
 
             if COVAR_TIED:
                 num_free_params += (fullnum_subsegs + 1) * num_track_groups
             else:
                 num_free_params += (fullnum_subsegs * 2) * num_track_groups
+
         elif distribution == DISTRIBUTION_GAMMA:
             mean_spec = ""
             covar_spec = ""
@@ -822,15 +851,15 @@ class InputMasterSaver(Saver):
             # the gamma distribution rather than the ML estimate for the
             # mean and converting
             real_mat_spec = GammaRealMatParamSpec(self)
-            mc_spec = GammaMCParamSpec(self)
+            mc_spec = param_spec.generate_mc_objects()
 
             num_free_params += (fullnum_subsegs * 2) * num_track_groups
         else:
             raise ValueError("distribution %s not supported" % distribution)
-
-        mx_spec = MXParamSpec(self)
-        name_collection_spec = NameCollectionParamSpec(self)
+        dpmf_spec = param_spec.generate_dpmf_objects()
+        mx_spec = param_spec.generate_mx_objects()
         card_seg = num_segs
-        dpmf_spec = DPMFParamSpec(self)
+        ve_spec = VirtualEvidenceSpec(self)
 
         return locals()  # dict of vars set in this function
+
