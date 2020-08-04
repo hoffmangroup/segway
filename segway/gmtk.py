@@ -18,6 +18,13 @@ def array2text(a):
         delimiter = "\n" * (ndim - 1)
         return delimiter.join(array2text(row) for row in a)
 
+class Object(str):
+    def __new__(cls, _name, content, _kind):
+        return str.__new__(cls, content)
+
+    def __init__(self, name, content, kind):
+        self.kind = kind
+        self.name = name
 
 class Array(ndarray):
     def __new__(cls, *args):
@@ -28,7 +35,7 @@ class Array(ndarray):
         input_array = array(args)
         obj = np.asarray(input_array).view(cls)
         return obj
-
+    
 class Section(OrderedDict):
     """
     Contains GMTK objects of a single type and supports writing them to file.
@@ -62,7 +69,6 @@ class Section(OrderedDict):
             raise ValueError("Object has incorrect type.")
         else:
             super(Section, self).__setattr__(key, value)
-
 
 class InlineSection(Section):
 
@@ -107,8 +113,7 @@ class InlineMCSection(InlineSection):
 
     def __setattr__(self, key, value):
         OrderedDict.__setattr__(self, key, value)
-
-
+     
     def __str__(self):
         """
         Returns string representation of all MC objects contained in this
@@ -138,8 +143,8 @@ class InlineMCSection(InlineSection):
 
             lines.append("\n")
             return "\n".join(lines)
-
-
+        
+        
 class InlineMXSection(InlineSection):
     """
         Special InlineSection subclass which contains MX objects.
@@ -178,7 +183,7 @@ class InlineMXSection(InlineSection):
                 # check if number of components is equal to length of DPMF 
                 obj = list(self.values())[i]
                 dpmf_name = obj.dpmf
-                components = obj.mc
+                components = obj.components
                 dpmf_length = self.dpmf[dpmf_name].get_length()
                 if not dpmf_length == len(components):
                     raise ValueError(
@@ -192,7 +197,6 @@ class InlineMXSection(InlineSection):
 
             lines.append("\n")
             return "\n".join(lines)
-
 
 class InputMaster:
     """
@@ -223,7 +227,7 @@ class InputMaster:
         self.deterministic_cpt = InlineSection()
         # TODO fix error
         self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
-        self.mx = InlineMXSection(dpmf=self.dpmf, components=self.mc)
+        self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
         self.name_collection = InlineSection()
 
     def __str__(self):
@@ -233,7 +237,7 @@ class InputMaster:
         :return:
         """
         attrs = [self.deterministic_cpt, self.name_collection, self.mean,
-                 self.covar, self.dense_cpt, self.dpmf, self.mc, self.mx]
+                 self.covar, self.dense_cpt, self.dpmf, self.mc, self.mx]        
 
         s = []
         for obj in attrs:
@@ -260,7 +264,7 @@ class DenseCPT(Array):
         if len(new_shape) == 1:
             new_shape = (new_shape[0], )
         self.reshape((new_shape))
-        
+
         num_parents = len(self.shape) - 1
         line.append(str(num_parents))  # number of parents
         cardinality_line = map(str, self.shape)
@@ -269,7 +273,6 @@ class DenseCPT(Array):
         line.append("\n")
 
         return "\n".join(line)
-
 
 class NameCollection(list):
     """
@@ -346,7 +349,7 @@ class Covar(Array):
         line.append(array2text(self))  # covar values
         line.append("\n")
         return "\n".join(line)
-
+    
     def get_dimension(self):
         """
         Return dimension of this Covar object.
@@ -378,7 +381,6 @@ class DPMF(Array):
     def get_length(self):
         return len(self)
 
-
 class MC:
     """
     A single MC object.
@@ -393,8 +395,7 @@ class MC:
         :param component_type: int: type of MC
         """
         self.component_type = component_type
-
-
+        
 class DiagGaussianMC(MC):
     """
     Attributes:
@@ -458,7 +459,6 @@ class MX:
         line.append(" ".join(self.components))  # component names
         return "\n".join(line)
 
-
 class DeterministicCPT:
     """
     A single DeterministicCPT object.
@@ -474,15 +474,15 @@ class DeterministicCPT:
         """
         Initialize a single DeterministicCPT object.
         :param parent_cardinality: tuple[int]: cardinality of parents
-        (if empty, then number of parents = 0; if no parents, then placeholder
-        for parent_cardinality = -1)
+        (if empty, then number of parents = 0
         :param cardinality: int: cardinality of self
         :param dt: name existing Decision Tree (DT) associated with this
        DeterministicCPT
         """
-        if len(parent_cardinality) == 0:
-            self.parent_cardinality = -1
-        self.parent_cardinality = cardinality_parents
+        if not isinstance(cardinality_parents, tuple):
+            self.cardinality_parents = (cardinality_parents, )
+        else:
+            self.cardinality_parents = cardinality_parents
         self.cardinality = cardinality
         self.dt = dt
 
@@ -492,10 +492,7 @@ class DeterministicCPT:
         :return:
         """
         line = []
-        if self.cardinality_parents == -1:
-            num_parents = 0
-        else:
-            num_parents = len(self.cardinality_parents)
+        num_parents = len(self.cardinality_parents)
         line.append(str(num_parents))  # number of parents
         cardinalities = []
         cardinalities.extend(self.cardinality_parents)
