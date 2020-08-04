@@ -1,587 +1,541 @@
 from collections import OrderedDict
+import numpy as np
+from numpy import array, ndarray
 
-MC_TYPE_DIAG = "COMPONENT_TYPE_DIAG_GAUSSIAN"
-MC_TYPE_GAMMA = "COMPONENT_TYPE_GAMMA"
-MC_TYPE_MISSING = "COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN"
-COPY_PARENT = "internal:copyParent"
+COMPONENT_TYPE_DIAG_GAUSSIAN = 0
+
+
+def array2text(a):
+    """
+    Convert multi-dimensional array to text.
+    :param a: array
+    :return:
+    """
+    ndim = a.ndim
+    if ndim == 1:
+        return " ".join(map(str, a))
+    else:
+        delimiter = "\n" * (ndim - 1)
+        return delimiter.join(array2text(row) for row in a)
+
+
+class Array(ndarray):
+    # TODO 
+    def __init__(self, *args):
+        array.__init__(self, list(args))
+
+    def __str__(self):
+        # 1 dimensional str representation covered here
+        # Multidimensional vary between kinds and will have to be specified
+        # in specific sub classes.
+        assert(len(self.shape) <= 1)
+        return " ".join([str(self.size), array2text(self)])
+
+
+class Section(OrderedDict):
+    """
+    Contains GMTK objects of a single type and supports writing them to file.
+    Key: name of GMTK object
+    Value: GMTK object
+    """
+    def kind(self):
+        """
+        Return string attribute kind of all GMTK objects in this Section object.
+        :return: str: type of all GMTK objects in this Section object
+        """
+        section_kind = None
+        for obj in self.values():
+            if not section_kind:
+                section_kind = obj.kind
+            else:
+                assert section_kind == obj.kind, "Objects must be of same type."
+        return section_kind
+
+
+    def __setattr__(self, key, value):
+        """
+        Check if all the GMTK objects are of the same type.
+        :param key: str: name of GMTK object
+        :param value: GMTK object
+        :return:
+        For now, single object
+        TODO, add multiple objects at once
+        """
+        if not self.kind() == value.kind:
+            raise ValueError("Object has incorrect type.")
+        else:
+            super(Section, self).__setattr__(key, value)
+
+class InlineSection(Section):
+
+    def __str__(self):
+        """
+        Returns inline string representation of this Section object by calling
+        the individual GMTK object's __str__().
+        :return:
+        """
+        # if no gmtk objects
+        if len(self) == 0:
+            return ""
+
+        lines = ["{}_IN_FILE inline".format(self.kind())]
+        lines.append(str(len(self)) + "\n")  # total number of gmtk objects
+        for i in range(len(self)):
+            lines.append(str(i))  # index of gmtk object
+            lines.append(list(self)[i])  # name of gmtk object
+            lines.append(list(self.values())[i].__str__())
+            # string representation of gmtk object
+
+        return "\n".join(lines)
+
+
+class InlineMCSection(InlineSection):
+    """
+    Special InlineSection subclass which contains MC objects.
+    Attributes:
+        mean: InlineSection object which point to InputMaster.mean
+        covar: InlineSection object which point to InputMaster.covar
+    """
+    def __init__(self, mean, covar):
+        """
+        :param mean: InlineSection: InlineSection object which point to
+        InputMaster.mean
+        :param covar: InlineSection: InlineSection object which point to
+        InputMaster.covar
+        """
+        self.mean = mean
+        self.covar = covar
+        InlineSection.__init__(self)
+
+    def __setattr__(self, key, value):
+        OrderedDict.__setattr__(self, key, value)
+
+
+    def __str__(self):
+        """
+        Returns string representation of all MC objects contained in this
+        InlineMCSection by calling the individual MC object's __str__().
+        :return:
+        """
+        if len(self) == 0:
+            return ""
+        else:
+            lines = ["{}_IN_FILE inline".format(self.kind())]
+            lines.append(str(len(self)) + "\n")  # total number of MC objects
+            for i in range(len(self)):
+                lines.append(str(i))  # index of MC object
+                # check if dimension of Mean and Covar of this MC are the same
+                obj = list(self.values())[i]
+                mean_name = obj.mean
+                covar_name = obj.covar
+                if not self.mean[mean_name].get_dimension() == self.covar[covar_name].get_dimension():
+                    # TODO delete MC? redefine?
+                    raise ValueError("Inconsistent dimensions of mean and covar associated to MC.")
+                else:
+                    lines.append(str(self.mean[mean_name].get_dimension()))
+                    # dimension of MC
+                    lines.append(str(obj.component_type))  # component type
+                    lines.append(list(self)[i])  # name of MC
+                    lines.append(obj.__str__())  # string representation of MC obj
+
+            lines.append("\n")
+            return "\n".join(lines)
+
+
+class InlineMXSection(InlineSection):
+    """
+        Special InlineSection subclass which contains MX objects.
+        Attributes:
+            dpmf: InlineSection object which point to InputMaster.dpmf
+            components: InlineSection object which point to InputMaster.mc
+        """
+
+    def __init__(self, dpmf, components):
+        """
+        :param dpmf: InlineSection: InlineSection object which point to
+        InputMaster.dpmf
+        :param components: InlineSection: InlineSection object which point to
+        InputMaster.mc
+        """
+        self.dpmf = dpmf
+        self.components = components
+        InlineSection.__init__(self)
+
+    def __setattr__(self, key, value):
+        OrderedDict.__setattr__(self, key, value)
+
+    def __str__(self):
+        """
+        Returns string representation of all MX objects contained in this
+        InlineMXSection by calling the individual MX object's __str__.
+        :return:
+        """
+        if len(self) == 0:
+            return []
+        else:
+            lines = ["{}_IN_FILE inline".format(self.kind())]
+            lines.append(str(len(self)) + "\n")  # total number of MX objects
+            for i in range(len(self)):
+                lines.append(str(i))  # index of MX object
+                # check if dimension of Mean and Covar of this MC are the same
+                obj = list(self.values())[i]
+                dpmf_name = obj.dpmf
+                components_name = obj.components
+                dpmf_length = self.dpmf[dpmf_name].get_length()
+                if not dpmf_length == len(components_name):
+                    raise ValueError(
+                        "Dimension of DPMF must be equal to number of components associated with this MX object.")
+                else:
+                    lines.append(str(dpmf_length))
+                    # dimension of MX
+                    lines.append(list(self)[i])  # name of MX
+                    lines.append(obj.__str__())
+                    # string representation of this MX object
+
+            lines.append("\n")
+            return "\n".join(lines)
 
 
 class DenseCPT:
     """
     A single DenseCPT object.
-    Attributes:
-    parent_card
-    cardinality
-    prob
     """
-    def __init__(self, name, cardinality, prob, parent_card=-1):
-        """
-        name: str
-        parent_card: str/int or list[str/int]
-        cardinality: str/int
-        prob: list[float]
-        """
-        self.name = name
-        if parent_card != -1:
-            if not isinstance(parent_card, list):
-                self.parent_card = [parent_card]
-            else:
-                self.parent_card = parent_card
-        else:
-            self.parent_card = -1
-        self.cardinality = cardinality
-        # TODO array
-        self.prob = prob
+    kind = "DENSE_CPT"
 
-    def generate(self, index):
+    def __init__(self, probabilites):
         """
-        Returns string format of DenseCPT to be printed into input.master
-        file (new lines to be added).
-        index: int
-        index of the denseCPT
+        todo check if probabilities sums to 1
+        TODO temporary (make densecpt a subclass of Array)
+        :param probabilites: list[float]: probabilities
         """
-        lines = []
-        line = []
-        line.append(str(index))
-        line.append(self.name)
-        if self.parent_card == -1:  # no parents
-            num_parents = 0
-            parent_card_str = [""]
-        else:
-            num_parents = len(self.parent_card)
-            parent_card_str = []
-            for i in range(num_parents):
-                parent_card_str.append(str(self.parent_card[i]))
-        line.append(str(num_parents))
-        if self.parent_card != -1:
-            line.extend(parent_card_str)
-        line.append(str(self.cardinality))
-        lines.append(" ".join(line))
-        lines.append(self.generate_prob(self.prob) + "\n")
-        lines.append("\n")
-        return "\n".join(lines)
+        self.prob = array(probabilites)
 
-    def generate_prob(self, prob):
+    def __str__(self):
         """
-        Generates format of probabilities for single DenseCPT.
-        :param prob: list[float]
-        probabilities of DenseCPT
-        :return: string format to be used by DenseCPT.generate()
+        Return string representation of this DenseCPT object.
+        :return:
         """
         line = []
-        if isinstance(prob[0], float):
-            prob_str = []
-            for i in range(len(prob)):
-                prob_str.append(str(prob[i]))
-            return " ".join(prob_str)
+        # num_parents = len(self.shape) - 1
+        num_parents = len(self.prob.shape) - 1
+        if not num_parents == 0:
+            line.append(str(num_parents))  # number of parents
+        cardinality_line = []
+        if num_parents == 0:
+            parent_cardinality = 0
+            cardinality_line.append(parent_cardinality)
+            # cardinality_line.extend(self.shape)
+            cardinality_line.extend(self.prob.shape)
+            cardinality_line = map(str, cardinality_line)
         else:
+            # cardinality_line = map(str, self.shape)
+            cardinality_line = map(str, self.prob.shape)
 
-            for i in range(len(prob)):
-                line.append(self.generate_prob(prob[i]))
-                # TODO check if it works without that one line gap
+        line.append(" ".join(cardinality_line))  # cardinalities
+        # line.append(array2text(self))  # probabilities
+        line.append(array2text(self.prob))
+        line.append("\n")
+
         return "\n".join(line)
 
 
-class DeterministicCPT:
-    """
-    A single DeterministicCPT objects.
-    Attributes:
-        parent_card: str/int or list[str/int]
-        cardinality: str/int
-        name_of_existing_DT: str
-    """
-
-    def __init__(self, name, parent_card, cardinality, dt):
-        """
-        name: str
-        parent_card: str/int or list[str/int]
-        cardinality: str/int
-        dt: str
-        """
-        self.name = name
-        if not isinstance(parent_card, list):
-            self.parent_card = [parent_card]
-        else:
-            self.parent_card = parent_card
-
-        self.cardinality = cardinality
-        self.dt = dt
-
-    def generate(self, index):
-        """
-        :return: String format of DeterministicCPT to be printed into
-        input.master
-        file (new lines to be added).
-        index: int
-        index of DeterministicCPT
-        """
-        lines = []
-        line = []
-        line.append(str(index))
-        line.append(self.name)
-        lines.append(" ".join(line))
-        lines.append(str(len(self.parent_card)))
-        num_parents_cardinalities = []
-        num_parents_cardinalities.extend(self.parent_card)
-        num_parents_cardinalities.append(self.cardinality)
-        lines.append(" ".join(num_parents_cardinalities))
-        lines.append(self.dt)
-        lines.append("\n")
-
-        return "\n".join(lines)
-
-
-class NameCollection:
+class NameCollection(list):
     """
     A single NameCollection object.
-    Attributes:
-    names: list[str] or str
     """
+    kind = "NAME_COLLECTION"
 
-    def __init__(self, name, *args):
+    def __init__(self, *args):
         """
-        name: str
-        name of collection
-        :param args: str
-        name in name collection
+        Initialize a single NameCollection object.
+        :param args: str: names in this NameCollection
         """
-        self.name = name
-        self.names_in_col = []
-        for name in args:
-            if isinstance(name, list):
-                self.names_in_col.extend(name)
-            else:
-                self.names_in_col.append(name)
+        list.__init__(self, list(args))
 
-    def generate(self, index):
+    def __str__(self):
         """
-        Returns string format of NameCollection objects to be printed into the
+        Returns string format of NameCollection object to be printed into the
         input.master file (new lines to be added)
-        index: int
-        index of name collection
         """
         line = []
-        line.append(str(index))
-        line.append(self.name)
-        line.append(str(len(self.names_in_col)))
+        if len(self) == 0:
+            return line
+        else:
+            line.append(str(len(self)))
+        line.extend(self)
+        line.append("\n")
 
-        lines = []
-        lines.append(" ".join(line))
-        lines.append("\n".join(self.names_in_col))
-        lines.append("\n")
-
-        return "\n".join(lines)
+        return "\n".join(line)
 
 
 class Mean:
     """
+    TODO
     A single Mean object.
-    name: str
-    value: list[float] or float
-    Mean values of the Mean object.
     """
+    kind = "MEAN"
 
-    def __init__(self, name, *args):
+    def __init__(self, *args):
         """
-        name: str
-        name of mean object
-        :param args: float
-        mean values
+        :param args: float: mean values
         """
-        self.name = name
-        self.mean_values = []
-        for val in args:
-            self.mean_values.append(val)
+        self.mean_values = array(args)
 
-    def generate(self, index):
+    def __str__(self):
         """
         Returns the string format of the Mean object to be printed into the
         input.master file (new lines to be added).
-        index: int
-        index of mean object
         :return:
         """
         line = []
-        line.append(str(index))
-        line.append(self.name)
-        line.append(str(len(self.mean_values)))
-        mean_str = []
-        for i in self.mean_values:
-            mean_str.append(str(i))
-        line.extend(mean_str)
+        #line.append(str(len(self)))  # dimension of Mean
+        line.append(str(self.get_dimension()))
+        # line.extend(array2text(self))
+        line.append(array2text(self.mean_values))
         line.append("\n")
+        return "\n".join(line)
 
-        return " ".join(line)
-
-
-class MC:
-    """
-    A single all MC objects.
-    Value: list
-    mc = MC()
-    mc1 = [26, 0, "mean_0", "covar_0"]
-    <mc_name>= [<dimensionality>, <type>, <mean of mc>, <covar of mc>]
-    """
-    def __init__(self, name, dim, type, mean=Mean('sample_mean'),
-                 covar=Mean('sample_covar'), weights=[], gamma_shape="",
-                 gamma_scale=""):
+    def get_dimension(self):
         """
-        name: str
-        name of MC object
-        :param dim: str/int
-        dimensionality of mc
-        :param type: str/int
-        type of mc
-        :param mean: Mean
-        mean of mc
-        :param covar: Covar
-        covar of mc
+        Return dimension of this Mean object.
+        :return: int: dimension of this Mean object
         """
-        self.name = name
-        self.mean = mean
-        self.covar = covar
-        self.dim = dim
-        self.type = type
-        # TODO
-        self.weights = weights
-        self.gamma_shape = gamma_shape
-        self.gamma_scale = gamma_scale
-
-    def generate(self, index):
-        """
-        Returns string format of MC object to be printed into the input.master
-        file (new lines to be added).
-        index: int
-        index of mc object
-        :return:
-        """
-        line = []
-        line.append(str(index))
-        line.append(str(self.dim))
-
-        if self.type == MC_TYPE_GAMMA:
-            # TODO min track
-            line.append(str(self.type))
-            line.append(self.gamma_scale)
-            line.append(self.gamma_shape)
-
-        elif self.type == MC_TYPE_MISSING:
-            line.append(str(self.type))
-            line.append(self.name)
-            line.append(self.mean.name)
-            line.append(self.covar.name)
-            line.append("matrix_weightscale_1x1")
-            line.append("\n")
-        else: # default and for MC_TYPE_DIAG
-            # TODO component_suffix
-            line.append(str(self.type))
-            line.append(self.name)
-            line.append(self.mean.name)
-            line.append(self.covar.name)
-            line.append("\n")
-
-        return " ".join(line)
-
-
-class MX:
-    """
-    A single MX object.
-    """
-    def __init__(self, name, dim, dpmf, components):
-        """
-        name: str
-        name of MX object
-        dimensionality: int
-        dpmf: DPMF
-        components: list[mc] or mc (component)
-        """
-        self.name = name
-        self.dim = dim
-        if not isinstance(components, list):
-            components  = [components]
-        if len(dpmf.dpmf_values) != len(components):
-            raise ValueError("Dimension of DPMF object must be equal " +
-                             "to number of components of MX.")
-        self.comp = components
-        self.dpmf = dpmf
-
-    def generate(self, index):
-        """
-        Returns string format of MX object to be printed into the input.master
-        file (new lines to be added).
-        index: int
-        index of mx object
-        :return:
-        """
-        line = []
-        line.append(str(index))
-        line.append(str(self.dim))
-        line.append(self.name)
-        line.append(str(len(self.comp)))  # num components
-        line.append(self.dpmf.name)
-        comp_names = []
-        for comp in self.comp:
-            comp_names.append(comp.name)
-        line.extend(comp_names)
-        line.append("\n")
-
-        return " ".join(line)
+        # return
+        return len(self.mean_values)
 
 
 class Covar:
     """
     A single Covar object.
     """
+    kind = "COVAR"
 
-    def __init__(self, name, *args):
+    def __init__(self, *args):
         """
-        name: str
-        name of MX object
-        :param args: covar values
+        :param args: float: covar values
         """
-        self.name = name
-        self.covar_values = []
-        for val in args:
-            self.covar_values.append(val)
+        self.covar_values = array(args)
 
-    def generate(self, index):
+    def __str__(self):
         """
-        Returns string format of Covar object to be printed into the
-        input.master
-        file (new lines to be added).
-        index: int
-        index of Covar object
+        Return string representation of single Covar object.
         :return:
         """
-        line = []
-        line.append(str(index))
-        line.append(self.name)
-        line.append(str(len(self.covar_values)))
-        covar_str = []
-        for i in self.covar_values:
-            covar_str.append(str(i))
-        line.extend(covar_str)
+        line = [str(self.get_dimension())]  # dimension of covar object
+        line.append(array2text(self.covar_values))  # covar values
         line.append("\n")
+        return "\n".join(line)
 
-        return " ".join(line)
+    def get_dimension(self):
+        """
+        Return dimension of this Covar object.
+        :return: int: dimension of this Covar object
+        """
+        #return len(self)
+        # is len the best
+        return len(self.covar_values)
 
 
 class DPMF:
     """
     A single DPMF object.
     """
+    kind = "DPMF"
 
-    def __init__(self, name, *args):
+    def __init__(self, *args):
         """
-        name: str
-        name of dpmf object
-        :param args: dpmf values summing to 1
+        Initialize a single DPMF object.
+        :param args: float: DPMF values
+        """
+        dpmf_val = array(args)
+        if np.sum(dpmf_val) != 1.0:
+            raise ValueError("Sum of DPMF values must be 1.0.")
+        else:
+            self.dpmf_val = dpmf_val
 
+    def __str__(self):
         """
-        self.name = name
-        self.dpmf_values = []
-        for val in args:
-            self.dpmf_values.append(val)
-        print("dpmf_val", self.dpmf_values)
-        if sum(self.dpmf_values) != 1.0:
-            self.dpmf_values = []
-            raise ValueError("DPMF values must sum to 1.0.")
+        Return string representation of this DPMF.
+        :return:
+        """
+        line = [str(self.get_length())]  # dpmf length
+        line.append(array2text(self.dpmf_val))  # dpmf values
+        line.append("\n")
+        return "\n".join(line)
 
-    def generate(self, index):
+    def get_length(self):
+        return len(self.dpmf_val)
+
+
+class MC:
+    """
+    A single MC object.
+    Attributes:
+        component_type: int: type of MC
+    """
+    kind = "MC"
+
+    def __init__(self, component_type):
         """
-         Returns string format of DPMF object to be printed into the
-         input.master
-        file (new lines to be added).
+        Initialize a single MC object.
+        :param component_type: int: type of MC
+        """
+        self.component_type = component_type
+
+
+class DiagGaussianMC(MC):
+    """
+    Attributes:
+        component_type = 0
+        mean: str: name of Mean object associated to this MC
+        covar: str: name of Covar obejct associated to this MC
+    """
+    def __init__(self, mean, covar):
+        """
+        Initialize a single DiagGaussianMC object.
+        :param mean: name of Mean object associated to this MC
+        :param covar: name of Covar obejct associated to this MC
+        """
+        # more component types?
+        self.mean = mean
+        self.covar = covar
+        MC.__init__(self, COMPONENT_TYPE_DIAG_GAUSSIAN)
+
+    def __str__(self):
+        """
+        Return string representation of this MC object.
+        :return:
+        """
+        return " ".join([self.mean, self.covar])
+
+
+class MX:
+    """
+    A single MX object.
+    Attributes:
+        dpmf: str: name of DPMF object associated with MX
+        components: list[str]: names of components associated with this MX
+    """
+    kind = "MX"
+
+    def __init__(self, dpmf, components):
+        """
+        Initialize a single MX object.
+        :param dpmf: str: name of DPMF object associated with this MX
+        :param components: str or list[str]: names of components associated with
+        this MX
+        """
+        self.dpmf = dpmf
+        if isinstance(components, str):
+            self.components = [components]
+        elif isinstance(components, list):
+            for name in components:
+                if not isinstance(name, str):
+                    raise ValueError("All component names must be strings.")
+            self.components = components
+        else:  # not allowed types
+            raise ValueError("Incorrect format of component names.")
+
+    def __str__(self):
+        """
+        Return string representation of this MX.
+        :return:
+        """
+        line = [str(len(self.components))]  # number of components
+        line.append(self.dpmf)  # dpmf name
+        line.append(" ".join(self.components))  # component names
+        return "\n".join(line)
+
+
+class DeterministicCPT:
+    """
+    A single DeterministicCPT object.
+    Attributes:
+       parent_cardinality: tuple[int]: cardinality of parents
+       cardinality: int: cardinality of self
+       dt: str: name existing Decision Tree (DT) associated with this
+       DeterministicCPT
+    """
+    kind = "DETERMINISTIC_CPT"
+
+    def __init__(self, parent_cardinality, cardinality, dt):
+        """
+        Initialize a single DeterministicCPT object.
+        :param parent_cardinality: tuple[int]: cardinality of parents
+        (if empty, then number of parents = 0; if no parents, then placeholder
+        for parent_cardinality = -1)
+        :param cardinality: int: cardinality of self
+        :param dt: name existing Decision Tree (DT) associated with this
+       DeterministicCPT
+        """
+        if len(parent_cardinality) == 0:
+            self.parent_cardinality = -1
+        self.parent_cardinality = parent_cardinality
+        self.cardinality = cardinality
+        self.dt = dt
+
+    def __str__(self):
+        """
+        Return string representation of this DeterministicCPT.
         :return:
         """
         line = []
-        line.append(str(index))
-        line.append(self.name)
-        line.append(str(len(self.dpmf_values)))
-        dpmf_str = []
-        for i in self.dpmf_values:
-            dpmf_str.append(str(i))
-        line.extend(dpmf_str)
+        if self.parent_cardinality == -1:
+            num_parents = 0
+        else:
+            num_parents = len(self.parent_cardinality)
+        line.append(str(num_parents))  # number of parents
+        cardinalities = []
+        cardinalities.extend(self.parent_cardinality)
+        cardinalities.append(self.cardinality)
+        line.append(" ".join(map(str, cardinalities)))  # cardinalities of parent and self
+        line.append(self.dt)
         line.append("\n")
-        return " ".join(line)
-
-
-class Object:
-
-    def __new__(cls, _name, content, _kind):
-        pass
-
-    def __init__(self, name, content, kind):
-        pass
-
+        return "\n".join(line)
 
 class InputMaster:
     """
-    Main class to produce the input.master file.
+    Master class which contains all GMTK objects present in the input
+    master and is responsible for creating their string representation.
     Attributes:
-        mean: OrderedDict
-        covar: OrderedDict
-        dense: OrderedDict
-        deterministic: OrderedDict
-        dpmf: OrderedDict
-        mc: OrderedDict
-        mx: OrderedDict
-        name_collection: OrderedDict
-        key: name of object
-        value: GMTKObject instance
+        mean: InlineSection: contains all Mean objects in input master
+        covar: InlineSection: contains all Covar objects in input master
+        dpmf: InlineSection: contains all DPMF objects in input master
+        dense_cpt: InlineSection: contains all DenseCPT objects in input master
+        deterministic_cpt: InlineSection: contains all DeterministicCPT objects
+        in input master
+        mc: InlineMCSection: contains all MC objects in input master
+        mx: InlineMXSection: contains all MX objects in input master
+        name_collection: InlineSection: contains all NameCollection objects in
+        input master
     """
 
     def __init__(self):
-        self.mean = OrderedDict()
-        self.covar = OrderedDict()
-        self.dense = OrderedDict()
-        self.deterministic = OrderedDict()
-        self.dpmf = OrderedDict()
-        self.mc = OrderedDict()
-        self.mx = OrderedDict()
-        self.name_collection = OrderedDict()
-
-    def update(self, gmtk_obj):
         """
-        gmtk_obj: list or single gmtk object
-        List of GMTK objects
+        Initialize InputMaster instance with empty attributes (InlineSection
+        and its subclasses).
         """
-        if not isinstance(gmtk_obj, list):
-            gmtk_obj = [gmtk_obj]
-        for obj in gmtk_obj:
-            if not (isinstance(obj, Mean) or isinstance(obj, Covar) or
-                    isinstance(obj, DeterministicCPT) or isinstance(obj,
-                                                                    DenseCPT)
-                    or isinstance(obj, DPMF) or isinstance(obj, MC)
-                    or isinstance(obj, MX) or isinstance(obj, NameCollection)):
-
-                raise ValueError("Object is not an allowed GMTK type.")
-
-        for obj in gmtk_obj:  # all objects are of allowed types
-
-            name = obj.name
-
-            if isinstance(obj, Mean):
-                self.mean[name] = obj
-            if isinstance(obj, Covar):
-                self.covar[name] = obj
-            if isinstance(obj, DeterministicCPT):
-                self.deterministic[name] = obj
-            if isinstance(obj, DenseCPT):
-                self.dense[name] = obj
-            if isinstance(obj, DPMF):
-                self.dpmf[name] = obj
-            if isinstance(obj, MC):
-                self.mc[name] = obj
-            if isinstance(obj, MX):
-                self.mx[name] = obj
-            if isinstance(obj, NameCollection):
-                self.name_collection[name] = obj
-
-    def generate_mean(self):
-        if len(self.mean) == 0:
-            return []
-
-        means = ["MEAN_IN_FILE inline"]
-        means.append(str(len(self.mean)) + "\n")
-        for key_index in range(len(list(self.mean))):
-            means.append(
-                self.mean[list(self.mean)[key_index]].generate(key_index))
-        return "\n".join(means)
-
-    def generate_covar(self):
-        if len(self.covar) == 0:
-            return []
-
-        covars = ["COVAR_IN_FILE inline"]
-        covars.append(str(len(self.covar)) + "\n")
-
-        for key_index in range(len(list(self.covar))):
-            covars.append(
-                self.covar[list(self.covar)[key_index]].generate(key_index))
-        return "\n".join(covars)
-
-    def generate_dense(self):
-        if len(self.dense) == 0:
-            return []
-
-        dense_cpts = ["DENSE_CPT_IN_FILE inline"]
-        dense_cpts.append(str(len(self.dense)) + "\n")
-
-        for key_index in range(len(list(self.dense))):
-            dense_cpts.append(
-                self.dense[list(self.dense)[key_index]].generate(key_index))
-        return "\n".join(dense_cpts)
-
-    def generate_deterministic(self):
-        if len(self.deterministic) == 0:
-            return []
-
-        det_cpts = ["DETERMINISTIC_CPT_IN_FILE inline"]
-        det_cpts.append(str(len(self.deterministic)) + "\n")
-
-        for key_index in range(len(list(self.deterministic))):
-            det_cpts.append(self.deterministic[
-                                list(self.deterministic)[key_index]].generate(
-                key_index))
-        return "\n".join(det_cpts)
-
-    def generate_dpmf(self):
-        if len(self.dpmf) == 0:
-            return []
-
-        dpmfs = ["DPMF_IN_FILE inline"]
-        dpmfs.append(str(len(self.dpmf)) + "\n")
-
-        for key_index in range(len(list(self.dpmf))):
-            dpmfs.append(
-                self.dpmf[list(self.dpmf)[key_index]].generate(key_index))
-        return "\n".join(dpmfs)
-
-    def generate_mc(self):
-        if len(self.mc) == 0:
-            return []
-
-        mcs = ["MC_IN_FILE inline"]
-        mcs.append(str(len(self.mc)) + "\n")
-
-        for key_index in range(len(list(self.mc))):
-            mcs.append(self.mc[list(self.mc)[key_index]].generate(key_index))
-
-        return "\n".join(mcs)
-
-    def generate_mx(self):
-        if len(self.mx) == 0:
-            return []
-
-        mxs = ["MX_IN_FILE inline"]
-        mxs.append(str(len(self.mx)) + "\n")
-
-        for key_index in range(len(list(self.mx))):
-            mxs.append(self.mx[list(self.mx)[key_index]].generate(key_index))
-        return "\n".join(mxs)
-
-    def generate_name_col(self):
-        if len(self.name_collection) == 0:
-            return []
-
-        collections = ["NAME_COLLECTION_IN_FILE inline"]
-        collections.append(str(len(self.name_collection)) + "\n")
-
-        for key_index in range(len(list(self.name_collection))):
-            collections.append(self.name_collection[list(self.name_collection)[
-                key_index]].generate(key_index))
-
-        return "\n".join(collections)
+        self.mean = InlineSection()
+        self.covar = InlineSection()
+        self.dpmf = InlineSection()
+        self.dense_cpt = InlineSection()
+        self.deterministic_cpt = InlineSection()
+        # TODO fix error
+        self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
+        self.mx = InlineMXSection(dpmf=self.dpmf, components=self.mc)
+        self.name_collection = InlineSection()
 
     def __str__(self):
-        attrs_gen = [self.generate_name_col(), self.generate_deterministic(),
-                     self.generate_dense(), self.generate_mean(),
-                     self.generate_covar(), self.generate_dpmf(),
-                     self.generate_mc(), self.generate_mx()]
+        """
+        Return string representation of all the attributes (GMTK types) by
+        calling the attributes' (InlineSection and its subclasses) __str__().
+        :return:
+        """
+        attrs = [self.deterministic_cpt, self.name_collection, self.mean, self.covar, self.dense_cpt,
+                 self.dpmf, self.mc, self.mx]
+
         s = []
-        for obj in attrs_gen:
-            s.append("".join(obj))
+        for obj in attrs:
+            s.append("".join(obj.__str__()))
 
         return "".join(s)
-
