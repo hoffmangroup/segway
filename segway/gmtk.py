@@ -256,6 +256,11 @@ class DenseCPT(Array):
         :return:
         """
         line = []
+        new_shape = self.shape[1:]
+        if len(new_shape) == 1:
+            new_shape = (new_shape[0], )
+        self.reshape((new_shape))
+        
         num_parents = len(self.shape) - 1
         line.append(str(num_parents))  # number of parents
         cardinality_line = map(str, self.shape)
