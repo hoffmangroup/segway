@@ -20,17 +20,14 @@ def array2text(a):
 
 
 class Array(ndarray):
-    # TODO 
-    def __init__(self, *args):
-        array.__init__(self, list(args))
-
-    def __str__(self):
-        # 1 dimensional str representation covered here
-        # Multidimensional vary between kinds and will have to be specified
-        # in specific sub classes.
-        assert(len(self.shape) <= 1)
-        return " ".join([str(self.size), array2text(self)])
-
+    def __new__(cls, *args):
+        """
+        :param input_array: ndarray
+        :return:
+        """
+        input_array = array(args)
+        obj = np.asarray(input_array).view(cls)
+        return obj
 
 class Section(OrderedDict):
     """
@@ -65,6 +62,7 @@ class Section(OrderedDict):
             raise ValueError("Object has incorrect type.")
         else:
             super(Section, self).__setattr__(key, value)
+
 
 class InlineSection(Section):
 
@@ -196,19 +194,61 @@ class InlineMXSection(InlineSection):
             return "\n".join(lines)
 
 
-class DenseCPT:
+class InputMaster:
+    """
+    Master class which contains all GMTK objects present in the input
+    master and is responsible for creating their string representation.
+    Attributes:
+        mean: InlineSection: contains all Mean objects in input master
+        covar: InlineSection: contains all Covar objects in input master
+        dpmf: InlineSection: contains all DPMF objects in input master
+        dense_cpt: InlineSection: contains all DenseCPT objects in input master
+        deterministic_cpt: InlineSection: contains all DeterministicCPT objects
+        in input master
+        mc: InlineMCSection: contains all MC objects in input master
+        mx: InlineMXSection: contains all MX objects in input master
+        name_collection: InlineSection: contains all NameCollection objects in
+        input master
+    """
+
+    def __init__(self):
+        """
+        Initialize InputMaster instance with empty attributes (InlineSection
+        and its subclasses).
+        """
+        self.mean = InlineSection()
+        self.covar = InlineSection()
+        self.dpmf = InlineSection()
+        self.dense_cpt = InlineSection()
+        self.deterministic_cpt = InlineSection()
+        # TODO fix error
+        self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
+        self.mx = InlineMXSection(dpmf=self.dpmf, components=self.mc)
+        self.name_collection = InlineSection()
+
+    def __str__(self):
+        """
+        Return string representation of all the attributes (GMTK types) by
+        calling the attributes' (InlineSection and its subclasses) __str__().
+        :return:
+        """
+        attrs = [self.deterministic_cpt, self.name_collection, self.mean,
+                 self.covar, self.dense_cpt, self.dpmf, self.mc, self.mx]
+
+        s = []
+        for obj in attrs:
+            s.append("".join(obj.__str__()))
+
+        return "".join(s)
+
+
+class DenseCPT(Array):
     """
     A single DenseCPT object.
     """
     kind = "DENSE_CPT"
 
-    def __init__(self, probabilites):
-        """
-        todo check if probabilities sums to 1
-        TODO temporary (make densecpt a subclass of Array)
-        :param probabilites: list[float]: probabilities
-        """
-        self.prob = array(probabilites)
+    # todo check if sums to 1.0
 
     def __str__(self):
         """
@@ -216,24 +256,11 @@ class DenseCPT:
         :return:
         """
         line = []
-        # num_parents = len(self.shape) - 1
-        num_parents = len(self.prob.shape) - 1
-        if not num_parents == 0:
-            line.append(str(num_parents))  # number of parents
-        cardinality_line = []
-        if num_parents == 0:
-            parent_cardinality = 0
-            cardinality_line.append(parent_cardinality)
-            # cardinality_line.extend(self.shape)
-            cardinality_line.extend(self.prob.shape)
-            cardinality_line = map(str, cardinality_line)
-        else:
-            # cardinality_line = map(str, self.shape)
-            cardinality_line = map(str, self.prob.shape)
-
+        num_parents = len(self.shape) - 1
+        line.append(str(num_parents))  # number of parents
+        cardinality_line = map(str, self.shape)
         line.append(" ".join(cardinality_line))  # cardinalities
-        # line.append(array2text(self))  # probabilities
-        line.append(array2text(self.prob))
+        line.append(array2text(self))
         line.append("\n")
 
         return "\n".join(line)
@@ -268,18 +295,15 @@ class NameCollection(list):
         return "\n".join(line)
 
 
-class Mean:
+class Mean(Array):
     """
     TODO
     A single Mean object.
     """
     kind = "MEAN"
 
-    def __init__(self, *args):
-        """
-        :param args: float: mean values
-        """
-        self.mean_values = array(args)
+    def __array_finalize__(self, obj):
+        if obj is None: return
 
     def __str__(self):
         """
@@ -288,10 +312,8 @@ class Mean:
         :return:
         """
         line = []
-        #line.append(str(len(self)))  # dimension of Mean
-        line.append(str(self.get_dimension()))
-        # line.extend(array2text(self))
-        line.append(array2text(self.mean_values))
+        line.append(str(self.get_dimension()))  # dimension
+        line.append(array2text(self))
         line.append("\n")
         return "\n".join(line)
 
@@ -301,28 +323,22 @@ class Mean:
         :return: int: dimension of this Mean object
         """
         # return
-        return len(self.mean_values)
+        return len(self)
 
 
-class Covar:
+class Covar(Array):
     """
     A single Covar object.
     """
     kind = "COVAR"
-
-    def __init__(self, *args):
-        """
-        :param args: float: covar values
-        """
-        self.covar_values = array(args)
 
     def __str__(self):
         """
         Return string representation of single Covar object.
         :return:
         """
-        line = [str(self.get_dimension())]  # dimension of covar object
-        line.append(array2text(self.covar_values))  # covar values
+        line = [str(self.get_dimension())] # dimension
+        line.append(array2text(self))  # covar values
         line.append("\n")
         return "\n".join(line)
 
@@ -333,25 +349,16 @@ class Covar:
         """
         #return len(self)
         # is len the best
-        return len(self.covar_values)
+        return len(self)
 
 
-class DPMF:
+class DPMF(Array):
     """
     A single DPMF object.
     """
     kind = "DPMF"
 
-    def __init__(self, *args):
-        """
-        Initialize a single DPMF object.
-        :param args: float: DPMF values
-        """
-        dpmf_val = array(args)
-        if np.sum(dpmf_val) != 1.0:
-            raise ValueError("Sum of DPMF values must be 1.0.")
-        else:
-            self.dpmf_val = dpmf_val
+    # todo check if sums to 1.0
 
     def __str__(self):
         """
@@ -359,12 +366,12 @@ class DPMF:
         :return:
         """
         line = [str(self.get_length())]  # dpmf length
-        line.append(array2text(self.dpmf_val))  # dpmf values
+        line.append(array2text(self))  # dpmf values
         line.append("\n")
         return "\n".join(line)
 
     def get_length(self):
-        return len(self.dpmf_val)
+        return len(self)
 
 
 class MC:
@@ -492,50 +499,3 @@ class DeterministicCPT:
         line.append(self.dt)
         line.append("\n")
         return "\n".join(line)
-
-class InputMaster:
-    """
-    Master class which contains all GMTK objects present in the input
-    master and is responsible for creating their string representation.
-    Attributes:
-        mean: InlineSection: contains all Mean objects in input master
-        covar: InlineSection: contains all Covar objects in input master
-        dpmf: InlineSection: contains all DPMF objects in input master
-        dense_cpt: InlineSection: contains all DenseCPT objects in input master
-        deterministic_cpt: InlineSection: contains all DeterministicCPT objects
-        in input master
-        mc: InlineMCSection: contains all MC objects in input master
-        mx: InlineMXSection: contains all MX objects in input master
-        name_collection: InlineSection: contains all NameCollection objects in
-        input master
-    """
-
-    def __init__(self):
-        """
-        Initialize InputMaster instance with empty attributes (InlineSection
-        and its subclasses).
-        """
-        self.mean = InlineSection()
-        self.covar = InlineSection()
-        self.dpmf = InlineSection()
-        self.dense_cpt = InlineSection()
-        self.deterministic_cpt = InlineSection()
-        # TODO fix error
-        self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
-        self.mx = InlineMXSection(dpmf=self.dpmf, components=self.mc)
-        self.name_collection = InlineSection()
-
-    def __str__(self):
-        """
-        Return string representation of all the attributes (GMTK types) by
-        calling the attributes' (InlineSection and its subclasses) __str__().
-        :return:
-        """
-        attrs = [self.deterministic_cpt, self.name_collection, self.mean, self.covar, self.dense_cpt,
-                 self.dpmf, self.mc, self.mx]
-
-        s = []
-        for obj in attrs:
-            s.append("".join(obj.__str__()))
-
-        return "".join(s)
