@@ -148,7 +148,7 @@ class InlineMXSection(InlineSection):
             components: InlineSection object which point to InputMaster.mc
         """
 
-    def __init__(self, dpmf, components):
+    def __init__(self, dpmf, mc):
         """
         :param dpmf: InlineSection: InlineSection object which point to
         InputMaster.dpmf
@@ -156,7 +156,7 @@ class InlineMXSection(InlineSection):
         InputMaster.mc
         """
         self.dpmf = dpmf
-        self.components = components
+        self.mc = mc
         InlineSection.__init__(self)
 
     def __setattr__(self, key, value):
@@ -175,12 +175,12 @@ class InlineMXSection(InlineSection):
             lines.append(str(len(self)) + "\n")  # total number of MX objects
             for i in range(len(self)):
                 lines.append(str(i))  # index of MX object
-                # check if dimension of Mean and Covar of this MC are the same
+                # check if number of components is equal to length of DPMF 
                 obj = list(self.values())[i]
                 dpmf_name = obj.dpmf
-                components_name = obj.components
+                components = obj.mc
                 dpmf_length = self.dpmf[dpmf_name].get_length()
-                if not dpmf_length == len(components_name):
+                if not dpmf_length == len(components):
                     raise ValueError(
                         "Dimension of DPMF must be equal to number of components associated with this MX object.")
                 else:
@@ -465,7 +465,7 @@ class DeterministicCPT:
     """
     kind = "DETERMINISTIC_CPT"
 
-    def __init__(self, parent_cardinality, cardinality, dt):
+    def __init__(self, cardinality_parents, cardinality, dt):
         """
         Initialize a single DeterministicCPT object.
         :param parent_cardinality: tuple[int]: cardinality of parents
@@ -477,7 +477,7 @@ class DeterministicCPT:
         """
         if len(parent_cardinality) == 0:
             self.parent_cardinality = -1
-        self.parent_cardinality = parent_cardinality
+        self.parent_cardinality = cardinality_parents
         self.cardinality = cardinality
         self.dt = dt
 
@@ -487,13 +487,13 @@ class DeterministicCPT:
         :return:
         """
         line = []
-        if self.parent_cardinality == -1:
+        if self.cardinality_parents == -1:
             num_parents = 0
         else:
-            num_parents = len(self.parent_cardinality)
+            num_parents = len(self.cardinality_parents)
         line.append(str(num_parents))  # number of parents
         cardinalities = []
-        cardinalities.extend(self.parent_cardinality)
+        cardinalities.extend(self.cardinality_parents)
         cardinalities.append(self.cardinality)
         line.append(" ".join(map(str, cardinalities)))  # cardinalities of parent and self
         line.append(self.dt)
