@@ -254,10 +254,10 @@ class InputMaster:
         :param filename: str
         :return:
         """
-        with open(filename, 'w') as file:
-            print('# include "traindir/auxiliary/segway.inc"', file=file)
-            print(self, file=file)
-
+        with open(filename, 'w') as filename:
+            print('# include "traindir/auxiliary/segway.inc"', file=filename)
+            print(self, file=filename)
+            
 
 class DenseCPT(Array):
     """
