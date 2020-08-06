@@ -255,7 +255,7 @@ class InputMaster:
         :return:
         """
         with open(filename, 'w') as filename:
-            print('# include "traindir/auxiliary/segway.inc"', file=filename)
+            print('''# include "traindir/auxiliary/segway.inc"''', file=filename)
             print(self, file=filename)
             
 
