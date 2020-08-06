@@ -42,6 +42,12 @@ class Section(OrderedDict):
     Key: name of GMTK object
     Value: GMTK object
     """
+    def __init__(self):
+        """
+        Initialize an empty Section object.
+        """
+        super(Section, self).__init__()
+        
     def kind(self):
         """
         Return string attribute kind of all GMTK objects in this Section object.
