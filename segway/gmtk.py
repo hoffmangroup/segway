@@ -244,6 +244,15 @@ class InputMaster:
             s.append("".join(obj.__str__()))
 
         return "".join(s)
+    
+    def save(self, filename):
+        """
+        Opens filename for writing and writes out the contents of its attributes.
+        :param filename: str
+        :return: None
+        """
+        with open(filename, 'w') as file:
+            print(self, file=file)
 
 
 class DenseCPT(Array):
