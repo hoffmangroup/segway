@@ -35,7 +35,7 @@ class Array(ndarray):
         input_array = array(args)
         obj = np.asarray(input_array).view(cls)
         return obj
-    
+
 class Section(OrderedDict):
     """
     Contains GMTK objects of a single type and supports writing them to file.
@@ -69,6 +69,7 @@ class Section(OrderedDict):
             raise ValueError("Object has incorrect type.")
         else:
             super(Section, self).__setattr__(key, value)
+
 
 class InlineSection(Section):
 
@@ -113,7 +114,8 @@ class InlineMCSection(InlineSection):
 
     def __setattr__(self, key, value):
         OrderedDict.__setattr__(self, key, value)
-     
+
+
     def __str__(self):
         """
         Returns string representation of all MC objects contained in this
@@ -143,8 +145,8 @@ class InlineMCSection(InlineSection):
 
             lines.append("\n")
             return "\n".join(lines)
-        
-        
+
+
 class InlineMXSection(InlineSection):
     """
         Special InlineSection subclass which contains MX objects.
@@ -198,6 +200,7 @@ class InlineMXSection(InlineSection):
             lines.append("\n")
             return "\n".join(lines)
 
+
 class InputMaster:
     """
     Master class which contains all GMTK objects present in the input
@@ -237,23 +240,13 @@ class InputMaster:
         :return:
         """
         attrs = [self.deterministic_cpt, self.name_collection, self.mean,
-                 self.covar, self.dense_cpt, self.dpmf, self.mc, self.mx]        
+                 self.covar, self.dense_cpt, self.dpmf, self.mc, self.mx]
 
         s = []
         for obj in attrs:
             s.append("".join(obj.__str__()))
 
         return "".join(s)
-    
-    def save(self, filename):
-        """
-        Opens filename for writing and writes out the contents of its attributes.
-        :param filename: str
-        :return: None
-        """
-        with open(filename, 'w') as file:
-            print('# include "traindir/auxiliary/segway.inc"', file=file)
-            print(self, file=file)
 
 
 class DenseCPT(Array):
@@ -274,7 +267,7 @@ class DenseCPT(Array):
         if len(new_shape) == 1:
             new_shape = (new_shape[0], )
         self.reshape((new_shape))
-
+        
         num_parents = len(self.shape) - 1
         line.append(str(num_parents))  # number of parents
         cardinality_line = map(str, self.shape)
@@ -283,6 +276,7 @@ class DenseCPT(Array):
         line.append("\n")
 
         return "\n".join(line)
+
 
 class NameCollection(list):
     """
@@ -295,21 +289,25 @@ class NameCollection(list):
         Initialize a single NameCollection object.
         :param args: str: names in this NameCollection
         """
-        list.__init__(self, list(args))
+        if isinstance(args[0], list):  # names in NameCollection have been given in a single list 
+            list.__init__(self, [])
+            self.extend(args[0])
+        else:
+            list.__init__(self, list(args))
 
     def __str__(self):
         """
         Returns string format of NameCollection object to be printed into the
         input.master file (new lines to be added)
         """
-        line = []
         if len(self) == 0:
-            return line
+            return ""
         else:
+            line = []
             line.append(str(len(self)))
         line.extend(self)
         line.append("\n")
-
+        list.__str__(self)
         return "\n".join(line)
 
 
@@ -359,7 +357,7 @@ class Covar(Array):
         line.append(array2text(self))  # covar values
         line.append("\n")
         return "\n".join(line)
-    
+
     def get_dimension(self):
         """
         Return dimension of this Covar object.
@@ -391,6 +389,7 @@ class DPMF(Array):
     def get_length(self):
         return len(self)
 
+
 class MC:
     """
     A single MC object.
@@ -405,7 +404,8 @@ class MC:
         :param component_type: int: type of MC
         """
         self.component_type = component_type
-        
+
+
 class DiagGaussianMC(MC):
     """
     Attributes:
@@ -469,6 +469,7 @@ class MX:
         line.append(" ".join(self.components))  # component names
         return "\n".join(line)
 
+
 class DeterministicCPT:
     """
     A single DeterministicCPT object.
@@ -491,7 +492,7 @@ class DeterministicCPT:
         """
         if not isinstance(cardinality_parents, tuple):
             self.cardinality_parents = (cardinality_parents, )
-        else:
+        else: 
             self.cardinality_parents = cardinality_parents
         self.cardinality = cardinality
         self.dt = dt
