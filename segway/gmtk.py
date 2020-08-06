@@ -248,6 +248,16 @@ class InputMaster:
 
         return "".join(s)
 
+    def save(self, filename):
+        """
+        Opens filename for writing and writes out the contents of its attributes.
+        :param filename: str
+        :return:
+        """
+        with open(filename, 'w') as file:
+            print('# include "traindir/auxiliary/segway.inc"', file=file)
+            print(self, file=file)
+
 
 class DenseCPT(Array):
     """
