@@ -114,9 +114,11 @@ class InlineMCSection(InlineSection):
         :param covar: InlineSection: InlineSection object which point to
         InputMaster.covar
         """
+        super(InlineSection, self).__init__()
         self.mean = mean
         self.covar = covar
-        InlineSection.__init__(self)
+        
+        # InlineSection.__init__(self)
 
     def __setattr__(self, key, value):
         OrderedDict.__setattr__(self, key, value)
@@ -168,9 +170,10 @@ class InlineMXSection(InlineSection):
         :param components: InlineSection: InlineSection object which point to
         InputMaster.mc
         """
+        super(InlineMXSection, self).__init__()
         self.dpmf = dpmf
         self.mc = mc
-        InlineSection.__init__(self)
+        # InlineSection.__init__(self)
 
     def __setattr__(self, key, value):
         OrderedDict.__setattr__(self, key, value)
@@ -306,10 +309,12 @@ class NameCollection(list):
         :param args: str: names in this NameCollection
         """
         if isinstance(args[0], list):  # names in NameCollection have been given in a single list 
-            list.__init__(self, [])
+            super(NameCollection, self).__init__([])
+            #list.__init__(self, [])
             self.extend(args[0])
         else:
-            list.__init__(self, list(args))
+            super(NameCollection, self).__init__(list(args))
+            # list.__init__(self, list(args))
 
     def __str__(self):
         """
@@ -436,9 +441,10 @@ class DiagGaussianMC(MC):
         :param covar: name of Covar obejct associated to this MC
         """
         # more component types?
+        super(DiagGaussianMC, self).__init__(COMPONENT_TYPE_DIAG_GAUSSIAN)
         self.mean = mean
         self.covar = covar
-        MC.__init__(self, COMPONENT_TYPE_DIAG_GAUSSIAN)
+        #MC.__init__(self, COMPONENT_TYPE_DIAG_GAUSSIAN)
 
     def __str__(self):
         """
