@@ -35,6 +35,28 @@ class Array(ndarray):
         input_array = array(args)
         obj = np.asarray(input_array).view(cls)
         return obj
+    
+    @classmethod
+    def uniform_from_shape(cls, *shape):
+        """
+        Instantiate Array of a specific shape with probabilities set uniformly
+        in each leaf.
+        :param shape: int
+        TODO assumptions about square matrix?
+        :return:
+        """
+        a = np.empty(shape)
+
+        value = 1.0/shape[-1]  # number of columns
+        a.fill(value)
+
+        if len(shape) != 1:
+            # set diagonal elements to 0.0
+            # TODO sq matrix assumption
+            diag_index = range(shape[0])
+            a[diag_index, diag_index] = 0.0
+
+        return a
 
 class Section(OrderedDict):
     """
