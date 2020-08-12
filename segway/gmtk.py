@@ -136,7 +136,7 @@ class InlineMCSection(InlineSection):
         :param covar: InlineSection: InlineSection object which point to
         InputMaster.covar
         """
-        super(InlineSection, self).__init__()
+        super(InlineMCSection, self).__init__()
         self.mean = mean
         self.covar = covar
         
