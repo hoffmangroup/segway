@@ -73,13 +73,15 @@ class Section(OrderedDict):
     def __getattr__(self, name):
         if not name.startswith('_'):
             return self[name]
-        super(Section, self).__getattr__(name)
+        OrderedDict.__getattr__(self, name)
 
     def __setattr__(self, name, value):
         if not name.startswith('_'):
-            self[name] = value
+            if not self.kind() == value.kind:
+                raise ValueError("Object has incorrect type.")
+#             self[name] = value
         else:
-            super(Section, self).__setattr__(name, value)
+            OrderedDict.__setattr__(self, name, value)
         
     def kind(self):
         """
@@ -95,19 +97,19 @@ class Section(OrderedDict):
         return section_kind
 
 
-    def __setattr__(self, key, value):
-        """
-        Check if all the GMTK objects are of the same type.
-        :param key: str: name of GMTK object
-        :param value: GMTK object
-        :return:
-        For now, single object
-        TODO, add multiple objects at once
-        """
-        if not self.kind() == value.kind:
-            raise ValueError("Object has incorrect type.")
-        else:
-            super(Section, self).__setattr__(key, value)
+#     def __setattr__(self, key, value):
+#         """
+#         Check if all the GMTK objects are of the same type.
+#         :param key: str: name of GMTK object
+#         :param value: GMTK object
+#         :return:
+#         For now, single object
+#         TODO, add multiple objects at once
+#         """
+#         if not self.kind() == value.kind:
+#             raise ValueError("Object has incorrect type.")
+#         else:
+#             super(Section, self).__setattr__(key, value)
 
 
 class InlineSection(Section):
