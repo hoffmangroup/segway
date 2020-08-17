@@ -311,13 +311,12 @@ class ParamSpec(object):
         print(means)
         # dimensions of means: num_segs x num_subsegs x num_tracks
         # create Mean objects
-        num_segs, num_subsegs, num_tracks = means.shape 
-        names_array = array(names).reshape(means.shape)
-        for i in range(num_segs):
-            for j in range(num_subsegs):
-                for k in range(num_tracks):
-                    input_master.mean[names_array[i, j, k]] = Mean(means[i, j, k])
-
+        names_array = array(names).reshape((self.num_segs, self.num_subsegs, len(self.track_names)))
+        for i in range(self.num_segs):
+            for j in range(self.num_subsegs):
+                for k in range(len(self.track_names)):
+                    input_master.mean[names_array[i, j, k]] = Mean(means[k][i, 1, j])
+                    #Mean(means[i, j, k])
         return input_master.mean.__str__()
 
 
