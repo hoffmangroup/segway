@@ -308,6 +308,7 @@ class ParamSpec(object):
                                         distribution=self.distribution,
                                         num_mix_components=self.num_mix_components)
         means = self.make_mean_data()  # array
+        print(means)
         # dimensions of means: num_segs x num_subsegs x num_tracks
         # create Mean objects
         num_segs, num_subsegs, num_tracks = means.shape 
