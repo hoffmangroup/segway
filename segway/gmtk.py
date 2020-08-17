@@ -79,7 +79,7 @@ class Section(OrderedDict):
         if not name.startswith('_'):
             if not self.kind() == value.kind:
                 raise ValueError("Object has incorrect type.")
-#             self[name] = value
+            self[name] = value
         else:
             OrderedDict.__setattr__(self, name, value)
         
