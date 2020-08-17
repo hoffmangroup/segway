@@ -70,6 +70,17 @@ class Section(OrderedDict):
         """
         super(Section, self).__init__()
         
+    def __getattr__(self, name):
+        if not name.startswith('_'):
+            return self[name]
+        super(Section, self).__getattr__(name)
+
+    def __setattr__(self, name, value):
+        if not name.startswith('_'):
+            self[name] = value
+        else:
+            super(Section, self).__setattr__(name, value)
+        
     def kind(self):
         """
         Return string attribute kind of all GMTK objects in this Section object.
