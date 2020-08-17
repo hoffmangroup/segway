@@ -308,14 +308,14 @@ class ParamSpec(object):
                                         distribution=self.distribution,
                                         num_mix_components=self.num_mix_components)
         means = self.make_mean_data()  # array
-        print(means)
+        print("means", type(means), means)
         # dimensions of means: num_segs x num_subsegs x num_tracks
         # create Mean objects
         names_array = array(names).reshape((self.num_segs, self.num_subsegs, len(self.track_names)))
         for i in range(self.num_segs):
             for j in range(self.num_subsegs):
                 for k in range(len(self.track_names)):
-                    input_master.mean[names_array[i, j, k]] = Mean(means[k][i, 1, j])
+                    input_master.mean[names_array[i, j, k]] = Mean(means[k][i, :, j])
                     #Mean(means[i, j, k])
         return input_master.mean.__str__()
 
