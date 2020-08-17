@@ -462,7 +462,7 @@ class MC:
         self.component_type = component_type
 
 
-class DiagGaussianMC(MC):
+class DiagGaussianMC(MC, object):
     """
     Attributes:
         component_type = 0
