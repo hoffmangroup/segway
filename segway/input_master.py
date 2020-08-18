@@ -143,82 +143,6 @@ def make_zero_diagonal_table(length):
     return res
 
 
-def generate_gmtk_obj_names(obj, track_names, num_segs, num_subsegs,
-                            distribution, num_mix_components):
-    """
-    Generate GMTK object names for the types:
-    NameCollection: "col"
-    entries in NameCollection: "mx_name"
-    Covar: "covar", "tied_covar"
-    Mean: "mean"
-    MX: "mx"
-    MC: "mc_diag", "mc_gamma", "mc_missing", "gammascale"
-    DPMF: "dpmf"
-    :param obj: str: type of gmtk object for which names must be generated
-    :param: track_names: list[str]: list of all track names
-    :param: num_segs: int: number of segs
-    :param: num_subsegs: int: number of subsegs
-    :param: distribution: str: distribution
-    :param: number of mixture components
-    :return:
-    """
-    allowed_types = ["mx", "mc_diag", "mc_gamma", "mc_missing", "mean",
-                     "covar", "col", "mx_name", "dpmf", "gammascale",
-                     "gammashape", "tied_covar"]
-    if not obj in allowed_types:
-        raise ValueError("Undefined GMTK object type: {}".format(obj))
-
-    names = []
-    if obj == "covar":
-        for name in track_names:
-            names.append("covar_{}".format(name))
-
-
-    # todo check component suffix
-    elif obj == "tied_covar":
-        for name in track_names:
-            names.append("covar_{}".format(name))
-
-    elif obj == "col":
-        for name in track_names:
-            names.append("collection_seg_{}".format(name))
-
-    elif obj == "mx_name":
-        for name in track_names:
-            for i in range(num_segs):
-                for j in range(num_subsegs):
-                    line = "mx_seg{}_subseg{}_{}".format(i, j, name)
-                    names.append(line)
-
-    elif obj == "dpmf" and num_mix_components == 1:
-        return ["dpmf_always"]
-
-    else:
-        for i in range(num_segs):
-            for j in range(num_subsegs):
-                for name in track_names:
-                    # TODO check component suffix diff
-                    if obj == "mc_diag":
-                        line = "mc_{}_seg{}_subseg{}_{}".format(distribution,
-                                                                i, j, name)
-                    # TODO
-
-                    # if obj == "mc_gamma":
-                    # covered in general name generation
-                    #     line = "{}_{}_seg{}_subseg{}_{}".format(obj,
-                    #                         distribution, i, j, name)
-
-                    # TODO
-                    elif obj == "mc_missing":
-                        line = ""
-
-                    else:
-                        line = "{}_seg{}_subseg{}_{}".format(obj, i, j, name)
-                    names.append(line)
-
-    return names
-
-
 class ParamSpec(object):
     """
     base class for parameter specifications used in input.master files
@@ -252,22 +176,100 @@ class ParamSpec(object):
         """
         return None
 
-    def generate_name_collection(self):
+    def get_head_track_names(self):
+        """
+        Return list of head track names. 
+        """    
+        print(self.track_groups, self.tracks)
+        head_track_names = []
+        for group in self.track_groups:
+            head_track_names.append(group[0].name)
+        return head_track_names
+
+    def generate_gmtk_obj_names(self, obj, track_names):
+        """
+        Generate GMTK object names for the types:
+        NameCollection: "col"
+        entries in NameCollection: "mx_name"
+        Covar: "covar", "tied_covar"
+        Mean: "mean"
+        MX: "mx"
+        MC: "mc_diag", "mc_gamma", "mc_missing", "gammascale"
+        DPMF: "dpmf"
+        :param obj: str: type of gmtk object for which names must be generated
+        :param track_names: list[str]: list of track names
+        :return: list[str]: list of GMTK object names 
+        """
+        allowed_types = ["mx", "mc_diag", "mc_gamma", "mc_missing", "mean",
+                     "covar", "col", "mx_name", "dpmf", "gammascale",
+                     "gammashape", "tied_covar"]
+        if not obj in allowed_types:
+            raise ValueError("Undefined GMTK object type: {}".format(obj))
+        num_segs = self.num_segs 
+        num_subsegs = self.num_subsegs
+        distribution = self.distribution 
+        num_mix_components = self.num_mix_components
+        names = []
+        if obj == "covar":
+            for name in track_names:
+                names.append("covar_{}".format(name))
+        # todo check component suffix
+        elif obj == "tied_covar":
+            for name in track_names:
+                names.append("covar_{}".format(name))
+
+        elif obj == "col":
+            for name in track_names:
+                names.append("collection_seg_{}".format(name))
+
+        elif obj == "mx_name":
+            for name in track_names:
+                for i in range(num_segs):
+                    for j in range(num_subsegs):
+                        line = "mx_seg{}_subseg{}_{}".format(i, j, name)
+                        names.append(line)
+
+        elif obj == "dpmf" and num_mix_components == 1:
+            return ["dpmf_always"]
+
+        else:
+            for i in range(num_segs):
+                for j in range(num_subsegs):
+                    for name in track_names:
+                        # TODO check component suffix diff
+                        if obj == "mc_diag":
+                            line = "mc_{}_seg{}_subseg{}_{}".format(distribution,
+                                                                i, j, name)
+                        # TODO
+
+                    # if obj == "mc_gamma":
+                    # covered in general name generation
+                    #     line = "{}_{}_seg{}_subseg{}_{}".format(obj,
+                    #                         distribution, i, j, name)
+
+                        # TODO
+                        elif obj == "mc_missing":
+                            line = ""
+
+                        else:
+                            line = "{}_seg{}_subseg{}_{}".format(obj, i, j, name)
+                        names.append(line)
+
+        return names
+
+    
+    def generate_name_collection(self, track_names):
+        """
+        Generate string representation of NameCollection objects in input master. 
+        :param: track_names: list[str]: list of track names
+        """
         # generate list of collection names
-        collection_names = generate_gmtk_obj_names(obj="col",
-                                                   track_names=self.track_names,
-                                                   num_segs=self.num_segs,
-                                                   num_subsegs=self.num_subsegs,
-                                                   distribution=self.distribution,
-                                                   num_mix_components=self.num_mix_components)
+        collection_names = self.generate_gmtk_obj_names(obj="col",
+                                                   track_names=track_names)
         #  generate list of all names in NameCollections
-        names = generate_gmtk_obj_names("mx_name",
-                                        track_names=self.track_names,
-                                        num_segs=self.num_segs,
-                                        num_subsegs=self.num_subsegs,
-                                        distribution=self.distribution,
-                                        num_mix_components=self.num_mix_components)
-        num_tracks = len(self.track_names)
+        names = self.generate_gmtk_obj_names("mx_name",
+                                        track_names=track_names)
+        num_tracks = len(track_names)
         len_name_group = int(len(names) / num_tracks)
         # names grouped by collection
         name_groups = [names[i:i + len_name_group] for i in
@@ -299,42 +301,36 @@ class ParamSpec(object):
 
         return means_tiled + (stds_tiled * noise)
 
-    def generate_mean_objects(self):
+    def generate_mean_objects(self, track_names):
+        """
+        Generate string representation of Mean objects in input master. 
+        :param: track_names: list[str]: list of track names 
+        """
         # generate list of names of Mean objects
-        names = generate_gmtk_obj_names("mean",
-                                        track_names=self.track_names,
-                                        num_segs=self.num_segs,
-                                        num_subsegs=self.num_subsegs,
-                                        distribution=self.distribution,
-                                        num_mix_components=self.num_mix_components)
+        names = self.generate_gmtk_obj_names("mean",
+                                        track_names=track_names)
         means = self.make_mean_data()  # array
-        print("means", type(means), means)
-        # dimensions of means: num_segs x num_subsegs x num_tracks
+        # dimensions of means: num_segs x num_subsegs x num_head_tracks
         # create Mean objects
-        names_array = array(names).reshape((self.num_segs, self.num_subsegs, len(self.track_names)))
+        names_array = array(names).reshape((self.num_segs, self.num_subsegs, len(self.track_groups)))
         for i in range(self.num_segs):
             for j in range(self.num_subsegs):
-                for k in range(len(self.track_names)):
-                    input_master.mean[names_array[i, j, k]] = Mean(means[k][i, :, j])
-                    #Mean(means[i, j, k])
+                for k in range(len(self.track_groups)):
+                    input_master.mean[names_array[i, j, k]] = Mean(means[i, j, k])
         return input_master.mean.__str__()
 
 
-    def generate_covar_objects(self):
+    def generate_covar_objects(self, track_names):
+        """
+        Generate string representation of Covar objects in input master.
+        :param: track_names: list[str]: list of track names 
+        """
         if COVAR_TIED:
-            names = generate_gmtk_obj_names("tied_covar",
-                                            track_names=self.track_names,
-                                            num_segs=self.num_segs,
-                                            num_subsegs=self.num_subsegs,
-                                            distribution=self.distribution,
-                                            num_mix_components=self.num_mix_components)
+            names = self.generate_gmtk_obj_names("tied_covar",
+                                            track_names=track_names)
         else:
-            names = generate_gmtk_obj_names("covar",
-                                            track_names=self.track_names,
-                                            num_segs=self.num_segs,
-                                            num_subsegs=self.num_subsegs,
-                                            distribution=self.distribution,
-                                            num_mix_components=self.num_mix_components)
+            names = self.generate_gmtk_obj_names("covar",
+                                            track_names=track_names)
         covars = self.vars  # array of variance values
         # create Covar objects
         for i in range(len(names)):
@@ -342,12 +338,14 @@ class ParamSpec(object):
 
         return input_master.covar.__str__()
 
-
-
     def generate_real_mat_objects(self):
         pass
 
-    def generate_mc_objects(self):
+    def generate_mc_objects(self, track_names):
+        """
+        Generate string representation of MC objects in input master. 
+        :param: track_names: list[str]: list of track names 
+        """
         # if distribution is norm or asinh_norm
         if self.distribution in DISTRIBUTIONS_LIKE_NORM:
             if USE_MFSDG:
@@ -356,12 +354,8 @@ class ParamSpec(object):
             else:
                 option = "mc_diag"
             # generate MC object names
-            names = generate_gmtk_obj_names(option,
-                                            track_names=self.track_names,
-                                            num_segs=self.num_segs,
-                                            num_subsegs=self.num_subsegs,
-                                            distribution=self.distribution,
-                                            num_mix_components=self.num_mix_components)
+            names = self.generate_gmtk_obj_names(option,
+                                            track_names=track_names)
 
             covar_names = list(input_master.mc.covar) * (
                         self.num_segs * self.num_subsegs)
@@ -405,20 +399,18 @@ class ParamSpec(object):
         #                     gamma_scale=gamma_scale[i])
         #         input_master.update(mc_obj)
 
-    def generate_mx_objects(self):
+    def generate_mx_objects(self, track_names):
+        """Generate string representation of MX objects in input master. 
+        :param: track_names: list[str]: list of track names 
+        """
         # generate list of MX names
-        names = generate_gmtk_obj_names("mx",
-                                        track_names=self.track_names,
-                                        num_segs=self.num_segs,
-                                        num_subsegs=self.num_subsegs,
-                                        distribution=self.distribution,
-                                        num_mix_components=self.num_mix_components)
+        names = self.generate_gmtk_obj_names("mx",
+                                        track_names=track_names)
 
         mc_names = list(input_master.mc) # list of all mc names
         dpmf_names = list(input_master.dpmf) # list of all dpmf names
         multiple = int(len(names) / len(dpmf_names))
-        dpmf_names *= multiple
-        # replicate dpmf names for iteration
+        dpmf_names *= multiple  # replicate dpmf names for iteration
 
         # create MX objects
         for i in range(len(names)):
@@ -427,14 +419,13 @@ class ParamSpec(object):
         return input_master.mx.__str__()
 
 
-    def generate_dpmf_objects(self):
+    def generate_dpmf_objects(self, track_names):
+        """Generate string representation of DPMF objects in input master. 
+        :param: track_names: list[str]: list of track names 
+        """
         # generate a list of dpmf names
-        names = generate_gmtk_obj_names("dpmf",
-                                        track_names=self.track_names,
-                                        num_segs=self.num_segs,
-                                        num_subsegs=self.num_subsegs,
-                                        distribution=self.distribution,
-                                        num_mix_components=self.num_mix_components)
+        names = self.generate_gmtk_obj_names("dpmf",
+                                        track_names=track_names)
         # if single dpmf
         if self.num_mix_components == 1:
             input_master.dpmf[names[0]] = DPMF(1.0)
@@ -535,10 +526,8 @@ class ParamSpec(object):
         cpt_seg = make_zero_diagonal_table(num_subsegs)
         seg_subseg_subseg = (vstack_tile(cpt_seg, num_segs, 1))
         segCountDown = self.make_dense_cpt_segCountDown_seg_segTransition()
-        #rint(start_seg.shape, "\n", seg_subseg.shape, "\n", seg_seg.shape, "\n",seg_subseg_subseg.shape, "\n",segCountDown.shape)
         prob = [start_seg, seg_subseg, seg_seg, seg_subseg_subseg, segCountDown]
         # create DenseCPTs and add to input_master.dense_cpt: InlineSection
-        # object
         for i in range(len(names)):
             input_master.dense_cpt[names[i]] = DenseCPT(prob[i])
 
@@ -657,19 +646,19 @@ class InputMasterSaver(Saver):
 
         # segCountDown_seg_segTransition
         num_free_params += fullnum_subsegs
-
-        name_collection_spec = param_spec.generate_name_collection()
+        head_track_names = param_spec.get_head_track_names()
+        name_collection_spec = param_spec.generate_name_collection(head_track_names)
 
         distribution = self.distribution
         if distribution in DISTRIBUTIONS_LIKE_NORM:
-            mean_spec = param_spec.generate_mean_objects()
-            covar_spec = param_spec.generate_covar_objects()
+            mean_spec = param_spec.generate_mean_objects(head_track_names)
+            covar_spec = param_spec.generate_covar_objects(head_track_names)
             if USE_MFSDG:
                 real_mat_spec = RealMatParamSpec(self)
             else:
                 real_mat_spec = ""
 
-            mc_spec = param_spec.generate_mc_objects()
+            mc_spec = param_spec.generate_mc_objects(head_track_names)
 
             if COVAR_TIED:
                 num_free_params += (fullnum_subsegs + 1) * num_track_groups
@@ -684,14 +673,14 @@ class InputMasterSaver(Saver):
             # the gamma distribution rather than the ML estimate for the
             # mean and converting
             real_mat_spec = GammaRealMatParamSpec(self)
-            mc_spec = param_spec.generate_mc_objects()
+            mc_spec = param_spec.generate_mc_objects(head_track_names)
 
             num_free_params += (fullnum_subsegs * 2) * num_track_groups
         else:
             raise ValueError("distribution %s not supported" % distribution)
 
-        dpmf_spec = param_spec.generate_dpmf_objects()
-        mx_spec = param_spec.generate_mx_objects()
+        dpmf_spec = param_spec.generate_dpmf_objects(head_track_names)
+        mx_spec = param_spec.generate_mx_objects(head_track_names)
         card_seg = num_segs
         ve_spec = VirtualEvidenceSpec(self)
 
