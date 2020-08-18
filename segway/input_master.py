@@ -180,7 +180,6 @@ class ParamSpec(object):
         """
         Return list of head track names. 
         """    
-        print(self.track_groups, self.tracks)
         head_track_names = []
         for group in self.track_groups:
             head_track_names.append(group[0].name)
