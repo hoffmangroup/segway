@@ -37,11 +37,12 @@ class Array(ndarray):
         return obj
     
     @classmethod
-    def uniform_from_shape(cls, shape):
+    def uniform_from_shape(cls, shape, diag_value=0.0):
         """
         Instantiate Array of a specific shape with probabilities set uniformly
         in each leaf.
         :param shape: Tuple[int]: shape of Array
+        :param: diag_value: float: optional value for the diagonal entry
         TODO assumptions about square matrix?
         :return:
         """
@@ -55,7 +56,7 @@ class Array(ndarray):
             if div == 0: 
                 a.fill(1.0)
             else: 
-                value = 1.0 / div
+                value = (1.0 - diag_value) / div
                 a.fill(value)
                 # len(shape) = 2 => seg_seg => square matrix
                 if len(shape) == 2:
@@ -343,12 +344,13 @@ class DenseCPT(Array):
         return "\n".join(line)
     
     @classmethod
-    def uniform_from_shape(cls, *shape):
+    def uniform_from_shape(cls, *shape, value=0.0):
         """
-        :param shape: int: shape of DenseCPT
+        :param: shape: int: shape of DenseCPT
+        :param: value: float: optional value for diagonal entry of DenseCPT
         :return: DenseCPT with uniform probabilities and given shape
         """
-        a = super(DenseCPT, cls).uniform_from_shape(shape)
+        a = super(DenseCPT, cls).uniform_from_shape(shape, value)
         if a.shape != (1,) and len(shape) != 1:
             return np.squeeze(DenseCPT(a))
         return a
@@ -419,12 +421,13 @@ class Mean(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape):
+    def uniform_from_shape(cls, *shape, value):
         """
-        :param shape: int: shape of DenseCPT
+        :param: shape: int: shape of DenseCPT
+        :param: value: float: optional value for diagonal entry
         :return: DenseCPT with uniform probabilities and given shape
         """
-        a = super(Mean, cls).uniform_from_shape(shape)
+        a = super(Mean, cls).uniform_from_shape(shape, value)
         if a.shape != (1,):
             return np.squeeze(Mean(a))
         return Mean(a)
@@ -454,12 +457,13 @@ class Covar(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape):
+    def uniform_from_shape(cls, *shape, value=0.0):
         """
         :param shape: int: shape of DenseCPT
+        :param: value: float: optional value for diagonal entry
         :return: DenseCPT with uniform probabilities and given shape
         """
-        a = super(Covar, cls).uniform_from_shape(shape)
+        a = super(Covar, cls).uniform_from_shape(shape, value)
         if a.shape != (1,):
             return np.squeeze(Covar(a))
         return Covar(a)
@@ -487,12 +491,13 @@ class DPMF(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape):
+    def uniform_from_shape(cls, *shape, value):
         """
         :param shape: int: shape of DenseCPT
+        :param: value: float: optional value for diagonal entry 
         :return: DenseCPT with uniform probabilities and given shape
         """
-        a = super(DPMF, cls).uniform_from_shape(shape)
+        a = super(DPMF, cls).uniform_from_shape(shape, value)
         if a.shape != (1,):
             return np.squeeze(DPMF(a))
         return DPMF(a)
