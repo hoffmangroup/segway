@@ -37,26 +37,51 @@ class Array(ndarray):
         return obj
     
     @classmethod
-    def uniform_from_shape(cls, *shape):
+    def uniform_from_shape(cls, shape):
         """
         Instantiate Array of a specific shape with probabilities set uniformly
         in each leaf.
-        :param shape: int
+        :param shape: Tuple[int]: shape of Array
         TODO assumptions about square matrix?
         :return:
         """
-        a = np.empty(shape)
+        if len(shape) == 1:
+            a = np.squeeze(DenseCPT(np.empty(shape)), axis=0)
+            a.fill(1.0 / shape[-1])  #  number of columns
+        else:
+            a = np.empty(shape)
+            div = shape[-1] - 1
+            # if num_subsegs = 1
+            if div == 0: 
+                a.fill(1.0)
+            else: 
+                value = 1.0 / div
+                a.fill(value)
+                # len(shape) = 2 => seg_seg => square matrix
+                if len(shape) == 2:
+                    # set diagonal elements to 0.0
+                    diag_index = range(shape[0])
+                    a[diag_index, diag_index] = 0.0
 
-        value = 1.0/shape[-1]  # number of columns
-        a.fill(value)
+                # len(shape) = 3 => seg_subseg_subseg
+                # => num_segs x square matrix
+                if len(shape) == 3:
+                    # "diag_indices" to be set to 0: 
+                    # range(seg), diag_index, diag_index 
+                    diag_index = []
+                    for s in range(shape[-1]):
+                        diag_index.append([s] * len(shape[1:]))
+                    final_indices = []
+                    for i in range(shape[0]):
+                        for item in diag_index:
+                            index = [i]
+                            index.extend(item)
+                            final_indices.append(tuple(index))
 
-        if len(shape) != 1:
-            # set diagonal elements to 0.0
-            # TODO sq matrix assumption
-            diag_index = range(shape[0])
-            a[diag_index, diag_index] = 0.0
-
+                    for index in final_indices:
+                        a[index] = 0.0
         return a
+
 
 class Section(OrderedDict):
     """
@@ -95,22 +120,6 @@ class Section(OrderedDict):
             else:
                 assert section_kind == obj.kind, "Objects must be of same type."
         return section_kind
-
-
-#     def __setattr__(self, key, value):
-#         """
-#         Check if all the GMTK objects are of the same type.
-#         :param key: str: name of GMTK object
-#         :param value: GMTK object
-#         :return:
-#         For now, single object
-#         TODO, add multiple objects at once
-#         """
-#         if not self.kind() == value.kind:
-#             raise ValueError("Object has incorrect type.")
-#         else:
-#             super(Section, self).__setattr__(key, value)
-
 
 class InlineSection(Section):
 
@@ -292,15 +301,17 @@ class InputMaster:
 
         return "".join(s)
 
-#     def save(self, filename):
-#         """
-#         Opens filename for writing and writes out the contents of its attributes.
-#         :param filename: str
-#         :return:
-#         """
-#         with open(filename, 'w') as filename:
-#             print('''# include "traindir/auxiliary/segway.inc"''', file=filename)
-#             print(self, file=filename)
+    def save(self, filename, traindir='segway_output/traindir'):
+        """
+        Opens filename for writing and writes out the contents of its attributes.
+        :param: filename: str: path to input master file 
+        :param: traindir: str: path to traindir 
+        (default assumes path to traindir is 'segway_output/traindir')
+        :return: None 
+        """
+        with open(filename, 'w') as filename:
+            print('''# include "''' + traindir + '''/auxiliary/segway.inc"''', file=filename)
+            print(self, file=filename)
             
 
 class DenseCPT(Array):
@@ -330,7 +341,17 @@ class DenseCPT(Array):
         line.append("\n")
 
         return "\n".join(line)
-
+    
+    @classmethod
+    def uniform_from_shape(cls, *shape):
+        """
+        :param shape: int: shape of DenseCPT
+        :return: DenseCPT with uniform probabilities and given shape
+        """
+        a = super(DenseCPT, cls).uniform_from_shape(shape)
+        if a.shape != (1,) and len(shape) != 1:
+            return np.squeeze(DenseCPT(a))
+        return a
 
 class NameCollection(list):
     """
@@ -396,8 +417,19 @@ class Mean(Array):
         """
         # return
         return len(self)
+    
+    @classmethod
+    def uniform_from_shape(cls, *shape):
+        """
+        :param shape: int: shape of DenseCPT
+        :return: DenseCPT with uniform probabilities and given shape
+        """
+        a = super(Mean, cls).uniform_from_shape(shape)
+        if a.shape != (1,):
+            return np.squeeze(Mean(a))
+        return Mean(a)
 
-
+    
 class Covar(Array):
     """
     A single Covar object.
@@ -419,11 +451,20 @@ class Covar(Array):
         Return dimension of this Covar object.
         :return: int: dimension of this Covar object
         """
-        #return len(self)
-        # is len the best
         return len(self)
-
-
+    
+    @classmethod
+    def uniform_from_shape(cls, *shape):
+        """
+        :param shape: int: shape of DenseCPT
+        :return: DenseCPT with uniform probabilities and given shape
+        """
+        a = super(Covar, cls).uniform_from_shape(shape)
+        if a.shape != (1,):
+            return np.squeeze(Covar(a))
+        return Covar(a)
+    
+    
 class DPMF(Array):
     """
     A single DPMF object.
@@ -444,7 +485,17 @@ class DPMF(Array):
 
     def get_length(self):
         return len(self)
-
+    
+    @classmethod
+    def uniform_from_shape(cls, *shape):
+        """
+        :param shape: int: shape of DenseCPT
+        :return: DenseCPT with uniform probabilities and given shape
+        """
+        a = super(DPMF, cls).uniform_from_shape(shape)
+        if a.shape != (1,):
+            return np.squeeze(DPMF(a))
+        return DPMF(a)
 
 class MC:
     """
