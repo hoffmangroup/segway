@@ -344,13 +344,15 @@ class DenseCPT(Array):
         return "\n".join(line)
     
     @classmethod
-    def uniform_from_shape(cls, *shape, value=0.0):
+    def uniform_from_shape(cls, *shape, **kwargs):
         """
         :param: shape: int: shape of DenseCPT
-        :param: value: float: optional value for diagonal entry of DenseCPT
+        :param: value: float: optional value for diagonal entry of DenseCPT (default is 0.0) 
         :return: DenseCPT with uniform probabilities and given shape
         """
-        a = super(DenseCPT, cls).uniform_from_shape(shape, value)
+        if 'value' not in kwargs.keys():
+            kwargs['value'] = 0.0 
+        a = super(DenseCPT, cls).uniform_from_shape(shape, kwargs['value'])
         if a.shape != (1,) and len(shape) != 1:
             return np.squeeze(DenseCPT(a))
         return a
@@ -368,11 +370,9 @@ class NameCollection(list):
         """
         if isinstance(args[0], list):  # names in NameCollection have been given in a single list 
             super(NameCollection, self).__init__([])
-            #list.__init__(self, [])
             self.extend(args[0])
         else:
             super(NameCollection, self).__init__(list(args))
-            # list.__init__(self, list(args))
 
     def __str__(self):
         """
@@ -421,13 +421,15 @@ class Mean(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape, value=0.0):
+    def uniform_from_shape(cls, *shape, **kwargs):
         """
         :param: shape: int: shape of Mean
-        :param: value: float: optional value for diagonal entry
+        :param: value: float: optional value for diagonal entry (default is 0.0) 
         :return: Mean with uniform probabilities and given shape
         """
-        a = super(Mean, cls).uniform_from_shape(shape, value)
+        if 'value' not in kwargs.keys():
+            kwargs['value'] = 0.0 
+        a = super(Mean, cls).uniform_from_shape(shape, kwargs['value'])
         if a.shape != (1,):
             return np.squeeze(Mean(a))
         return Mean(a)
@@ -457,13 +459,15 @@ class Covar(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape, value=0.0):
+    def uniform_from_shape(cls, *shape, **kwargs):
         """
         :param shape: int: shape of Covar
-        :param: value: float: optional value for diagonal entry
+        :param: value: float: optional value for diagonal entry (default is 0.0) 
         :return: Covar with uniform probabilities and given shape
         """
-        a = super(Covar, cls).uniform_from_shape(shape, value)
+        if 'value' not in kwargs.keys():
+            kwargs['value'] = 0.0 
+        a = super(Covar, cls).uniform_from_shape(shape, kwargs['value'])
         if a.shape != (1,):
             return np.squeeze(Covar(a))
         return Covar(a)
@@ -491,13 +495,15 @@ class DPMF(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape, value=0.0):
+    def uniform_from_shape(cls, *shape, **kwargs):
         """
         :param shape: int: shape of DPMF
-        :param: value: float: optional value for diagonal entry 
+        :param: value: float: optional value for diagonal entry (default is 0.0) 
         :return: DPMF with uniform probabilities and given shape
         """
-        a = super(DPMF, cls).uniform_from_shape(shape, value)
+        if 'value' not in kwargs.keys():
+            kwargs['value'] = 0.0 
+        a = super(DPMF, cls).uniform_from_shape(shape, kwargs['value'])
         if a.shape != (1,):
             return np.squeeze(DPMF(a))
         return DPMF(a)
