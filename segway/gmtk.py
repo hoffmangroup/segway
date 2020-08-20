@@ -315,6 +315,7 @@ class InputMaster:
         :return: None 
         """
         with open(filename, 'w') as filename:
+            print(sys.version)
             if sys.version.startswith('2'):
                 print >> filename, '''# include "''' + traindir + '''/auxiliary/segway.inc"'''
                 print >> filename, self 
