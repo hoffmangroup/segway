@@ -1,3 +1,4 @@
+from __future__ import division 
 from collections import OrderedDict
 import numpy as np
 from numpy import array, ndarray
