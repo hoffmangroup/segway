@@ -63,7 +63,7 @@ class Array(ndarray):
                 if len(shape) == 2:
                     # set diagonal elements to 0.0
                     diag_index = range(shape[0])
-                    a[diag_index, diag_index] = 0.0
+                    a[diag_index, diag_index] = diag_value
 
                 # len(shape) = 3 => seg_subseg_subseg
                 # => num_segs x square matrix
@@ -81,7 +81,7 @@ class Array(ndarray):
                             final_indices.append(tuple(index))
 
                     for index in final_indices:
-                        a[index] = 0.0
+                        a[index] = diag_value 
         return a
 
 
@@ -418,11 +418,11 @@ class Mean(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape, value):
+    def uniform_from_shape(cls, *shape, value=0.0):
         """
-        :param: shape: int: shape of DenseCPT
+        :param: shape: int: shape of Mean
         :param: value: float: optional value for diagonal entry
-        :return: DenseCPT with uniform probabilities and given shape
+        :return: Mean with uniform probabilities and given shape
         """
         a = super(Mean, cls).uniform_from_shape(shape, value)
         if a.shape != (1,):
@@ -456,9 +456,9 @@ class Covar(Array):
     @classmethod
     def uniform_from_shape(cls, *shape, value=0.0):
         """
-        :param shape: int: shape of DenseCPT
+        :param shape: int: shape of Covar
         :param: value: float: optional value for diagonal entry
-        :return: DenseCPT with uniform probabilities and given shape
+        :return: Covar with uniform probabilities and given shape
         """
         a = super(Covar, cls).uniform_from_shape(shape, value)
         if a.shape != (1,):
@@ -488,11 +488,11 @@ class DPMF(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape, value):
+    def uniform_from_shape(cls, *shape, value=0.0):
         """
-        :param shape: int: shape of DenseCPT
+        :param shape: int: shape of DPMF
         :param: value: float: optional value for diagonal entry 
-        :return: DenseCPT with uniform probabilities and given shape
+        :return: DPMF with uniform probabilities and given shape
         """
         a = super(DPMF, cls).uniform_from_shape(shape, value)
         if a.shape != (1,):
