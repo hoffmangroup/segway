@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 from __future__ import division 
+import sys 
 from collections import OrderedDict
 import numpy as np
 from numpy import array, ndarray
@@ -314,8 +315,12 @@ class InputMaster:
         :return: None 
         """
         with open(filename, 'w') as filename:
-            print('''# include "''' + traindir + '''/auxiliary/segway.inc"''', file=filename)
-            print(self, file=filename)
+            if sys.version.startswith('2'):
+                print >> filename, '''# include "''' + traindir + '''/auxiliary/segway.inc"'''
+                print >> filename, self 
+            else:
+                print('''# include "''' + traindir + '''/auxiliary/segway.inc"''', file=filename)
+                print(self, file=filename)
             
 
 class DenseCPT(Array):
