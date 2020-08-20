@@ -26,8 +26,8 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     SUPERVISION_SUPERVISED, USE_MFSDG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
 
-from .gmtk import InputMaster, NameCollection, DenseCPT, \
-    DeterministicCPT, DPMF, MC, MX, Covar, Mean, DiagGaussianMC
+from .gmtk import (InputMaster, NameCollection, DenseCPT,
+    DeterministicCPT, DPMF, MC, MX, Covar, Mean, DiagGaussianMC)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
 # scalars and vectors in the parameter output. By default in newer (> 1.14)
