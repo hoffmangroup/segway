@@ -1,5 +1,3 @@
-# -*- coding: utf-8 -*-
-
 from __future__ import division 
 import sys 
 from collections import OrderedDict
@@ -47,7 +45,9 @@ class Array(ndarray):
         in each leaf.
         :param shape: Tuple[int]: shape of Array
         :param: diag_value: float: optional value for the diagonal entry
-        TODO assumptions about square matrix?
+        Assuming that if len(shape) = 2, then this method is being called for 
+        DenseCPT 'seg_seg' (which is a square matrix), if len(shape) = 3, 
+        then this method is being called for DenseCPT 'seg_subseg_subseg'. 
         :return:
         """
         if len(shape) == 1:
