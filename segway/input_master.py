@@ -14,6 +14,7 @@ import sys
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
                    vectorize, where, zeros)
+import numpy as np
 from six.moves import map, range
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
@@ -528,7 +529,7 @@ class ParamSpec(object):
         prob = [start_seg, seg_subseg, seg_seg, seg_subseg_subseg, segCountDown]
         # create DenseCPTs and add to input_master.dense_cpt: InlineSection
         for i in range(len(names)):
-            input_master.dense_cpt[names[i]] = DenseCPT(prob[i])
+            input_master.dense_cpt[names[i]] = np.squeeze(DenseCPT(prob[i]), axis=0)
 
         return input_master.dense_cpt.__str__()
 
