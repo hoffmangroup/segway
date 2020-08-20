@@ -167,8 +167,6 @@ class InlineMCSection(InlineSection):
         self.mean = mean
         self.covar = covar
         
-        # InlineSection.__init__(self)
-
     def __setattr__(self, key, value):
         OrderedDict.__setattr__(self, key, value)
 
@@ -222,7 +220,6 @@ class InlineMXSection(InlineSection):
         super(InlineMXSection, self).__init__()
         self.dpmf = dpmf
         self.mc = mc
-        # InlineSection.__init__(self)
 
     def __setattr__(self, key, value):
         OrderedDict.__setattr__(self, key, value)
@@ -315,13 +312,11 @@ class InputMaster:
         :return: None 
         """
         with open(filename, 'w') as filename:
-            print(sys.version)
-            if sys.version.startswith('2'):
-                print >> filename, '''# include "''' + traindir + '''/auxiliary/segway.inc"'''
-                print >> filename, self 
-            else:
-                print('''# include "''' + traindir + '''/auxiliary/segway.inc"''', file=filename)
-                print(self, file=filename)
+            print >> filename, '''# include "''' + traindir + '''/auxiliary/segway.inc"'''
+            print >> filename, self 
+#             else:
+#                 print('''# include "''' + traindir + '''/auxiliary/segway.inc"''', file=filename)
+#                 print(self, file=filename)
             
 
 class DenseCPT(Array):
