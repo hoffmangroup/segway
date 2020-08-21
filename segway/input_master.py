@@ -597,7 +597,7 @@ class DenseCPTParamSpec(TableParamSpec):
         return self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION, cpt,
                                     dirichlet=self.len_seg_strength > 0)
     
-    def generate_dense_cpt_objects(self):
+    def generate_objects(self):
         # names of dense cpts
         names = ["start_seg", "seg_subseg", "seg_seg", "seg_subseg_subseg",
                  "segCountDown_seg_segTransition"]
