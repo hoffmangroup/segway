@@ -623,9 +623,12 @@ class DenseCPTParamSpec(TableParamSpec):
         # create DenseCPTs and add to input_master.dense_cpt: InlineSection
         for i in range(len(names)):
             input_master.dense_cpt[names[i]] = np.squeeze(DenseCPT(prob[i]), axis=0)
+            
+        if self.use_dinucleotide:
+            print("use dinucleotide here") 
     
         return input_master.dense_cpt.__str__()
-
+            
 # TODO     
 #         if self.use_dinucleotide:
 #             yield self.make_dense_cpt_seg_dinucleotide_spec()
