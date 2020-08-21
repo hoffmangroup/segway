@@ -26,7 +26,7 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     SUPERVISION_SUPERVISED, USE_MFSDG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
 
-from .gmtk import (InputMaster, NameCollection, DenseCPT,
+from gmtk.input_master import (InputMaster, NameCollection, DenseCPT,
     DeterministicCPT, DPMF, MC, MX, Covar, Mean, DiagGaussianMC)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
