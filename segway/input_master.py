@@ -154,7 +154,8 @@ class ParamSpec(object):
                   "num_track_groups", "track_groups", "num_mix_components",
                   "means", "vars", "num_mix_components", "random_state",
                   "tracks", "resolution", "card_seg_countdown", "seg_table",
-                    "seg_countdowns_initial"]
+                    "seg_countdowns_initial", "len_seg_strength", 
+                  "use_dinucleotide"]
 
     jitter_std_bound = 0.2
     track_names = []
@@ -257,7 +258,6 @@ class ParamSpec(object):
 
         return names
 
-    
     def generate_name_collection(self, track_names):
         """
         Generate string representation of NameCollection objects in input master. 
@@ -281,7 +281,6 @@ class ParamSpec(object):
                 NameCollection(name_groups[group_index])
 
         return input_master.name_collection.__str__()
-
 
     def make_mean_data(self):
         num_segs = self.num_segs
@@ -337,9 +336,6 @@ class ParamSpec(object):
             input_master.covar[names[i]] = Covar(covars[i])  # TODO index error
 
         return input_master.covar.__str__()
-
-    def generate_real_mat_objects(self):
-        pass
 
     def generate_mc_objects(self, track_names):
         """
@@ -418,7 +414,6 @@ class ParamSpec(object):
                         components=mc_names[i])
         return input_master.mx.__str__()
 
-
     def generate_dpmf_objects(self, track_names):
         """Generate string representation of DPMF objects in input master. 
         :param: track_names: list[str]: list of track names 
@@ -437,11 +432,6 @@ class ParamSpec(object):
             for i in range(len(names)):
                 input_master.dpmf[names[i]] = DPMF(dpmf_values[i])
         return input_master.dpmf.__str__()
-
-
-    def generate_ve(self):
-        #  TODO
-        pass
 
     def calc_prob_transition(self, length):
         """Calculate probability transition from scaled expected length.
@@ -510,7 +500,21 @@ class ParamSpec(object):
             res[seg_countdown_allow:, label] = probs_prevent_transition
 
         return res
+      
+    def make_table_spec(self, name, table, dirichlet=False):
+        """
+        if dirichlet is True, this table has a corresponding DirichletTable
+        automatically generated name
+        """
+        ndim = table.ndim - 1  # don't include output dim
 
+        if dirichlet:
+            extra_rows = ["DirichletTable %s" % self.make_dirichlet_name(name)]
+        else:
+            extra_rows = []
+
+        return TableParamSpec.make_table_spec(self, name, table, ndim,
+                                              extra_rows)
 
     def generate_dense_cpt_objects(self):
         # names of dense cpts
@@ -527,17 +531,163 @@ class ParamSpec(object):
         seg_subseg_subseg = (vstack_tile(cpt_seg, num_segs, 1))
         segCountDown = self.make_dense_cpt_segCountDown_seg_segTransition()
         prob = [start_seg, seg_subseg, seg_seg, seg_subseg_subseg, segCountDown]
+        
+        # create corresponding DirichletTable generated name if necessary
+        for i in range(len(names[0:4])):
+            self.make_table_spec(names[i], prob[i])
+            
+        # for DenseCPT segCountDown_seg_segTransition:
+        self.make_table_spec(names[4], prob[4], dirichlet=self.len_seg_strength > 0) 
+        
         # create DenseCPTs and add to input_master.dense_cpt: InlineSection
         for i in range(len(names)):
             input_master.dense_cpt[names[i]] = np.squeeze(DenseCPT(prob[i]), axis=0)
-
+    
         return input_master.dense_cpt.__str__()
 
     def make_dinucleotide_table_row(self):
-        pass
+        # simple one-parameter model
+        gc = self.random_state.uniform()
+        at = 1 - gc
 
-    def make_seg_dinucleotide(self):
-        pass
+        a = at / 2
+        c = gc / 2
+        g = gc - c
+        t = 1 - a - c - g
+
+        acgt = array([a, c, g, t])
+
+        # shape: (16,)
+        return outer(acgt, acgt).ravel()
+
+    def make_dense_cpt_seg_dinucleotide_spec(self):
+        table = [self.make_dinucleotide_table_row()
+                 for seg_index in range(self.num_segs)]
+
+        return self.make_table_spec("seg_dinucleotide", table)
+      
+      
+class TableParamSpec(ParamSpec):
+    copy_attrs = ParamSpec.copy_attrs \
+        + ["resolution", "card_seg_countdown", "seg_table",
+           "seg_countdowns_initial"]
+
+    # see Segway paper
+    probs_force_transition = array([0.0, 0.0, 1.0])
+
+    def make_table_spec(self, name, table, ndim, extra_rows=[]):
+        header_rows = [name, ndim]
+        header_rows.extend(table.shape)
+
+        rows = [" ".join(map(str, header_rows))]
+        rows.extend(extra_rows)
+        rows.extend([array2text(table), ""])
+
+        return "\n".join(rows)
+
+    def calc_prob_transition(self, length):
+        """Calculate probability transition from scaled expected length.
+        """
+        length_scaled = length // self.resolution
+
+        prob_self_self = prob_transition_from_expected_len(length_scaled)
+        prob_self_other = 1.0 - prob_self_self
+
+        return prob_self_self, prob_self_other
+
+    def make_dense_cpt_segCountDown_seg_segTransition(self):  # noqa
+        # first values are the ones where segCountDown = 0 therefore
+        # the transitions to segTransition = 2 occur early on
+        card_seg_countdown = self.card_seg_countdown
+
+        # by default, when segCountDown is high, never transition
+        res = empty((card_seg_countdown, self.num_segs, CARD_SEGTRANSITION))
+
+        prob_seg_self_self, prob_seg_self_other = \
+            self.calc_prob_transition(LEN_SEG_EXPECTED)
+
+        prob_subseg_self_self, prob_subseg_self_other = \
+            self.calc_prob_transition(LEN_SUBSEG_EXPECTED)
+
+        # 0: no transition
+        # 1: subseg transition (no transition when CARD_SUBSEG == 1)
+        # 2: seg transition
+        probs_allow_transition = \
+            array([prob_seg_self_self * prob_subseg_self_self,
+                   prob_seg_self_self * prob_subseg_self_other,
+                   prob_seg_self_other])
+
+        probs_prevent_transition = array([prob_subseg_self_self,
+                                          prob_subseg_self_other,
+                                          0.0])
+
+        # find the labels with maximum segment lengths and those without
+        table = self.seg_table
+        ends = table[:, OFFSET_END]
+        bitmap_without_maximum = ends == 0
+
+        # where() returns a tuple; this unpacks it
+        labels_with_maximum, = where(~bitmap_without_maximum)
+        labels_without_maximum, = where(bitmap_without_maximum)
+
+        # labels without a maximum
+        res[0, labels_without_maximum] = probs_allow_transition
+        res[1:, labels_without_maximum] = probs_prevent_transition
+
+        # labels with a maximum
+        seg_countdowns_initial = self.seg_countdowns_initial
+
+        res[0, labels_with_maximum] = self.probs_force_transition
+        for label in labels_with_maximum:
+            seg_countdown_initial = seg_countdowns_initial[label]
+            minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
+
+            seg_countdown_allow = seg_countdown_initial - minimum + 1
+
+            res[1:seg_countdown_allow, label] = probs_allow_transition
+            res[seg_countdown_allow:, label] = probs_prevent_transition
+
+        return res
+
+      
+    @staticmethod
+    def make_dirichlet_name(name):
+        return "dirichlet_%s" % name
+      
+
+class DirichletTabParamSpec(TableParamSpec):
+    type_name = "DIRICHLET_TAB"
+    copy_attrs = TableParamSpec.copy_attrs \
+        + ["len_seg_strength", "num_bases", "card_seg_countdown",
+           "num_mix_components"]
+
+    def make_table_spec(self, name, table):
+        dirichlet_name = self.make_dirichlet_name(name)
+
+        return TableParamSpec.make_table_spec(self, dirichlet_name, table,
+                                              table.ndim)
+
+    def make_dirichlet_table(self):
+        probs = self.make_dense_cpt_segCountDown_seg_segTransition()
+
+        # XXX: the ratio is not exact as num_bases is not the same as
+        # the number of base-base transitions. It is surely close
+        # enough, though
+        total_pseudocounts = self.len_seg_strength * self.num_bases
+        divisor = self.card_seg_countdown * self.num_segs
+        pseudocounts_per_row = total_pseudocounts / divisor
+
+        # astype(int) means flooring the floats
+        pseudocounts = (probs * pseudocounts_per_row).astype(int)
+
+        return pseudocounts
+
+    def generate_objects(self):
+        # XXX: these called functions have confusing/duplicative names
+        if self.len_seg_strength > 0:
+            dirichlet_table = self.make_dirichlet_table()
+            yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
+                                   dirichlet_table)
 
 
 class DTParamSpec(ParamSpec):
@@ -589,6 +739,13 @@ class DTParamSpec(ParamSpec):
             assert supervision_type == SUPERVISION_UNSUPERVISED
 
 
+class RealMatParamSpec(ParamSpec):
+    type_name = "REAL_MAT"
+
+    def generate_objects(self):
+        yield "matrix_weightscale_1x1 1 1 1.0"
+            
+          
 class VirtualEvidenceSpec(ParamSpec):
     type_name = "VE_CPT"
 
