@@ -1,4 +1,4 @@
-from __future__ import division 
+from __future__ import division, print_function
 import sys 
 from collections import OrderedDict
 import numpy as np
@@ -37,55 +37,6 @@ class Array(ndarray):
         input_array = array(args)
         obj = np.asarray(input_array).view(cls)
         return obj
-    
-    @classmethod
-    def uniform_from_shape(cls, shape, diag_value=0.0):
-        """
-        Instantiate Array of a specific shape with probabilities set uniformly
-        in each leaf.
-        :param shape: Tuple[int]: shape of Array
-        :param: diag_value: float: optional value for the diagonal entry
-        Assuming that if len(shape) = 2, then this method is being called for 
-        DenseCPT 'seg_seg' (which is a square matrix), if len(shape) = 3, 
-        then this method is being called for DenseCPT 'seg_subseg_subseg'. 
-        :return:
-        """
-        if len(shape) == 1:
-            a = np.squeeze(DenseCPT(np.empty(shape)), axis=0)
-            a.fill(1.0 / shape[-1])  #  number of columns
-        else:
-            a = np.empty(shape)
-            div = shape[-1] - 1
-            # if num_subsegs = 1
-            if div == 0: 
-                a.fill(1.0)
-            else: 
-                value = (1.0 - diag_value) / div
-                a.fill(value)
-                # len(shape) = 2 => seg_seg => square matrix
-                if len(shape) == 2:
-                    # set diagonal elements to 0.0
-                    diag_index = range(shape[0])
-                    a[diag_index, diag_index] = diag_value
-
-                # len(shape) = 3 => seg_subseg_subseg
-                # => num_segs x square matrix
-                if len(shape) == 3:
-                    # "diag_indices" to be set to 0: 
-                    # range(seg), diag_index, diag_index 
-                    diag_index = []
-                    for s in range(shape[-1]):
-                        diag_index.append([s] * len(shape[1:]))
-                    final_indices = []
-                    for i in range(shape[0]):
-                        for item in diag_index:
-                            index = [i]
-                            index.extend(item)
-                            final_indices.append(tuple(index))
-
-                    for index in final_indices:
-                        a[index] = diag_value 
-        return a
 
 
 class Section(OrderedDict):
@@ -283,7 +234,6 @@ class InputMaster:
         self.dpmf = InlineSection()
         self.dense_cpt = InlineSection()
         self.deterministic_cpt = InlineSection()
-        # TODO fix error
         self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
         self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
         self.name_collection = InlineSection()
@@ -312,11 +262,8 @@ class InputMaster:
         :return: None 
         """
         with open(filename, 'w') as filename:
-            print >> filename, '''# include "''' + traindir + '''/auxiliary/segway.inc"'''
-            print >> filename, self 
-#             else:
-#                 print('''# include "''' + traindir + '''/auxiliary/segway.inc"''', file=filename)
-#                 print(self, file=filename)
+            print('# include "' + traindir + '/auxiliary/segway.inc"', file=filename)
+            print(self, file=filename)
             
 
 class DenseCPT(Array):
@@ -347,15 +294,53 @@ class DenseCPT(Array):
     def uniform_from_shape(cls, *shape, **kwargs):
         """
         :param: shape: int: shape of DenseCPT
-        :param: value: float: optional value for diagonal entry of DenseCPT (default is 0.0) 
+        :param: kwargs: float: optional value for diagonal entry of DenseCPT (default is 0.0) 
         :return: DenseCPT with uniform probabilities and given shape
         """
-        if 'value' not in kwargs.keys():
-            kwargs['value'] = 0.0 
-        a = super(DenseCPT, cls).uniform_from_shape(shape, kwargs['value'])
-        if a.shape != (1,) and len(shape) != 1:
-            return np.squeeze(DenseCPT(a))
-        return a
+        if 'self' not in kwargs.keys():
+            kwargs['self'] = 0.0  # set default value for diagonal entry to 0
+        diag_value = kwargs['self']
+
+        if len(shape) == 1:
+            a = np.squeeze(DenseCPT(np.empty(shape)), axis=0)
+            a.fill(1.0 / shape[-1])  # uniform by number of columns
+            return a
+        else:
+            a = np.empty(shape)
+            div = shape[-1] - 1
+   
+            # if num_subsegs = 1
+            if div == 0:
+                a.fill(1.0)
+            else:
+                value = (1.0 - diag_value) / div
+                a.fill(value)
+                # len(shape) = 2 => seg_seg => square matrix
+                if len(shape) == 2:
+                    # replace diagonal entries 
+                    diag_index = range(shape[0])
+                    a[diag_index, diag_index] = diag_value 
+
+                # len(shape) = 3 => seg_subseg_subseg
+                # => num_segs x square matrix
+                if len(shape) == 3:
+                    # "diag_indices" to be set to 0:
+                    # range(seg), diag_index, diag_index
+                    diag_index = []
+                    for s in range(shape[-1]):
+                        diag_index.append([s] * len(shape[1:]))
+                    final_indices = []
+                    # prepare "diagonal" indices
+                    for i in range(shape[0]):
+                        for item in diag_index: 
+                            index = [i]
+                            index.extend(item)
+                            final_indices.append(tuple(index))
+                    for index in final_indices:  # replace diagonal entries 
+                        a[index] = diag_value
+                        
+            return np.squeeze(DenseCPT(a), axis=0)
+        
 
 class NameCollection(list):
     """
@@ -417,22 +402,7 @@ class Mean(Array):
         Return dimension of this Mean object.
         :return: int: dimension of this Mean object
         """
-        # return
         return len(self)
-    
-    @classmethod
-    def uniform_from_shape(cls, *shape, **kwargs):
-        """
-        :param: shape: int: shape of Mean
-        :param: value: float: optional value for diagonal entry (default is 0.0) 
-        :return: Mean with uniform probabilities and given shape
-        """
-        if 'value' not in kwargs.keys():
-            kwargs['value'] = 0.0 
-        a = super(Mean, cls).uniform_from_shape(shape, kwargs['value'])
-        if a.shape != (1,):
-            return np.squeeze(Mean(a))
-        return Mean(a)
 
     
 class Covar(Array):
@@ -458,20 +428,6 @@ class Covar(Array):
         """
         return len(self)
     
-    @classmethod
-    def uniform_from_shape(cls, *shape, **kwargs):
-        """
-        :param shape: int: shape of Covar
-        :param: value: float: optional value for diagonal entry (default is 0.0) 
-        :return: Covar with uniform probabilities and given shape
-        """
-        if 'value' not in kwargs.keys():
-            kwargs['value'] = 0.0 
-        a = super(Covar, cls).uniform_from_shape(shape, kwargs['value'])
-        if a.shape != (1,):
-            return np.squeeze(Covar(a))
-        return Covar(a)
-    
     
 class DPMF(Array):
     """
@@ -495,19 +451,21 @@ class DPMF(Array):
         return len(self)
     
     @classmethod
-    def uniform_from_shape(cls, *shape, **kwargs):
+    def uniform_from_shape(cls, *shape):
         """
-        :param shape: int: shape of DPMF
-        :param: value: float: optional value for diagonal entry (default is 0.0) 
+        :param: shape: int: shape of DPMF 
         :return: DPMF with uniform probabilities and given shape
-        """
-        if 'value' not in kwargs.keys():
-            kwargs['value'] = 0.0 
-        a = super(DPMF, cls).uniform_from_shape(shape, kwargs['value'])
-        if a.shape != (1,):
-            return np.squeeze(DPMF(a))
-        return DPMF(a)
+        """  
+        a = np.empty(shape)
+        if len(shape) != 1:
+            raise ValueError("DPMF must be one-dimensional.")
+        else:
+            value = 1.0 / shape[0]
+            a.fill(value)
+            
+        return DPMF(a).squeeze(axis=0)
 
+    
 class MC:
     """
     A single MC object.
@@ -541,7 +499,6 @@ class DiagGaussianMC(MC, object):
         super(DiagGaussianMC, self).__init__(COMPONENT_TYPE_DIAG_GAUSSIAN)
         self.mean = mean
         self.covar = covar
-        #MC.__init__(self, COMPONENT_TYPE_DIAG_GAUSSIAN)
 
     def __str__(self):
         """
