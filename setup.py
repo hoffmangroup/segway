@@ -21,8 +21,8 @@ doclines = __doc__.splitlines()
 name, short_description = doclines[0].split(": ")
 long_description = "\n".join(doclines[2:])
 
-url = "https://pmgenomics.ca/hoffmanlab/proj/%s/" % name.lower()
-download_url = "https://pypi.python.org/pypi/segway"
+url = "https://%s.hoffmanlab.org" % name.lower()
+download_url = "https://pypi.python.org/pypi/%s" % name.lower()
 
 classifiers = ["Natural Language :: English",
                "Development Status :: 5 - Production/Stable",

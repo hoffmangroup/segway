@@ -24,7 +24,6 @@ import re
 from shutil import copy2
 import stat
 from string import ascii_letters
-import subprocess
 import sys
 from threading import Lock, Thread
 from time import sleep
@@ -40,7 +39,7 @@ from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import Path
 import pipes
-from pkg_resources import Requirement, working_set
+from pkg_resources import parse_version, Requirement, working_set
 from six import PY2, viewitems, viewvalues
 from six.moves import map, range, zip
 from six.moves.urllib.parse import quote
@@ -81,7 +80,7 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
 from .version import __version__
 
 # GMTK runtime requirements
-MINIMUM_GMTK_VERSION = (1, 4, 2)
+MINIMUM_GMTK_VERSION = parse_version("1.4.2")
 GMTK_VERSION_ERROR_MSG = """
 GMTK version %s was detected.
 Segway requires GMTK version %s or later to be installed.
@@ -4211,24 +4210,23 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
 
 def check_gmtk_version():
     """ Checks if the supported minimum GMTK version is installed """
-    # Typical expected output from "gmtkPrint -version":
-    # gmtkPrint (GMTK) 1.4.3
+    # Typical expected output from "gmtkTriangulate -version":
+    # gmtkTriangulate (GMTK) 1.4.3
     # Mercurial id: 8995e40101d2 tip
     # checkin date: Fri Oct 30 10:51:44 2015 -0700
 
     # Older versions:
     # GMTK 1.4.0 (Mercurial id: bdf2718cc6ce tip checkin date: Thu Jun 25 12:31:56 2015 -0700)
 
-    # Try to open gmtkPrint to get the version
+    # Try to open gmtkTriangulate to get the version
     try:
-        # blocks until finished
-        output_string = subprocess.check_output(["gmtkPrint", "-version"])
+        output_string = TRIANGULATE_PROG.getoutput("-version").decode()
     # If GMTK was not found
-    except OSError:
+    except IOError:  # optbuild raises an IOError when programs cannot be found
         # Raise a runtime error stating that GMTK was not found on the path
-        raise RuntimeError("GMTK cannot be found on your PATH.\nPlease "
-                           "install GMTK from "
-                           "http://melodi.ee.washington.edu/gmtk/ "
+        raise RuntimeError("GMTK cannot be found on your PATH.\n"
+                           "Please install GMTK from "
+                           "https://github.com/melodi-lab/gmtk/releases "
                            "before running Segway.")
 
     output_lines = output_string.splitlines()
@@ -4240,24 +4238,20 @@ def check_gmtk_version():
         version_word_index = -1
 
     # Get the first line of output
-    first_output_line = output_lines[0].decode()
+    first_output_line = output_lines[0]
 
     # Get the version string from the proper word on the line
-    current_version_string = first_output_line.split()[version_word_index]
+    current_gmtk_version_string = first_output_line.split()[version_word_index]
 
     # Get the version number to compare with the minimum version
-    current_version = map(int, current_version_string.split("."))
-    version_zip = zip(current_version, MINIMUM_GMTK_VERSION)
-    for current_version_number, minimum_version_number in version_zip:
-        # If the version number (from most to least significant digit) is
-        # ever less than the minimum
-        if current_version_number < minimum_version_number:
-            # Raise a runtime error stating the version found and the
-            # minimum required
-            minimum_version_string = ".".join(map(str, MINIMUM_GMTK_VERSION))
-            raise RuntimeError(GMTK_VERSION_ERROR_MSG %
-                               (current_version_string,
-                                minimum_version_string))
+    current_gmtk_version = parse_version(current_gmtk_version_string)
+
+    if current_gmtk_version < MINIMUM_GMTK_VERSION:
+        # Raise a runtime error stating the version found and the
+        # minimum required
+        raise RuntimeError(GMTK_VERSION_ERROR_MSG %
+                           (current_gmtk_version_string,
+                            MINIMUM_GMTK_VERSION))
 
 
 def main(argv=sys.argv[1:]):

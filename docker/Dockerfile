@@ -21,6 +21,9 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
 && apt-get clean \
 && rm -rf /var/lib/apt/lists/*
 # Install pip for Python 2
+# Newer distributions come with Python 3, not Python 2, and the Python 2
+# package on Ubuntu does not include pip nor has a package for it so it must be
+# installed manually
 RUN curl https://bootstrap.pypa.io/get-pip.py --output get-pip.py && python2 get-pip.py
 # RUN apt-get install -y libbz2-dev liblzo2-dev libblosc-dev libatlas-dev liblapack-dev
 

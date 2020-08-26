@@ -12,8 +12,9 @@ from __future__ import absolute_import
 # All configuration values have a default; values that are commented out
 # serve to show the default.
 
-from pkg_resources import get_distribution
 import sys
+
+from pkg_resources import get_distribution
 
 sys.path.insert(0, "..")
 
