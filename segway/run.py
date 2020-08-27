@@ -39,7 +39,7 @@ from optplus import str2slice_or_int
 from optbuild import AddableMixin
 from path import Path
 import pipes
-from pkg_resources import Requirement, working_set
+from pkg_resources import parse_version, Requirement, working_set
 from six import PY2, viewitems, viewvalues
 from six.moves import map, range, zip
 from six.moves.urllib.parse import quote
@@ -78,6 +78,13 @@ from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     VIRTUAL_EVIDENCE_LIST_FILENAME,
                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 from .version import __version__
+
+# GMTK runtime requirements
+MINIMUM_GMTK_VERSION = parse_version("1.4.2")
+GMTK_VERSION_ERROR_MSG = """
+GMTK version %s was detected.
+Segway requires GMTK version %s or later to be installed.
+Please update your GMTK version."""
 
 # set once per file run
 UUID = uuid1().hex
@@ -4201,10 +4208,57 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
     return task_spec, options, archives, traindir, annotatedir
 
 
+def check_gmtk_version():
+    """ Checks if the supported minimum GMTK version is installed """
+    # Typical expected output from "gmtkTriangulate -version":
+    # gmtkTriangulate (GMTK) 1.4.3
+    # Mercurial id: 8995e40101d2 tip
+    # checkin date: Fri Oct 30 10:51:44 2015 -0700
+
+    # Older versions:
+    # GMTK 1.4.0 (Mercurial id: bdf2718cc6ce tip checkin date: Thu Jun 25 12:31:56 2015 -0700)
+
+    # Try to open gmtkTriangulate to get the version
+    try:
+        output_string = TRIANGULATE_PROG.getoutput("-version").decode()
+    # If GMTK was not found
+    except IOError:  # optbuild raises an IOError when programs cannot be found
+        # Raise a runtime error stating that GMTK was not found on the path
+        raise RuntimeError("GMTK cannot be found on your PATH.\n"
+                           "Please install GMTK from "
+                           "https://github.com/melodi-lab/gmtk/releases "
+                           "before running Segway.")
+
+    output_lines = output_string.splitlines()
+
+    # Check if there's only one line of output (for older versions)
+    if len(output_lines) == 1:
+        version_word_index = 1
+    else:
+        version_word_index = -1
+
+    # Get the first line of output
+    first_output_line = output_lines[0]
+
+    # Get the version string from the proper word on the line
+    current_gmtk_version_string = first_output_line.split()[version_word_index]
+
+    # Get the version number to compare with the minimum version
+    current_gmtk_version = parse_version(current_gmtk_version_string)
+
+    if current_gmtk_version < MINIMUM_GMTK_VERSION:
+        # Raise a runtime error stating the version found and the
+        # minimum required
+        raise RuntimeError(GMTK_VERSION_ERROR_MSG %
+                           (current_gmtk_version_string,
+                            MINIMUM_GMTK_VERSION))
+
+
 def main(argv=sys.argv[1:]):
 
     task_spec, options, archives, traindir, annotatedir = parse_options(argv)
 
+    check_gmtk_version()
     runner = Runner.fromoptions(task_spec, archives,
                                 traindir, annotatedir, options)
 
