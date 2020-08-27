@@ -1,5 +1,5 @@
 from __future__ import division, print_function
-import sys 
+import sys
 from collections import OrderedDict
 import numpy as np
 from numpy import array, ndarray
@@ -20,6 +20,7 @@ def array2text(a):
         delimiter = "\n" * (ndim - 1)
         return delimiter.join(array2text(row) for row in a)
 
+
 class Object(str):
     def __new__(cls, _name, content, _kind):
         return str.__new__(cls, content)
@@ -27,6 +28,7 @@ class Object(str):
     def __init__(self, name, content, kind):
         self.kind = kind
         self.name = name
+
 
 class Array(ndarray):
     def __new__(cls, *args):
@@ -50,7 +52,7 @@ class Section(OrderedDict):
         Initialize an empty Section object.
         """
         super(Section, self).__init__()
-        
+
     def __getattr__(self, name):
         if not name.startswith('_'):
             return self[name]
@@ -63,7 +65,7 @@ class Section(OrderedDict):
             self[name] = value
         else:
             OrderedDict.__setattr__(self, name, value)
-        
+
     def kind(self):
         """
         Return string attribute kind of all GMTK objects in this Section object.
@@ -120,7 +122,6 @@ class InlineMCSection(InlineSection):
         
     def __setattr__(self, key, value):
         OrderedDict.__setattr__(self, key, value)
-
 
     def __str__(self):
         """
@@ -264,7 +265,7 @@ class InputMaster:
         with open(filename, 'w') as filename:
             print('# include "' + traindir + '/auxiliary/segway.inc"', file=filename)
             print(self, file=filename)
-            
+
 
 class DenseCPT(Array):
     """
@@ -280,16 +281,28 @@ class DenseCPT(Array):
         :return:
         """
         line = []
-        
+
         num_parents = len(self.shape) - 1
         line.append(str(num_parents))  # number of parents
         cardinality_line = map(str, self.shape)
         line.append(" ".join(cardinality_line))  # cardinalities
+        if 'extra_rows' not in self.__dict__.keys():
+            extra_rows = []
+        else:
+            extra_rows = self.extra_rows
+        line.extend(extra_rows)
         line.append(array2text(self))
         line.append("\n")
 
         return "\n".join(line)
-    
+
+    def __setattr__(self, key, value):
+        if key == 'extra_rows':
+            if key not in self.__dict__.keys():
+                super(DenseCPT, self).__setattr__(key, value)
+        else:
+            raise ValueError("Attribute not allowed.")
+
     @classmethod
     def uniform_from_shape(cls, *shape, **kwargs):
         """
@@ -297,18 +310,18 @@ class DenseCPT(Array):
         :param: kwargs: float: optional value for diagonal entry of DenseCPT (default is 0.0) 
         :return: DenseCPT with uniform probabilities and given shape
         """
-        if 'self' not in kwargs.keys():
-            kwargs['self'] = 0.0  # set default value for diagonal entry to 0
-        diag_value = kwargs['self']
+        diag_value = kwargs.pop('self', 0.0)  # set default value for diagonal entry to 0
 
         if len(shape) == 1:
-            a = np.squeeze(DenseCPT(np.empty(shape)), axis=0)
-            a.fill(1.0 / shape[-1])  # uniform by number of columns
-            return a
+            a = np.empty(shape)
+            cpt = DenseCPT(a)
+            cpt = np.squeeze(cpt, axis=0)
+            cpt.fill(1.0 / shape[-1])  #  number of columns
+            return cpt
+
         else:
             a = np.empty(shape)
             div = shape[-1] - 1
-   
             # if num_subsegs = 1
             if div == 0:
                 a.fill(1.0)
@@ -317,9 +330,9 @@ class DenseCPT(Array):
                 a.fill(value)
                 # len(shape) = 2 => seg_seg => square matrix
                 if len(shape) == 2:
-                    # replace diagonal entries 
+                    # set diagonal elements to 0.0
                     diag_index = range(shape[0])
-                    a[diag_index, diag_index] = diag_value 
+                    a[diag_index, diag_index] = diag_value
 
                 # len(shape) = 3 => seg_subseg_subseg
                 # => num_segs x square matrix
@@ -330,17 +343,20 @@ class DenseCPT(Array):
                     for s in range(shape[-1]):
                         diag_index.append([s] * len(shape[1:]))
                     final_indices = []
-                    # prepare "diagonal" indices
                     for i in range(shape[0]):
-                        for item in diag_index: 
+                        for item in diag_index:
                             index = [i]
                             index.extend(item)
                             final_indices.append(tuple(index))
-                    for index in final_indices:  # replace diagonal entries 
+
+                    for index in final_indices:
                         a[index] = diag_value
-                        
-            return np.squeeze(DenseCPT(a), axis=0)
+
+            cpt = DenseCPT(a)
+
+            return np.squeeze(cpt, axis=0)
         
+
 
 class NameCollection(list):
     """
@@ -402,9 +418,9 @@ class Mean(Array):
         Return dimension of this Mean object.
         :return: int: dimension of this Mean object
         """
-        return len(self)
-
+        return len(self)    
     
+
 class Covar(Array):
     """
     A single Covar object.
@@ -427,8 +443,8 @@ class Covar(Array):
         :return: int: dimension of this Covar object
         """
         return len(self)
-    
-    
+
+
 class DPMF(Array):
     """
     A single DPMF object.
@@ -449,23 +465,23 @@ class DPMF(Array):
 
     def get_length(self):
         return len(self)
-    
+
     @classmethod
     def uniform_from_shape(cls, *shape):
         """
         :param: shape: int: shape of DPMF 
         :return: DPMF with uniform probabilities and given shape
-        """  
+        """
         a = np.empty(shape)
         if len(shape) != 1:
             raise ValueError("DPMF must be one-dimensional.")
         else:
             value = 1.0 / shape[0]
             a.fill(value)
-            
+
         return DPMF(a).squeeze(axis=0)
 
-    
+
 class MC:
     """
     A single MC object.
@@ -568,7 +584,7 @@ class DeterministicCPT:
         """
         if not isinstance(cardinality_parents, tuple):
             self.cardinality_parents = (cardinality_parents, )
-        else: 
+        else:
             self.cardinality_parents = cardinality_parents
         self.cardinality = cardinality
         self.dt = dt
@@ -588,3 +604,20 @@ class DeterministicCPT:
         line.append(self.dt)
         line.append("\n")
         return "\n".join(line)
+    
+
+
+
+
+
+    
+
+
+
+     
+
+
+
+
+
+
