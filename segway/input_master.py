@@ -670,21 +670,3 @@ class InputMasterSaver(Saver):
         ve_spec = VirtualEvidenceSpec(self)
 
         return locals()  # dict of vars set in this function
-
-                                                                          674,0-1       Bot
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
