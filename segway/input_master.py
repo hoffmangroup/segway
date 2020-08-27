@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 from __future__ import absolute_import, division
 
 """input_master.py: write input master files
@@ -41,7 +42,7 @@ try:
 except TypeError:
     # Otherwise ignore the attempt
     pass
-
+  
 if USE_MFSDG:
     # because tying not implemented yet
     COVAR_TIED = False
@@ -89,7 +90,6 @@ def array2text(a):
         delimiter = "\n" * (ndim - 1)
         return delimiter.join(array2text(row) for row in a)
 
-
 def make_spec(name, iterable):
     """
     name: str, name of GMTK object type
@@ -118,7 +118,6 @@ def make_spec(name, iterable):
         all_lines = [line.encode(SEGWAY_ENCODING) for line in all_lines]
 
     return "\n".join(all_lines) + "\n"
-
 
 def prob_transition_from_expected_len(length):
     # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
@@ -154,8 +153,7 @@ class ParamSpec(object):
                   "num_track_groups", "track_groups", "num_mix_components",
                   "means", "vars", "num_mix_components", "random_state",
                   "tracks", "resolution", "card_seg_countdown", "seg_table",
-                    "seg_countdowns_initial", "len_seg_strength", 
-                  "use_dinucleotide"]
+                    "seg_countdowns_initial", "len_seg_strength", "num_bases"]
 
     jitter_std_bound = 0.2
     track_names = []
@@ -170,7 +168,7 @@ class ParamSpec(object):
 
     def __str__(self):
         return make_spec(self.type_name, self.generate_objects())
-    
+
     def make_data(self):
         """
         override this in subclasses
@@ -181,7 +179,7 @@ class ParamSpec(object):
     def get_head_track_names(self):
         """
         Return list of head track names. 
-        """    
+        """
         head_track_names = []
         for group in self.track_groups:
             head_track_names.append(group[0].name)
@@ -201,14 +199,15 @@ class ParamSpec(object):
         :param track_names: list[str]: list of track names
         :return: list[str]: list of GMTK object names 
         """
+
         allowed_types = ["mx", "mc_diag", "mc_gamma", "mc_missing", "mean",
                      "covar", "col", "mx_name", "dpmf", "gammascale",
                      "gammashape", "tied_covar"]
         if not obj in allowed_types:
             raise ValueError("Undefined GMTK object type: {}".format(obj))
-        num_segs = self.num_segs 
+        num_segs = self.num_segs
         num_subsegs = self.num_subsegs
-        distribution = self.distribution 
+        distribution = self.distribution
         num_mix_components = self.num_mix_components
         names = []
         if obj == "covar":
@@ -239,24 +238,13 @@ class ParamSpec(object):
                     for name in track_names:
                         # TODO check component suffix diff
                         if obj == "mc_diag":
-                            line = "mc_{}_seg{}_subseg{}_{}".format(distribution,
-                                                                i, j, name)
-                        # TODO
-
-                    # if obj == "mc_gamma":
-                    # covered in general name generation
-                    #     line = "{}_{}_seg{}_subseg{}_{}".format(obj,
-                    #                         distribution, i, j, name)
-
-                        # TODO
-                        elif obj == "mc_missing":
-                            line = ""
-
+                            line = "mc_{}_seg{}_subseg{}_{}".format(distribution, i, j, name)
                         else:
                             line = "{}_seg{}_subseg{}_{}".format(obj, i, j, name)
                         names.append(line)
 
         return names
+
 
     def generate_name_collection(self, track_names):
         """
@@ -266,7 +254,7 @@ class ParamSpec(object):
         # generate list of collection names
         collection_names = self.generate_gmtk_obj_names(obj="col",
                                                    track_names=track_names)
-        #  generate list of all names in NameCollections
+        #  generate list of all names in NameCollections
         names = self.generate_gmtk_obj_names("mx_name",
                                         track_names=track_names)
         num_tracks = len(track_names)
@@ -281,6 +269,7 @@ class ParamSpec(object):
                 NameCollection(name_groups[group_index])
 
         return input_master.name_collection.__str__()
+
 
     def make_mean_data(self):
         num_segs = self.num_segs
@@ -317,7 +306,6 @@ class ParamSpec(object):
                 for k in range(len(self.track_groups)):
                     input_master.mean[names_array[i, j, k]] = Mean(means[i, j, k])
         return input_master.mean.__str__()
-
 
     def generate_covar_objects(self, track_names):
         """
@@ -365,36 +353,6 @@ class ParamSpec(object):
                                                         covar=covar_names[i])
             return input_master.mc.__str__()
 
-        # # TODO if distribution is gamma
-        # elif self.distribution == DISTRIBUTION_GAMMA:
-        #     option = "mc_gamma"
-        #     names = generate_gmtk_obj_names(option,
-        #                                     track_names=self.track_names,
-        #                                     num_segs=self.num_segs,
-        #                                     num_subsegs=self.num_subsegs,
-        #                                     distribution=self.distribution,
-        #                                     num_mix_components=self.num_mix_components)
-        #     # generate gammashape and gammascale names for MC objects
-        #     gamma_scale = generate_gmtk_obj_names("gammascale",
-        #                                           track_names=self.track_names,
-        #                                           num_segs=self.num_segs,
-        #                                           num_subsegs=self.num_subsegs,
-        #                                           distribution=self.distribution,
-        #                                           num_mix_components=self.num_mix_components)
-        #
-        #     gamma_shape = generate_gmtk_obj_names("gammashape",
-        #                                           track_names=self.track_names,
-        #                                           num_segs=self.num_segs,
-        #                                           num_subsegs=self.num_subsegs,
-        #                                           distribution=self.distribution,
-        #                                           num_mix_components=self.num_mix_components)
-        #     # create MC objects
-        #     for i in range(len(names)):
-        #         mc_obj = MC(name=names[i], dim=1, type="COMPONENT_TYPE_GAMMA",
-        #                     gamma_shape=gamma_shape[i],
-        #                     gamma_scale=gamma_scale[i])
-        #         input_master.update(mc_obj)
-
     def generate_mx_objects(self, track_names):
         """Generate string representation of MX objects in input master. 
         :param: track_names: list[str]: list of track names 
@@ -432,25 +390,6 @@ class ParamSpec(object):
             for i in range(len(names)):
                 input_master.dpmf[names[i]] = DPMF(dpmf_values[i])
         return input_master.dpmf.__str__()
-      
-      
-class TableParamSpec(ParamSpec):
-    copy_attrs = ParamSpec.copy_attrs \
-        + ["resolution", "card_seg_countdown", "seg_table",
-           "seg_countdowns_initial"]
-
-    # see Segway paper
-    probs_force_transition = array([0.0, 0.0, 1.0])
-
-    def make_table_spec(self, name, table, ndim, extra_rows=[]):
-        header_rows = [name, ndim]
-        header_rows.extend(table.shape)
-
-        rows = [" ".join(map(str, header_rows))]
-        rows.extend(extra_rows)
-        rows.extend([array2text(table), ""])
-
-        return "\n".join(rows)
 
     def calc_prob_transition(self, length):
         """Calculate probability transition from scaled expected length.
@@ -465,6 +404,10 @@ class TableParamSpec(ParamSpec):
     def make_dense_cpt_segCountDown_seg_segTransition(self):  # noqa
         # first values are the ones where segCountDown = 0 therefore
         # the transitions to segTransition = 2 occur early on
+
+        # see Segway paper
+        probs_force_transition = array([0.0, 0.0, 1.0])
+
         card_seg_countdown = self.card_seg_countdown
 
         # by default, when segCountDown is high, never transition
@@ -503,8 +446,8 @@ class TableParamSpec(ParamSpec):
 
         # labels with a maximum
         seg_countdowns_initial = self.seg_countdowns_initial
-
-        res[0, labels_with_maximum] = self.probs_force_transition
+        res[0, labels_with_maximum] = probs_force_transition
+        # res[0, labels_with_maximum] = self.probs_force_transition
         for label in labels_with_maximum:
             seg_countdown_initial = seg_countdowns_initial[label]
             minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
@@ -516,88 +459,7 @@ class TableParamSpec(ParamSpec):
 
         return res
 
-      
-    @staticmethod
-    def make_dirichlet_name(name):
-        return "dirichlet_%s" % name
-      
-
-class DenseCPTParamSpec(TableParamSpec):
-    type_name = "DENSE_CPT"
-    copy_attrs = TableParamSpec.copy_attrs \
-        + ["random_state", "len_seg_strength", "use_dinucleotide"]
-
-    def make_table_spec(self, name, table, dirichlet=False):
-        """
-        if dirichlet is True, this table has a corresponding DirichletTable
-        automatically generated name
-        """
-        ndim = table.ndim - 1  # don't include output dim
-
-        if dirichlet:
-            extra_rows = ["DirichletTable %s" % self.make_dirichlet_name(name)]
-        else:
-            extra_rows = []
-
-        return TableParamSpec.make_table_spec(self, name, table, ndim,
-                                              extra_rows)
-
-    def make_empty_cpt(self):
-        num_segs = self.num_segs
-
-        return zeros((num_segs, num_segs))
-
-    def make_dense_cpt_start_seg_spec(self):
-        num_segs = self.num_segs
-        cpt = fill_array(1.0 / num_segs, num_segs)
-
-        return self.make_table_spec("start_seg", cpt)
-
-    def make_dense_cpt_seg_subseg_spec(self):
-        num_subsegs = self.num_subsegs
-        cpt = fill_array(1.0 / num_subsegs, (self.num_segs, num_subsegs))
-
-        return self.make_table_spec("seg_subseg", cpt)
-
-    def make_dense_cpt_seg_seg_spec(self):
-        cpt = make_zero_diagonal_table(self.num_segs)
-
-        return self.make_table_spec("seg_seg", cpt)
-
-    def make_dense_cpt_seg_subseg_subseg_spec(self):
-        cpt_seg = make_zero_diagonal_table(self.num_subsegs)
-        cpt = vstack_tile(cpt_seg, self.num_segs, 1)
-
-        return self.make_table_spec("seg_subseg_subseg", cpt)
-
-    def make_dinucleotide_table_row(self):
-        # simple one-parameter model
-        gc = self.random_state.uniform()
-        at = 1 - gc
-
-        a = at / 2
-        c = gc / 2
-        g = gc - c
-        t = 1 - a - c - g
-
-        acgt = array([a, c, g, t])
-
-        # shape: (16,)
-        return outer(acgt, acgt).ravel()
-
-    def make_dense_cpt_seg_dinucleotide_spec(self):
-        table = [self.make_dinucleotide_table_row()
-                 for seg_index in range(self.num_segs)]
-
-        return self.make_table_spec("seg_dinucleotide", table)
-
-    def make_dense_cpt_segCountDown_seg_segTransition_spec(self):  # noqa
-        cpt = self.make_dense_cpt_segCountDown_seg_segTransition()
-
-        return self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION, cpt,
-                                    dirichlet=self.len_seg_strength > 0)
-    
-    def generate_objects(self):
+    def generate_dense_cpt_objects(self):
         # names of dense cpts
         names = ["start_seg", "seg_subseg", "seg_seg", "seg_subseg_subseg",
                  "segCountDown_seg_segTransition"]
@@ -612,39 +474,32 @@ class DenseCPTParamSpec(TableParamSpec):
         seg_subseg_subseg = (vstack_tile(cpt_seg, num_segs, 1))
         segCountDown = self.make_dense_cpt_segCountDown_seg_segTransition()
         prob = [start_seg, seg_subseg, seg_seg, seg_subseg_subseg, segCountDown]
-        
-        # create corresponding DirichletTable generated name if necessary
-        for i in range(len(names[0:4])):
-            self.make_table_spec(names[i], prob[i])
-            
-        # for DenseCPT segCountDown_seg_segTransition:
-        self.make_table_spec(names[4], prob[4], dirichlet=self.len_seg_strength > 0) 
-        
         # create DenseCPTs and add to input_master.dense_cpt: InlineSection
         for i in range(len(names)):
             input_master.dense_cpt[names[i]] = np.squeeze(DenseCPT(prob[i]), axis=0)
-            
-        if self.use_dinucleotide:
-            print("use dinucleotide here") 
-    
+        # adding dirichlet row if necessary 
+        if self.len_seg_strength > 0:
+            dirichlet_row = ["DirichletTable %s" % self.make_dirichlet_name(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION)]
+            input_master.dense_cpt[NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION].extra_rows = dirichlet_row
         return input_master.dense_cpt.__str__()
-            
-# TODO     
-#         if self.use_dinucleotide:
-#             yield self.make_dense_cpt_seg_dinucleotide_spec()
-          
 
-class DirichletTabParamSpec(TableParamSpec):
-    type_name = "DIRICHLET_TAB"
-    copy_attrs = TableParamSpec.copy_attrs \
-        + ["len_seg_strength", "num_bases", "card_seg_countdown",
-           "num_mix_components"]
+    def make_dinucleotide_table_row(self):
+        pass
 
-    def make_table_spec(self, name, table):
+    def make_seg_dinucleotide(self):
+        pass
+
+    def make_dirichlet_name(self, name):
+        return "dirichlet_{}".format(name)
+
+    def make_dirichlet_table_spec(self, name, table):
         dirichlet_name = self.make_dirichlet_name(name)
-
-        return TableParamSpec.make_table_spec(self, dirichlet_name, table,
-                                              table.ndim)
+        ndim = table.ndim
+        header_rows = [dirichlet_name, ndim]
+        header_rows.extend(table.shape)
+        rows = [" ".join(map(str, header_rows))]
+        rows.extend([array2text(table), ""])
+        return "\n".join(rows)
 
     def make_dirichlet_table(self):
         probs = self.make_dense_cpt_segCountDown_seg_segTransition()
@@ -661,14 +516,20 @@ class DirichletTabParamSpec(TableParamSpec):
 
         return pseudocounts
 
-    def generate_objects(self):
+    def generate_dirichlet_objects(self):
         # XXX: these called functions have confusing/duplicative names
         if self.len_seg_strength > 0:
+            header = ["DIRICHLET_TAB_IN_FILE inline"]
+            header.append("1\n")  # only one DirichletTab for segCountDown_seg_segTransition 
+            header.append("0") # index of dirichlet tab 
             dirichlet_table = self.make_dirichlet_table()
-            yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
+            value = self.make_dirichlet_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
                                    dirichlet_table)
+            header.append(value)
+            return "\n".join(header)
+        else:
+            return ""
 
-            
 class DTParamSpec(ParamSpec):
     type_name = "DT"
     copy_attrs = ParamSpec.copy_attrs + ["seg_countdowns_initial",
@@ -718,13 +579,6 @@ class DTParamSpec(ParamSpec):
             assert supervision_type == SUPERVISION_UNSUPERVISED
 
 
-class RealMatParamSpec(ParamSpec):
-    type_name = "REAL_MAT"
-
-    def generate_objects(self):
-        yield "matrix_weightscale_1x1 1 1 1.0"
-            
-          
 class VirtualEvidenceSpec(ParamSpec):
     type_name = "VE_CPT"
 
@@ -769,13 +623,8 @@ class InputMasterSaver(Saver):
         include_filename = self.gmtk_include_filename_relative
 
         dt_spec = DTParamSpec(self)
-
-        if self.len_seg_strength > 0:
-            dirichlet_spec = DirichletTabParamSpec(self)
-        else:
-            dirichlet_spec = ""
-
-        dense_cpt_spec = DenseCPTParamSpec(self) 
+        dirichlet_spec = param_spec.generate_dirichlet_objects()
+        dense_cpt_spec = param_spec.generate_dense_cpt_objects()
 
         # seg_seg
         num_free_params += fullnum_subsegs * (fullnum_subsegs - 1)
@@ -821,3 +670,21 @@ class InputMasterSaver(Saver):
         ve_spec = VirtualEvidenceSpec(self)
 
         return locals()  # dict of vars set in this function
+
+                                                                          674,0-1       Bot
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
