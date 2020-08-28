@@ -21,7 +21,7 @@ installed for Segway:
 You need Python 2.7, or Python 3.6 or later versions.
 
 You need Graphical Models Toolkit (GMTK), which you can get at
-<http://melodi.ee.washington.edu/downloads/gmtk/gmtk-1.4.4.tar.gz>.
+<https://github.com/melodi-lab/gmtk/releases>.
 
 You need the HDF5 serial library and tools. The following packages are
 necessary for the OS you are running:
@@ -442,11 +442,10 @@ Model Customization
 
 You can supply your own custom or modified models to Segway by using the
 :option:`--structure` option. The model is defined by the syntax that GMTK
-uses. To learn more about using GMTK to create your own models there is a
-`GMTK tutorial`_ and the `GMTK documentation`_.
+uses. To learn more about using GMTK to create your own models there 
+the `GMTK documentation`_.
 
-.. _GMTK tutorial: http://melodi.ee.washington.edu/~bilmes/gmtk_timit_tutorial.pdf
-.. _GMTK documentation: http://melodi.ee.washington.edu/~bilmes/gmtk_docs_draft_09_08_2014.pdf
+.. _GMTK documentation: https://github.com/melodi-lab/gmtk/blob/master/documentation.pdf
 
 .. _segment-duration-model:
 
