@@ -1,5 +1,4 @@
 from __future__ import division, print_function
-import sys
 from collections import OrderedDict
 import numpy as np
 from numpy import array, ndarray
@@ -605,19 +604,3 @@ class DeterministicCPT:
         line.append("\n")
         return "\n".join(line)
     
-
-
-
-
-
-    
-
-
-
-     
-
-
-
-
-
-
