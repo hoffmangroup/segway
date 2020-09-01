@@ -592,8 +592,6 @@ class VirtualEvidenceSpec(ParamSpec):
 
     def generate_objects(self):
         yield self.make_virtual_evidence_spec()
-
-class RealMatParamSpec:
   
 
 class InputMasterSaver(Saver):
