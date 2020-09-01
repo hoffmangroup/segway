@@ -15,7 +15,7 @@ from numpy import (array, empty, set_printoptions, sqrt, tile, where)
 import numpy as np
 from six.moves import map, range
 
-from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
+from ._util import (copy_attrs, data_string,
                     DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
                     OFFSET_END, OFFSET_START, OFFSET_STEP,
                     resource_substitute, Saver, SEGWAY_ENCODING,
