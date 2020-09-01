@@ -546,7 +546,7 @@ class DiagGaussianMC(MC, object):
         :param covar: name of Covar obejct associated to this MC
         """
         # more component types?
-        super(DiagGaussianMC, self).__init__(COMPONENT_TYPE_DIAG_GAUSSIAN)
+        super(DiagGaussianMC, self).__init__("COMPONENT_TYPE_DIAG_GAUSSIAN")
         self.mean = mean
         self.covar = covar
 
