@@ -136,7 +136,7 @@ class InlineSection(Section):
                 # string representation of gmtk object
                 lines.append(list(self.values())[i].__str__())
 
-        return "\n".join(add_extra_line(add_extra_line(lines)))
+        return "\n".join(add_extra_line(lines))
     
 
 class InlineMCSection(InlineSection):
