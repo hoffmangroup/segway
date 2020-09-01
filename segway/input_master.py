@@ -489,15 +489,6 @@ class ParamSpec(object):
     def make_dirichlet_name(self, name):
         return "dirichlet_{}".format(name)
 
-    def make_dirichlet_table_spec(self, name, table):
-        dirichlet_name = self.make_dirichlet_name(name)
-        ndim = table.ndim
-        header_rows = [dirichlet_name, ndim]
-        header_rows.extend(table.shape)
-        rows = [" ".join(map(str, header_rows))]
-        rows.extend([array2text(table), ""])
-        return "\n".join(rows)
-
     def make_dirichlet_table(self):
         probs = self.make_dense_cpt_segCountDown_seg_segTransition()
 
@@ -516,16 +507,22 @@ class ParamSpec(object):
     def generate_dirichlet_objects(self):
         # XXX: these called functions have confusing/duplicative names
         if self.len_seg_strength > 0:
-            header = ["DIRICHLET_TAB_IN_FILE inline"]
-            header.append("1\n")  # only one DirichletTab for segCountDown_seg_segTransition 
-            header.append("0") # index of dirichlet tab 
+            lines = ["DIRICHLET_TAB_IN_FILE inline"]
+            lines.append("1\n")  # only one DirichletTab for segCountDown_seg_segTransition 
+            row = ["0"] # index of dirichlet tab 
+            row.append(self.make_dirichlet_name(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION))
+            # name of dirichlet tab
             dirichlet_table = self.make_dirichlet_table()
-            value = self.make_dirichlet_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
-                                   dirichlet_table)
-            header.append(value)
-            return "\n".join(header)
+            dim_shape = [dirichlet_table.ndim]
+            dim_shape.extend(dirichlet_table.shape)
+            row.append(" ".join(map(str, dim_shape)))
+            lines.append(" ".join(row))
+            value = array2text(dirichlet_table)
+            lines.append("{}\n\n".format(value))
+            return "\n".join(lines)
         else:
             return ""
+          
 
 class DTParamSpec(ParamSpec):
     type_name = "DT"
