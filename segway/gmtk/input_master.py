@@ -18,7 +18,26 @@ def array2text(a):
     else:
         delimiter = "\n" * (ndim - 1)
         return delimiter.join(array2text(row) for row in a)
+    
+def add_extra_line(l):
+    """
+    :param: l: list[str] or str
+    Return copy of l with "\n" concatenated with the last item. 
+    (l must have at least one item.) 
+    For example:
+    l = ["a", "b", "c"]
+    new_l = add_extra_line(l)
+    new_l 
+    ["a", "b", "c\n"]
+    """
+    if isinstance(l, str):
+        return "{}\n".format(l)
 
+    last_element = "{}\n".format(l[-1])
+    new_l = l[:]
+    new_l[-1] = last_element
+    return new_l
+    
 
 class Object(str):
     def __new__(cls, _name, content, _kind):
@@ -77,6 +96,7 @@ class Section(OrderedDict):
             else:
                 assert section_kind == obj.kind, "Objects must be of same type."
         return section_kind
+    
 
 class InlineSection(Section):
 
@@ -89,17 +109,35 @@ class InlineSection(Section):
         # if no gmtk objects
         if len(self) == 0:
             return ""
+        # MC, MX are also one line types but have their own subclasses of InlineSection 
+        one_line_types = ["MEAN", "COVAR", "DPMF"]  # TODO: DPMF dim > 1?
 
         lines = ["{}_IN_FILE inline".format(self.kind())]
         lines.append(str(len(self)) + "\n")  # total number of gmtk objects
         for i in range(len(self)):
-            lines.append(str(i))  # index of gmtk object
-            lines.append(list(self)[i])  # name of gmtk object
-            lines.append(list(self.values())[i].__str__())
-            # string representation of gmtk object
+            obj_header = []
+            obj_header.append(str(i))  # index of gmtk object
+            obj_header.append(list(self)[i])  # name of gmtk object
+            
+            # special formatting for some GMTK types: 
+            if self.kind() == "NAME_COLLECTION":
+                # size of this NameCollection object 
+                obj_header.append(str(len(list(self.values())[i])))
+            if self.kind() == "DENSE_CPT":
+                # num_parents and cardinality of this DenseCPT 
+                obj_header.append(list(self.values())[i].get_header_info())
 
-        return "\n".join(lines)
+            if self.kind() in one_line_types:
+                # string representation of gmtk object
+                obj_header.append(list(self.values())[i].__str__())
+                lines.append(" ".join(obj_header))
+            else:
+                lines.append(" ".join(obj_header))
+                # string representation of gmtk object
+                lines.append(list(self.values())[i].__str__())
 
+        return "\n".join(add_extra_line(add_extra_line(lines)))
+    
 
 class InlineMCSection(InlineSection):
     """
@@ -132,9 +170,10 @@ class InlineMCSection(InlineSection):
             return ""
         else:
             lines = ["{}_IN_FILE inline".format(self.kind())]
-            lines.append(str(len(self)) + "\n")  # total number of MC objects
+            lines.append("{}\n".format(str(len(self))))  # total number of MC objects
             for i in range(len(self)):
-                lines.append(str(i))  # index of MC object
+                obj_line = []
+                obj_line.append(str(i))  # index of MC object
                 # check if dimension of Mean and Covar of this MC are the same
                 obj = list(self.values())[i]
                 mean_name = obj.mean
@@ -143,14 +182,14 @@ class InlineMCSection(InlineSection):
                     # TODO delete MC? redefine?
                     raise ValueError("Inconsistent dimensions of mean and covar associated to MC.")
                 else:
-                    lines.append(str(self.mean[mean_name].get_dimension()))
+                    obj_line.append(str(self.mean[mean_name].get_dimension()))
                     # dimension of MC
-                    lines.append(str(obj.component_type))  # component type
-                    lines.append(list(self)[i])  # name of MC
-                    lines.append(obj.__str__())  # string representation of MC obj
-
-            lines.append("\n")
-            return "\n".join(lines)
+                    obj_line.append(str(obj.component_type))  # component type
+                    obj_line.append(list(self)[i])  # name of MC
+                    obj_line.append(obj.__str__())  # string representation of MC obj
+                    lines.append(" ".join(obj_line))              
+                    
+            return "\n".join(add_extra_line(lines))
 
 
 class InlineMXSection(InlineSection):
@@ -185,9 +224,10 @@ class InlineMXSection(InlineSection):
             return []
         else:
             lines = ["{}_IN_FILE inline".format(self.kind())]
-            lines.append(str(len(self)) + "\n")  # total number of MX objects
+            lines.append("{}\n".format(str(len(self))))  # total number of MX objects
             for i in range(len(self)):
-                lines.append(str(i))  # index of MX object
+                obj_line = []
+                obj_line.append(str(i))  # index of MX object
                 # check if number of components is equal to length of DPMF 
                 obj = list(self.values())[i]
                 dpmf_name = obj.dpmf
@@ -197,14 +237,14 @@ class InlineMXSection(InlineSection):
                     raise ValueError(
                         "Dimension of DPMF must be equal to number of components associated with this MX object.")
                 else:
-                    lines.append(str(dpmf_length))
-                    # dimension of MX
-                    lines.append(list(self)[i])  # name of MX
-                    lines.append(obj.__str__())
+                    obj_line.append(str(dpmf_length))  # dimension of MX
+                    obj_line.append(list(self)[i])  # name of MX
+                    obj_line.append(obj.__str__())
                     # string representation of this MX object
+                    lines.append(" ".join(obj_line))              
 
-            lines.append("\n")
-            return "\n".join(lines)
+                        
+            return "\n".join(add_extra_line(lines))
 
 
 class InputMaster:
@@ -280,18 +320,12 @@ class DenseCPT(Array):
         :return:
         """
         line = []
-
-        num_parents = len(self.shape) - 1
-        line.append(str(num_parents))  # number of parents
-        cardinality_line = map(str, self.shape)
-        line.append(" ".join(cardinality_line))  # cardinalities
         if 'extra_rows' not in self.__dict__.keys():
             extra_rows = []
         else:
             extra_rows = self.extra_rows
         line.extend(extra_rows)
-        line.append(array2text(self))
-        line.append("\n")
+        line.append("{}\n".format(array2text(self)))
 
         return "\n".join(line)
 
@@ -301,6 +335,16 @@ class DenseCPT(Array):
                 super(DenseCPT, self).__setattr__(key, value)
         else:
             raise ValueError("Attribute not allowed.")
+     
+    def get_header_info(self):
+        """
+        Return number of parents, cardinality line (called by Section.__str__()).
+        """
+        line = []
+        line.append(str(len(self.shape) - 1))  # number of parents
+        cardinality_line = map(str, self.shape)
+        line.append(" ".join(cardinality_line))  # cardinalities
+        return " ".join(line) 
 
     @classmethod
     def uniform_from_shape(cls, *shape, **kwargs):
@@ -356,7 +400,6 @@ class DenseCPT(Array):
             return np.squeeze(cpt, axis=0)
         
 
-
 class NameCollection(list):
     """
     A single NameCollection object.
@@ -381,18 +424,13 @@ class NameCollection(list):
         """
         if len(self) == 0:
             return ""
-        else:
-            line = []
-            line.append(str(len(self)))
-        line.extend(self)
-        line.append("\n")
-        list.__str__(self)
+        line = []
+        line.extend(self)  # names 
         return "\n".join(line)
 
 
 class Mean(Array):
     """
-    TODO
     A single Mean object.
     """
     kind = "MEAN"
@@ -409,8 +447,7 @@ class Mean(Array):
         line = []
         line.append(str(self.get_dimension()))  # dimension
         line.append(array2text(self))
-        line.append("\n")
-        return "\n".join(line)
+        return " ".join(line)
 
     def get_dimension(self):
         """
@@ -433,8 +470,7 @@ class Covar(Array):
         """
         line = [str(self.get_dimension())] # dimension
         line.append(array2text(self))  # covar values
-        line.append("\n")
-        return "\n".join(line)
+        return " ".join(line)
 
     def get_dimension(self):
         """
@@ -459,8 +495,7 @@ class DPMF(Array):
         """
         line = [str(self.get_length())]  # dpmf length
         line.append(array2text(self))  # dpmf values
-        line.append("\n")
-        return "\n".join(line)
+        return " ".join(line)
 
     def get_length(self):
         return len(self)
@@ -558,7 +593,7 @@ class MX:
         line = [str(len(self.components))]  # number of components
         line.append(self.dpmf)  # dpmf name
         line.append(" ".join(self.components))  # component names
-        return "\n".join(line)
+        return " ".join(line)
 
 
 class DeterministicCPT:
@@ -575,7 +610,7 @@ class DeterministicCPT:
     def __init__(self, cardinality_parents, cardinality, dt):
         """
         Initialize a single DeterministicCPT object.
-        :param parent_cardinality: tuple[int]: cardinality of parents
+        :param cardinality_parents: tuple[int]: cardinality of parents
         (if empty, then number of parents = 0
         :param cardinality: int: cardinality of self
         :param dt: name existing Decision Tree (DT) associated with this
@@ -600,7 +635,6 @@ class DeterministicCPT:
         cardinalities.extend(self.cardinality_parents)
         cardinalities.append(self.cardinality)
         line.append(" ".join(map(str, cardinalities)))  # cardinalities of parent and self
-        line.append(self.dt)
-        line.append("\n")
+        line.append("{}\n".format(self.dt))
         return "\n".join(line)
     
