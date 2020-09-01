@@ -8,13 +8,10 @@ __version__ = "$Revision$"
 
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from math import frexp, ldexp
-from string import Template
 import sys
 
 from genomedata._util import fill_array
-from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
-                   vectorize, where, zeros)
+from numpy import (array, empty, set_printoptions, sqrt, tile, where)
 import numpy as np
 from six.moves import map, range
 
@@ -28,7 +25,7 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
 
 from .gmtk.input_master import (InputMaster, NameCollection, DenseCPT,
-    DeterministicCPT, DPMF, MC, MX, Covar, Mean, DiagGaussianMC)
+    DPMF, MX, Covar, Mean, DiagGaussianMC)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
 # scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -43,7 +40,7 @@ except TypeError:
     # Otherwise ignore the attempt
     pass
   
-if USE_MFSDG:
+if USE_MFSDG:  
     # because tying not implemented yet
     COVAR_TIED = False
 else:
@@ -596,6 +593,8 @@ class VirtualEvidenceSpec(ParamSpec):
     def generate_objects(self):
         yield self.make_virtual_evidence_spec()
 
+class RealMatParamSpec:
+  
 
 class InputMasterSaver(Saver):
     resource_name = "input.master.tmpl"
@@ -638,29 +637,19 @@ class InputMasterSaver(Saver):
         if distribution in DISTRIBUTIONS_LIKE_NORM:
             mean_spec = param_spec.generate_mean_objects(head_track_names)
             covar_spec = param_spec.generate_covar_objects(head_track_names)
-            if USE_MFSDG:
-                real_mat_spec = RealMatParamSpec(self)
-            else:
-                real_mat_spec = ""
 
+            # TODO: class RealMatParamSpec 
+            # for now this is sufficient because util.USE_MFSDG = False by default 
+            real_mat_spec = ""
             mc_spec = param_spec.generate_mc_objects(head_track_names)
 
             if COVAR_TIED:
                 num_free_params += (fullnum_subsegs + 1) * num_track_groups
             else:
                 num_free_params += (fullnum_subsegs * 2) * num_track_groups
+                
+# TODO: gamma distribution option 
 
-        elif distribution == DISTRIBUTION_GAMMA:
-            mean_spec = ""
-            covar_spec = ""
-
-            # XXX: another option is to calculate an ML estimate for
-            # the gamma distribution rather than the ML estimate for the
-            # mean and converting
-            real_mat_spec = GammaRealMatParamSpec(self)
-            mc_spec = param_spec.generate_mc_objects(head_track_names)
-
-            num_free_params += (fullnum_subsegs * 2) * num_track_groups
         else:
             raise ValueError("distribution %s not supported" % distribution)
 
