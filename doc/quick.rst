@@ -14,8 +14,8 @@ Generic installation
 
 1. To install Segway first install `GMTK
    <https://github.com/melodi-lab/gmtk/releases>`_,
-   and install `HDF5 <http://www.hdfgroup.org/downloads/index.html>`_,.
-   Then run this command from :program:`bash`::
+   and install `HDF5 <http://www.hdfgroup.org/downloads/index.html>`_,
+   then run this command from :program:`bash`::
 
      pip install segway
 
