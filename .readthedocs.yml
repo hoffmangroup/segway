@@ -4,16 +4,9 @@
 # Required
 version: 2
 
-build:
-    image: hoffmanlab/segway-test:latest
+conda:
+    environment: environment.yml
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:
   configuration: doc/conf.py
-
-# Segway needs to be installed ideally with pip --no-deps
-python:
-    version: 3.7
-    install:
-        - method: pip
-          path: .
