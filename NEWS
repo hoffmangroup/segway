@@ -1,3 +1,9 @@
+3.0.2:
+* segway: added readthedocs configuration file
+* segway: added conda environment file
+* segway: updated GMTK download locations in documentation
+* segway: change GMTK to a runtime only dependency
+
 3.0.1:
 * segway: fixed regression with the prior-strength option
 * segway: added manifest file for easier installation on older systems with Python
