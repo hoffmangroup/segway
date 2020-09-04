@@ -1,3 +1,6 @@
+3.0.3:
+* segway: enable virtual evidence for posterior tasks
+
 3.0.2:
 * segway: added readthedocs configuration file
 * segway: added conda environment file

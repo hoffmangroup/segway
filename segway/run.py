@@ -4088,14 +4088,16 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                        help="virtual evidence with priors for labels at each position in "
                        "FILE (default none)")
 
-    group = identify_init.add_argument_group("Flags (annotate-init)")
+    group = identify_init.add_argument_group("Flags "
+                                             "(annotate-init, posterior-init)")
     group.add_argument("-c", "--clobber", action="store_true",
                        help="delete any preexisting files and assumes any "
                        "model files specified in options as output to be "
                        "overwritten")
 
     # select coords to identify in the init step
-    group = identify_init.add_argument_group("Data selection (annotate-init)")
+    group = identify_init.add_argument_group("Data selection "
+                                             "(annotate-init, posterior-init)")
     group.add_argument("--include-coords", metavar="FILE",
                        help="limit to genomic coordinates in"
                        " FILE (default all) (Note: does not apply to"
@@ -4117,7 +4119,10 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                        " (default none)")
 
     group = identify_init_run.add_argument_group("Virtual Evidence "
-                                              "(annotate-init, annotate-run)")
+                                                 "(annotate-init, "
+                                                 "posterior-init, "
+                                                 "annotate-run, "
+                                                 "posterior-run)")
     group.add_argument("--virtual-evidence", metavar="FILE",
                        help="virtual evidence with priors for labels at each position in "
                        "FILE (default none)")
@@ -4162,11 +4167,12 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                      usage = "segway annotate-finish [args] GENOMEDATA TRAINDIR ANNOTATEDIR")
 
     # posterior and identify take the same options
-    tasks.add_parser("posterior-init", parents=[identify_init, args,
+    tasks.add_parser("posterior-init", parents=[identify_init,
+                                                identify_init_run, args,
                                                 identify_args],
                      usage = "segway posterior-init [args] GENOMEDATA TRAINDIR POSTDIR")
-    tasks.add_parser("posterior-run", parents=[identify_run, args,
-                                               identify_args],
+    tasks.add_parser("posterior-run", parents=[identify_run, identify_init_run,
+                                               args, identify_args],
                      usage = "segway posterior-run [args] GENOMEDATA TRAINDIR POSTDIR")
     tasks.add_parser("posterior-finish", parents=[identify_finish, args,
                                                   identify_args],
