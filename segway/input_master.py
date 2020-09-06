@@ -687,7 +687,7 @@ class InputMasterSaver(Saver):
                   "supervision_type",
                   "use_dinucleotide", "mins", "means", "vars",
                   "gmtk_include_filename_relative", "track_groups",
-                  "num_mix_components", "virtual_evidence"]
+                  "num_mix_components", "virtual_evidence", "tracks"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping
