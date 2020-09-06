@@ -357,7 +357,6 @@ class ParamSpec(object):
         name_groups = [names[i:i + len_name_group] for i in
                        range(0, len(names), len_name_group)]
         # create NameCollection objects and add to input master
-        for collection_name, collection_entry in 
         for group_index in range(len(name_groups)):
             input_master.name_collection[collection_names[group_index]] = \
                 NameCollection(name_groups[group_index])
