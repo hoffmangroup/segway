@@ -324,16 +324,16 @@ class ParamSpec(object):
         if not gmtk_object_type in allowed_types:
             raise ValueError("Undefined GMTK object type: {}".format(gmtk_object_type))
             
-        GMTK_OBJECT_NAME_GENERATORS = {'mx': generate_mx_object_names, 
-                                       'diag_gaussian_mc': generate_diag_gaussian_mc_object_names, 
-                                       'gamma_mc': generate_gamma_mc_object_names,
-                                       'missing_mc': generate_missing_mc_object_names,
-                                      'mean': generate_mean_object_names, 
-                                      'covar': generate_covar_object_names,
-                                       'tied_covar': generate_covar_object_names,
-                                      'collection_names': generate_collection_names, 
-                                       'collection_entries': generate_name_collection_entries, 
-                                      'dpmf': generate_dpmf_object_names}
+        GMTK_OBJECT_NAME_GENERATORS = {'mx': self.generate_mx_object_names, 
+                                       'diag_gaussian_mc': self.generate_diag_gaussian_mc_object_names, 
+                                       'gamma_mc': self.generate_gamma_mc_object_names,
+                                       'missing_mc': self.generate_missing_mc_object_names,
+                                      'mean': self.generate_mean_object_names, 
+                                      'covar': self.generate_covar_object_names,
+                                       'tied_covar': self.generate_covar_object_names,
+                                      'collection_names': self.generate_collection_names, 
+                                       'collection_entries': self.generate_name_collection_entries, 
+                                      'dpmf': self.generate_dpmf_object_names}
             
         return GMTK_OBJECT_NAME_GENERATORS[gmtk_object_type]()
 
