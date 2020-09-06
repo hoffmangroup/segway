@@ -25,7 +25,7 @@ from ._util import (copy_attrs, data_string,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
 
 from .gmtk.input_master import (InputMaster, NameCollection, DenseCPT,
-    DPMF, MX, Covar, Mean, DiagGaussianMC, InlineSection)
+    DPMF, MX, Covar, Mean, DiagGaussianMC)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
 # scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -245,6 +245,7 @@ class ParamSpec(object):
         Generate Mean object names. 
         """      
         head_track_names = self.get_head_track_names()
+        component_suffix = self.get_template_component_suffix()
         names = []
         for i in range(self.num_segs):
             for j in range(self.num_subsegs):
@@ -294,17 +295,13 @@ class ParamSpec(object):
         """
         Generate DPMF object names. 
         """      
-        head_track_names = self.get_head_track_names()
         names = []
         if self.num_mix_components == 1:
             names.append("dpmf_always")
         else: 
             names.append("")
             # TODO (with dirichlet extra rows) 
-#             for i in range(self.num_segs):
-#                 for j in range(self.num_subsegs):
-#                     for track_name in head_track_names:
-#                         names.append("dpmf_seg{}_subseg{}_{}".format(i, j, track_name))
+        
         return names 
       
     def generate_gmtk_object_names(self, gmtk_object_type):
@@ -324,7 +321,7 @@ class ParamSpec(object):
                      "covar", "collection_names", "collection_entries", "dpmf", "gammascale",
                      "gammashape", "tied_covar"]
         
-        if not gmtk_object_types in allowed_types:
+        if not gmtk_object_type in allowed_types:
             raise ValueError("Undefined GMTK object type: {}".format(gmtk_object_type))
             
         GMTK_OBJECT_NAME_GENERATORS = {'mx': generate_mx_object_names, 
@@ -409,7 +406,7 @@ class ParamSpec(object):
             names = self.generate_gmtk_object_names("covar")
         covar_values = self.vars  # array of variance values
         # creating Covar objects and adding them to input master
-        dpmf_objects = map(Covar, covar_values) 
+        covar_objects = map(Covar, covar_values) 
         input_master.covar.update(dict(zip(names, covar_objects)))
 
         return str(input_master.covar)
@@ -451,7 +448,7 @@ class ParamSpec(object):
         dpmf_names = list(input_master.dpmf)  # list of all dpmf names
         multiple = int(len(names) / len(dpmf_names))
         dpmf_names *= multiple  # replicate dpmf names for iteration
-        mx_object = []
+        mx_objects = []
         # parameters required for creating MX object: names of mc, dpmf
         for mc_name, dpmf_name in zip(mc_names, dpmf_names):
             mx_objects.append(MX(dpmf=dpmf_name, components=mc_name))
