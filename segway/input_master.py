@@ -461,7 +461,7 @@ class ParamSpec(object):
         input_master.mx.update(dict(zip(names, mx_objects)))
         return input_master.mx.__str__()
 
-    def generate_dpmf_objects(self, track_names):
+    def generate_dpmf_objects(self):
         """Generate string representation of DPMF objects in input master. 
         """
         # generate a list of dpmf names
