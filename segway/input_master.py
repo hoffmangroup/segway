@@ -334,7 +334,7 @@ class ParamSpec(object):
                                        'missing_mc': self.generate_missing_mc_object_names,
                                       'mean': self.generate_mean_object_names, 
                                       'covar': self.generate_covar_object_names,
-                                       'tied_covar': self.generate_covar_object_names,
+                                       'tied_covar': self.generate_tied_covar_object_names,
                                       'collection_names': self.generate_collection_names, 
                                        'collection_entries': self.generate_name_collection_entries, 
                                       'dpmf': self.generate_dpmf_object_names}
