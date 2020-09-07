@@ -217,10 +217,11 @@ class ParamSpec(object):
         Generate tied Covar object names. 
         """      
         head_track_names = self.get_head_track_names()
-        component_suffix = self.get_template_component_suffix()
         names = []
-        for track_name in head_track_names:
-            names.append("covar_{}{}".format(track_name, component_suffix))
+        for component_number in range(self.num_mix_components):
+            for track_name in head_track_names:
+                component_suffix = self.get_template_component_suffix(component_number)
+                names.append("covar_{}{}".format(track_name, component_suffix))
         return names
       
     def generate_covar_object_names(self):
@@ -228,12 +229,13 @@ class ParamSpec(object):
         Generate tied Covar object names. 
         """      
         head_track_names = self.get_head_track_names()
-        component_suffix = self.get_template_component_suffix()
         names = []
-        for i in range(self.num_segs):
-            for j in range(self.num_subsegs):
-                for track_name in head_track_names:
-                    names.append("covar_seg{}_subseg{}_{}{}".format(i, j, 
+        for component_number in range(self.num_mix_components):
+            for i in range(self.num_segs):
+                for j in range(self.num_subsegs):
+                    for track_name in head_track_names:
+                        component_suffix = self.get_template_component_suffix(component_number)
+                        names.append("covar_seg{}_subseg{}_{}{}".format(i, j, 
                                                                     track_name, 
                                                                     component_suffix))
 
@@ -245,12 +247,13 @@ class ParamSpec(object):
         Generate Mean object names. 
         """      
         head_track_names = self.get_head_track_names()
-        component_suffix = self.get_template_component_suffix()
         names = []
-        for i in range(self.num_segs):
-            for j in range(self.num_subsegs):
-                for track_name in head_track_names:
-                    names.append("mean_seg{}_subseg{}_{}{}".format(i, j, 
+        for component_number in range(self.num_mix_components):
+            for i in range(self.num_segs):
+                for j in range(self.num_subsegs):
+                    for track_name in head_track_names:
+                        component_suffix = self.get_template_component_suffix(component_number)
+                        names.append("mean_seg{}_subseg{}_{}{}".format(i, j, 
                                                                    track_name, 
                                                                   component_suffix))
 
@@ -274,12 +277,13 @@ class ParamSpec(object):
         Generate DiagGaussianMC object names. 
         """      
         head_track_names = self.get_head_track_names()
-        component_suffix = self.get_template_component_suffix()
         names = []
-        for i in range(self.num_segs):
-            for j in range(self.num_subsegs):
-                for track_name in head_track_names:
-                    names.append("mc_{}_seg{}_subseg{}_{}{}".format(self.distribution, 
+        for component_number in range(self.num_mix_components):
+            for i in range(self.num_segs):
+                for j in range(self.num_subsegs):
+                    for track_name in head_track_names:
+                        component_suffix = self.get_template_component_suffix(component_number)
+                        names.append("mc_{}_seg{}_subseg{}_{}{}".format(self.distribution, 
                                                                     i, j, track_name, 
                                                                    component_suffix))
         return names
