@@ -324,7 +324,6 @@ class ParamSpec(object):
         Generate DPMF object names. 
         """      
         # to do for num_mix_components > 1: 
-        DPMF_FORMAT_STRING = ""
         names = []
         if self.num_mix_components == 1:
             names.append("dpmf_always")
