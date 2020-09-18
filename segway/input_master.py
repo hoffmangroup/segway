@@ -189,45 +189,54 @@ class ParamSpec(object):
         for group in self.track_groups:
             head_track_names.append(group[0].name)
         return head_track_names
-      
+
+       
     def generate_collection_names(self):
         """
         Generate names of NameCollection objects. 
         """
+        COLLECTION_NAME_FORMAT_STRING = "collection_seg_{track_name}"
         head_track_names = self.get_head_track_names()
         names = []
         for name in head_track_names:
-            names.append("collection_seg_{}".format(name))
+            names.append(COLLECTION_NAME_FORMAT_STRING.format(track_name=name))
         return names 
 
     def generate_name_collection_entries(self):
         """
         Generate entries in NameCollection objects. 
         """
+        COLLECTION_ENTRY_FORMAT_STRING = \
+            "mx_seg{seg_index}_subseg{subseg_index}_{track_name}"
         head_track_names = self.get_head_track_names()
         names = []
         for name in head_track_names:
             for i in range(self.num_segs):
                 for j in range(self.num_subsegs):
-                    names.append("mx_seg{}_subseg{}_{}".format(i, j, name))
+                    names.append(COLLECTION_ENTRY_FORMAT_STRING.format(seg_index=i, 
+                                                                       subseg_index=j, 
+                                                                       track_name=name))
         return names
                      
     def generate_tied_covar_object_names(self):
         """
         Generate tied Covar object names. 
         """      
+        TIED_COVAR_FORMAT_STRING = "covar_{track_name}{suffix}"
         head_track_names = self.get_head_track_names()
         names = []
         for component_number in range(self.num_mix_components):
             for track_name in head_track_names:
                 component_suffix = self.get_template_component_suffix(component_number)
-                names.append("covar_{}{}".format(track_name, component_suffix))
+                names.append(TIED_COVAR_FORMAT_STRING.format(track_name=track_name, 
+                                                             suffix=component_suffix))
         return names
       
     def generate_covar_object_names(self):
         """
         Generate tied Covar object names. 
         """      
+        COVAR_FORMAT_STRING = "covar_seg{seg_index}_subseg{subseg_index}_{track_name}{suffix}"
         head_track_names = self.get_head_track_names()
         names = []
         for component_number in range(self.num_mix_components):
@@ -235,17 +244,18 @@ class ParamSpec(object):
                 for j in range(self.num_subsegs):
                     for track_name in head_track_names:
                         component_suffix = self.get_template_component_suffix(component_number)
-                        names.append("covar_seg{}_subseg{}_{}{}".format(i, j, 
-                                                                    track_name, 
-                                                                    component_suffix))
+                        names.append(COVAR_FORMAT_STRING.format(seg_index=i, 
+                                                                subseg_index=j, 
+                                                                track_name=track_name, 
+                                                                suffix=component_suffix))
 
-        return names
-      
+        return names 
     
     def generate_mean_object_names(self):
         """
         Generate Mean object names. 
         """      
+        MEAN_FORMAT_STRING = "mean_seg{seg_index}_subseg{subseg_index}_{track_name}{suffix}"
         head_track_names = self.get_head_track_names()
         names = []
         for component_number in range(self.num_mix_components):
@@ -253,9 +263,10 @@ class ParamSpec(object):
                 for j in range(self.num_subsegs):
                     for track_name in head_track_names:
                         component_suffix = self.get_template_component_suffix(component_number)
-                        names.append("mean_seg{}_subseg{}_{}{}".format(i, j, 
-                                                                   track_name, 
-                                                                  component_suffix))
+                        names.append(MEAN_FORMAT_STRING.format(seg_index=i, 
+                                                               subseg_index=j, 
+                                                               track_name=track_name, 
+                                                              suffix=component_suffix))
 
         return names
       
@@ -263,12 +274,15 @@ class ParamSpec(object):
         """
         Generate MX object names. 
         """      
+        MX_FORMAT_STRING = "mx_seg{seg_index}_subseg{subseg_index}_{track_name}"
         head_track_names = self.get_head_track_names()
         names = []
         for i in range(self.num_segs):
             for j in range(self.num_subsegs):
                 for track_name in head_track_names:
-                    names.append("mx_seg{}_subseg{}_{}".format(i, j, track_name))
+                    names.append(MX_FORMAT_STRING.format(seg_index=i, 
+                                                         subseg_index=j, 
+                                                         track_name=track_name))
 
         return names
     
@@ -276,6 +290,8 @@ class ParamSpec(object):
         """
         Generate DiagGaussianMC object names. 
         """      
+        DIAG_GAUSSIAN_FORMAT_STRING = \
+           "mc_{distribution}_seg{seg_index}_subseg{subseg_index}_{track_name}{suffix}"
         head_track_names = self.get_head_track_names()
         names = []
         for component_number in range(self.num_mix_components):
@@ -283,55 +299,56 @@ class ParamSpec(object):
                 for j in range(self.num_subsegs):
                     for track_name in head_track_names:
                         component_suffix = self.get_template_component_suffix(component_number)
-                        names.append("mc_{}_seg{}_subseg{}_{}{}".format(self.distribution, 
-                                                                    i, j, track_name, 
-                                                                   component_suffix))
+                        names.append(DIAG_GAUSSIAN_FORMAT_STRING.format(distribution=self.distribution, 
+                                                                    seg_index=i,
+                                                                        subseg_index=j, 
+                                                                        track_name=track_name, 
+                                                                   suffix=component_suffix))
         return names
     
     def generate_gamma_mc_object_names(self):
-        # todo: gammascale, gammashape
-        pass
-    
-    def generate_missing_mc_object_names(self):
-        pass
-
+        GAMMA_MC_FORMAT_STRING = \
+            "mc_gamma_seg{seg_index}_subseg{subseg_index}_{track_name}"
+        names = []
+        head_track_names = self.get_head_track_names()
+        for i in range(self.num_segs):
+            for j in range(self.num_subsegs):
+                for track_name in head_track_names:
+                    names.append(GAMMA_MC_FORMAT_STRING.format(seg_index=i,
+                                                               subseg_index=j,
+                                                               track_name=track_name))
+        return names
+      
     def generate_dpmf_object_names(self):
         """
         Generate DPMF object names. 
         """      
+        # to do for num_mix_components > 1: 
+        DPMF_FORMAT_STRING = ""
         names = []
         if self.num_mix_components == 1:
             names.append("dpmf_always")
         else: 
+            # TODO (with dirichlet extra rows) 
             names.append("")
-            # TODO (with dirichlet extra rows) 
-        
+          
         return names 
       
     def generate_gmtk_object_names(self, gmtk_object_type):
         """
         Generate GMTK object names for the types:
-        NameCollection: "col"
-        entries in NameCollection: "mx_name"
+        name of NameCollection: "collection_names"
+        entries in NameCollection: "collection_entries"
         Covar: "covar", "tied_covar"
         Mean: "mean"
         MX: "mx"
-        MC: "diag_gaussian_mc", "gamma_mc", "missing_mc", "gammascale"
+        MC: "diag_gaussian_mc"
         DPMF: "dpmf"
         :param gmtk_object_type: str: type of gmtk object for which names must be generated
         :return: list[str]: list of GMTK object names 
         """
-        allowed_types = ["mx", "diag_gaussian_mc", "gamma_mc", "missing_mc", "mean",
-                     "covar", "collection_names", "collection_entries", "dpmf", "gammascale",
-                     "gammashape", "tied_covar"]
-        
-        if not gmtk_object_type in allowed_types:
-            raise ValueError("Undefined GMTK object type: {}".format(gmtk_object_type))
-            
         GMTK_OBJECT_NAME_GENERATORS = {'mx': self.generate_mx_object_names, 
                                        'diag_gaussian_mc': self.generate_diag_gaussian_mc_object_names, 
-                                       'gamma_mc': self.generate_gamma_mc_object_names,
-                                       'missing_mc': self.generate_missing_mc_object_names,
                                       'mean': self.generate_mean_object_names, 
                                       'covar': self.generate_covar_object_names,
                                        'tied_covar': self.generate_tied_covar_object_names,
