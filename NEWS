@@ -1,3 +1,6 @@
+3.0.3:
+* segway: fixed posterior label output not working with resolutions greater than 1bp
+
 3.0.2:
 * segway: added readthedocs configuration file
 * segway: added conda environment file

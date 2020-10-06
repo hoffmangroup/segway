@@ -449,13 +449,22 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
         # run-length encoding on the probs_rounded_label
 
         with open(outfilename, "w") as outfile:
-            pos, = where(diff(probs_rounded_label) != 0)
-            pos = r_[start, pos[:] + start + 1, end]
+            # Create a list of indicies of unique values in the probability
+            # BED labels
+            unique_prob_value_indices, = where(diff(probs_rounded_label) != 0)
+            # The first index is always unique
+            unique_prob_value_indices = r_[0, unique_prob_value_indices + 1]
+            region_coords = r_[(unique_prob_value_indices * resolution) +
+                               start,
+                               end]
 
-            for bed_start, bed_end in zip(pos[:-1], pos[1:]):
+            bed_zipper = zip(region_coords[:-1], region_coords[1:],
+                             unique_prob_value_indices)
+
+            for bed_start, bed_end, prob_index in bed_zipper:
                 chrom_start = str(bed_start)
                 chrom_end = str(bed_end)
-                value = str(probs_rounded_label[bed_start - start])
+                value = str(probs_rounded_label[prob_index])
 
                 row = [chrom, chrom_start, chrom_end, value]
                 print(*row, sep="\t", file=outfile)
