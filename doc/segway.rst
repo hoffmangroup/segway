@@ -256,11 +256,6 @@ across all instances.
 Resolution
 ----------
 
-.. important::
-
-  The resolution feature is not implemented for posterior use in the Segway
-  |version| release.
-
 In order to speed up the inference process, you may downsample the
 data to a different resolution using the :option:`--resolution`\=\
 *res* option. This means that Segway will partition the input
@@ -778,20 +773,22 @@ A simple mnemonic file appears below::
 
 Posterior task
 ==============
-The **posterior** inference task of Segway estimates for each position
-of interest the probability that the model has a particular segment
-label given the data. This information is delivered in a series of
-numbered wiggle files, one for each segment label. In hierarchical 
-segmentation mode, setting the `--output-label` option to *full* or
-*subseg* will cause segway to produce a wiggle file for each sublabel
-instead, identified using the label and the sublabel in the file name 
-before the file extension. For example, the bedGraph file for label 0, 
-and sublabel 1 would be called ``posterior0.1.bedGraph``. The individual 
-values will vary from 0 to 100, showing the percentage probability at 
-each position for the label in that file. In most positions, the value 
-will be 0 or 100, and substantially reproduce the Viterbi path 
-determined from the **annotate** task. The **posterior** task uses the 
-same options for specifying a model and parameters as **annotate**.
+The **posterior** inference task of Segway estimates for each position of
+interest the probability that the model has a particular resolution-sized
+section given the data. The posterior output does not fall on segment
+boundaries since segment duration is itself probabilistically modeled.
+This information is delivered in a series of numbered BED files, one for each
+segment label. In hierarchical segmentation mode, setting the
+`--output-label` option to *full* or *subseg* will cause segway to produce a
+wiggle file for each sublabel instead, identified using the label and the
+sublabel in the file name before the file extension. For example, the
+bedGraph file for label 0, and sublabel 1 would be called
+``posterior0.1.bedGraph``. The individual values will vary from 0 to 100,
+showing the percentage probability at each position for the label in that
+file. In most positions, the value will be 0 or 100, and substantially
+reproduce the Viterbi path determined from the **annotate** task. The
+**posterior** task uses the same options for specifying a model and
+parameters as **annotate**.
 
 Posterior results can be useful in determining regions of ambiguous
 labeling or in diagnosing new models. The mostly binary nature of the
