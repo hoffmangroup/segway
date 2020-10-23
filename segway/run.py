@@ -2160,7 +2160,39 @@ class Runner(object):
 
         self.virtual_evidence_coords = virtual_evidence_coords
         self.virtual_evidence_priors = virtual_evidence_priors
+    
+    def get_virtual_evidence_in_window(self, window):
+        """Returns a tuple of a list of coords and their cooresponding
+        dictionary of priors based on the region described the window"""
 
+        # Return no virtual evidence if it is not enabled
+        virtual_evidence_coords = None
+        virtual_evidence_priors = None
+        # Otherwise
+        if self.virtual_evidence:
+            virtual_evidence_coords = []
+            virtual_evidence_priors = []
+            # Iterate over all VE coordinates and corresponding priors
+            zipper = zip(
+                self.virtual_evidence_coords[(window.world, window.chrom)],
+                self.virtual_evidence_priors[(window.world, window.chrom)]
+            )
+            for ve_coord, ve_prior in zipper:
+                # A VE coord does not overlap with the window if its interval
+                # ends entirely before the start of the window or starts
+                # entirely after the end of the window
+                # e.g. ve_coord[1] < window.start or ve_coord[0] > window.end
+                # Negate that condition (so a VE coord does overlap) for the
+                # following:
+                if ve_coord[1] >= window.start and ve_coord[0] <= window.end:
+                    # On VE coordinate overlap with window
+                    # Append to our resulting list
+                    virtual_evidence_coords.append(ve_coord)
+                    virtual_evidence_priors.append(ve_prior)
+        
+        # Return list of VE coords and corresponding priors
+        return (virtual_evidence_coords, virtual_evidence_priors)
+                
     def set_supervision_label_range_size(self, new_extension):
         """This function takes a new label extension new_extension,
         and add it into the supervision_label_range_size set.
@@ -2540,14 +2572,8 @@ class Runner(object):
                 supervision_coords = None
                 supervision_labels = None
 
-            if self.virtual_evidence:
-                virtual_evidence_coords = \
-                    self.virtual_evidence_coords[(window.world, window.chrom)]
-                virtual_evidence_priors = \
-                    self.virtual_evidence_priors[(window.world, window.chrom)]
-            else:
-                virtual_evidence_coords = None
-                virtual_evidence_priors = None
+            virtual_evidence_coords, virtual_evidence_priors = \
+                self.get_virtual_evidence_in_window(window)
 
             additional_prefix_args = [
                genomedata_names_text,
@@ -3634,14 +3660,8 @@ to find the winning instance anyway.""" % thread.instance_index)
         track_indexes_text = ",".join(map(str, track_indexes))
         genomedata_names_text = ",".join(genomedata_names)
 
-        if self.virtual_evidence:
-            virtual_evidence_coords = \
-                self.virtual_evidence_coords[(window.world, window.chrom)]
-            virtual_evidence_priors = \
-                self.virtual_evidence_priors[(window.world, window.chrom)]
-        else:
-            virtual_evidence_coords = None
-            virtual_evidence_priors = None
+        virtual_evidence_coords, virtual_evidence_priors = \
+            self.get_virtual_evidence_in_window(window)
 
         # Prefix args all get mapped with "str" function!
         prefix_args = [find_executable("segway-task"), "run", kind,
