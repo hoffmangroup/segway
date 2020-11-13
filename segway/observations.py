@@ -695,7 +695,7 @@ def _save_window(float_filename_or_file, int_filename_or_file,
                 ' '.join(['{}'.format(prob) for prob in prior]) + '\n')
 
     if int_blocks:
-        int_data = column_stack(int_blocks)
+        int_data = column_stack(int_blocks).astype(dtype=DTYPE_OBS_INT)
     else:
         int_data = array([], dtype=DTYPE_OBS_INT)
 

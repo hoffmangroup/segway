@@ -170,6 +170,8 @@ htmlhelp_basename = 'Segwaydoc'
 
 # -- Options for LaTeX output --------------------------------------------------
 
+latex_engine = 'lualatex'
+
 # The paper size ('letter' or 'a4').
 #latex_paper_size = 'letter'
 
