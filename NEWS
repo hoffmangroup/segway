@@ -1,5 +1,6 @@
 3.0.3:
 * segway: fixed posterior label output not working with resolutions greater than 1bp
+* segway: fixed bug when using virtual evidence with higher resolutions
 
 3.0.2:
 * segway: added readthedocs configuration file
