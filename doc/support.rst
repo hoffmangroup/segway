@@ -10,7 +10,7 @@ will get your question answered more quickly. It also allows us to
 pool knowledge and minimize redundant inquiries.
 You can subscribe here:
 
-https://mailman1.u.washington.edu/mailman/listinfo/segway-users
+https://listserv.utoronto.ca/cgi-bin/wa?A0=segway-l
 
 Specifically, if you want to report a bug or request a feature, please
 do so using the Segway issue tracker at:
@@ -22,7 +22,7 @@ Segway, but would like to hear about new releases and other important
 information, please subscribe to <segway-announce@uw.edu> by visiting
 this web page:
 
-https://mailman1.u.washington.edu/mailman/listinfo/segway-announce
+https://listserv.utoronto.ca/cgi-bin/wa?A0=segway-announce-l
 
 Announcements of this nature are sent to both ``segway-users`` and
 ``segway-announce``.

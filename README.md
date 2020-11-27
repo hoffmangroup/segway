@@ -35,4 +35,4 @@ ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
 FITNESS FOR A PARTICULAR PURPOSE.
 
 # Contact
-Please let us `segway-users at uw dot edu` know if you have any comments on the installation or use of Segway, or [file an issue on Github](https://github.com/hoffmangroup/segway/issues).
+Please let us `segway-l at listserv dot utoronto dot ca` know if you have any comments on the installation or use of Segway, or [file an issue on Github](https://github.com/hoffmangroup/segway/issues).
