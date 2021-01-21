@@ -75,10 +75,9 @@ that this is not a problem. However, you will probably want to split
 the input sequences somewhat because larger sequences make more
 difficult work units (greater memory and run time costs) and thereby
 impede efficient parallelization. The :option:`--split-sequences`\=\
-*size* option will split up sequences into windows with *size* frames
-each. The default *size* is 2,000,000. Decreasing to 500,000 will
-greatly improve speed at the cost of more artefacts at split
-boundaries.
+*size* option will split up sequences into windows with *size* base pairs
+each. The default *size* is 2,000,000. Decreasing to 500,000 will greatly
+improve speed at the cost of more artefacts at split boundaries.
 
 Reporting
 =========
