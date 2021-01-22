@@ -1,3 +1,5 @@
+3.0.4:
+
 3.0.3:
 * segway: fixed posterior label output not working with resolutions greater than 1bp
 * segway: fixed bug when using virtual evidence with higher resolutions
