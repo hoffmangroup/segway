@@ -40,7 +40,7 @@ Running Segway
    data. Here, we specify that we want Segway to discover four unique
    patterns::
 
-     segway --num-labels=4 train test.genomedata traindir
+     segway train --num-labels=4 test.genomedata traindir
 
 5. Use the ``segway identify`` command to create the segmentation,
    which partitions the genome into regions labeled with one of the
