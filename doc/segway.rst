@@ -815,7 +815,7 @@ SegRNA
 
 To use SegRNA [segrna2020]_ with stranded transcriptome datasets, the user provides one track per strand.
 Then for each dataset, the user species the tracks for each strand with the :option:`--track` option separated
-by a comma.For example::
+by a comma. For example::
 
     segway --track long.polyA.forward,long.polyA.reverse
 
