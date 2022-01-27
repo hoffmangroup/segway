@@ -3944,11 +3944,68 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
     identify_finish = tasks.add_parser("", add_help=False)
     identify_init_run = tasks.add_parser("", add_help=False)
 
+    # Common options across tasks
+    class Argument(object):
+        def __init__(self, args, kwargs):
+            self.args = args
+            self.kwargs = kwargs
+    
+    include_coords_args = Argument(
+        args = ["--include-coords"],
+        kwargs = {
+            "metavar": "FILE",
+            "help" : "limit to genomic coordinates in" " FILE (default all)"
+                     " (Note: does not apply to" " --validation-coords)",
+        }
+    )
+
+    exclude_coords_args = Argument(
+        args = ["--exclude-coords"],
+        kwargs = {
+            "metavar": "FILE",
+            "help" : "filter out genomic coordinates in FILE (default none)",
+        }
+    )
+
+    clobber_args = Argument(
+        args = ["-c", "--clobber"],
+        kwargs = {
+            "action": "store_true",
+            "help" : "delete any preexisting files and assumes any model files"
+                     " specified in options as output to be overwritten",
+        }
+    )
+
+    seg_table_args = Argument(
+        args = ["--seg-table"],
+        kwargs = {
+            "metavar": "FILE",
+            "help" : "load segment hyperparameters from FILE (default none)",
+        }
+    )
+
+    virtual_evidence_args = Argument (
+        args = ["--virtual-evidence"],
+        kwargs = {
+            "metavar": "FILE",
+            "help" : "virtual evidence with priors for labels at each position"
+                     " in FILE (default none)",
+        }
+    )
+
+    recover_args = Argument (
+        args = ["-r", "--recover"],
+        kwargs = {
+            "metavar": "DIR",
+            "help" : "continue from interrupted run in DIR",
+        }
+    )
+
     # next two groups of options belong in train-init
     # with OptionGroup(parser, "Data selection") as group:
     group = train_init.add_argument_group("Data selection (train-init)")
     group.add_argument("-t", "--track", action="append", default=[],
-                       metavar="TRACK", help="append TRACK to list of tracks"
+                       metavar="track", help="append track to list of tracks"
                        " to use (default all)")
 
     # TODO: Fix action "load" and use FileType instead
@@ -3957,15 +4014,10 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                        " newline-delimited FILE to list of tracks"
                        " to use")
 
-    group.add_argument("--include-coords", metavar="FILE",
-                       help="limit to genomic coordinates in"
-                       " FILE (default all) (Note: does not apply to"
-                       " --validation-coords)")
+    group.add_argument(*include_coords_args.args, **include_coords_args.kwargs)
 
     # exclude goes after all includes
-    group.add_argument("--exclude-coords", metavar="FILE",
-                       help="filter out genomic coordinates in FILE"
-                       " (default none)")
+    group.add_argument(*exclude_coords_args.args, **exclude_coords_args.kwargs)
 
     group.add_argument("--resolution", type=int, metavar="RES",
                        help="downsample to every RES bp (default %d)" %
@@ -4011,9 +4063,7 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                        " (default %s)" %
                        make_default_filename(RES_DONT_TRAIN, DIRPATH_AUX))
 
-    group.add_argument("--seg-table", metavar="FILE",
-                       help="load segment hyperparameters from FILE"
-                       " (default none)")
+    group.add_argument(*seg_table_args.args, **seg_table_args.kwargs)
 
     group.add_argument("--semisupervised", metavar="FILE",
                        help="semisupervised segmentation with labels in "
@@ -4080,10 +4130,7 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                          % VAR_FLOOR_GMM_DEFAULT)
 
     group = train_init.add_argument_group("Flags (train-init)")
-    group.add_argument("-c", "--clobber", action="store_true",
-                       help="delete any preexisting files and assumes any "
-                       "model files specified in options as output to be "
-                       "overwritten")
+    group.add_argument(*clobber_args.args, **clobber_args.kwargs)
 
     # Train run is where the train-rounds are calculated
     group = train_run.add_argument_group("Modeling Variables (train-run)")
@@ -4092,41 +4139,32 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                        " rounds (default %d)" % MAX_EM_ITERS)
 
     # Directory would be recovered from train-run
-    group = train_run.add_argument_group("Intermediate files (train-run)")
+    group = train_run.add_argument_group("Intermediate files (train-run,"
+                                         " annotate-run)")
     group.add_argument("-o", "--observations", metavar="DIR",
                        help="DEPRECATED - temp files are now used and "
                        "recommended. Previously would use or create "
                        "observations in DIR (default %s)" %
                        (DIRPATH_WORK_DIR_HELP / SUBDIRNAME_OBS))
 
-    group.add_argument("-r", "--recover", metavar="DIR",
-                       help="continue from interrupted run in DIR")
+    group.add_argument(*recover_args.args, **recover_args.kwargs)
 
     group = train_init_run.add_argument_group("Virtual Evidence "
                                               "(train-init, train-run)")
-    group.add_argument("--virtual-evidence", metavar="FILE",
-                       help="virtual evidence with priors for labels at each position in "
-                       "FILE (default none)")
+    group.add_argument(*virtual_evidence_args.args, **virtual_evidence_args.kwargs)
 
     group = identify_init.add_argument_group("Flags "
                                              "(annotate-init, posterior-init)")
-    group.add_argument("-c", "--clobber", action="store_true",
-                       help="delete any preexisting files and assumes any "
-                       "model files specified in options as output to be "
-                       "overwritten")
+    group.add_argument(*clobber_args.args, **clobber_args.kwargs)
 
     # select coords to identify in the init step
     group = identify_init.add_argument_group("Data selection "
                                              "(annotate-init, posterior-init)")
-    group.add_argument("--include-coords", metavar="FILE",
-                       help="limit to genomic coordinates in"
-                       " FILE (default all) (Note: does not apply to"
-                       " --validation-coords)")
+
+    group.add_argument(*include_coords_args.args, **include_coords_args.kwargs)
 
     # exclude goes after all includes
-    group.add_argument("--exclude-coords", metavar="FILE",
-                       help="filter out genomic coordinates in FILE"
-                       " (default none)")
+    group.add_argument(*exclude_coords_args.args, **exclude_coords_args.kwargs)
 
     group.add_argument("--output-label", type=str,
                        help="in the segmentation file, for each coordinate "
@@ -4134,18 +4172,18 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                        "sublabel (\"subseg\"), or both (\"full\")"
                        "  (default %s)" % OUTPUT_LABEL)
 
-    group.add_argument("--seg-table", metavar="FILE",
-                       help="load segment hyperparameters from FILE"
-                       " (default none)")
+    group.add_argument(*seg_table_args.args, **seg_table_args.kwargs)
 
     group = identify_init_run.add_argument_group("Virtual Evidence "
                                                  "(annotate-init, "
                                                  "posterior-init, "
                                                  "annotate-run, "
                                                  "posterior-run)")
-    group.add_argument("--virtual-evidence", metavar="FILE",
-                       help="virtual evidence with priors for labels at each position in "
-                       "FILE (default none)")
+    group.add_argument(*virtual_evidence_args.args, **virtual_evidence_args.kwargs)
+
+    group = identify_run.add_argument_group("Intermediate files (train-run,"
+                                            " annotate-run)")
+    group.add_argument(*recover_args.args, **recover_args.kwargs)
 
     # output files are produced by identify-finish
     group = identify_finish.add_argument_group("Output files (annotate-finish)")
