@@ -15,12 +15,14 @@ jobs:
     # Run job for both python versions in the docker image
     container:
       image: hoffmanlab/segway-test:latest
+      env:
+        SEGWAY_TEST_PYTHON_VERSION: 3
 
     steps:
       - uses: actions/checkout@v2
       - name: Build repository
         run: |
-          python3 -m pip install --verbose .
+          python${SEGWAY_TEST_PYTHON_VERSION} -m pip install --verbose .
           pip list
       - name: Run tests
         run: |
