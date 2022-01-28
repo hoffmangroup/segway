@@ -1,0 +1,45 @@
+cff-version: 1.2.0
+title: Segway
+version: 3.0.3
+date-released: "2020-01-22"
+message: If you use this software, please cite both the article from preferred-citation and the software itself.
+abstract: This software implements a method of segmentation and genome annotation
+authors:
+  - family-names: Hoffman
+    given-names: Michael M.
+    affiliation: "University Health Network"
+    orcid: "https://orcid.org/0000-0002-4517-1562"
+license: GPL-2.0-only
+repository-code: "https://github.com/hoffmangroup/segway"
+url: "https://segway.hoffmanlab.org"
+preferred-citation:
+  type: edited-work
+  title: Unsupervised pattern discovery in human chromatin structure through genomic segmentation
+  year: 2012
+  authors:
+    - family-names: Hoffman
+      given-names: Michael M.
+      affiliation: "University of Washington"
+      orcid: "https://orcid.org/0000-0002-4517-1562"
+    - family-names: Buske
+      given-names: Orion J.
+      affiliation: "University of Washington"
+      orcid: "https://orcid.org/0000-0002-9064-092X"
+    - family-names: Wang
+      given-names: Jie
+      affiliation: "University of Massachusetts Medical School"
+    - family-names: Weng
+      given-names: Zhiping
+      affiliation: "University of Massachusetts Medical School"
+    - family-names: Bilmes
+      given-names: Jeff A.
+      affiliation: "University of Washington"
+      orcid: "https://orcid.org/0000-0002-7372-8778"
+    - family-names: Noble
+      affiliation: "University of Washington"
+      orcid: "https://orcid.org/0000-0001-7283-4715"
+      given-names: William Stafford
+  doi: 10.1038/nmeth.1937
+  journal: "Nature Methods"
+  publisher:
+    name: "Nature Portfolio"
