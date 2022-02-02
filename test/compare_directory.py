@@ -195,8 +195,8 @@ def compare_directory(template_dirname, query_dirname):
         with tarfile.open(tar_filename, "w:gz") as tar:
             print("Archiving in {}:".format(tar_filename))
             for template_filename, query_filename in different_files_list:
-                tar.add(template_filename)
-                tar.add(query_filename)
+                tar.add(Path(template_filename).relpath())
+                tar.add(Path(query_filename).relpath())
                 print(template_filename, query_filename)
 
         print(msg, file=sys.stderr)
