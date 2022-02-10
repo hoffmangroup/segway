@@ -1,6 +1,6 @@
 name	value
 input_master_filename	traindir/params/input.0.master
-log_likelihood	-73982.8922865712
+log_likelihood	-73982.(%[89]\d+%)
 log_likelihood_filename	traindir/likelihood/likelihood.0.ll
 num_segs	4
 params_filename	traindir/params/params.0.params.1
