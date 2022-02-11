@@ -12,7 +12,7 @@ if [ $# != 0 ]; then
     exit 2
 fi
 
-if ! python -c 'import pyflakes'; then
+if ! python${SEGWAY_TEST_PYTHON_VERSION:-""} -c 'import pyflakes'; then
     echo "ERROR: Cannot find pyflakes installation."
     echo "skipping pyflakes check"
     exit 127
