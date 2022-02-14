@@ -10,5 +10,5 @@ set -o nounset -o pipefail -o errexit
 
 # this formulation ensures that you use your current python instead of
 # whatever was installed when pyflakes was installed
-python -c "from pyflakes.scripts.pyflakes import main; main()" "$@" \
+python${SEGWAY_TEST_PYTHON_VERSION:-""} -c "from pyflakes.scripts.pyflakes import main; main()" "$@" \
     | perl -pe 's/([^:]+:[^:]+):(.* (?:imported but unused|is assigned to but never used))$/\1:warning:\2/'
