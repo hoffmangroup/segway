@@ -1,4 +1,6 @@
 3.0.4:
+* segway: fix --recover option for annotate task
+* segway: add SegRNA documentation
 
 3.0.3:
 * segway: fixed posterior label output not working with resolutions greater than 1bp
