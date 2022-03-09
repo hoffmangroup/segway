@@ -808,6 +808,27 @@ Recovery
 --------
 Recovery is not yet supported for the posterior task.
 
+.. _segrna:
+
+SegRNA
+======
+
+To use SegRNA [segrna2020]_ with stranded transcriptome datasets, the user provides one track per strand.
+Then for each dataset, the user species the tracks for each strand with the :option:`--track` option separated
+by a comma. For example::
+
+    segway --track long.polyA.forward,long.polyA.reverse
+
+
+This command runs Segway in concatenated mode with long.polyA.forward in world 0 and long.polyA.reverse in world 1.
+To mimic the direction in which we usually read reverse strand data, from right to left, the user need to set the
+:option:`--reverse-world` option to the world representing reverse strand data. For example::
+
+    segway --track long.polyA.forward,long.polyA.reverse --reverse-world=1
+
+
+.. [segrna2020] Mendez, FANTOM6 consortium, Scott, Hoffman. "Unsupervised analysis of multi-experiment transcriptomic patterns with SegRNA identifies unannotated transcripts" bioRxiv,  https://doi.org/10.1101/2020.07.28.225193
+
 Modular interface
 ================
 Segway additionally supports running the tasks in a more modular manner.
