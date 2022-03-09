@@ -3946,59 +3946,41 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
 
     # Common options across tasks
     class Argument(object):
-        def __init__(self, args, kwargs):
+        def __init__(self, *args, **kwargs):
             self.args = args
             self.kwargs = kwargs
     
-    include_coords_args = Argument(
-        args = ["--include-coords"],
-        kwargs = {
-            "metavar": "FILE",
-            "help" : "limit to genomic coordinates in" " FILE (default all)"
-                     " (Note: does not apply to" " --validation-coords)",
-        }
+    include_coords_args = Argument("--include-coords",
+        metavar="FILE",
+        help="limit to genomic coordinates in" " FILE (default all)"
+             " (Note: does not apply to" " --validation-coords)",
     )
 
-    exclude_coords_args = Argument(
-        args = ["--exclude-coords"],
-        kwargs = {
-            "metavar": "FILE",
-            "help" : "filter out genomic coordinates in FILE (default none)",
-        }
+    exclude_coords_args = Argument("--exclude-coords",
+        metavar="FILE",
+        help="filter out genomic coordinates in FILE (default none)",
     )
 
-    clobber_args = Argument(
-        args = ["-c", "--clobber"],
-        kwargs = {
-            "action": "store_true",
-            "help" : "delete any preexisting files and assumes any model files"
-                     " specified in options as output to be overwritten",
-        }
+    clobber_args = Argument("-c", "--clobber",
+        action="store_true",
+        help="delete any preexisting files and assumes any model files"
+             "specified in options as output to be overwritten",
     )
 
-    seg_table_args = Argument(
-        args = ["--seg-table"],
-        kwargs = {
-            "metavar": "FILE",
-            "help" : "load segment hyperparameters from FILE (default none)",
-        }
+    seg_table_args = Argument("--seg-table",
+        metavar="FILE",
+        help="load segment hyperparameters from FILE (default none)",
     )
 
-    virtual_evidence_args = Argument (
-        args = ["--virtual-evidence"],
-        kwargs = {
-            "metavar": "FILE",
-            "help" : "virtual evidence with priors for labels at each position"
-                     " in FILE (default none)",
-        }
+    virtual_evidence_args = Argument ("--virtual-evidence",
+        metavar="FILE",
+        help="virtual evidence with priors for labels at each position"
+             " in FILE (default none)",
     )
 
-    recover_args = Argument (
-        args = ["-r", "--recover"],
-        kwargs = {
-            "metavar": "DIR",
-            "help" : "continue from interrupted run in DIR",
-        }
+    recover_args = Argument ("-r", "--recover",
+        metavar="DIR",
+        help="continue from interrupted run in DIR",
     )
 
     # next two groups of options belong in train-init
