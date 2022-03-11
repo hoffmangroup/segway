@@ -2181,10 +2181,10 @@ class Runner(object):
                 # A VE coord does not overlap with the window if its interval
                 # ends entirely before the start of the window or starts
                 # entirely after the end of the window
-                # e.g. ve_coord[1] < window.start or ve_coord[0] > window.end
+                # e.g. ve_coord[1] <= window.start or ve_coord[0] > window.end
                 # Negate that condition (so a VE coord does overlap) for the
                 # following:
-                if ve_coord[1] >= window.start and ve_coord[0] <= window.end:
+                if ve_coord[1] >= window.start and ve_coord[0] < window.end:
                     # On VE coordinate overlap with window
                     # Append to our resulting list
                     virtual_evidence_coords.append(ve_coord)
