@@ -547,7 +547,7 @@ class ParamSpec(object):
         # labels with a maximum
         seg_countdowns_initial = self.seg_countdowns_initial
         res[0, labels_with_maximum] = probs_force_transition
-        # res[0, labels_with_maximum] = self.probs_force_transition
+
         for label in labels_with_maximum:
             seg_countdown_initial = seg_countdowns_initial[label]
             minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
