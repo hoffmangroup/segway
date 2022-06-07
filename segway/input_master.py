@@ -381,16 +381,12 @@ class ParamSpec(object):
         return str(input_master.name_collection)
 
     def make_mean_data(self):
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
-        means = self.means  # indexed by track_index
-
         # maximum likelihood, adjusted by no more than 0.2*sd
         stds = sqrt(self.vars)
 
         # tile the means of each track (num_segs, num_subsegs times)
-        means_tiled = vstack_tile(means, num_segs, num_subsegs)
-        stds_tiled = vstack_tile(stds, num_segs, num_subsegs)
+        means_tiled = vstack_tile(self.means, self.num_segs, self.num_subsegs)
+        stds_tiled = vstack_tile(stds, self.num_segs, self.num_subsegs)
 
         jitter_std_bound = self.jitter_std_bound
         noise = self.random_state.uniform(-jitter_std_bound,
@@ -567,15 +563,13 @@ class ParamSpec(object):
         # names of dense cpts
         names = ["start_seg", "seg_subseg", "seg_seg", "seg_subseg_subseg",
                  "segCountDown_seg_segTransition"]
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
 
         # create required probability tables
-        start_seg = fill_array(1.0 / num_segs, num_segs)
-        seg_subseg = fill_array(1.0 / num_subsegs, (num_segs, num_subsegs))
-        seg_seg = make_zero_diagonal_table(num_segs)
-        cpt_seg = make_zero_diagonal_table(num_subsegs)
-        seg_subseg_subseg = (vstack_tile(cpt_seg, num_segs, 1))
+        start_seg = fill_array(1.0 / self.num_segs, self.num_segs)
+        seg_subseg = fill_array(1.0 / self.num_subsegs, (self.num_segs, self.num_subsegs))
+        seg_seg = make_zero_diagonal_table(self.num_segs)
+        cpt_seg = make_zero_diagonal_table(self.num_subsegs)
+        seg_subseg_subseg = (vstack_tile(cpt_seg, self.num_segs, 1))
         segCountDown = self.make_dense_cpt_segCountDown_seg_segTransition()
         prob = [start_seg, seg_subseg, seg_seg, seg_subseg_subseg, segCountDown]
         # create DenseCPTs and add to input_master.dense_cpt: InlineSection
@@ -716,10 +710,8 @@ class InputMasterSaver(Saver):
         param_spec = ParamSpec(self)
         num_free_params = 0
       
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
         num_track_groups = self.num_track_groups
-        fullnum_subsegs = num_segs * num_subsegs
+        fullnum_subsegs = self.num_segs * self.num_subsegs
 
         include_filename = self.gmtk_include_filename_relative
 
@@ -756,7 +748,7 @@ class InputMasterSaver(Saver):
 
         dpmf_spec = param_spec.generate_dpmf_objects()
         mx_spec = param_spec.generate_mx_objects()
-        card_seg = num_segs
+        card_seg = self.num_segs
         ve_spec = VirtualEvidenceSpec(self)
 
         return locals()  # dict of vars set in this function
