@@ -475,7 +475,7 @@ class ParamSpec(object):
             
         # adding MX object to input master     
         input_master.mx.update(dict(zip(names, mx_objects)))
-        return input_master.mx.__str__()
+        return str(input_master.mx)
 
     def generate_dpmf_objects(self):
         """Generate string representation of DPMF objects in input master. 
@@ -509,7 +509,7 @@ class ParamSpec(object):
         # first values are the ones where segCountDown = 0 therefore
         # the transitions to segTransition = 2 occur early on
 
-        # see Segway paper
+        # see Segway paper (Hoffman, M., Buske, O., Wang, J. et al. Unsupervised pattern discovery in human chromatin structure through genomic segmentation. Nat Methods 9, 473–476 (2012). https://doi.org/10.1038/nmeth.1937)
         probs_force_transition = array([0.0, 0.0, 1.0])
 
         card_seg_countdown = self.card_seg_countdown
