@@ -54,7 +54,10 @@ def concatenate_window_segmentations(window_filenames, header, outfilename):
                 # write the last line and the first line, after
                 # potentially merging
                 if last_vals == (chrom, start, seg):
+                    # update start position
                     first_row[INDEX_BED_START] = last_start
+                    # update thickStart position
+                    first_row[INDEX_BED_START + 5] = last_start
 
                     # add back trailing newline eliminated by line.split()
                     merged_line = "\t".join(first_row) + "\n"
