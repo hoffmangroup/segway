@@ -1,3 +1,6 @@
+3.0.5:
+* segway: fix inconsistent thickStart values when merging for final BED output
+
 3.0.4:
 * segway: fix selection of too many potential virtual evidence windows by 1bp
 * segway: fix --recover option for annotate task
