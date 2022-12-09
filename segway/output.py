@@ -15,6 +15,7 @@ from .layer import layer, make_layer_filename
 from ._util import Copier, maybe_gzip_open
 
 INDEX_BED_START = 1
+INDEX_BED_THICKSTART = INDEX_BED_START + 5
 
 def make_bed_attr(key, value):
     if " " in value:
@@ -54,7 +55,10 @@ def concatenate_window_segmentations(window_filenames, header, outfilename):
                 # write the last line and the first line, after
                 # potentially merging
                 if last_vals == (chrom, start, seg):
+                    # update start position
                     first_row[INDEX_BED_START] = last_start
+                    # update thickStart position
+                    first_row[INDEX_BED_THICKSTART] = last_start
 
                     # add back trailing newline eliminated by line.split()
                     merged_line = "\t".join(first_row) + "\n"
