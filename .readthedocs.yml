@@ -5,7 +5,22 @@
 version: 2
 
 conda:
-    environment: environment.yml
+  environment: environment.yml
+
+# Required for project building and versioning
+python:
+   install:
+      - method: pip
+        path: .
+
+build:
+  os: ubuntu-22.04
+  tools:
+    # Ref: https://github.com/readthedocs/readthedocs.org/issues/9008
+    python: "miniconda3-4.7"
+  jobs:
+    post_install:
+      - make -C doc cmdline-help
 
 # Build documentation in the docs/ directory with Sphinx
 sphinx:

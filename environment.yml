@@ -4,8 +4,8 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3
-  - segway
+  - python=3.8
+  - importlib_metadata
   - six
   - genomedata
   - gmtk
@@ -17,4 +17,3 @@ dependencies:
   - colorbrewer
   - drmaa>=0.4a3
   - ucsc-bedtobigbed
-

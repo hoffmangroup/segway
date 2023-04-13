@@ -1,26 +1,21 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division
 
 """gethelp.py: get help from a command-line script
 """
 
-__version__ = "$Revision$"
+## Copyright 2011 Michael M. Hoffman <mmh1@uw.edu>
 
-## Copyright 2011 Michael M. Hoffman <michael.hoffman@utoronto.ca>
-
+from importlib.metadata import entry_points
 import sys
 
-from six.moves import StringIO
-from six.moves.configparser import RawConfigParser
+MODULE_NAME = 'segtools'
 
 sys.path.insert(0, "..")
-from setup import entry_points
 
 def gethelp(scriptname):
-    config = RawConfigParser()
-    config.readfp(StringIO(entry_points))
-
-    entry = config.get("console_scripts", scriptname).split()[0]
+    console_scripts = entry_points()["console_scripts"]
+    entry_point = [x for x in console_scripts if x.name==scriptname][0]
+    entry = entry_point.value
     module_name, _, func_name = entry.partition(":")
 
     # __import__(module_name) usually returns the top-level package module only
@@ -35,8 +30,7 @@ def parse_options(args):
     from optparse import OptionParser
 
     usage = "%prog [OPTION]... SCRIPTNAME"
-    version = "%%prog %s" % __version__
-    parser = OptionParser(usage=usage, version=version)
+    parser = OptionParser(usage=usage)
 
     options, args = parser.parse_args(args)
 
