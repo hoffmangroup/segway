@@ -1,6 +1,6 @@
-==========
-Segway API
-==========
+====================
+Segway API Reference
+====================
 
 Description
 ===========
@@ -30,18 +30,16 @@ The Segway API describes the model using two files:
     2. A line saving the :py:class:`InputMaster` object to an input file, 
     which describes the parameters in GMTK structure format. 
 
-    3. Code calling Segway to train the defined model then annotation a genome
-    file using the trained model. 
+    3. Code calling Segway to train the defined model and annotate using the 
+    trained model. More information on running Segway is available in 
+    :ref:`python-interface`.
 
 A worked example applying the Segway API can be seen in the CNVway code.
 
 .. todo: other section? flip sentence order? link?
 
-Segway API Reference
-====================
-
 InputMaster Class
------------------
+=================
 
 Central class storing all parameter information.
 
@@ -55,7 +53,8 @@ Central class storing all parameter information.
     Behaves as a dictionary where keys are the hidden state name, which 
     can be referenced in the structure file, and each value should be set to 
     a list of state names or a :py:class:`NameCollection` object initialized 
-    with state names. 
+    with state names. If a Python list is given, it is converted to a 
+    :py:class:`NameCollection` object using :py:meth:`NameCollection.__init__`.
 
     .. py:attribute:: mean
         :type: InlineSection
@@ -64,7 +63,9 @@ Central class storing all parameter information.
     
     Behaves as a dictionary where keys are names for later reference and each
     value should be set to the mean value or a :py:class:`Mean` object 
-    initialized with the mean value.
+    initialized with the mean value. If a Python float or list of floats is 
+    given, it is converted to a :py:class:`Mean` object using 
+    :py:meth:`Mean.__init__`.
 
     .. py:attribute:: covar
         :type: InlineSection
@@ -73,7 +74,9 @@ Central class storing all parameter information.
     
     Behaves as a dictionary where keys are names for later reference and each
     value should be set to the covariance value or a :py:class:`Covar` object 
-    initialized with the covariance value.
+    initialized with the covariance value. If a Python float or list of floats is 
+    given, it is converted to a :py:class:`Covar` object using 
+    :py:meth:`Covar.__init__`.
 
     .. py:attribute:: dpmf
         :type: InlineSection
@@ -136,13 +139,14 @@ Central class storing all parameter information.
         :rtype: None
 
 Parameter Classes
------------------
+=================
+
 Class representing user-defined model parameters.
 
 .. py:class:: NameCollection
 
     A list of names with a specialized string method for writing to the 
-    parameter file. 
+    parameter file.
 
     .. py:method:: __init__(self, *args)
 
@@ -331,17 +335,35 @@ Class representing user-defined model parameters.
         :type dt: str 
 
 Section Classes
----------------
+===============
+
 Classes to store multiple objects that form one section of the parameter file. 
 
 .. py:class:: InlineSection
 
     A type-enforced dictionary with an additional string method for writing 
-    the parameter file. 
+    to the parameter file. 
+
+    .. py:attribute:: kind
+        :type: str or None
+        :value: None
+
+        A string denoting the type which can be values in this 
+        object. If not given, it is set by the first item. This should not be 
+        changed by user. 
 
 .. py:class:: InlineMCSection
 
-    A dictionary with an additional string method for writing the parameter file.
+    A type-enforced dictionary with an additional string method for writing 
+    to the parameter file.
+
+    .. py:attribute:: kind
+        :type: str or None
+        :value: None
+
+        A string denoting the type which can be values in this 
+        object. If not given, it is set by the first item. This should not be 
+        changed by user. 
 
     .. py:attribute:: mean
         :type: InlineSection
@@ -359,7 +381,16 @@ Classes to store multiple objects that form one section of the parameter file.
 
 .. py:class:: InlineMXSection
 
-    A dictionary with an additional string method for writing the parameter file.
+    A type-enforced dictionary with an additional string method for writing 
+    to the parameter file.
+
+    .. py:attribute:: kind
+        :type: str or None
+        :value: None
+
+        A string denoting the type which can be values in this 
+        object. If not given, it is set by the first item. This should not be 
+        changed by user. 
 
     .. py:attribute:: dpmf
         :type: InlineSection
