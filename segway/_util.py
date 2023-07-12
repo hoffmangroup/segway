@@ -376,13 +376,6 @@ def find_segment_starts(data, output_label):
     else:
         pos_diffs = (data[1:] != data[:-1])
 
-    # seg_diffs = absolute(diff(data))
-
-    # if output_label is set to "full" or "subseg"
-    # if output_label != "seg":
-    #     pos_diffs = maximum(seg_diffs[0], seg_diffs[1])
-    # else:
-    #     pos_diffs = seg_diffs
     end_pos, = pos_diffs.nonzero()
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
