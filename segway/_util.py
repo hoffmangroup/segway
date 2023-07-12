@@ -55,7 +55,7 @@ SUFFIX_TAB = extsep + EXT_TAB
 
 DELIMITER_BED = '\t'  # whitespace or tab is allowed
 
-DTYPE_IDENTIFY = intc
+DTYPE_IDENTIFY = 'U16'
 DTYPE_OBS_INT = intc
 DTYPE_SEG_LEN = intc
 
@@ -189,9 +189,13 @@ def get_col_index(chromosome, trackname):
 
 
 def get_label_color(label):
-    color = SCHEME[label % NUM_COLORS]
+    color = SCHEME[hash_label(label) % NUM_COLORS]
 
     return ",".join(map(str, color))
+
+
+def hash_label(label):
+    return sum(ord(character) for character in label)
 
 
 # XXX: suggest as default
@@ -346,10 +350,9 @@ def extract_superlabel(label):
     sublabel part, in which case only the superlabel part is
     returned
     """
-    if isinstance(label, str):
-        return int(label.split(".")[0])
-    else:
-        return label
+    if '.' in label:
+        return label.split(".")[0]
+    return label
 
 
 def find_segment_starts(data, output_label):
@@ -365,14 +368,21 @@ def find_segment_starts(data, output_label):
     else:
         len_data = len(data)
 
-    # unpack tuple, ignore rest
-    seg_diffs = absolute(diff(data))
-
     # if output_label is set to "full" or "subseg"
     if output_label != "seg":
+        # Equivalent to diff(data) != 0
+        seg_diffs = (data[:, 1:] != data[:, :-1])
         pos_diffs = maximum(seg_diffs[0], seg_diffs[1])
     else:
-        pos_diffs = seg_diffs
+        pos_diffs = (data[1:] != data[:-1])
+
+    # seg_diffs = absolute(diff(data))
+
+    # if output_label is set to "full" or "subseg"
+    # if output_label != "seg":
+    #     pos_diffs = maximum(seg_diffs[0], seg_diffs[1])
+    # else:
+    #     pos_diffs = seg_diffs
     end_pos, = pos_diffs.nonzero()
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)

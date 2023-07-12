@@ -34,7 +34,7 @@ MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 SCORE_MIN = 100
 SCORE_MAX = 1000
 
-SEG_INVALID = -1
+SEG_INVALID = "-1"
 
 EXT_OPTIONS = {}
 EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
@@ -315,9 +315,9 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     # if output_label == "subseg" or "full", need to catch
     # subseg output
     if output_label != "seg":
-        re_seg = re.compile(r"^(seg|subseg)\((\d+)\)=(\d+)$")
+        re_seg = re.compile(r"^(seg|subseg)\(([\w\d]+)\)=([\w\d]+)$")
     else:
-        re_seg = re.compile(r"^(seg)\((\d+)\)=(\d+)$")
+        re_seg = re.compile(r"^(seg)\(([\w\d]+)\)=([\w\d]+)$")
     # sentinel value
     res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_IDENTIFY)
     for line in lines:
@@ -345,7 +345,7 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
             if do_reverse:
                 index = -1 - index  # -1, -2, -3, etc.
 
-            val = int(match.group(3))
+            val = match.group(3)
             seg_index = seg_dict[match.group(1)]
             res[seg_index][index] = val
 
