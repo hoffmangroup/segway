@@ -315,9 +315,9 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     # if output_label == "subseg" or "full", need to catch
     # subseg output
     if output_label != "seg":
-        re_seg = re.compile(r"^(seg|subseg)\(([\w\d]+)\)=([\w\d]+)$")
+        re_seg = re.compile(r"^(seg|subseg)\((\d+)\)=(\w+)$")
     else:
-        re_seg = re.compile(r"^(seg)\(([\w\d]+)\)=([\w\d]+)$")
+        re_seg = re.compile(r"^(seg)\((\d+)\)=(\w+)$")
     # sentinel value
     res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_IDENTIFY)
     for line in lines:

@@ -55,7 +55,7 @@ SUFFIX_TAB = extsep + EXT_TAB
 
 DELIMITER_BED = '\t'  # whitespace or tab is allowed
 
-DTYPE_IDENTIFY = 'U16'
+DTYPE_IDENTIFY = 'U16' # typestring denoting 16 unicode characters
 DTYPE_OBS_INT = intc
 DTYPE_SEG_LEN = intc
 
@@ -195,6 +195,11 @@ def get_label_color(label):
 
 
 def hash_label(label):
+    """
+    Hash a string as the sum of the Unicode representations of its characters.
+    Used because hash() does not replicate across Python runs (multiple 
+    subprocesses). 
+    """
     return sum(ord(character) for character in label)
 
 
@@ -350,9 +355,9 @@ def extract_superlabel(label):
     sublabel part, in which case only the superlabel part is
     returned
     """
-    if '.' in label:
-        return label.split(".")[0]
-    return label
+    if '.' in label: # Incidates a 'superlabel.sublabel' format
+        return label.split(".")[0] # Return superlabel only
+    return label # Otherwise, label is superlabel
 
 
 def find_segment_starts(data, output_label):
@@ -370,13 +375,15 @@ def find_segment_starts(data, output_label):
 
     # if output_label is set to "full" or "subseg"
     if output_label != "seg":
-        # Equivalent to diff(data) != 0
-        seg_diffs = (data[:, 1:] != data[:, :-1])
+        # Equivalent to diff(data) != 0, so True where labels change
+        seg_diffs = (data[:, 1:] != data[:, :-1]) 
+        # pos_diffs records if either superlabel or sublabel change
         pos_diffs = maximum(seg_diffs[0], seg_diffs[1])
     else:
+        # Equivalent to diff(data) != 0, so True where labels change
         pos_diffs = (data[1:] != data[:-1])
 
-    end_pos, = pos_diffs.nonzero()
+    end_pos, = pos_diffs.nonzero() # Convert boolean array to indices
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
     if output_label == "full":
