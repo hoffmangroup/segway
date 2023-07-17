@@ -22,9 +22,10 @@ from six.moves import map, range, zip
 
 from .observations import (make_continuous_cells, make_supervision_cells,
                            make_virtual_evidence_cells, _save_window)
-from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
-                    EXT_INT, EXT_LIST, EXT_VIRTUAL_EVIDENCE, extract_superlabel,
-                    fill_array, find_segment_starts, get_label_color, TRAIN_PROG,
+from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_ANNOTATE, 
+                    DTYPE_POSTERIOR, EXT_FLOAT, EXT_INT, EXT_LIST, 
+                    EXT_VIRTUAL_EVIDENCE, extract_superlabel, fill_array, 
+                    find_segment_starts, get_label_color, TRAIN_PROG,
                     POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
                     SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
@@ -278,7 +279,7 @@ def divide_posterior_array(posterior_code, num_frames, num_sublabels):
     provide the find_segment_starts() function with data in the same format
     as during the viterbi task.
     """
-    res = zeros((2, num_frames), DTYPE_IDENTIFY)
+    res = zeros((2, num_frames), DTYPE_POSTERIOR)
     for frame_index in range(num_frames):
         total_label = posterior_code[frame_index]
         label, sublabel = divmod(total_label, num_sublabels)
@@ -288,7 +289,7 @@ def divide_posterior_array(posterior_code, num_frames, num_sublabels):
 
 def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     """
-    returns: numpy.ndarray of size (num_frames,), type DTYPE_IDENTIFY
+    returns: numpy.ndarray of size (num_frames,), type DTYPE_ANNOTATE
     """
     lines = iter(lines)
 
@@ -319,7 +320,7 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     else:
         re_seg = re.compile(r"^(seg)\((\d+)\)=(\w+)$")
     # sentinel value
-    res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_IDENTIFY)
+    res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_ANNOTATE)
     for line in lines:
         # Ptn-0 P': seg(0)=24,seg(1)=24
         if line.startswith(MSG_SUCCESS):

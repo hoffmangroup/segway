@@ -55,7 +55,8 @@ SUFFIX_TAB = extsep + EXT_TAB
 
 DELIMITER_BED = '\t'  # whitespace or tab is allowed
 
-DTYPE_IDENTIFY = 'U16' # typestring denoting 16 unicode characters
+DTYPE_ANNOTATE = 'U64' # typestring denoting 64 unicode characters
+DTYPE_POSTERIOR = intc
 DTYPE_OBS_INT = intc
 DTYPE_SEG_LEN = intc
 
@@ -196,10 +197,15 @@ def get_label_color(label):
 
 def hash_label(label):
     """
-    Hash a string as the sum of the Unicode representations of its characters.
+    If label is an integer or a string containing an integer, return it as 
+    an integer.
+    Otherwise, hash the label string as the sum of the Unicode 
+    representations of its characters.
     Used because hash() does not replicate across Python runs (multiple 
     subprocesses). 
     """
+    if isinstance(label, intc) or label.isnumeric():
+        return intc(label)
     return sum(ord(character) for character in label)
 
 
@@ -355,7 +361,7 @@ def extract_superlabel(label):
     sublabel part, in which case only the superlabel part is
     returned
     """
-    if '.' in label: # Incidates a 'superlabel.sublabel' format
+    if '.' in label: # Indicates a 'superlabel.sublabel' format
         return label.split(".")[0] # Return superlabel only
     return label # Otherwise, label is superlabel
 
