@@ -417,10 +417,16 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
 
     # Write posterior code file
     posterior_code = argmax(probs, axis=1)
+    print(posterior_code)
     if output_label != "seg":
         posterior_code = divide_posterior_array(posterior_code, num_frames,
                                                 num_sublabels)
+        
+    print(posterior_code)
     start_pos, labels = find_segment_starts(posterior_code, output_label)
+    print(start_pos)
+    print(labels)
+
     bed_filename = outfilename_tmpl % "_code"
     save_bed(bed_filename, start_pos, labels, coord, resolution,
              int(num_labels))
@@ -485,7 +491,12 @@ def parse_viterbi_save_bed(coord, resolution, do_reverse,
                            output_label):
     data = parse_viterbi(viterbi_lines, do_reverse, output_label)
 
+    print(data)
+
     start_pos, labels = find_segment_starts(data, output_label)
+
+    print(start_pos)
+    print(labels)
 
     save_bed(bed_filename, start_pos, labels, coord, resolution,
              int(num_labels))

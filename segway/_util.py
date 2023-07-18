@@ -17,8 +17,7 @@ from string import Template
 import sys
 
 import colorbrewer
-from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
-                    zeros)
+from numpy import append, array, empty, insert, intc, maximum, str_, zeros
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
 from pkg_resources import resource_filename, resource_string
@@ -204,7 +203,7 @@ def hash_label(label):
     Used because hash() does not replicate across Python runs (multiple 
     subprocesses). 
     """
-    if isinstance(label, intc) or label.isnumeric():
+    if (isinstance(label, intc) or isinstance(label, int)) or label.isnumeric():
         return intc(label)
     return sum(ord(character) for character in label)
 
@@ -357,13 +356,13 @@ def iter_chroms_coords(filenames, coords):
 
 def extract_superlabel(label):
     """
-    label is either an integer or a string with a superlabel and
-    sublabel part, in which case only the superlabel part is
-    returned
+    label is either an integer superlabel, a string superlabel, or a string 
+    with a superlabel and sublabel part separated by a period. In this last case,
+    only the superlabel part is returned. Returns a string.
     """
-    if '.' in label: # Indicates a 'superlabel.sublabel' format
+    if isinstance(label, str_) and '.' in label:
         return label.split(".")[0] # Return superlabel only
-    return label # Otherwise, label is superlabel
+    return str(label) # Otherwise, label is superlabel
 
 
 def find_segment_starts(data, output_label):
@@ -393,7 +392,7 @@ def find_segment_starts(data, output_label):
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
     if output_label == "full":
-        labels = array(["%d.%d" % segs for segs in zip(*data[:, start_pos])])
+        labels = array([f"{segs[0]}.{segs[1]}" for segs in zip(*data[:, start_pos])])
     elif output_label == "subseg":
         labels = data[1][start_pos]
     else:
