@@ -381,6 +381,7 @@ def find_segment_starts(data, output_label):
     # if output_label is set to "full" or "subseg"
     if output_label != "seg":
         # Equivalent to diff(data) != 0, so True where labels change
+        # Applied to both rows (seg and subseg) separately
         seg_diffs = (data[:, 1:] != data[:, :-1]) 
         # pos_diffs records if either superlabel or sublabel change
         pos_diffs = maximum(seg_diffs[0], seg_diffs[1])
@@ -392,7 +393,8 @@ def find_segment_starts(data, output_label):
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
     if output_label == "full":
-        labels = array([f"{segs[0]}.{segs[1]}" for segs in zip(*data[:, start_pos])])
+        labels = array([f"{segs[0]}.{segs[1]}" 
+                        for segs in zip(*data[:, start_pos])])
     elif output_label == "subseg":
         labels = data[1][start_pos]
     else:
