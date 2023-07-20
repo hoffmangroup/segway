@@ -360,7 +360,7 @@ def extract_superlabel(label):
     with a superlabel and sublabel part separated by a period. In this last case,
     only the superlabel part is returned. Returns a string.
     """
-    if isinstance(label, str_) and '.' in label:
+    if (isinstance(label, str_) or isinstance(label, str)) and '.' in label:
         return label.split(".")[0] # Return superlabel only
     return str(label) # Otherwise, label is superlabel
 
