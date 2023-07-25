@@ -57,8 +57,8 @@ from .task import MSG_SUCCESS
 from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
                     DISTRIBUTION_GAMMA, DISTRIBUTION_ASINH_NORMAL,
                     DELIMITER_BED,
-                    EXT_BED, EXT_FLOAT, EXT_GZ, EXT_INT, EXT_PARAMS,
-                    EXT_TAB, extjoin, extjoin_not_none, GB,
+                    EXT_BED, EXT_TRACK, EXT_FLOAT, EXT_GZ, EXT_INT, 
+                    EXT_PARAMS, EXT_TAB, extjoin, extjoin_not_none, GB,
                     ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
                     make_default_filename, make_filelistpath,
                     make_prefix_fmt, MB, memoized_property,
@@ -247,8 +247,14 @@ SUFFIX_TRIFILE = extsep + EXT_TRIFILE
 # "segway.bed.gz"
 BED_FILEBASENAME = extjoin(__package__, EXT_BED, EXT_GZ)
 
+# "segway.track.gz"
+TRACK_FILEBASENAME = extjoin(__package__, EXT_TRACK, EXT_GZ)
+
 # "segway.%d.bed.gz"
 BED_FILEBASEFMT = extjoin(__package__, "%d", EXT_BED, EXT_GZ)
+
+# "segway.%d.track.gz"
+TRACK_FILEBASEFMT = extjoin(__package__, "%d", EXT_TRACK, EXT_GZ)
 
 # "posterior%s.bed.gz"
 BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
@@ -1432,6 +1438,15 @@ class Runner(object):
             basename = BED_FILEBASENAME
         else:
             basename = BED_FILEBASEFMT
+
+        return self.work_dirpath / basename
+
+    @memoized_property
+    def track_filename(self):
+        if self.num_worlds == 1:
+            basename = TRACK_FILEBASENAME
+        else:
+            basename = TRACK_FILEBASEFMT
 
         return self.work_dirpath / basename
 

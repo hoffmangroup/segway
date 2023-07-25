@@ -144,11 +144,11 @@ def make_layer_filename(filename):
     """
     exported to run.py
 
-    replace .bed from right side with .layered.bed
+    replace .track from right side with .layered.track
     """
-    left, _, right = filename.rpartition(".bed")
+    left, _, right = filename.rpartition(".track")
 
-    return ".layered.bed".join([left, right])
+    return ".layered.track".join([left, right])
 
 def make_csv(seq):
     return ",".join(map(str, seq))

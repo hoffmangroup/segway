@@ -373,22 +373,16 @@ def write_bed(outfile, start_pos, labels, coord, resolution, num_labels,
         assert region_end == start_pos[-1] - resolution + remainder
     start_pos[-1] = region_end
 
-    # score_step = (SCORE_MAX - SCORE_MIN) / (num_labels - 1)
-    label_colors = [get_label_color(extract_superlabel(seg_label)) for
-                    seg_label in labels]
-
-    zipper = zip(start_pos[:-1], start_pos[1:], labels, label_colors)
+    zipper = zip(start_pos[:-1], start_pos[1:], labels)
 
     # this is easily concatenated since it has no context
-    for seg_start, seg_end, seg_label, label_color in zipper:
+    for seg_start, seg_end, seg_label in zipper:
         name = str(seg_label)
 
         chrom_start = str(seg_start)
         chrom_end = str(seg_end)
-        item_rgb = label_color
 
-        row = [chrom, chrom_start, chrom_end, name, BED_SCORE, BED_STRAND,
-               chrom_start, chrom_end, item_rgb][:num_cols]
+        row = [chrom, chrom_start, chrom_end, name][:num_cols]
 
         print(*row, sep="\t", file=outfile)
 

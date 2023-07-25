@@ -40,6 +40,7 @@ SEGWAY_ENCODING = "ascii"
 FILTERS_GZIP = Filters(complevel=1)
 
 EXT_BED = "bed"
+EXT_TRACK = "track"
 EXT_LIST = "list"
 EXT_INT = "int"
 EXT_FLOAT = "float32"
