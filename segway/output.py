@@ -46,7 +46,7 @@ def concatenate_window_segmentations(window_filenames, header,
             for line in window_file:
                 labels.add(line.split()[3])
     # Build a color assignment from the label list
-    label2color = {label: ','.join(map(str, SCHEME[i % NUM_COLORS])) 
+    label2color = {label: ','.join(map(str, SCHEME[(i + 1) % NUM_COLORS])) 
                    for i, label in enumerate(sorted(list(labels)))}
 
     # values for comparison to combine adjoining segments
