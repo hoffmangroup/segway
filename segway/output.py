@@ -38,16 +38,23 @@ def make_bed_attrs(mapping):
 # Concatenates the files, merging entries if necessary.  Start file with
 # header.  Used by IdentifySaver and PosteriorSaver.
 def concatenate_window_segmentations(window_filenames, header, 
-                                     bedfilename, trackfilename):
-    # Iterate through window files to build a label list
-    labels = set()
-    for window_filename in window_filenames:
-        with maybe_gzip_open(window_filename) as window_file:
-            for line in window_file:
-                labels.add(line.split()[3])
-    # Build a color assignment from the label list
-    label2color = {label: ','.join(map(str, SCHEME[(i + 1) % NUM_COLORS])) 
-                   for i, label in enumerate(sorted(list(labels)))}
+                                     bedfilename, trackfilename,
+                                     bed9 = True):
+    # If converting to BED9, build a color assignment using all labels
+    if bed9:
+        # Iterate through window files to build a label list
+        labels = set()
+        for window_filename in window_filenames:
+            with maybe_gzip_open(window_filename) as window_file:
+                for line in window_file:
+                    labels.add(line.split()[3])
+        # Build a color assignment from the label list
+        if all(label.isdecimal() for label in labels): # Index into color list
+            label2color = {label: ','.join(map(str, SCHEME[int(label) % NUM_COLORS]))
+                           for label in labels}
+        else: # Sort and assign colors by order
+            label2color = {label: ','.join(map(str, SCHEME[i % NUM_COLORS])) 
+                        for i, label in enumerate(sorted(list(labels)))}
 
     # values for comparison to combine adjoining segments
     last_line = ""
@@ -63,15 +70,17 @@ def concatenate_window_segmentations(window_filenames, header,
             for window_filename in window_filenames:
                 with maybe_gzip_open(window_filename) as window_file:
                     lines = window_file.readlines()
-                    # Created BED9 lines from the BED4 data
-                    for i, line in enumerate(lines):
-                        _, coords = parse_bed4(line)
-                        (chrom, start, end, seg) = coords
-                        bed9row = [chrom, start, end, seg, BED_SCORE, 
-                                   BED_STRAND, start, end, label2color[seg]]
-                        lines[i] = '\t'.join(bed9row) + '\n'
+                    
+                    # If converting to BED9, add extra columns to BED4 data
+                    if bed9:
+                        for i, line in enumerate(lines):
+                            _, coords = parse_bed4(line)
+                            (chrom, start, end, seg) = coords
+                            bed9row = [chrom, start, end, seg, BED_SCORE, 
+                                    BED_STRAND, start, end, label2color[seg]]
+                            lines[i] = '\t'.join(bed9row) + '\n'
 
-                    # Prepare the first line of the BED9 data
+                    # Prepare the first line of the data
                     first_line = lines[0]
                     first_row, first_coords = parse_bed4(first_line)
                     (chrom, start, end, seg) = first_coords
@@ -229,4 +238,5 @@ class PosteriorSaver(OutputSaver):
             trackheader = self.make_bedgraph_header(num_seg)
             concatenate_window_segmentations(posterior_filenames, trackheader, 
                                              "/dev/null",
-                                             posterior_bedgraph_tmpl % num_seg)
+                                             posterior_bedgraph_tmpl % num_seg,
+                                             bed9 = False)
