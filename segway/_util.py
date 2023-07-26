@@ -348,7 +348,7 @@ def extract_superlabel(label):
     returned
     """
     if isinstance(label, str):
-        return int(label.split(".")[0])
+        return label.split(".")[0]
     else:
         return label
 
