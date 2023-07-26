@@ -13,7 +13,8 @@ import colorbrewer
 
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename
-from ._util import Copier, maybe_gzip_open, BED_SCORE, BED_STRAND
+from ._util import (Copier, maybe_gzip_open, extract_superlabel, 
+                    BED_SCORE, BED_STRAND)
 
 INDEX_BED_START = 1
 INDEX_BED_THICKSTART = INDEX_BED_START + 5
@@ -47,7 +48,7 @@ def concatenate_window_segmentations(window_filenames, header,
         for window_filename in window_filenames:
             with maybe_gzip_open(window_filename) as window_file:
                 for line in window_file:
-                    labels.add(line.split()[3])
+                    labels.add(extract_superlabel(line.split()[3]))
         # Build a color assignment from the label list
         if all(label.isdecimal() for label in labels): # Index into color list
             label2color = {label: ','.join(map(str, SCHEME[int(label) % NUM_COLORS]))
