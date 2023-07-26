@@ -22,12 +22,11 @@ from six.moves import map, range, zip
 
 from .observations import (make_continuous_cells, make_supervision_cells,
                            make_virtual_evidence_cells, _save_window)
-from ._util import (BED_SCORE, BED_STRAND, ceildiv, DTYPE_IDENTIFY, EXT_FLOAT,
-                    EXT_INT, EXT_LIST, EXT_VIRTUAL_EVIDENCE, extract_superlabel,
-                    fill_array, find_segment_starts, get_label_color, TRAIN_PROG,
-                    POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    SEGWAY_ENCODING, VALIDATE_PROG, VITERBI_PROG,
-                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
+from ._util import (ceildiv, DTYPE_IDENTIFY, EXT_FLOAT, EXT_INT, EXT_LIST, 
+                    EXT_VIRTUAL_EVIDENCE, fill_array, find_segment_starts, 
+                    TRAIN_PROG, POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, 
+                    read_posterior, SEGWAY_ENCODING, VALIDATE_PROG, 
+                    VITERBI_PROG, VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 
 MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 
