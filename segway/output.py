@@ -78,7 +78,8 @@ def concatenate_window_segmentations(window_filenames, header,
                             _, coords = parse_bed4(line)
                             (chrom, start, end, seg) = coords
                             bed9row = [chrom, start, end, seg, BED_SCORE, 
-                                    BED_STRAND, start, end, label2color[seg]]
+                                    BED_STRAND, start, end, 
+                                    label2color[extract_superlabel(seg)]]
                             lines[i] = '\t'.join(bed9row) + '\n'
 
                     # Prepare the first line of the data
