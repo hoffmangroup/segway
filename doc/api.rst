@@ -137,6 +137,18 @@ Central class storing all parameter information.
         :type filename: str
         :returns: None
         :rtype: None
+    
+Usage example:
+
+.. code-block:: python
+
+    # Create InputMaster object
+    input_master = InputMaster()
+    # Set parameters
+    ...
+    # Save to output file
+    input_master.save(outfile)
+
 
 Parameter Classes
 =================
@@ -154,6 +166,18 @@ Class representing user-defined model parameters.
 
         :param args: List of names or names as multiple arguments.
         :type names: list[str] or str
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a NameCollection object in the InputMaster 
+    # name_collection InlineSection
+    input_master.name_collection["labels"] = \
+        NameCollection(["label1", "label2"])
+    # Alternately, a list will be converted to a NameCollection
+    input_master.name_collection["labels"] = ["label1", "label2"]
+
 
 .. py:class:: Mean
 
@@ -176,6 +200,16 @@ Class representing user-defined model parameters.
         :return: The dimension of the mean array
         :rtype: int
 
+Usage example:
+
+.. code-block:: python
+
+    # Create a Mean object in the InputMaster mean InlineSection
+    input_master.mean["dist1"] = Mean(0.0)
+    # Alternately, a numeric value will be converted to a Mean
+    input_master.mean["dist2"] = 0.0
+
+
 .. py:class:: Covar
 
     A Numpy ``ndarray`` representing a distribution's covariance, with a 
@@ -196,6 +230,16 @@ Class representing user-defined model parameters.
 
         :return: The dimension of the covariance array
         :rtype: int
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a Covar object in the InputMaster covar InlineSection
+    input_master.covar["dist1"] = Covar(1.0)
+    # Alternately, a numeric value will be converted to a Covar
+    input_master.covar["dist2"] = 1.0
+
 
 .. py:class:: DPMF
 
@@ -226,41 +270,66 @@ Class representing user-defined model parameters.
         :return: The length of the DPMF array, equal to the number of outcomes for the DPMF
         :rtype: int
 
+Usage example:
+
+.. code-block:: python
+
+    # Create a custom DPMF object in the InputMaster mean InlineSection
+    input_master.dpmf["biased"] = DPMF([0.7, 0.3])
+    # Create a uniform DPMF with a specified shape
+    input_master.dpmf["uniform"] = DPMF.uniform_from_shape(3)
+
+
 .. py:class:: DiagGaussianMC
 
     A Gaussian distribution with diagonal covariance. Currently the only 
     concrete MC subclass which can be used as a mixture component. 
 
     .. py:attribute:: mean
-        :type: Mean
+        :type: str
 
-        A :py:class:`Mean` object representing the mean of this Gaussian
+        Name of a :py:class:`Mean` object representing the mean of this 
+        Gaussian.
     
     .. py:attribute:: covar
-        :type: Covar
+        :type: str
         
-        A :py:class:`Covar` object representing the covariance vector along the 
-        diagonal of the covariance matrix. 
+        Name of a :py:class:`Covar` object representing the covariance 
+        vector along the diagonal of the covariance matrix. 
 
     .. py:method:: __init__(self, mean, covar)
 
         Create a :py:class:`DiagGaussianMC` object with the specified mean 
         and covariance.
 
-        :param mean: mean of the distribution
-        :type mean: Mean
-        :param covar: diagonal covariance vector of the distribution
-        :type covar: Covar
+        :param mean: Name of a Mean object for the distribution mean
+        :type mean: str
+        :param covar: Name of a Covar object for the diagonal covariance 
+        vector of the distribution
+        :type covar: str
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a DiagGaussian object in the InputMaster mc 
+    # InlineMCSection.
+    # Arguments are labels for Mean and Covariance objects.
+    input_master.mc["dist1"] = \
+        DiagGaussianMC(mean = "dist1", covar = "dist1")
+    input_master.mc["dist2"] = \
+        DiagGaussianMC(mean = "dist2", covar = "dist2")
+
 
 .. py:class:: MX
 
     A Gaussian mixture model built from Gaussian mixture components.
 
     .. py:attribute:: dpmf
-        :type: DPMF
+        :type: str
 
-        A :py:class:`DPMF` object representing the contribution of each 
-        Gaussian mixture component to the mixture model.
+        Name of a :py:class:`DPMF` object representing the contribution of 
+        each Gaussian mixture component to the mixture model.
     
     .. py:attribute:: components
         :type: str or list[str]
@@ -272,10 +341,20 @@ Class representing user-defined model parameters.
         Create an :py:class:`MX` object with the mixture distribution and 
         components.
 
-        :param dpmf: DPMF describing mixture weights.
-        :type dpmf: DPMF
+        :param dpmf: Name of a DPMF describing mixture weights.
+        :type dpmf: str
         :param components: Name or list of names of mixture components
         :type components: str or list[str]
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a MX objects in the InputMaster mx InlineMXSection.
+    # Arguments are labels for DPMF and MX objects.
+    input_master.mx["emission1"] = MX("biased", ["dist1", "dist2"])
+    input_master.mx["emission2"] = MX("biased", ["dist1", "dist2"])
+
 
 .. py:class:: DenseCPT
 
@@ -294,13 +373,27 @@ Class representing user-defined model parameters.
         A class method for creating a :py:class:`DenseCPT` object with the provided 
         shape.
         If the table is 2 or 3 dimensional, the diagonal entries of the table 
-        are set to the ``self`` parameter (default 0) and all other entries 
-        are set to be uniform. 
+        are set to the ``self_transition`` parameter (default 0) and all other 
+        entries are set to be uniform. 
 
         :param shape: Shape of Dense CPT table
         :type shape: Array_like or multiple arguments
-        :param self: Value for diagonal entries in the table. Defaults to 0.0
+        :param self_transition: Value for diagonal entries in the table. Defaults to 0.0
         :type self: float
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a custom DenseCPT in the InputMaster dense_cpt 
+    # InlineSection.
+    input_master.dense_cpt["start"] = \
+        DenseCPT([[0.7, 0.3], [0.8, 0.2]])
+    # Create a DenseCPT with specified diagonal value and 
+    # uniform other values
+    input_master.dense_cpt["transition"] = \
+        DenseCPT.uniform_from_shape(2, 2, self_transition = 0.6)
+
 
 .. py:class:: DeterministicCPT
 
@@ -334,10 +427,13 @@ Class representing user-defined model parameters.
         :param dt: Name of an existing decision tree 
         :type dt: str 
 
+
 Section Classes
 ===============
 
-Classes to store multiple objects that form one section of the parameter file. 
+Classes to store multiple objects that form one section of the parameter file.
+These are used within the ``InputMaster`` object and need not be defined by 
+the user.
 
 .. py:class:: InlineSection
 
