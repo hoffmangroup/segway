@@ -9,7 +9,6 @@ __version__ = "$Revision$"
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from six.moves import range
-import colorbrewer
 
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename
