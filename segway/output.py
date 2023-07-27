@@ -14,13 +14,13 @@ import colorbrewer
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename
 from ._util import (Copier, maybe_gzip_open, extract_superlabel, 
-                    BED_SCORE, BED_STRAND)
+                    BED_SCORE, BED_STRAND, NUM_COLORS, SCHEME)
 
 INDEX_BED_START = 1
 INDEX_BED_THICKSTART = INDEX_BED_START + 5
 
-NUM_COLORS = 8
-SCHEME = colorbrewer.Dark2[NUM_COLORS]
+LABEL_INDEX = 3
+
 
 def make_bed_attr(key, value):
     if " " in value:
@@ -35,27 +35,34 @@ def make_bed_attrs(mapping):
     return "track %s" % res
 
 
-# Takes a list of filepaths, each of which points to a segmentation bed file.
-# Concatenates the files, merging entries if necessary.  Start file with
-# header.  Used by IdentifySaver and PosteriorSaver.
+def create_color_assignment(window_filenames):
+    # Build a color assignment for each superlabel in the window files
+    labels = set()
+    for window_filename in window_filenames:
+        with maybe_gzip_open(window_filename) as window_file:
+            for line in window_file:
+                label = extract_superlabel(line.split()[LABEL_INDEX])
+                labels.add(label)
+    # If labels are numbers, use as indices into color list
+    if all(label.isdecimal() for label in labels): # Index into color list
+        return {label: ','.join(map(str, SCHEME[int(label) % NUM_COLORS]))
+                for label in labels}
+    # Otherwise, assign colors by alphabetical order
+    return {label: ','.join(map(str, SCHEME[i % NUM_COLORS])) 
+            for i, label in enumerate(sorted(list(labels)))}
+
+
+# Takes a list of filepaths, each of which points to a segmentation BED4 file.
+# Concatenates the files, merging entries if necessary. Produces a BED file 
+# and a track file with an additional header, by default with 9 columns. 
+# Used by IdentifySaver and PosteriorSaver.
 def concatenate_window_segmentations(window_filenames, header, 
                                      bedfilename, trackfilename,
-                                     bed9 = True):
-    # If converting to BED9, build a color assignment using all labels
-    if bed9:
-        # Iterate through window files to build a label list
-        labels = set()
-        for window_filename in window_filenames:
-            with maybe_gzip_open(window_filename) as window_file:
-                for line in window_file:
-                    labels.add(extract_superlabel(line.split()[3]))
-        # Build a color assignment from the label list
-        if all(label.isdecimal() for label in labels): # Index into color list
-            label2color = {label: ','.join(map(str, SCHEME[int(label) % NUM_COLORS]))
-                           for label in labels}
-        else: # Sort and assign colors by order
-            label2color = {label: ','.join(map(str, SCHEME[i % NUM_COLORS])) 
-                        for i, label in enumerate(sorted(list(labels)))}
+                                     as9cols = True):
+    # If converting to 9-column output formats, build a color 
+    # assignment using all labels
+    if as9cols:
+        color_assignement = create_color_assignment(window_filenames)
 
     # values for comparison to combine adjoining segments
     last_line = ""
@@ -64,22 +71,22 @@ def concatenate_window_segmentations(window_filenames, header,
 
     with maybe_gzip_open(bedfilename, "wt") as bedfile:
         with maybe_gzip_open(trackfilename, "wt") as trackfile:
-            # XXX: add in browser track line (see SVN revisions
-            # previous to 195)
+            # Write header to trackfile only
             print(header, file=trackfile)
 
             for window_filename in window_filenames:
                 with maybe_gzip_open(window_filename) as window_file:
                     lines = window_file.readlines()
                     
-                    # If converting to BED9, add extra columns to BED4 data
-                    if bed9:
+                    # If converting to 9 column format, add extra columns 
+                    # to BED4 data
+                    if as9cols:
                         for i, line in enumerate(lines):
                             _, coords = parse_bed4(line)
                             (chrom, start, end, seg) = coords
                             bed9row = [chrom, start, end, seg, BED_SCORE, 
                                     BED_STRAND, start, end, 
-                                    label2color[extract_superlabel(seg)]]
+                                    color_assignement[extract_superlabel(seg)]]
                             lines[i] = '\t'.join(bed9row) + '\n'
 
                     # Prepare the first line of the data
@@ -241,4 +248,4 @@ class PosteriorSaver(OutputSaver):
             concatenate_window_segmentations(posterior_filenames, trackheader, 
                                              "/dev/null",
                                              posterior_bedgraph_tmpl % num_seg,
-                                             bed9 = False)
+                                             as9cols = False)
