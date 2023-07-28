@@ -178,7 +178,7 @@ class IdentifySaver(OutputSaver):
                 for index, window in enumerate(self.windows)
                 if world == window.world]
 
-    def concatenate(self, world):
+    def merge_windows(self, world):
         # the final bed filename, not the individual viterbi_filenames
         bedfilename = self.make_filename(self.bed_filename, world)
         trackfilename = self.make_filename(self.track_filename, world)
@@ -193,7 +193,7 @@ class IdentifySaver(OutputSaver):
                              bedfilename, trackfilename)
 
     def __call__(self, world):
-        self.concatenate(world)
+        self.merge_windows(world)
 
         track_filename = self.make_filename(self.track_filename, world)
         layer(track_filename, make_layer_filename(track_filename),
@@ -231,7 +231,7 @@ class PosteriorSaver(OutputSaver):
                              posterior_code_bedfilename,
                              posterior_code_trackfilename)
 
-        # Save posterior bedgraph files
+        # Save posterior bedgraph and track files
         posterior_bedgraph_tmpl = self.make_filename(self.bedgraph_filename, 
                                                      world)
         posterior_track_tmpl = self.make_filename(self.posterior_track_filename, 
@@ -245,7 +245,6 @@ class PosteriorSaver(OutputSaver):
         else:
             label_print_range = range(self.num_segs)
         for num_seg in label_print_range:
-            # GIVE BED OUTPUT
             posterior_filenames = [posterior_tmpl % num_seg for posterior_tmpl in self.posterior_filenames]
             trackheader = self.make_bedgraph_header(num_seg)
             merge_windows_to_bed(posterior_filenames, trackheader, 
