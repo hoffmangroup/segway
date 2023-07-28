@@ -259,8 +259,16 @@ TRACK_FILEBASEFMT = extjoin(__package__, "%d", EXT_TRACK, EXT_GZ)
 # "posterior%s.bed.gz"
 BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
 
-# "posterior%s.%%d.bed.gz"
+# "posterior%s.%%d.bedgraph.gz"
 BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ)
+
+
+# "posterior%s.track.gz"
+POSTERIOR_TRACK_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_TRACK, EXT_GZ)
+
+# "posterior%s.%%d.track.gz"
+POSTERIOR_TRACK_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_TRACK, EXT_GZ)
+
 FLOAT_TABFILEBASENAME = extjoin("observations", EXT_TAB)
 TRAIN_FILEBASENAME = extjoin(PREFIX_TRAIN, EXT_TAB)
 TRAIN_RESULTS_TMPL = extjoin(PREFIX_TRAIN_RESULTS, EXT_TAB, "tmpl")
@@ -1457,6 +1465,15 @@ class Runner(object):
         else:
             basename = BEDGRAPH_FILEBASEFMT
 
+        return self.work_dirpath / basename
+    
+    @memoized_property
+    def posterior_track_filename(self):
+        if self.num_worlds == 1:
+            basename = POSTERIOR_TRACK_FILEBASENAME
+        else:
+            basename = POSTERIOR_TRACK_FILEBASEFMT
+        
         return self.work_dirpath / basename
 
     @memoized_property

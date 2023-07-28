@@ -202,7 +202,9 @@ class IdentifySaver(OutputSaver):
 
 
 class PosteriorSaver(OutputSaver):
-    copy_attrs = OutputSaver.copy_attrs + ["bedgraph_filename", "bed_filename",
+    copy_attrs = OutputSaver.copy_attrs + ["bedgraph_filename", 
+                                           "posterior_track_filename",
+                                           "bed_filename",
                                            "track_filename",
                                            "posterior_filenames",
                                            "output_label"]
@@ -231,8 +233,10 @@ class PosteriorSaver(OutputSaver):
                              posterior_code_trackfilename)
 
         # Save posterior bedgraph files
-        posterior_track_tmpl = self.make_filename(self.track_filename, world)
-        posterior_bedgraph_tmpl = self.make_filename(self.bedgraph_filename, world)
+        posterior_bedgraph_tmpl = self.make_filename(self.bedgraph_filename, 
+                                                     world)
+        posterior_track_tmpl = self.make_filename(self.posterior_track_filename, 
+                                                  world)
         if self.output_label == "subseg":
             label_print_range = range(self.num_segs * self.num_subsegs)
         elif self.output_label == "full":
