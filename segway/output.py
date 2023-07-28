@@ -55,9 +55,8 @@ def create_color_assignment(window_filenames):
 # Concatenates the files, merging entries if necessary. Produces a BED file 
 # and a track file with an additional header, by default with 9 columns. 
 # Used by IdentifySaver and PosteriorSaver.
-def concatenate_window_segmentations(window_filenames, header, 
-                                     bedfilename, trackfilename,
-                                     as9cols = True):
+def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
+                         as9cols = True):
     # If converting to 9-column output formats, build a color 
     # assignment using all labels
     if as9cols:
@@ -68,80 +67,80 @@ def concatenate_window_segmentations(window_filenames, header,
     last_start = None
     last_vals = (None, None, None) # (chrom, coord, seg)
 
-    with maybe_gzip_open(bedfilename, "wt") as bedfile:
-        with maybe_gzip_open(trackfilename, "wt") as trackfile:
-            # Write header to trackfile only
-            print(header, file=trackfile)
+    with (maybe_gzip_open(bedfilename, "wt") as bedfile, 
+          maybe_gzip_open(trackfilename, "wt") as trackfile):
+        # Write header to trackfile only
+        print(header, file=trackfile)
 
-            for window_filename in window_filenames:
-                with maybe_gzip_open(window_filename) as window_file:
-                    lines = window_file.readlines()
-                    
-                    # If converting to 9 column format, add extra columns 
-                    # to BED4 data
-                    if as9cols:
-                        for i, line in enumerate(lines):
-                            _, coords = parse_bed4(line)
-                            (chrom, start, end, seg) = coords
-                            bed9row = [chrom, start, end, seg, BED_SCORE, 
-                                    BED_STRAND, start, end, 
-                                    color_assignement[extract_superlabel(seg)]]
-                            lines[i] = '\t'.join(bed9row) + '\n'
+        for window_filename in window_filenames:
+            with maybe_gzip_open(window_filename) as window_file:
+                lines = window_file.readlines()
+                
+                # If converting to 9 column format, add extra columns 
+                # to BED4 data
+                if as9cols:
+                    for i, line in enumerate(lines):
+                        _, coords = parse_bed4(line)
+                        (chrom, start, end, seg) = coords
+                        bed9row = [chrom, start, end, seg, BED_SCORE, 
+                                BED_STRAND, start, end, 
+                                color_assignement[extract_superlabel(seg)]]
+                        lines[i] = '\t'.join(bed9row) + '\n'
 
-                    # Prepare the first line of the data
-                    first_line = lines[0]
-                    first_row, first_coords = parse_bed4(first_line)
-                    (chrom, start, end, seg) = first_coords
+                # Prepare the first line of the data
+                first_line = lines[0]
+                first_row, first_coords = parse_bed4(first_line)
+                (chrom, start, end, seg) = first_coords
 
-                    # write the last line and the first line, after
-                    # potentially merging
-                    if last_vals == (chrom, start, seg):
-                        # update start position
-                        first_row[INDEX_BED_START] = last_start
-                        # update thickStart position
-                        first_row[INDEX_BED_THICKSTART] = last_start
+                # write the last line and the first line, after
+                # potentially merging
+                if last_vals == (chrom, start, seg):
+                    # update start position
+                    first_row[INDEX_BED_START] = last_start
+                    # update thickStart position
+                    first_row[INDEX_BED_THICKSTART] = last_start
 
-                        # add back trailing newline eliminated by line.split()
-                        merged_line = "\t".join(first_row) + "\n"
+                    # add back trailing newline eliminated by line.split()
+                    merged_line = "\t".join(first_row) + "\n"
 
-                        # if there's just a single line in the BED file
-                        if len(lines) == 1:
-                            last_line = merged_line
-                            last_vals = (chrom, end, seg)
-                            # last_start is already set correctly
-                            # postpone writing until after additional merges
-                            continue
-                        else:
-                            # write the merged line
-                            bedfile.write(merged_line)
-                            trackfile.write(merged_line)
+                    # if there's just a single line in the BED file
+                    if len(lines) == 1:
+                        last_line = merged_line
+                        last_vals = (chrom, end, seg)
+                        # last_start is already set correctly
+                        # postpone writing until after additional merges
+                        continue
                     else:
-                        if len(lines) == 1:
-                            # write the last line of the last file.
-                            # hold back the first line of this file,
-                            # and treat it as the last line
-                            bedfile.write(last_line)
-                            trackfile.write(last_line)
-                        else:
-                            # write the last line of the last file, first
-                            # line of this file
-                            bedfile.writelines([last_line, first_line])
-                            trackfile.writelines([last_line, first_line])
+                        # write the merged line
+                        bedfile.write(merged_line)
+                        trackfile.write(merged_line)
+                else:
+                    if len(lines) == 1:
+                        # write the last line of the last file.
+                        # hold back the first line of this file,
+                        # and treat it as the last line
+                        bedfile.write(last_line)
+                        trackfile.write(last_line)
+                    else:
+                        # write the last line of the last file, first
+                        # line of this file
+                        bedfile.writelines([last_line, first_line])
+                        trackfile.writelines([last_line, first_line])
 
-                    # write the bulk of the lines
-                    bedfile.writelines(lines[1:-1])
-                    trackfile.writelines(lines[1:-1])
+                # write the bulk of the lines
+                bedfile.writelines(lines[1:-1])
+                trackfile.writelines(lines[1:-1])
 
-                    # set last_line
-                    last_line = lines[-1]
-                    last_row, last_coords = parse_bed4(last_line)
-                    (chrom, start, end, seg) = last_coords
-                    last_vals = (chrom, end, seg)
-                    last_start = start
+                # set last_line
+                last_line = lines[-1]
+                last_row, last_coords = parse_bed4(last_line)
+                (chrom, start, end, seg) = last_coords
+                last_vals = (chrom, end, seg)
+                last_start = start
 
-            # write the very last line of all files
-            bedfile.write(last_line)
-            trackfile.write(last_line)
+        # write the very last line of all files
+        bedfile.write(last_line)
+        trackfile.write(last_line)
 
 class OutputSaver(Copier):
     copy_attrs = ["tracks", "uuid", "num_worlds", "num_segs", "num_subsegs"]
@@ -191,8 +190,8 @@ class IdentifySaver(OutputSaver):
                                    in enumerate(self.viterbi_filenames)
                                    if windows[window_index].world == world]
         header = self.make_track_header()
-        concatenate_window_segmentations(world_viterbi_filenames, header, 
-                                         bedfilename, trackfilename)
+        merge_windows_to_bed(world_viterbi_filenames, header, 
+                             bedfilename, trackfilename)
 
     def __call__(self, world):
         self.concatenate(world)
@@ -227,11 +226,12 @@ class PosteriorSaver(OutputSaver):
         posterior_code_trackfilename = self.make_filename(self.track_filename, world)
         posterior_code_filenames = [posterior_tmpl % "_code" for posterior_tmpl in self.posterior_filenames]
         trackheader = self.make_track_header()
-        concatenate_window_segmentations(posterior_code_filenames, trackheader, 
-                                         posterior_code_bedfilename, 
-                                         posterior_code_trackfilename)
+        merge_windows_to_bed(posterior_code_filenames, trackheader, 
+                             posterior_code_bedfilename,
+                             posterior_code_trackfilename)
 
         # Save posterior bedgraph files
+        posterior_track_tmpl = self.make_filename(self.track_filename, world)
         posterior_bedgraph_tmpl = self.make_filename(self.bedgraph_filename, world)
         if self.output_label == "subseg":
             label_print_range = range(self.num_segs * self.num_subsegs)
@@ -242,9 +242,10 @@ class PosteriorSaver(OutputSaver):
         else:
             label_print_range = range(self.num_segs)
         for num_seg in label_print_range:
+            # GIVE BED OUTPUT
             posterior_filenames = [posterior_tmpl % num_seg for posterior_tmpl in self.posterior_filenames]
             trackheader = self.make_bedgraph_header(num_seg)
-            concatenate_window_segmentations(posterior_filenames, trackheader, 
-                                             "/dev/null",
-                                             posterior_bedgraph_tmpl % num_seg,
-                                             as9cols = False)
+            merge_windows_to_bed(posterior_filenames, trackheader, 
+                                 posterior_bedgraph_tmpl % num_seg,
+                                 posterior_track_tmpl % num_seg,
+                                 as9cols = False)
