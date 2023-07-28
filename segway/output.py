@@ -67,8 +67,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
     last_start = None
     last_vals = (None, None, None) # (chrom, coord, seg)
 
-    with (maybe_gzip_open(bedfilename, "wt") as bedfile, 
-          maybe_gzip_open(trackfilename, "wt") as trackfile):
+    with maybe_gzip_open(bedfilename, "wt") as bedfile, maybe_gzip_open(trackfilename, "wt") as trackfile:
         # Write header to trackfile only
         print(header, file=trackfile)
 
