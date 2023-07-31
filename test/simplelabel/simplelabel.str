@@ -11,7 +11,8 @@ frame: 0 {
    variable: seg {
       type: TYPE_SEG;
       conditionalparents: nil using DenseCPT("start_seg");
-      % Line below defines labels
+      % Variable names are defined in input.master in the name collection 
+      % collection_seg_testtrack1
       symboltable: collection("collection_seg_testtrack1");
    }
 
@@ -70,7 +71,8 @@ frame: 1 {
                           | seg(-1) using DeterministicCPT("seg_seg_copy")
                           | seg(-1) using DenseCPT("seg_seg");
       switchingparents: segTransition(0) using mapping("internal:copyParent");
-      % Line below defines labels
+      % Variable names are defined in input.master in the name collection 
+      % collection_seg_testtrack1
       symboltable: collection("collection_seg_testtrack1");   
 }
 
