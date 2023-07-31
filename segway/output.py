@@ -13,12 +13,8 @@ from six.moves import range
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename
 from ._util import (Copier, maybe_gzip_open, extract_superlabel, 
+                    LABEL_INDEX, INDEX_BED_START, INDEX_BED_THICKSTART,
                     BED_SCORE, BED_STRAND, NUM_COLORS, SCHEME)
-
-INDEX_BED_START = 1
-INDEX_BED_THICKSTART = INDEX_BED_START + 5
-
-LABEL_INDEX = 3
 
 
 def make_bed_attr(key, value):
@@ -51,16 +47,18 @@ def create_color_assignment(window_filenames):
             for i, label in enumerate(sorted(list(labels)))}
 
 
-# Takes a list of filepaths, each of which points to a segmentation BED4 file.
-# Concatenates the files, merging entries if necessary. Produces a BED file 
-# and a track file with an additional header, by default with 9 columns. 
-# Used by IdentifySaver and PosteriorSaver.
 def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
-                         as9cols = True):
+                         bed9_output = True):
+    """
+    Given a list of filepaths, each of which points to a segmentation BED4 file,
+    concatenate the files and merge entries if necessary. 
+    Writes one BED file and a second BED file with additional track header, 
+    by default with 9 columns. 
+    """
     # If converting to 9-column output formats, build a color 
     # assignment using all labels
-    if as9cols:
-        color_assignement = create_color_assignment(window_filenames)
+    if bed9_output:
+        segment_colors = create_color_assignment(window_filenames)
 
     # values for comparison to combine adjoining segments
     last_line = ""
@@ -77,13 +75,13 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
                 
                 # If converting to 9 column format, add extra columns 
                 # to BED4 data
-                if as9cols:
+                if bed9_output:
                     for i, line in enumerate(lines):
                         _, coords = parse_bed4(line)
                         (chrom, start, end, seg) = coords
                         bed9row = [chrom, start, end, seg, BED_SCORE, 
                                 BED_STRAND, start, end, 
-                                color_assignement[extract_superlabel(seg)]]
+                                segment_colors[extract_superlabel(seg)]]
                         lines[i] = '\t'.join(bed9row) + '\n'
 
                 # Prepare the first line of the data
@@ -250,4 +248,4 @@ class PosteriorSaver(OutputSaver):
             merge_windows_to_bed(posterior_filenames, trackheader, 
                                  posterior_bedgraph_tmpl % num_seg,
                                  posterior_track_tmpl % num_seg,
-                                 as9cols = False)
+                                 bed9_output = False)
