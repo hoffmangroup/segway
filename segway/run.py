@@ -3932,17 +3932,16 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
     group.add_argument("-n", "--dry-run", action="store_true",
                        help="write all files, but do not run any executables")
 
-    # define steps for each of the three main tasks
-    train_init = tasks.add_parser("", add_help=False)
-    train_run = tasks.add_parser("", add_help=False)
-    train_finish = tasks.add_parser("", add_help=False)
-    train_run_round = tasks.add_parser("", add_help=False)
-    train_init_run = tasks.add_parser("", add_help=False)
+    # Parent parsers for each sub-step and combinations
+    train_init = ArgumentParser(add_help=False)
+    train_run = ArgumentParser(add_help=False)
+    train_finish = ArgumentParser(add_help=False)
+    train_init_run = ArgumentParser(add_help=False)
 
-    identify_init = tasks.add_parser("", add_help=False)
-    identify_run = tasks.add_parser("", add_help=False)
-    identify_finish = tasks.add_parser("", add_help=False)
-    identify_init_run = tasks.add_parser("", add_help=False)
+    identify_init = ArgumentParser(add_help=False)
+    identify_run = ArgumentParser(add_help=False)
+    identify_finish = ArgumentParser(add_help=False)
+    identify_init_run = ArgumentParser(add_help=False)
 
     # Common options across tasks
     class Argument(object):
@@ -4176,12 +4175,14 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
     group.add_argument("--bigBed", metavar="FILE",
                        help="specify layered bigBed filename")
 
-    args = tasks.add_parser("", add_help=False)
+    # Parent parser for position arguments
+    args = ArgumentParser(add_help=False)
     # Positional arguments
     args.add_argument("archives", nargs="+")  # "+" for at least 1 arg
     args.add_argument("traindir", nargs=1)
 
-    identify_args = tasks.add_parser("", add_help=False)
+    # Parent parser for annotate/identify
+    identify_args = ArgumentParser(add_help=False)
     identify_args.add_argument("annotatedir", nargs=1)
 
     tasks.add_parser("train-init", parents=[train_init, train_init_run, args],
@@ -4190,8 +4191,7 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                      usage = "segway train-run [args] GENOMEDATA TRAINDIR")
     tasks.add_parser("train-finish", parents=[train_finish, args],
                      usage = "segway train-finish [args] GENOMEDATA TRAINDIR")
-    tasks.add_parser("train-run-round", parents=[train_run_round,
-                                                 train_init_run, args],
+    tasks.add_parser("train-run-round", parents=[train_init_run, args],
                      usage = "segway train-run-round [args] GENOMEDATA TRAINDIR")
 
     tasks.add_parser("annotate-init",
