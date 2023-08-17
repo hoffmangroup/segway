@@ -1,2 +1,57 @@
 [build-system]
-requires = ["setuptools>=42", "wheel", "setuptools_scm[toml]>=3.4"]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools", "setuptools-scm"]
+
+[project]
+authors = [{name = "Michael Hoffman", email = "michael.hoffman@utoronto.ca"}]
+classifiers = [
+  "Natural Language :: English",
+  "Development Status :: 5 - Production/Stable",
+  "Intended Audience :: Science/Research",
+  "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+  "Topic :: Scientific/Engineering :: Bio-Informatics",
+  "Operating System :: Unix",
+  "Programming Language :: Python :: 3",
+]
+dependencies = [
+  "autolog>=0.2.0",
+  "colorbrewer>=0.2.0",
+  "drmaa>=0.4a3",
+  "genomedata>=1.7",
+  "numpy",
+  "optbuild>=0.2.0",
+  "optplus>=0.2.0",
+  "path.py>=11",
+  "six",
+  "tables>2.0.4",
+  "textinput>=0.2.0",
+]
+description = "Segway is a tool for easy pattern discovery and identification in functional genomics data."
+dynamic = ["version"]
+name = "segway"
+readme = "README.md"
+requires-python = ">=3.7"
+
+[project.license]
+text = "GPL-2.0-only"
+
+[project.scripts]
+segway = "segway.run:main"
+segway-layer = "segway.layer:main"
+segway-task = "segway.task:main"
+segway-winner = "segway.winner:main"
+
+[project.urls]
+"Bug Tracker" = "https://github.com/hoffmangroup/segway/issues"
+"Download" = "https://pypi.python.org/pypi/segway"
+"Homepage" = "https://hoffmanlab.org/proj/segway"
+
+[tool.setuptools]
+# Override setuptools autodiscovery algorithm
+packages = ["segway", "segway.data", "segway.cluster"]
+
+# Enable version inference from scm
+[tool.setuptools_scm]
+
+[tool.mypy]
+ignore_missing_imports = true

@@ -1,6 +1,0 @@
-include segway/data/*
-include docker/*
-recursive-include doc/*
-include NEWS
-include LICENSE
-include *.md
