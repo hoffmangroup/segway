@@ -1,7 +1,7 @@
 FROM ubuntu:latest
 
 # Install Ubuntu 20.04.01 LTS
-# Install pkg-config for locationg development files (hdf5)
+# Install pkg-config for GMTK
 # Install Python 3 and pip3
 # Install HDF5
 # Install Git
@@ -12,7 +12,7 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     pkg-config \
     python3 \
     python3-pip \
-    libhdf5-dev \
+    libhdf5-serial-dev \
     hdf5-tools \
     git \
     curl \
@@ -38,9 +38,9 @@ RUN curl -SL https://depot.galaxyproject.org/software/gmtk/gmtk_1.4.4_src_all.ta
 # Update pip
 # Install PyFlakes for testing
 RUN python3 -m pip install --upgrade \
+    build \
     pip \
-    setuptools \
-    pyflakes
+    setuptools
 
 # Install segway
 # RUN pip install segway
