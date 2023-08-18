@@ -19,16 +19,16 @@ jobs:
         SEGWAY_TEST_PYTHON_VERSION: 3
 
     steps:
-      - uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.7'
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Install test dependencies
         run: |
-          python3 -m pip install build
+          python3 -m pip install build pyflakes
       - name: Build repository
         run: |
           python3 -m build
