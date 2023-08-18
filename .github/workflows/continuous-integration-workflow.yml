@@ -19,10 +19,22 @@ jobs:
         SEGWAY_TEST_PYTHON_VERSION: 3
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.7'
+      - name: Install test dependencies
+        run: |
+          python3 -m pip install build
       - name: Build repository
         run: |
-          python${SEGWAY_TEST_PYTHON_VERSION} -m pip install --verbose .
+          python3 -m build
+      - name: Install
+        run: |
+          python3 -m pip install -v .
           pip list
       - name: Run tests
         run: |
@@ -35,3 +47,8 @@ jobs:
           name: test-results
           path: |
             test/**/*-changes.tar.gz
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: segway-build
+          path: dist/*
