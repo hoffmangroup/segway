@@ -28,7 +28,7 @@ jobs:
           fetch-depth: 0
       - name: Install test dependencies
         run: |
-          python3 -m pip install build pyflakes
+          python3 -m pip install --upgrade pip setuptools build pyflakes
       - name: Build repository
         run: |
           python3 -m build
