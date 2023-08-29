@@ -6,7 +6,6 @@ FROM ubuntu:latest
 # Install HDF5
 # Install Git
 # Install curl (for retrieving GMTK)
-# Install node for github actions
 # Avoid prompts and do not install recommended packages
 RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
     build-essential \
@@ -18,7 +17,6 @@ RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-ins
     hdf5-tools \
     git \
     curl \
-    nodejs \
 && apt-get clean \
 && rm -rf /var/lib/apt/lists/*
 
