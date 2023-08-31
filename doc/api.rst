@@ -22,7 +22,7 @@ The Segway API describes the model using two files:
 
   2. A Python file describing the initial parameter settings and Segway 
   commands for training and inference. The classes provided by the Segway API
-  for writing this file are described below. It should contain 3 areas:
+  for writing this file are described below. It should contain 3 sections:
 
     1. Code defining an :py:class:`InputMaster` object and setting its 
     appropriate attributes to describe the model.
@@ -50,7 +50,7 @@ Central class storing all parameter information.
     
     Stores the names of hidden states (segmentation labels) in the model. 
     
-    Behaves as a dictionary where keys are the hidden state name, which 
+    Behaves as a dictionary where keys are the hidden variable names, which 
     can be referenced in the structure file, and each value should be set to 
     a list of state names or a :py:class:`NameCollection` object initialized 
     with state names. If a Python list is given, it is converted to a 
@@ -100,10 +100,10 @@ Central class storing all parameter information.
     .. py:attribute:: mx
         :type: InlineMXSection
     
-    Store Gaussian mixture distributions constructed from above-defined mixture 
+    Store Gaussian mixture (mx) distributions constructed from above-defined mixture 
     components. 
     
-    Behaves as a dictionary where keys are hidden state names (from 
+    Behaves as a dictionary where keys are hidden variable names (from 
     :py:attr:`self.name_collection`) and each value is an :py:class:`MX` object.
 
     .. py:attribute:: dense_cpt
@@ -160,12 +160,12 @@ Class representing user-defined model parameters.
     A list of names with a specialized string method for writing to the 
     parameter file.
 
-    .. py:method:: __init__(self, *args)
+    .. py:method:: __init__(self, names)
 
         Create a :py:class:`NameCollection` object containing the provided names.
 
-        :param args: List of names or names as multiple arguments.
-        :type names: list[str] or str
+        :param names: List of names or names as multiple arguments.
+        :type names: list[str]
 
 Usage example:
 
@@ -193,12 +193,12 @@ Usage example:
         :param args: The mean value which is interpreted by the Numpy ``array`` constructor. 
         :type args: array_like
 
-    .. py:method:: get_dimension(self)
+    .. py:method:: get_header_info(self)
 
-        Return the dimension of this object.
+        Return a string describing the dimension and values.
 
-        :return: The dimension of the mean array
-        :rtype: int
+        :return: String description for input.master
+        :rtype: str
 
 Usage example:
 
@@ -224,12 +224,12 @@ Usage example:
         :param args: The covariance value which is interpreted by the Numpy ``array`` constructor. 
         :type args: array_like
 
-    .. py:method:: get_dimension(self)
+    .. py:method:: get_header_info(self)
 
-        Return the dimension of this object.
+        Return a string describing the dimension and values.
 
-        :return: The dimension of the covariance array
-        :rtype: int
+        :return: String description for input.master
+        :rtype: str
 
 Usage example:
 
@@ -263,12 +263,12 @@ Usage example:
         :returns: DPMF with given shape and uniform probabilities.
         :rtype: DPMF
 
-    .. py:method:: get_length(self)
+    .. py:method:: get_header_info(self)
 
-        Return the length of this object.
+        Return a string describing the dimension and values.
 
-        :return: The length of the DPMF array, equal to the number of outcomes for the DPMF
-        :rtype: int
+        :return: String description for input.master
+        :rtype: str
 
 Usage example:
 
@@ -381,6 +381,13 @@ Usage example:
         :param self_transition: Value for diagonal entries in the table. Defaults to 0.0
         :type self: float
 
+    .. py:method:: get_header_info(self)
+
+        Return a string describing the number of parents and cardinality.
+
+        :return: Header describing object for input.master
+        :rtype: str
+
 Usage example:
 
 .. code-block:: python
@@ -426,6 +433,13 @@ Usage example:
         :type cardinality: int
         :param dt: Name of an existing decision tree 
         :type dt: str 
+
+    .. py:method:: get_header_info(self)
+
+        Return header information for this object, which is an empty string.
+
+        :return: Empty header string for input.master
+        :rtype: str
 
 
 Section Classes
