@@ -49,7 +49,7 @@ from .bed import parse_bed4, read_native
 from .cluster import (is_running_locally, make_native_spec, JobTemplateFactory,
                       RestartableJob, RestartableJobDict, Session)
 from .include import IncludeSaver
-from .input_master import InputMasterSaver
+from .input_master import InputMasterSaver, INPUT_MASTER_NAME, save_input_master
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
@@ -559,7 +559,7 @@ class TrainThread(Thread):
         self.num_segs = num_segs
         self.instance_index = instance_index
         self.runner.input_master_filename = make_default_filename(
-            InputMasterSaver.resource_name, runner.params_dirpath,
+            INPUT_MASTER_NAME, runner.params_dirpath,
             instance_index)
 
         Thread.__init__(self)
@@ -2059,6 +2059,7 @@ class Runner(object):
         _, input_master_filename_is_new = \
             InputMasterSaver(self)(input_master_filename, self.params_dirpath,
                                    self.clobber, instance_index)
+        save_input_master(self, input_master_filename, self.params_dirpath, self.clobber, instance_index)
 
     def load_supervision(self):
         # The semi-supervised mode changes the DBN structure so there is an
@@ -3239,6 +3240,8 @@ class Runner(object):
         input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(self.input_master_filename,
                                    self.params_dirpath, self.clobber)
+        save_input_master(self, input_master_filename, self.params_dirpath, self.clobber)
+
         self.input_master_filename = input_master_filename
 
         # save file locations to tab-delimited file
@@ -3424,7 +3427,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # only want "input.master" not "input.0.master" if there is
         # only one instance
         if (not self.instance_make_new_params and
-           resource == InputMasterSaver.resource_name):
+           resource == INPUT_MASTER_NAME):
             instance_index = None
 
         old_filename = make_default_filename(resource,
@@ -3461,7 +3464,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             # into our current one. If just using train-run-round, these will
             # already be present.
             self.input_master_filename = \
-                self.recover_filename(InputMasterSaver.resource_name)
+                self.recover_filename(INPUT_MASTER_NAME)
             log_likelihood_tab_filename = self.log_likelihood_tab_filename
             recover_log_likelihood_tab_filepath.copy2(
                 log_likelihood_tab_filename)
@@ -4060,7 +4063,7 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
     group.add_argument("-i", "--input-master", metavar="FILE",
                        help="use or create input master in FILE"
                        " (default %s)" %
-                       make_default_filename(InputMasterSaver.resource_name,
+                       make_default_filename(INPUT_MASTER_NAME,
                                              DIRPATH_PARAMS))
 
     group.add_argument("-s", "--structure", metavar="FILE",

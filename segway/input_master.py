@@ -9,6 +9,7 @@ __version__ = "$Revision$"
 ## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from math import frexp, ldexp
+from itertools import product
 from string import Template
 import sys
 
@@ -24,7 +25,10 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
                     SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED, USE_MFSDG,
-                    VIRTUAL_EVIDENCE_LIST_FILENAME)
+                    VIRTUAL_EVIDENCE_LIST_FILENAME, make_default_filename)
+
+from .gmtk import (InputMaster, DiagGaussianMC, MX, DPMF, DeterministicCPT, 
+                   DenseCPT, DecisionTree, VirtualEvidence)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
 # scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -68,6 +72,8 @@ DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
 # This allows consistency between Python 2 and Python 3
 # TODO[PY2-EOL]: remove
 ROUND_NDIGITS = 12
+
+INPUT_MASTER_NAME = "input.master.tmpl"
 
 
 def vstack_tile(array_like, *reps):
@@ -155,6 +161,387 @@ def jitter_cell(cell, random_state):
     return cell + random_state.uniform(-max_noise, max_noise)
 
 jitter = vectorize(jitter_cell)
+
+
+def save_input_master(runner, input_master_filename, params_dirpath=None, 
+                      clobber=False, instance_index=None):
+    """
+    Save the input.master file using the GMTK API. 
+    """
+
+    input_master = InputMaster()
+    
+    # Preamble
+    include_filename = runner.gmtk_include_filename_relative
+    card_seg = runner.num_segs
+    segway_preamble = \
+f"""#include "{include_filename}"
+
+#if CARD_SEG != {card_seg}
+#error Specified number of segment labels (CARD_SEG) does not match the number used for this input master file ({card_seg})
+#endif
+
+"""
+    input_master.preamble = segway_preamble
+
+
+    # Decision Trees
+    segCountDown_tree = make_segCountDown_tree(runner)
+
+    map_frameIndex_ruler_tree = \
+"""1
+% is the frameIndex divisible by RULER_SCALE
+    -1 { mod(p0, RULER_SCALE) == 0 }
+"""
+    input_master.dt["map_frameIndex_ruler"] = \
+        DecisionTree(map_frameIndex_ruler_tree)
+    
+    map_seg_segCountDown_tree = \
+f"""1
+% this is only used at the beginning of an observation track
+0 {segCountDown_tree}
+"""
+    input_master.dt["map_seg_segCountDown"] = \
+        DecisionTree(map_seg_segCountDown_tree)
+    
+    map_segTransition_ruler_seg_segCountDown_segCountDown_tree = \
+f"""4
+    0 2 2 default
+      % segTransition(0) == 2 (seg transition):
+      % reinitialize the segCountDown value based on the usual tree
+      % used at the beginning of a segment
+      2 {segCountDown_tree}
+
+      % segTransition(0) in (0, 1) (no transition, subseg transition):
+      1 2 0 default
+            % ruler(0) == 0:
+            -1 {{ p3 }} % not at ruler mark -> copy previous value
+
+            % ruler(0) == 1:
+            -1 {{ max(p3-1, 0) }} % subtract 1 from previous value, or 0
+"""
+    input_master.dt["map_segTransition_ruler_seg_segCountDown_segCountDown"] = \
+        DecisionTree(map_segTransition_ruler_seg_segCountDown_segCountDown_tree)
+
+    map_seg_subseg_obs_tree = \
+"""2       % num parents
+        -1 { p0*CARD_SUBSEG + p1 } 
+"""
+    input_master.dt["map_seg_subseg_obs"] = \
+        DecisionTree(map_seg_subseg_obs_tree)
+    
+    if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
+        map_supervisionLabel_seg_alwaysTrue = \
+"""2              % num parents
+% first parent is the label: 0 = no label; 1+ = (desired-1)
+% second parent is target
+    0 2 0 default
+        % no label
+        -1 1 % does not matter, observed child is always true
+
+        % label set
+        #if SUPERVISIONLABEL_EXTENSION == 1
+            %% if only one supervision label is allowed
+            %%% if the target == label - 1: then observed child is true
+            %%% if the target != label - 1: then observed child is false => impossible
+            -1 { p1 == (p0-SUPERVISION_LABEL_OFFSET) }
+        #else
+            %% if multiple supervision label is allowed
+            %%% if the target in range [label - 1, label - 1 + label_range):
+            %%% then observed child is true
+            %%% if the target not in range [label - 1, label - 1 + label_range):
+            %%% then observed child is false => impossible
+            -1 { (p1 > (p0-SUPERVISION_LABEL_OFFSET-1)) && (p1 < (p0-SUPERVISION_LABEL_OFFSET+SUPERVISIONLABEL_RANGE_SIZE)) }
+        #endif
+"""
+        input_master.dt["map_supervisionLabel_seg_alwaysTrue"] = \
+            DecisionTree(map_supervisionLabel_seg_alwaysTrue)
+
+    # TODO: Dirichlet Table param spec
+    # if self.len_seg_strength > 0:
+    #         dirichlet_spec = DirichletTabParamSpec(self)
+    #     else:
+    #         dirichlet_spec = ""
+
+    # Deterministic CPTs
+    input_master.deterministic_cpt["seg_segCountDown"] = \
+        DeterministicCPT(("CARD_SEG", ), "CARD_SEGCOUNTDOWN", 
+                         "map_seg_segCountDown")
+    input_master.deterministic_cpt["frameIndex_ruler"] = \
+        DeterministicCPT(("CARD_FRAMEINDEX", ), "CARD_RULER", 
+                         "map_frameIndex_ruler")
+    input_master.deterministic_cpt["segTransition_ruler_seg_segCountDown_segCountDown"] = \
+        DeterministicCPT(("CARD_SEGTRANSITION", "CARD_RULER", "CARD_SEG", 
+                          "CARD_SEGCOUNTDOWN"), "CARD_SEGCOUNTDOWN", 
+                         "map_segTransition_ruler_seg_segCountDown_segCountDown")
+    input_master.deterministic_cpt["seg_seg_copy"] = \
+        DeterministicCPT(("CARD_SEG", ), "CARD_SEG", 
+                         "internal:copyParent")
+    input_master.deterministic_cpt["subseg_subseg_copy"] = \
+        DeterministicCPT(("CARD_SUBSEG", ), "CARD_SUBSEG", 
+                         "internal:copyParent")
+    if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
+        input_master.deterministic_cpt["supervisionLabel_seg_alwaysTrue"] = \
+        DeterministicCPT(("CARD_SUPERVISIONLABEL", "CARD_SEG"), "CARD_BOOLEAN", 
+                         "map_supervisionLabel_seg_alwaysTrue")
+    else:
+        assert (runner.supervision_type == SUPERVISION_SUPERVISED or 
+                runner.supervision_type == SUPERVISION_UNSUPERVISED)
+
+
+    # Dense CPTs
+    num_segs = runner.num_segs
+    num_subsegs = runner.num_subsegs
+    input_master.dense_cpt["start_seg"] = DenseCPT.uniform_from_shape(num_segs)
+    input_master.dense_cpt["seg_subseg"] = DenseCPT.uniform_from_shape(num_segs, num_subsegs)
+    input_master.dense_cpt["seg_seg"] = DenseCPT.uniform_from_shape(num_segs, num_segs)
+    input_master.dense_cpt["seg_subseg_subseg"] = DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs)
+    input_master.dense_cpt["segCountDown_seg_segTransition"] = make_dense_cpt_segCountDown_seg_segTransition(runner)
+    if runner.use_dinucleotide:
+        input_master.dense_cpt["seg_dinucleotide"] = make_dense_cpt_seg_dinucleotide()
+
+    distribution = runner.distribution
+    # Normal distributions
+    if distribution in DISTRIBUTIONS_LIKE_NORM:
+        # Mean and Covar
+        for component in range(runner.num_mix_components):
+            mean_data = make_mean_data(runner)
+            covar_data = make_covar_data(runner)
+            for seg_index in range(num_segs):
+                seg_name = f"seg{seg_index}"
+                for subseg_index in range(num_subsegs):
+                    subseg_name = f"subseg{subseg_index}"
+                    for track_index, track_group in enumerate(runner.track_groups):
+                        track_name = track_group[0].name
+
+                        if runner.num_mix_components == 1:
+                            component_suffix = ""
+                        else:
+                            component_suffix = f"_component{component}"
+                        mean_name = f"mean_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
+                        
+                        input_master.mean[mean_name] = mean_data[seg_index, subseg_index, track_index]
+
+                        # If COVAR_TIED, write one covar per track and component
+                        if COVAR_TIED:
+                            covar_name = f"covar_{track_name}{component_suffix}"
+                            if seg_index == 0 and subseg_index == 0:
+                                input_master.covar[covar_name] = covar_data[seg_index, subseg_index, track_index]
+                        else:  # Otherwise, write for every seg and subseg
+                            covar_name = f"covar_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
+                            input_master.covar[covar_name] = covar_data[seg_index, subseg_index, track_index]
+
+                        # Diag Gaussian MC with mean and covar name
+                        mc_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
+                        if USE_MFSDG:  # Add weights to end of Gaussian
+                            suffix = "matrix_weightscale_1x1"
+                        else:
+                            suffix = ""
+                        input_master.mc[mc_name] = DiagGaussianMC(mean=mean_name, covar=covar_name, suffix=suffix)
+
+
+        # if USE_MFSDG:
+        #     real_mat_spec = RealMatParamSpec(self)
+        # else:
+        #     real_mat_spec = ""
+
+
+    # elif distribution == DISTRIBUTION_GAMMA:
+    #     mean_spec = ""
+    #     covar_spec = ""
+
+        # XXX: another option is to calculate an ML estimate for
+        # the gamma distribution rather than the ML estimate for the
+        # mean and converting
+    #     real_mat_spec = GammaRealMatParamSpec(self)
+    #     mc_spec = GammaMCParamSpec(self)
+
+    # else:
+    #     raise ValueError("distribution %s not supported" % distribution)
+
+    # Mixtures and Name Collection
+    for track_index, track_group in enumerate(runner.track_groups):
+        track_name = track_group[0].name
+        name_collection_name = f"collection_seg_{track_name}"
+        name_collection_items = []
+        for seg_index in range(num_segs):
+            seg_name = f"seg{seg_index}"
+            for subseg_index in range(num_subsegs):
+                subseg_name = f"subseg{subseg_index}"
+
+                mx_name = f"mx_{seg_name}_{subseg_name}_{track_name}"
+                name_collection_items.append(mx_name)
+
+                if runner.num_mix_components == 1:
+                    dpmf_name = "dpmf_always"
+                else:
+                    dpmf_name = f"dpmf_{seg_name}_{subseg_name}_{track_name}"
+                
+                mx_components = []
+                for component in range(runner.num_mix_components):
+                    if runner.num_mix_components == 1:
+                        component_suffix = ""
+                    else:
+                        component_suffix = f"_component{component}"
+                    mx_components.append(f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}")
+
+                input_master.mx[mx_name] = MX(dpmf_name, mx_components)
+        input_master.name_collection[name_collection_name] = name_collection_items
+
+
+    # DPMF
+    if runner.num_mix_components == 1:
+        input_master.dpmf["dpmf_always"] = DPMF.uniform_from_shape(1)
+    else:
+        for seg_index in range(num_segs):
+            seg_name = f"seg{seg_index}"
+            for subseg_index in range(num_subsegs):
+                subseg_name = f"subseg{subseg_index}"
+                for track_index, track_group in enumerate(runner.track_groups):
+                    track_name = track_group[0].name
+
+                    dpmf_name = f"dpmf_{seg_name}_{subseg_name}_{track_name}"
+                    # TODO: Does not include "DirichletConst 100"
+                    input_master.dpmf[dpmf_name] = DPMF.uniform_from_shape(runner.num_mix_components)
+
+
+    # Virtual Evidence
+    # TODO: This is written on multiple lines, while the template is a single 
+    # line. How to fix without changing gmtk api significantly?
+    if runner.virtual_evidence:
+        virtual_evidence = f"1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} nfs:{num_segs} nis:0 fmt:ascii END"
+        input_master.virtual_evidence["seg_virtualEvidence"] = VirtualEvidence(virtual_evidence)
+
+    if not input_master_filename:
+        input_master_filename = make_default_filename(input_master_filename, params_dirpath, instance_index)
+    input_master.save(input_master_filename + '.test')
+
+
+def make_segCountDown_tree(runner):
+    num_segs = runner.num_segs
+    seg_countdowns_initial = runner.seg_countdowns_initial
+
+    header = ([str(num_segs)] +
+                [str(num_seg) for num_seg in range(num_segs - 1)] +
+                ["default"])
+
+    lines = [" ".join(header)]
+
+    for seg_countdown_initial in seg_countdowns_initial:
+        lines.append(f"    -1 {seg_countdown_initial}")
+
+    return "\n".join(lines)
+
+
+def make_dense_cpt_segCountDown_seg_segTransition(runner):  # noqa
+        # first values are the ones where segCountDown = 0 therefore
+        # the transitions to segTransition = 2 occur early on
+        card_seg_countdown = runner.card_seg_countdown
+
+        # by default, when segCountDown is high, never transition
+        res = empty((card_seg_countdown, runner.num_segs, CARD_SEGTRANSITION))
+
+        prob_seg_self_self, prob_seg_self_other = \
+            calc_prob_transition(runner.resolution, LEN_SEG_EXPECTED)
+
+        prob_subseg_self_self, prob_subseg_self_other = \
+            calc_prob_transition(runner.resolution, LEN_SUBSEG_EXPECTED)
+
+        # 0: no transition
+        # 1: subseg transition (no transition when CARD_SUBSEG == 1)
+        # 2: seg transition
+        probs_allow_transition = \
+            array([prob_seg_self_self * prob_subseg_self_self,
+                   prob_seg_self_self * prob_subseg_self_other,
+                   prob_seg_self_other])
+
+        probs_prevent_transition = array([prob_subseg_self_self,
+                                          prob_subseg_self_other,
+                                          0.0])
+
+        # find the labels with maximum segment lengths and those without
+        table = runner.seg_table
+        ends = table[:, OFFSET_END]
+        bitmap_without_maximum = ends == 0
+
+        # where() returns a tuple; this unpacks it
+        labels_with_maximum, = where(~bitmap_without_maximum)
+        labels_without_maximum, = where(bitmap_without_maximum)
+
+        # labels without a maximum
+        res[0, labels_without_maximum] = probs_allow_transition
+        res[1:, labels_without_maximum] = probs_prevent_transition
+
+        # labels with a maximum
+        seg_countdowns_initial = runner.seg_countdowns_initial
+
+        res[0, labels_with_maximum] = array([0.0, 0.0, 1.0])
+        for label in labels_with_maximum:
+            seg_countdown_initial = seg_countdowns_initial[label]
+            minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
+
+            seg_countdown_allow = seg_countdown_initial - minimum + 1
+
+            res[1:seg_countdown_allow, label] = probs_allow_transition
+            res[seg_countdown_allow:, label] = probs_prevent_transition
+
+        return DenseCPT(res)
+
+
+def calc_prob_transition(resolution, length):
+    """Calculate probability transition from scaled expected length.
+    """
+    length_scaled = length // resolution
+
+    prob_self_self = prob_transition_from_expected_len(length_scaled)
+    prob_self_other = 1.0 - prob_self_self
+
+    return prob_self_self, prob_self_other
+
+
+def make_dense_cpt_seg_dinucleotide(runner):
+    dinucleotide_table = [make_dinucleotide_table_row(runner) 
+                          for _ in range(runner.num_segs)]
+    return DenseCPT(dinucleotide_table)
+
+
+def make_dinucleotide_table_row(runner):
+    # simple one-parameter model
+    gc = runner.random_state.uniform()
+    at = 1 - gc
+
+    a = at / 2
+    c = gc / 2
+    g = gc - c
+    t = 1 - a - c - g
+
+    acgt = array([a, c, g, t])
+
+    # shape: (16,)
+    return outer(acgt, acgt).ravel()
+
+
+def make_mean_data(runner):
+    num_segs = runner.num_segs
+    num_subsegs = runner.num_subsegs
+    means = runner.means  # indexed by track_index
+
+    # maximum likelihood, adjusted by no more than 0.2*sd
+    stds = sqrt(runner.vars)
+
+    # tile the means of each track (num_segs, num_subsegs times)
+    means_tiled = vstack_tile(means, num_segs, num_subsegs)
+    stds_tiled = vstack_tile(stds, num_segs, num_subsegs)
+
+    jitter_std_bound = 0.2
+    noise = runner.random_state.uniform(-jitter_std_bound,
+            jitter_std_bound, stds_tiled.shape)
+
+    return means_tiled + (stds_tiled * noise)
+
+
+def make_covar_data(runner):
+    return vstack_tile(runner.vars, runner.num_segs, runner.num_subsegs)
 
 
 class ParamSpec(object):
@@ -846,12 +1233,12 @@ class InputMasterSaver(Saver):
         # the locals of this function are used as the template mapping
         # use caution before deleting or renaming any variables
         # check that they are not used in the input.master template
-        num_free_params = 0
+        # num_free_params = 0
 
-        num_segs = self.num_segs
-        num_subsegs = self.num_subsegs
-        num_track_groups = self.num_track_groups
-        fullnum_subsegs = num_segs * num_subsegs
+        # num_segs = self.num_segs
+        # num_subsegs = self.num_subsegs
+        # num_track_groups = self.num_track_groups
+        # fullnum_subsegs = num_segs * num_subsegs
 
         include_filename = self.gmtk_include_filename_relative
 
@@ -865,10 +1252,10 @@ class InputMasterSaver(Saver):
         dense_cpt_spec = DenseCPTParamSpec(self)
 
         # seg_seg
-        num_free_params += fullnum_subsegs * (fullnum_subsegs - 1)
+        # num_free_params += fullnum_subsegs * (fullnum_subsegs - 1)
 
         # segCountDown_seg_segTransition
-        num_free_params += fullnum_subsegs
+        # num_free_params += fullnum_subsegs
 
         distribution = self.distribution
         if distribution in DISTRIBUTIONS_LIKE_NORM:
@@ -885,10 +1272,10 @@ class InputMasterSaver(Saver):
 
             mc_spec = NormMCParamSpec(self)
 
-            if COVAR_TIED:
-                num_free_params += (fullnum_subsegs + 1) * num_track_groups
-            else:
-                num_free_params += (fullnum_subsegs * 2) * num_track_groups
+            # if COVAR_TIED:
+                # num_free_params += (fullnum_subsegs + 1) * num_track_groups
+            # else:
+                # num_free_params += (fullnum_subsegs * 2) * num_track_groups
         elif distribution == DISTRIBUTION_GAMMA:
             mean_spec = ""
             covar_spec = ""
@@ -899,13 +1286,13 @@ class InputMasterSaver(Saver):
             real_mat_spec = GammaRealMatParamSpec(self)
             mc_spec = GammaMCParamSpec(self)
 
-            num_free_params += (fullnum_subsegs * 2) * num_track_groups
+            # num_free_params += (fullnum_subsegs * 2) * num_track_groups
         else:
             raise ValueError("distribution %s not supported" % distribution)
 
         mx_spec = MXParamSpec(self)
         name_collection_spec = NameCollectionParamSpec(self)
-        card_seg = num_segs
+        card_seg = self.num_segs
         dpmf_spec = DPMFParamSpec(self)
 
         ve_spec = VirtualEvidenceSpec(self)
