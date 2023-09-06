@@ -209,10 +209,10 @@ workdir instead.
 |rarr| ``likelihood.``\ \*\ ``.ll``                 contains text of the last log likelihood value for an
                                                     instance. Segway uses this to decide when to
                                                     stop training
-``posterior``\ \*\ ``.bedGraph.gz``                 posterior probabilities for the given label in bedGraph 
+``posterior``\ \*\ ``.bed.gz``                      posterior probabilities for the given label in BED4 file 
                                                     format
-``posterior``\ \*\ ``.track.gz``                    posterior probabilities for the given label in BED9 file 
-                                                    format with a trackline for visualization
+``posterior``\ \*\ ``.bedGraph.gz``                 posterior probabilities for the given label in bedGraph 
+                                                    format (bedGraph header followed by BED4 format)
 |rarr| ``validation.output.``\ \*\ ``.ll``          contains text of the last validation GMTK output for an
                                                     instance
 |rarr| ``validation.output.winner.``\ \*\ ``.ll``   contains text of the current best validation GMTK output
@@ -259,8 +259,8 @@ workdir instead.
 |rarr| ``params.``\ \*\ ``.params``                 final trained parameters for a given instance
 |rarr| ``params.params``                            best final set of trained parameters
 ``segway.bed.gz``                                   segmentation in BED9 format
-``segway.track.gz``                                 segmentation in BED9 format with a trackline for 
-                                                    visualization
+``segway.track.gz``                                 segmentation in browser track file with track line
+                                                    followed by segmentation in BED9 format
 ``segway.str``                                      dynamic Bayesian network structure
 ``train.tab``                                       important file locations and hyperparameters used in training, to be passed to identify
 ``triangulation/``                                  triangulation files used for DBN interface

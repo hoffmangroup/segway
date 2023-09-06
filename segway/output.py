@@ -13,7 +13,7 @@ from six.moves import range
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename
 from ._util import (Copier, maybe_gzip_open, extract_superlabel, 
-                    LABEL_INDEX, INDEX_BED_START, INDEX_BED_THICKSTART,
+                    INDEX_BED_NAME, INDEX_BED_CHROMSTART, INDEX_BED_THICKSTART,
                     BED_SCORE, BED_STRAND, NUM_COLORS, SCHEME)
 
 
@@ -30,21 +30,21 @@ def make_bed_attrs(mapping):
     return "track %s" % res
 
 
-def create_color_assignment(window_filenames):
+def make_label_colors(window_filenames):
     # Build a color assignment for each superlabel in the window files
     labels = set()
     for window_filename in window_filenames:
         with maybe_gzip_open(window_filename) as window_file:
             for line in window_file:
-                label = extract_superlabel(line.split()[LABEL_INDEX])
+                label = extract_superlabel(line.split()[INDEX_BED_NAME])
                 labels.add(label)
     # If labels are numbers, use as indices into color list
     if all(label.isdecimal() for label in labels): # Index into color list
         return {label: ','.join(map(str, SCHEME[int(label) % NUM_COLORS]))
                 for label in labels}
     # Otherwise, assign colors by alphabetical order
-    return {label: ','.join(map(str, SCHEME[i % NUM_COLORS])) 
-            for i, label in enumerate(sorted(list(labels)))}
+    return {label: ','.join(map(str, SCHEME[index % NUM_COLORS])) 
+            for index, label in enumerate(sorted(list(labels)))}
 
 
 def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
@@ -58,7 +58,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
     # If converting to 9-column output formats, build a color 
     # assignment using all labels
     if bed9_output:
-        segment_colors = create_color_assignment(window_filenames)
+        segment_colors = make_label_colors(window_filenames)
 
     # values for comparison to combine adjoining segments
     last_line = ""
@@ -93,7 +93,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
                 # potentially merging
                 if last_vals == (chrom, start, seg):
                     # update start position
-                    first_row[INDEX_BED_START] = last_start
+                    first_row[INDEX_BED_CHROMSTART] = last_start
                     # update thickStart position
                     first_row[INDEX_BED_THICKSTART] = last_start
 
@@ -200,7 +200,7 @@ class IdentifySaver(OutputSaver):
 
 class PosteriorSaver(OutputSaver):
     copy_attrs = OutputSaver.copy_attrs + ["bedgraph_filename", 
-                                           "posterior_track_filename",
+                                           "posterior_bed_filename",
                                            "bed_filename",
                                            "track_filename",
                                            "posterior_filenames",
@@ -230,10 +230,9 @@ class PosteriorSaver(OutputSaver):
                              posterior_code_trackfilename)
 
         # Save posterior bedgraph and track files
+        posterior_bed_tmpl = self.make_filename(self.posterior_bed_filename, world)
         posterior_bedgraph_tmpl = self.make_filename(self.bedgraph_filename, 
                                                      world)
-        posterior_track_tmpl = self.make_filename(self.posterior_track_filename, 
-                                                  world)
         if self.output_label == "subseg":
             label_print_range = range(self.num_segs * self.num_subsegs)
         elif self.output_label == "full":
@@ -246,6 +245,6 @@ class PosteriorSaver(OutputSaver):
             posterior_filenames = [posterior_tmpl % num_seg for posterior_tmpl in self.posterior_filenames]
             trackheader = self.make_bedgraph_header(num_seg)
             merge_windows_to_bed(posterior_filenames, trackheader, 
+                                 posterior_bed_tmpl % num_seg,
                                  posterior_bedgraph_tmpl % num_seg,
-                                 posterior_track_tmpl % num_seg,
                                  bed9_output = False)

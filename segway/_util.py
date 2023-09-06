@@ -116,12 +116,11 @@ VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 VALIDATE_PROG = OptionBuilder_GMTK("gmtkJT")
 
-LABEL_INDEX = 3
-
 BED_SCORE = "1000"
 BED_STRAND = "."
-INDEX_BED_START = 1
-INDEX_BED_THICKSTART = INDEX_BED_START + 5
+INDEX_BED_CHROMSTART = 1
+INDEX_BED_NAME = 3
+INDEX_BED_THICKSTART = 6
 
 # use the GMTK MissingFeatureScaledDiagGaussian feature?
 USE_MFSDG = False
