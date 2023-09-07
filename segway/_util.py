@@ -245,6 +245,7 @@ def constant(val):
     """
     return partial(next, repeat(val))
 
+
 array_factory = constant(array([]))
 
 
@@ -421,6 +422,7 @@ def parse_posterior(iterable, output_label):
                                          "subseg\((\d+)\)=(\d+)$")
     else:
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
+        
     # ignores non-matching lines
     for line in iterable:
         m_posterior_entry = re_posterior_entry.match(line.rstrip().decode(SEGWAY_ENCODING))

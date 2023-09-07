@@ -256,7 +256,7 @@ BED_FILEBASEFMT = extjoin(__package__, "%d", EXT_BED, EXT_GZ)
 # "segway.%d.track.gz"
 TRACK_FILEBASEFMT = extjoin(__package__, "%d", EXT_TRACK, EXT_GZ)
 
-# "posterior%s.bed.gz"
+# "posterior%s.bedgraph.gz"
 BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
 
 # "posterior%s.%%d.bedgraph.gz"
@@ -491,14 +491,12 @@ def rewrite_cliques(rewriter, frame, output_label):
         rewriter.send(NewLine("%d 1 seg %d" % (orig_num_cliques, frame)))
 
     # XXX: add subseg as a clique to report it in posterior
-
     return orig_num_cliques
 
 
 def make_mem_req(mem_usage):
     # double usage at this point
     mem_usage_gibibytes = ceil(mem_usage / GB)
-
     return "%dG" % mem_usage_gibibytes
 
 
@@ -822,6 +820,7 @@ class Runner(object):
                 self.init = False
                 self.run = False
                 self.finish = False
+
                 # Overwrite the selected subtask back to true
                 setattr(self, subtask[0], True)
             else:
@@ -853,6 +852,7 @@ class Runner(object):
             if task_name == "annotate":
                 task_name = "identify"
             subtask = task[1:]
+
             # Check if multiple subtasks are present,
             # meaning run-round was chosen
             if (len(subtask) == 2 and
@@ -992,6 +992,7 @@ class Runner(object):
 
             elif option == "mem_usage":
                 mem_usage_list = list(map(float, options.mem_usage.split(",")))
+
                 # XXX: should do a ceil first?
                 # use int64 in case run.py is run on a 32-bit machine to
                 # control 64-bit compute nodes
@@ -1103,6 +1104,7 @@ class Runner(object):
     @memoized_property
     def triangulation_dirpath(self):
         res = self.work_dirpath / "triangulation"
+
         # Check to make sure this wasn't created by an ealier subtask
         if not Path(res).exists():
             self.make_dir(res)
@@ -1297,7 +1299,6 @@ class Runner(object):
         # Numerical Recipes in C, Eqn 14.1.7
         # XXX: best would be to switch to the pairwise parallel method
         # (see Wikipedia)
-
         sums_squares_normalized = self.sums_squares / self.num_datapoints
         return self.transform(sums_squares_normalized -
                               square(self._means_untransformed))
@@ -2016,6 +2017,7 @@ class Runner(object):
             attr = getattr(genome, name)
 
         track_groups = self.track_groups
+
         # Create an empty list of the same type as the genomedata attribute and
         # of the the same length of the track groups
         shape = len(track_groups)
@@ -2159,6 +2161,7 @@ class Runner(object):
                      " A new one will need to be supplied by --virtual-evidence"
                      " during train-run for Segway to be able to apply it to the model")
            return
+        
         # defaultdict of list of dictionaries of the format {label: prior} 
         # key: chrom
         # value: list of dictionaries of the format {label: prior}
@@ -2492,6 +2495,7 @@ class Runner(object):
                                 JOB_SCRIPT_FILE_PERMISSIONS)
         with fdopen(job_script_fd, "w") as job_script_file:
             print("#!/usr/bin/env bash", file=job_script_file)
+
             # this doesn't include use of segway-wrapper, which takes the
             # memory usage as an argument, and may be run multiple times
             self.log_cmdline(gmtk_cmdline, args, job_script_file)
@@ -2570,6 +2574,7 @@ class Runner(object):
             chrom = 0
             window_start = 0
             window_end = 0
+
             # Set task to the bundle train task
             task_kind = BUNDLE_TRAIN_TASK_KIND
             is_reverse = 0  # is_reverse is irrelevant for bundling
@@ -3197,6 +3202,7 @@ class Runner(object):
                 value = row["value"]
 
                 row_type = IDENTIFY_OPTION_TYPES[name]
+
                 # Checks if this option was of type list, sets each element to
                 # correct type then
                 if isinstance(row_type, list):
@@ -3332,6 +3338,7 @@ class Runner(object):
 
             # this is where the actual training takes place
             instance_params = run_train_func(self.num_segs_range)
+
             # write results from each instance to their own file
             for index, instance_param in enumerate(instance_params):
                 result_filename = make_default_filename \
@@ -4209,6 +4216,7 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
                        help="specify layered bigBed filename")
 
     args = tasks.add_parser("", add_help=False)
+
     # Positional arguments
     args.add_argument("archives", nargs="+")  # "+" for at least 1 arg
     args.add_argument("traindir", nargs=1)
@@ -4276,6 +4284,7 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
     # Separate arguments and task_spec from options
     task_spec = options.task_spec
     archives = options.archives
+
     # Add [0] to unlist directory names
     traindir = options.traindir[0]
     if hasattr(options, "annotatedir"):
@@ -4333,7 +4342,6 @@ def check_gmtk_version():
 
 
 def main(argv=sys.argv[1:]):
-
     task_spec, options, archives, traindir, annotatedir = parse_options(argv)
 
     check_gmtk_version()

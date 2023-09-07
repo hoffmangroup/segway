@@ -23,6 +23,7 @@ def make_bed_attr(key, value):
 
     return "%s=%s" % (key, value)
 
+
 def make_bed_attrs(mapping):
     res = " ".join(make_bed_attr(key, mapping[key])
                    for key in sorted(mapping))
@@ -38,10 +39,12 @@ def make_label_colors(window_filenames):
             for line in window_file:
                 label = extract_superlabel(line.split()[INDEX_BED_NAME])
                 labels.add(label)
+
     # If labels are numbers, use as indices into color list
     if all(label.isdecimal() for label in labels): # Index into color list
         return {label: ','.join(map(str, SCHEME[int(label) % NUM_COLORS]))
                 for label in labels}
+    
     # Otherwise, assign colors by alphabetical order
     return {label: ','.join(map(str, SCHEME[index % NUM_COLORS])) 
             for index, label in enumerate(sorted(list(labels)))}
@@ -76,13 +79,13 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
                 # If converting to 9 column format, add extra columns 
                 # to BED4 data
                 if bed9_output:
-                    for i, line in enumerate(lines):
+                    for index, line in enumerate(lines):
                         _, coords = parse_bed4(line)
                         (chrom, start, end, seg) = coords
                         bed9row = [chrom, start, end, seg, BED_SCORE, 
                                 BED_STRAND, start, end, 
                                 segment_colors[extract_superlabel(seg)]]
-                        lines[i] = '\t'.join(bed9row) + '\n'
+                        lines[index] = '\t'.join(bed9row) + '\n'
 
                 # Prepare the first line of the data
                 first_line = lines[0]
@@ -94,6 +97,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
                 if last_vals == (chrom, start, seg):
                     # update start position
                     first_row[INDEX_BED_CHROMSTART] = last_start
+
                     # update thickStart position
                     first_row[INDEX_BED_THICKSTART] = last_start
 
@@ -104,6 +108,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
                     if len(lines) == 1:
                         last_line = merged_line
                         last_vals = (chrom, end, seg)
+
                         # last_start is already set correctly
                         # postpone writing until after additional merges
                         continue
@@ -130,7 +135,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
 
                 # set last_line
                 last_line = lines[-1]
-                last_row, last_coords = parse_bed4(last_line)
+                _, last_coords = parse_bed4(last_line)
                 (chrom, start, end, seg) = last_coords
                 last_vals = (chrom, end, seg)
                 last_start = start
@@ -138,6 +143,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
         # write the very last line of all files
         bedfile.write(last_line)
         trackfile.write(last_line)
+
 
 class OutputSaver(Copier):
     copy_attrs = ["tracks", "uuid", "num_worlds", "num_segs", "num_subsegs"]
@@ -167,6 +173,7 @@ class OutputSaver(Copier):
         attrs["description"] = description
 
         return make_bed_attrs(attrs)
+
 
 class IdentifySaver(OutputSaver):
     copy_attrs = OutputSaver.copy_attrs + ["bed_filename", "track_filename", "viterbi_filenames", "bigbed_filename", "windows"]
@@ -220,7 +227,7 @@ class PosteriorSaver(OutputSaver):
         return bedgraph_header_tmpl % (num_seg, num_seg)
 
     def __call__(self, world):
-        # Save posterior code bed file
+        # Save posterior code bed and track files
         posterior_code_bedfilename = self.make_filename(self.bed_filename, world)
         posterior_code_trackfilename = self.make_filename(self.track_filename, world)
         posterior_code_filenames = [posterior_tmpl % "_code" for posterior_tmpl in self.posterior_filenames]
@@ -229,7 +236,7 @@ class PosteriorSaver(OutputSaver):
                              posterior_code_bedfilename,
                              posterior_code_trackfilename)
 
-        # Save posterior bedgraph and track files
+        # Save posterior bed and bedgraph files
         posterior_bed_tmpl = self.make_filename(self.posterior_bed_filename, world)
         posterior_bedgraph_tmpl = self.make_filename(self.bedgraph_filename, 
                                                      world)

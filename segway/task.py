@@ -111,6 +111,7 @@ def save_temp_observation_filelists(float_observations_filename,
     virtual_evidence_observation_list_fd,\
         virtual_evidence_observation_list_filename = \
         mkstemp(prefix=EXT_VIRTUAL_EVIDENCE + extsep, suffix=extsep + EXT_LIST)
+    
     # Write out the observation filename to their respective observation list
     # For gmtk observation list files, there may be more than one
     # observation file. In this case we only ever insert one
@@ -186,6 +187,7 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
                                 float_observation_list_filename,
                                 int_observation_list_filename,
                                 virtual_evidence_list_filename])
+        
         # Reraise the exception
         raise
 
@@ -198,6 +200,7 @@ def prepare_gmtk_observations(gmtk_args, chromosome_name, start, end,
     # cppCommandOptions is stored as a string with format CPP_DIRECTIVE_FMT
     cpp_command_options_index = gmtk_args.index("-cppCommandOptions") + 1
     cpp_command_str = gmtk_args[cpp_command_options_index]
+
     # if the placeholder is present, it is replaced. otherwise, the cpp options
     # are unchanged
     gmtk_args[cpp_command_options_index] = cpp_command_str.replace(
@@ -311,12 +314,14 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     line = next(lines)
     assert line.startswith("Printing random variables from")
     seg_dict = {'seg': 0, 'subseg': 1}
+
     # if output_label == "subseg" or "full", need to catch
     # subseg output
     if output_label != "seg":
         re_seg = re.compile(r"^(seg|subseg)\((\d+)\)=(\d+)$")
     else:
         re_seg = re.compile(r"^(seg)\((\d+)\)=(\d+)$")
+
     # sentinel value
     res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_IDENTIFY)
     for line in lines:
@@ -440,11 +445,11 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
     zipper = zip(outfilenames, probs_rounded.T, label_print_range)
     for outfilename, probs_rounded_label, label_index in zipper:
         # run-length encoding on the probs_rounded_label
-
         with open(outfilename, "w") as outfile:
             # Create a list of indicies of unique values in the probability
             # BED labels
             unique_prob_value_indices, = where(diff(probs_rounded_label) != 0)
+
             # The first index is always unique
             unique_prob_value_indices = r_[0, unique_prob_value_indices + 1]
             region_coords = r_[(unique_prob_value_indices * resolution) +
@@ -509,6 +514,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
     # a 2,000,000-frame output file is only 84 MiB so it is okay to
     # read the whole thing into memory
     (chrom, start, end) = coord
+
     # Create and save the window
     genomedata_names = genomedata_names.split(",")
     track_indexes = make_track_indexes(track_indexes_text)
@@ -527,6 +533,7 @@ def run_posterior_save_bed(coord, resolution, do_reverse, outfilename,
                                                resolution, distribution,
                                                None, virtual_evidence_cells,
                                                num_labels)
+    
     # remove from memory
     del continuous_cells
     gc.collect()
@@ -570,6 +577,7 @@ def run_viterbi_save_bed(coord, resolution, do_reverse, outfilename,
                                                resolution, distribution,
                                                None, virtual_evidence_cells,
                                                num_labels)
+    
     # remove from memory
     del continuous_cells
     gc.collect()
@@ -650,6 +658,7 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
         save_temp_observation_filelists(PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME,
                                         PLACEHOLDER_OBSERVATION_FILENAME)
+    
     # Modify the given gmtk arguments to use the temporary placeholder
     # observation lists
     replace_subsequent_value(args, EXT_OPTIONS[EXT_FLOAT],
@@ -665,6 +674,7 @@ def run_bundle_train(coord, resolution, do_reverse, outfilename, *args):
     args[cpp_command_options_index] = cpp_command_str.replace(
                                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER,
                                     placeholder_virtual_evidence_list, 1)
+    
     # Run EM bundling
     with files_to_remove([placeholder_float_list, placeholder_int_list]):
         TRAIN_PROG.getoutput(*args)
