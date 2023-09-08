@@ -14,8 +14,7 @@ from .bed import parse_bed4
 from .layer import layer, make_layer_filename
 from ._util import (Copier, extract_superlabel, get_label_color, 
                     maybe_gzip_open, BED_SCORE, BED_STRAND, 
-                    INDEX_BED_CHROMSTART, INDEX_BED_NAME, INDEX_BED_THICKSTART,
-                    NUM_COLORS)
+                    INDEX_BED_CHROMSTART, INDEX_BED_NAME, INDEX_BED_THICKSTART)
 
 
 def make_bed_attr(key, value):
