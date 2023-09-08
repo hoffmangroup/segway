@@ -34,7 +34,7 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
 # "legacy" printing mode'
 try:
     # If it is a possibility, use the older printing style
-    set_printoptions(legacy='1.13')
+    set_printoptions(legacy="1.13")
 except TypeError:
     # Otherwise ignore the attempt
     pass

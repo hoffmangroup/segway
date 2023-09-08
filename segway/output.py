@@ -12,9 +12,10 @@ from six.moves import range
 
 from .bed import parse_bed4
 from .layer import layer, make_layer_filename
-from ._util import (Copier, maybe_gzip_open, extract_superlabel, 
-                    INDEX_BED_NAME, INDEX_BED_CHROMSTART, INDEX_BED_THICKSTART,
-                    BED_SCORE, BED_STRAND, NUM_COLORS, SCHEME)
+from ._util import (Copier, extract_superlabel, get_label_color, 
+                    maybe_gzip_open, BED_SCORE, BED_STRAND, 
+                    INDEX_BED_CHROMSTART, INDEX_BED_NAME, INDEX_BED_THICKSTART,
+                    NUM_COLORS)
 
 
 def make_bed_attr(key, value):
@@ -32,7 +33,17 @@ def make_bed_attrs(mapping):
 
 
 def make_label_colors(window_filenames):
-    # Build a color assignment for each superlabel in the window files
+    """
+    Create a color assignment for each superlabel in the window files.
+    Numerical labels are treated as indices into the color palette list.
+    String labels are sorted in alphabetical order and the first colors in the 
+    color palette are used.
+
+    Example color assignment for labels "a", "b", "c": 
+    {"a": "27,158,119", "b": "217,95,2", "c": "117,112,179"}
+    """
+
+    # 
     labels = set()
     for window_filename in window_filenames:
         with maybe_gzip_open(window_filename) as window_file:
@@ -42,26 +53,26 @@ def make_label_colors(window_filenames):
 
     # If labels are numbers, use as indices into color list
     if all(label.isdecimal() for label in labels): # Index into color list
-        return {label: ','.join(map(str, SCHEME[int(label) % NUM_COLORS]))
+        return {label: get_label_color(int(label))
                 for label in labels}
     
     # Otherwise, assign colors by alphabetical order
-    return {label: ','.join(map(str, SCHEME[index % NUM_COLORS])) 
+    return {label: get_label_color(index) 
             for index, label in enumerate(sorted(list(labels)))}
 
 
 def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
-                         bed9_output = True):
+                         bed9_output=True):
     """
     Given a list of filepaths, each of which points to a segmentation BED4 file,
     concatenate the files and merge entries if necessary. 
-    Writes one BED file and a second BED file with additional track header, 
-    by default with 9 columns. 
+    Write two files: a BED4 file and a track file containing a track line and 
+    BED data.
     """
     # If converting to 9-column output formats, build a color 
     # assignment using all labels
     if bed9_output:
-        segment_colors = make_label_colors(window_filenames)
+        label_colors = make_label_colors(window_filenames)
 
     # values for comparison to combine adjoining segments
     last_line = ""
@@ -84,7 +95,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
                         (chrom, start, end, seg) = coords
                         bed9row = [chrom, start, end, seg, BED_SCORE, 
                                 BED_STRAND, start, end, 
-                                segment_colors[extract_superlabel(seg)]]
+                                label_colors[extract_superlabel(seg)]]
                         lines[index] = '\t'.join(bed9row) + '\n'
 
                 # Prepare the first line of the data
