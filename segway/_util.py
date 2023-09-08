@@ -54,7 +54,7 @@ SUFFIX_BED = extsep + EXT_BED
 SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_TAB = extsep + EXT_TAB
 
-DELIMITER_BED = '\t'  # whitespace or tab is allowed
+DELIMITER_BED = "\t"  # whitespace or tab is allowed
 
 DTYPE_IDENTIFY = intc
 DTYPE_OBS_INT = intc
@@ -352,7 +352,7 @@ def extract_superlabel(label):
     returned
     """
     if isinstance(label, str):
-        return label.split(".")[0]
+        return label.partition(".")[0]
     else:
         return label
 
