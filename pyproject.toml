@@ -55,3 +55,10 @@ packages = ["segway", "segway.data", "segway.cluster"]
 
 [tool.mypy]
 ignore_missing_imports = true
+
+[tool.isort]
+combine_star = true
+float_to_top = true
+force_single_line = false
+profile = "google"
+py_version = 3
