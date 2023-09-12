@@ -13,6 +13,7 @@ from six.moves.configparser import RawConfigParser
 
 CONFIGPARSER_SECTION = "all"
 
+
 class OneSectionRawConfigParser(RawConfigParser):
     """
     for UNIX configuration files which lake a section header
@@ -39,8 +40,10 @@ class OneSectionRawConfigParser(RawConfigParser):
     def get(self, option):
         return RawConfigParser.get(self, CONFIGPARSER_SECTION, option)
 
+
 def main(args=sys.argv[1:]):
     pass
+
 
 if __name__ == "__main__":
     sys.exit(main())

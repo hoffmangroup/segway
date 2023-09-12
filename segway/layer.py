@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, with_statement, print_function
+from __future__ import (absolute_import, division, print_function,
+                        with_statement)
 
 """
 layer: convert flattened Viterbi BED files to a layered thick/thin bed file
@@ -18,11 +19,10 @@ from six import iterkeys, reraise, viewitems
 from six.moves import map
 from tabdelim import DictReader
 
-from .bed import get_trackline_and_reader_native
 from ._util import (BED_SCORE, BED_STRAND, get_label_color,
                     maybe_gzip_open, memoized_property, PassThroughDict,
                     SUFFIX_BED, SUFFIX_TAB)
-
+from .bed import get_trackline_and_reader_native
 from .version import __version__
 
 BED_START = "0"
@@ -39,6 +39,7 @@ BEDTOBIGBED_PROG = OptionBuilder_ShortOptWithEquals("bedToBigBed")
 
 COLOR_DEFAULT = "128,128,128"
 
+
 # XXX: don't need counter, can use length
 class IncrementingDefaultDict(defaultdict):
     def __init__(self, *args, **kwargs):
@@ -51,12 +52,13 @@ class IncrementingDefaultDict(defaultdict):
 
         return value
 
+
 class Tee(object):
     def __init__(self, *args):
         self._items = args
         self._exits = []
 
-    ## code borrowed from Python 2.7 contextlib.nested
+    # code borrowed from Python 2.7 contextlib.nested
     def __enter__(self):
         items = self._items
         new_items = []
@@ -95,9 +97,11 @@ class Tee(object):
         for item in self._items:
             item.flush(*args, **kwargs)
 
+
 def make_comment_ignoring_dictreader(iterable, *args, **kwargs):
     return DictReader((item for item in iterable if not item.startswith("#")),
                       *args, **kwargs)
+
 
 def load_mnemonics(filename):
     mnemonics = PassThroughDict()
@@ -113,6 +117,7 @@ def load_mnemonics(filename):
 
     return mnemonics, ordering
 
+
 def uniquify(seq):
     """
     http://stackoverflow.com/questions/480214/how-do-you-remove-duplicates-from-a-list-in-python-whilst-preserving-order
@@ -123,10 +128,14 @@ def uniquify(seq):
     seen_add = seen.add
     return [x for x in seq if x not in seen and not seen_add(x)]
 
+
 re_stem = re.compile(r"^(.+(?=\.)|[A-Za-z]+|)")
+
+
 def get_stem(text):
     # returns empty string when there is no stem part
     return re_stem.match(text).group(0)
+
 
 def recolor(mnemonics, labels):
     res = {}
@@ -140,6 +149,7 @@ def recolor(mnemonics, labels):
 
     return res
 
+
 def make_layer_filename(filename):
     """
     exported to run.py
@@ -150,8 +160,10 @@ def make_layer_filename(filename):
 
     return ".layered.track".join([left, right])
 
+
 def make_csv(seq):
     return ",".join(map(str, seq))
+
 
 def update_trackline(trackline, updates):
     if not trackline:
@@ -168,6 +180,7 @@ def update_trackline(trackline, updates):
                 trackline[word_index] = '%s="%s"' % (key, value)
                 break
 
+
 def get_color(datum, label, label_key):
     try:
         return datum.itemRgb
@@ -179,6 +192,7 @@ def get_color(datum, label, label_key):
             label_int = label_key
 
         return get_label_color(label_int)
+
 
 class Segmentation(defaultdict):
     """
@@ -202,7 +216,7 @@ class Segmentation(defaultdict):
                 try:
                     assert datum.strand in ACCEPTABLE_STRANDS
                 except AttributeError:
-                    pass # no strand
+                    pass  # no strand
 
                 label = datum.name
                 label_key = label_dict[label]
@@ -246,7 +260,8 @@ class Segmentation(defaultdict):
         outfile = maybe_gzip_open(outfilename, "wt")
 
         if bigbed_outfilename:
-            temp_file = NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_BED, mode="wt")
+            temp_file = NamedTemporaryFile(prefix=__package__,
+                                           suffix=SUFFIX_BED, mode="wt")
             bigbed_infilename = temp_file.name
             outfile = Tee(outfile, temp_file)
 
@@ -264,18 +279,20 @@ class Segmentation(defaultdict):
                 #     with temp_file
                 #         print >>temp_file, "blah"
                 #     print temp_file.name
-                with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB, mode="wt") as sizes_file:
+                with NamedTemporaryFile(prefix=__package__, suffix=SUFFIX_TAB,
+                                        mode="wt") as sizes_file:
                     for chrom, end in viewitems(ends):
                         print(chrom, str(end), sep="\t", file=sizes_file)
 
                     sizes_file.flush()
-                    BEDTOBIGBED_PROG(bigbed_infilename, sizes_file.name, bigbed_outfilename)
-
+                    BEDTOBIGBED_PROG(bigbed_infilename, sizes_file.name,
+                                     bigbed_outfilename)
 
     def write_trackline(self, outfile):
-        # If self.trackline is None then TypeErrors occur when joining/printing.
-        # This assertion can help single out trackline if it is the culprit
-        assert(self.trackline)
+        # If self.trackline is None then TypeErrors occur when
+        # joining/printing. This assertion can help single out trackline if
+        # it is the culprit
+        assert self.trackline
         try:
             final_outfile = outfile._items[0]
         except AttributeError:
@@ -304,7 +321,8 @@ class Segmentation(defaultdict):
                     color = colors.get(label, COLOR_DEFAULT)
 
                     # find all the rows for this label
-                    segments_label_rows = segments[:, OFFSET_LABEL] == label_key
+                    segments_label_rows = (segments[:, OFFSET_LABEL] ==
+                                           label_key)
 
                     # extract just the starts and ends
                     segments_label = segments[segments_label_rows,
@@ -312,14 +330,16 @@ class Segmentation(defaultdict):
 
                     # pad end if necessary
                     segments_label_list = [segments_label]
-                    if not len(segments_label) or segments_label[-1, OFFSET_END] != end:
+                    if (not len(segments_label) or
+                            segments_label[-1, OFFSET_END] != end):
                         # must be end-1 to end or UCSC gets cranky.
                         # unfortunately this results in all on at the
                         # right edge of each region
                         segments_label_list.append((end-1, end))
 
                     # pad beginning if necessary
-                    if not len(segments_label) or segments_label[0, OFFSET_START] != start:
+                    if (not len(segments_label) or
+                            segments_label[0, OFFSET_START] != start):
                         segments_label_list.insert(0, (start, start+1))
 
                     segments_label = vstack(segments_label_list)
@@ -340,12 +360,13 @@ class Segmentation(defaultdict):
                     mnemonic = mnemonics[str(label)]
 
                     row = [chrom, str(start), str(end), mnemonic, BED_SCORE,
-                           BED_STRAND, str(start), str(end), color, block_count,
-                           block_sizes_str, block_starts_str]
+                           BED_STRAND, str(start), str(end), color,
+                           block_count, block_sizes_str, block_starts_str]
 
                     print(*row, sep="\t", file=outfile)
 
         return ends
+
 
 def layer(infilename="-", outfilename="-", mnemonic_filename=None,
           trackline_updates={}, bigbed_outfilename=None, do_recolor=False):
@@ -358,6 +379,7 @@ def layer(infilename="-", outfilename="-", mnemonic_filename=None,
         segmentation.recolor()
 
     segmentation.save(outfilename, bigbed_outfilename)
+
 
 def parse_options(args):
     from optplus import OptionParser
@@ -385,6 +407,7 @@ def parse_options(args):
 
     return options, args
 
+
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
@@ -393,6 +416,7 @@ def main(args=sys.argv[1:]):
                  bigbed_outfilename=options.bigBed,
                  do_recolor=options.recolor,
                  *args)
+
 
 if __name__ == "__main__":
     sys.exit(main())
