@@ -36,10 +36,10 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.7'
+          python-version: '3.8'
       - name: Install test dependencies
         run: |
-          python3 -m pip install --upgrade pip setuptools build pyflakes
+          python3 -m pip install --upgrade pip setuptools build flake8 flake8-import-order flake8-quotes
       - name: Build repository
         run: |
           python3 -m build
