@@ -89,13 +89,7 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
                 # If converting to 9 column format, add extra columns
                 # to BED4 data
                 if bed9_output:
-                    for index, line in enumerate(lines):
-                        _, coords = parse_bed4(line)
-                        (chrom, start, end, seg) = coords
-                        bed9row = [chrom, start, end, seg, BED_SCORE,
-                                   BED_STRAND, start, end,
-                                   label_colors[extract_superlabel(seg)]]
-                        lines[index] = "\t".join(bed9row) + "\n"
+                    lines = list(bed4_to_bed9(lines, label_colors))
 
                 # Prepare the first line of the data
                 first_line = lines[0]
@@ -153,6 +147,20 @@ def merge_windows_to_bed(window_filenames, header, bedfilename, trackfilename,
         # write the very last line of all files
         bedfile.write(last_line)
         trackfile.write(last_line)
+
+
+def bed4_to_bed9(lines, label_colors):
+    """
+    Produce BED9 lines from a list of BED4 lines and a label color dictionary.
+    Acts as a generator, so yields lines.
+    """
+    for line in lines:
+        _, coords = parse_bed4(line)
+        (chrom, start, end, seg) = coords
+        bed9row = [chrom, start, end, seg, BED_SCORE,
+                   BED_STRAND, start, end,
+                   label_colors[extract_superlabel(seg)]]
+        yield "\t".join(bed9row) + "\n"
 
 
 class OutputSaver(Copier):

@@ -1436,41 +1436,32 @@ class Runner(object):
 
         return res
 
-    @memoized_property
-    def bed_filename(self):
+    def _make_filename_or_fmt(self, basename, basefmt):
         if self.num_worlds == 1:
-            basename = BED_FILEBASENAME
+            basename = basename
         else:
-            basename = BED_FILEBASEFMT
+            basename = basefmt
 
         return self.work_dirpath / basename
+
+    @memoized_property
+    def bed_filename(self):
+        return self._make_filename_or_fmt(BED_FILEBASENAME, BED_FILEBASEFMT)
 
     @memoized_property
     def track_filename(self):
-        if self.num_worlds == 1:
-            basename = TRACK_FILEBASENAME
-        else:
-            basename = TRACK_FILEBASEFMT
-
-        return self.work_dirpath / basename
+        return self._make_filename_or_fmt(TRACK_FILEBASENAME,
+                                          TRACK_FILEBASEFMT)
 
     @memoized_property
     def bedgraph_filename(self):
-        if self.num_worlds == 1:
-            basename = BEDGRAPH_FILEBASENAME
-        else:
-            basename = BEDGRAPH_FILEBASEFMT
-
-        return self.work_dirpath / basename
+        return self._make_filename_or_fmt(BEDGRAPH_FILEBASENAME,
+                                          BEDGRAPH_FILEBASEFMT)
 
     @memoized_property
     def posterior_bed_filename(self):
-        if self.num_worlds == 1:
-            basename = POSTERIOR_BED_FILEBASENAME
-        else:
-            basename = POSTERIOR_BED_FILEBASEFMT
-
-        return self.work_dirpath / basename
+        return self._make_filename_or_fmt(POSTERIOR_BED_FILEBASENAME,
+                                          POSTERIOR_BED_FILEBASEFMT)
 
     @memoized_property
     def train_prog(self):
