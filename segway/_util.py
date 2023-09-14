@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function, with_statement
+from __future__ import (absolute_import, division, print_function,
+                        with_statement)
 
 __version__ = "$Revision$"
 
@@ -18,7 +19,7 @@ import sys
 
 import colorbrewer
 from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
-                    zeros)
+                   zeros)
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
 from pkg_resources import resource_filename, resource_string
@@ -40,6 +41,7 @@ SEGWAY_ENCODING = "ascii"
 FILTERS_GZIP = Filters(complevel=1)
 
 EXT_BED = "bed"
+EXT_TRACK = "track"
 EXT_LIST = "list"
 EXT_INT = "int"
 EXT_FLOAT = "float32"
@@ -53,7 +55,7 @@ SUFFIX_BED = extsep + EXT_BED
 SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_TAB = extsep + EXT_TAB
 
-DELIMITER_BED = '\t'  # whitespace or tab is allowed
+DELIMITER_BED = "\t"  # whitespace or tab is allowed
 
 DTYPE_IDENTIFY = intc
 DTYPE_OBS_INT = intc
@@ -74,7 +76,7 @@ PREFIX_VALIDATION_OUTPUT = "validation.output"
 
 VIRTUAL_EVIDENCE_LIST_FILENAME = "VIRTUAL_EVIDENCE_LIST_FILENAME"
 
-# cppCommandOption which will be replaced in GMTK commands 
+# cppCommandOption which will be replaced in GMTK commands
 # by the actual names of the temporary filelists once they are created
 VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER = "VE_PLACEHOLDER"
 
@@ -94,8 +96,11 @@ OFFSET_END = 1
 OFFSET_STEP = 2
 
 data_filename = partial(resource_filename, PKG_DATA)
+
+
 def data_string(resource):
     return resource_string(PKG_DATA, resource).decode(SEGWAY_ENCODING)
+
 
 NUM_COLORS = 8
 SCHEME = colorbrewer.Dark2[NUM_COLORS]
@@ -117,6 +122,9 @@ VALIDATE_PROG = OptionBuilder_GMTK("gmtkJT")
 
 BED_SCORE = "1000"
 BED_STRAND = "."
+INDEX_BED_CHROMSTART = 1
+INDEX_BED_NAME = 3
+INDEX_BED_THICKSTART = 6
 
 # use the GMTK MissingFeatureScaledDiagGaussian feature?
 USE_MFSDG = False
@@ -135,6 +143,7 @@ def extjoin(*args):
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
+
 
 _Window = namedtuple("Window", ["world", "chrom", "start", "end"])
 
@@ -240,6 +249,7 @@ def constant(val):
     constant values for defaultdict
     """
     return partial(next, repeat(val))
+
 
 array_factory = constant(array([]))
 
@@ -347,7 +357,7 @@ def extract_superlabel(label):
     returned
     """
     if isinstance(label, str):
-        return int(label.split(".")[0])
+        return label.partition(".")[0]
     else:
         return label
 
@@ -393,7 +403,7 @@ def find_segment_starts(data, output_label):
 # XXX: Accepts float inputs without complaint. When float inputs are given,
 #      float output is returned. Is this desirable?
 def ceildiv(dividend, divisor):
-    "integer ceiling division"
+    """Integer ceiling division"""
 
     # int(bool) means 0 -> 0, 1+ -> 1
     return (dividend // divisor) + int(bool(dividend % divisor))
@@ -407,19 +417,21 @@ def parse_posterior(iterable, output_label):
     index: (int) frame index
     label: (int) segment label
     prob: (float) prob value
-    
+
     in the case that output_label is set to output sublabels as well,
     the label variable will be of the form (int, int) for the segment
     label and sublabel
     """
     if output_label != "seg":
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+),"
-                                         "subseg\((\d+)\)=(\d+)$")
+                                        "subseg\((\d+)\)=(\d+)$")
     else:
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
+
     # ignores non-matching lines
     for line in iterable:
-        m_posterior_entry = re_posterior_entry.match(line.rstrip().decode(SEGWAY_ENCODING))
+        m_posterior_entry = \
+            re_posterior_entry.match(line.rstrip().decode(SEGWAY_ENCODING))
 
         if m_posterior_entry:
             group = m_posterior_entry.group
@@ -430,7 +442,7 @@ def parse_posterior(iterable, output_label):
                 yield (int(group(2)), int(group(3)), float(group(1)))
 
 
-def read_posterior(infile, num_frames, num_labels, 
+def read_posterior(infile, num_frames, num_labels,
                    num_sublabels, output_label):
     """
     returns an array (num_frames, num_labels)
@@ -444,7 +456,7 @@ def read_posterior(infile, num_frames, num_labels,
             seg_index = label * num_sublabels + sublabel
             if sublabel >= num_sublabels:
                 raise ValueError("saw sublabel %s but num_sublabels is only %s"
-                                % (sublabel, num_sublabels))
+                                 % (sublabel, num_sublabels))
         else:
             seg_index = label
         if label >= num_labels:
@@ -528,6 +540,7 @@ def make_prefix_fmt(num):
 
 def main(args=sys.argv[1:]):
     pass
+
 
 if __name__ == "__main__":
     sys.exit(main())

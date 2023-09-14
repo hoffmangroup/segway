@@ -53,6 +53,7 @@ DIM_TRACK = 1  # Dimension in numpy array for track data
 PRIOR_AXIS = 0
 POSITION_AXIS = 1
 
+
 class VirtualEvidenceWarning(SegwayWarning):
     """
     User-supplied priors sum to greater than one.
@@ -295,9 +296,11 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
             )
 
     downsampled_input_array = zeros(calc_downsampled_shape(input_array,
-                                    resolution), input_array.dtype)
-    presence_downsampled_input_array = zeros(calc_downsampled_shape(input_array,
-                                             resolution), input_array.dtype)
+                                                           resolution),
+                                    input_array.dtype)
+    presence_downsampled_input_array = \
+        zeros(calc_downsampled_shape(input_array, resolution),
+              input_array.dtype)
     # For each input partition find its mode
     for index, input_partition in enumerate(resolution_partitioned_input_array):
         # Get the number of times each index occurs in the input partition.
@@ -366,7 +369,8 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
             res[index] = uniform_priors
         else:
             # Remove any rows which don't contain priors
-            defined_priors = input_partition[input_partition.any(POSITION_AXIS)]
+            defined_priors = \
+                input_partition[input_partition.any(POSITION_AXIS)]
 
             # take the mean of the given priors for each label over the
             # position axis
@@ -375,6 +379,7 @@ def downsample_prior_array(raw_prior_array, resolution, uniform_priors):
             res[index] = mean_prior_vector
 
     return res
+
 
 def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
                                                        resolution, num_labels):
@@ -413,7 +418,8 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
 
     # take the presence to be 1 at every position the user has defined
     # any priors and 0 otherwise
-    presence_array = raw_prior_array.any(axis=POSITION_AXIS).astype(DTYPE_OBS_INT)
+    presence_array = \
+        raw_prior_array.any(axis=POSITION_AXIS).astype(DTYPE_OBS_INT)
 
     if resolution == 1:
         # our "downsampled" prior array at resolution 1 is just the
@@ -433,7 +439,6 @@ def get_downsampled_virtual_evidence_data_and_presence(raw_prior_array,
                                                      uniform_priors)
     downsampled_presence_array = downsample_presence_array(presence_array,
                                                            resolution)
-
 
     return downsampled_prior_array, downsampled_presence_array
 
@@ -508,8 +513,9 @@ def make_supervision_cells(supervision_coords, supervision_labels, start, end):
 
 def fill_virtual_evidence_cells(prior_input_array, num_labels):
     """
-    For genomic positions which have at least one, but not all priors specified,
-    this function will apply a uniform prior to all remaining labels.
+    For genomic positions which have at least one, but not all priors
+    specified, this function will apply a uniform prior to all remaining labels
+
     Indexes where no prior was ever specified will remain zero for downsampling
 
     Example:
@@ -518,7 +524,7 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
      [None, 0.4, None, None, None],
      [None, None, None, None, None]]
 
-    OUTPUT: 
+    OUTPUT:
     [[0.5, 0.2, 0.10, 0.10, 0.10],
      [0.15, 0.4, 0.15, 0.15, 0.15],
      [0.0 ... 0.0]]
@@ -538,7 +544,8 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
             else:
                 remaining_probability = 0
 
-            # divide remaining probability uniformly amongst the remaining labels
+            # divide remaining probability uniformly amongst the
+            # remaining labels
             prior_input[prior_input == None] = (remaining_probability /
                                                 (num_labels-num_prior_labels))
 
@@ -546,8 +553,10 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
 
     return prior_array
 
+
 def check_is_close(prior_sums, reference):
     return all((prior_sums - reference) <= 0)
+
 
 def make_virtual_evidence_cells(coords, priors,
                                 start, end, num_labels):
@@ -574,11 +583,13 @@ def make_virtual_evidence_cells(coords, priors,
             raise ValueError("VE label {} overlaps in coordinates {}-{}".format(label,
                              label_start, label_end))
         res[label][(label_start - start):(label_end - start)] = \
-            list(prior_dict.values()) * ((label_end - start)-(label_start - start))
+            (list(prior_dict.values()) *
+             ((label_end - start)-(label_start - start)))
 
     # For coords which had at least one label supplied, fill remaining labels
     # with uniform remaining probability
-    # Transpose the priors so that it has positions as rows and labels as columns
+    # Transpose the priors so that it has positions as rows and labels
+    # as columns
     res = fill_virtual_evidence_cells(res.transpose(), num_labels)
 
     if any(res < 0):
@@ -614,7 +625,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
             if continuous_cells is None:
                 # Copy the first track into our continous cells
                 continuous_cells = copy(chromosome[start:end,
-                                        [track_index]])
+                                                   [track_index]])
             else:
                 # Otherwise append the track to our continuous cells
                 continuous_cells = append(continuous_cells,
@@ -625,7 +636,7 @@ def make_continuous_cells(track_indexes, genomedata_names,
     return continuous_cells
 
 
-def _save_window(float_filename_or_file, int_filename_or_file, 
+def _save_window(float_filename_or_file, int_filename_or_file,
                  float_data, resolution, distribution, seq_data=None,
                  supervision_data=None, virtual_evidence_data=None,
                  virtual_evidence_filename_or_file=None, num_labels=None):
@@ -692,7 +703,7 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         # Produces error: observation file 0 '/tmp/segway.qvHHEnnQV4/ve.gradckoq.list' segment 0: couldn't read 0'th item in frame 0
         for prior in virtual_evidence_data_array:
             virtual_evidence_filename_or_file.write(
-                ' '.join(['{}'.format(prob) for prob in prior]) + '\n')
+                " ".join(["{}".format(prob) for prob in prior]) + "\n")
 
     if int_blocks:
         int_data = column_stack(int_blocks).astype(dtype=DTYPE_OBS_INT)
@@ -700,6 +711,7 @@ def _save_window(float_filename_or_file, int_filename_or_file,
         int_data = array([], dtype=DTYPE_OBS_INT)
 
     int_data.tofile(int_filename_or_file)
+
 
 def add_starts_ends(new_windows, starts, ends):
     """
@@ -723,12 +735,14 @@ def add_starts_ends(new_windows, starts, ends):
 
     return new_windows[0]
 
+
 def generate_coords_from_dict(coords_dict):
     # use a deque to allow fast insertion/removal at the
     # beginning and end of the sequence
     for chrom, coords_list in viewitems(coords_dict):
         starts, ends = map(deque, zip(*coords_list))
         yield chrom, starts, ends
+
 
 class Observations(object):
     copy_attrs = ["include_coords", "exclude_coords", "max_frames",
@@ -883,8 +897,8 @@ class Observations(object):
                     subtract_regions(start, end, chr_exclude_coords)
                 subtracted_start, subtracted_end = \
                     add_starts_ends(new_validation_windows,
-                                        starts,
-                                        ends)
+                                    starts,
+                                    ends)
                 if subtracted_start:
                     # skip or split long sequences
                     new_validation_windows = \
@@ -892,8 +906,8 @@ class Observations(object):
                                                   subtracted_end)
                     split_start, split_end = \
                         add_starts_ends(new_validation_windows,
-                                            starts,
-                                            ends)
+                                        starts,
+                                        ends)
                     if split_start:
                         for world in range(self.num_worlds):
                             validation_windows.append(Window(
@@ -1041,7 +1055,8 @@ class Observations(object):
             row = [float_filepath, str(window_index), chrom, str(start),
                    str(end)]
             float_tabwriter.writerow(row)
-            print(" %s (%d, %d)" % (float_filepath, start, end), file=sys.stderr)
+            print(" %s (%d, %d)" % (float_filepath, start, end),
+                  file=sys.stderr)
 
     def open_writable_or_dummy(self, filepath):
         if not filepath or (not self.clobber and filepath.exists()):
@@ -1057,4 +1072,5 @@ class Observations(object):
         with open_writable(self.float_filelistpath) as float_filelist:
             with open_writable(self.int_filelistpath) as int_filelist:
                 with open_writable(self.float_tabfilepath) as float_tabfile:
-                    self.write_tab_file(float_filelist, int_filelist, float_tabfile)
+                    self.write_tab_file(float_filelist, int_filelist,
+                                        float_tabfile)
