@@ -1,11 +1,11 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division
 
 __version__ = "$Revision$"
 
 # common stuff: needs to be in a different file from __init__ because
 # it is imported by lsf.py and sge.py
-# Copyright 2009, 2011, 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2009, 2011, 2012, 2013
+# Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 import sys
 from tempfile import gettempdir
@@ -15,7 +15,7 @@ from optbuild import Mixin_NoConvertUnderscore, OptionBuilder_ShortOptWithSpace
 from .._util import data_filename, KB, MB
 
 NATIVE_SPEC_PROG = (Mixin_NoConvertUnderscore
-                    + OptionBuilder_ShortOptWithSpace)() # do not run
+                    + OptionBuilder_ShortOptWithSpace)()  # do not run
 
 # CLEAN_PERIOD in lsb.params, after which jobs are removed from
 # mbatchd's memory default is 3600, multiplying by 0.5 for a margin of
@@ -36,8 +36,10 @@ See the Troubleshooting section of the Segway documentation."""
 
 NULL_FILENAME = "/dev/null"
 
+
 class JobError(RuntimeError):
     pass
+
 
 class _JobTemplateFactory(object):
     # this might be overridden by a subclass
@@ -120,8 +122,10 @@ class _JobTemplateFactory(object):
     def delete_job_template(self, session):
         session.deleteJobTemplate(self.template)
 
+
 def make_native_spec(*args, **kwargs):
     return " ".join(NATIVE_SPEC_PROG.build_args(args=args, options=kwargs))
+
 
 def calc_mem_limit(mem_usage):
     """
@@ -132,6 +136,7 @@ def calc_mem_limit(mem_usage):
 
 def main(args=sys.argv[1:]):
     pass
+
 
 if __name__ == "__main__":
     sys.exit(main())

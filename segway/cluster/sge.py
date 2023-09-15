@@ -9,9 +9,10 @@ from math import ceil
 from resource import getrlimit, RLIMIT_STACK
 import sys
 
-from .._util import MB
-from .common import (CLEAN_SAFE_TIME, _JobTemplateFactory,
+from .common import (_JobTemplateFactory, CLEAN_SAFE_TIME,
                      make_native_spec)
+from .._util import MB
+
 
 # qsub -w: switches off job validation
 # qsub -j: switches off merging output and error
@@ -22,6 +23,7 @@ try:
                       if num > 0)
 except ValueError:
     STACK_LIMIT = 10*MB
+
 
 class JobTemplateFactory(_JobTemplateFactory):
     def make_res_req(self, mem_usage, tmp_usage):
@@ -45,6 +47,7 @@ class JobTemplateFactory(_JobTemplateFactory):
 
         return res
 
+
 def make_single_res_req(name, mem):
     # round up to the next mebibyte
     return "%s=%dM" % (name, ceil(mem / MB))
@@ -59,6 +62,7 @@ def get_job_max_query_lifetime():
 
 def main(args=sys.argv[1:]):
     pass
+
 
 if __name__ == "__main__":
     sys.exit(main())

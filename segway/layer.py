@@ -81,7 +81,7 @@ class Tee(object):
             try:
                 if exit(*exc):
                     exc = (None, None, None)
-            except:
+            except:  # noqa: E722
                 exc = sys.exc_info()
         if exc != (None, None, None):
             # Don't rely on sys.exc_info() still containing

@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import division
 
 # Copyright 2009, 2011, 2012 Michael M. Hoffman <mmh1@washington.edu>
 
@@ -8,8 +7,8 @@ import sys
 
 from optbuild import OptionBuilder
 
-from .._util import MB
 from .common import _JobTemplateFactory
+from .._util import MB
 
 NATIVE_SPEC_PROG = OptionBuilder()  # do not run
 
