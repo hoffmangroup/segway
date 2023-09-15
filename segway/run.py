@@ -347,7 +347,7 @@ OFFSET_FILENAMES = 3  # where the filenames begin in Results
 OFFSET_VALIDATION_FILENAMES = 6  # where the validation filenames begin
 
 GMTKJT_OUTPUT_PATTERN = \
-    "Segment (\d+), after Prob E: log\(prob\(evidence\)\) = (\d+\.\d{1,9})?"
+    r"Segment (d+), after Prob E: log(prob(evidence)) = (d+\.d{1,9})?"
 GMTKJT_PATTERN_WINDOW_MATCH_INDEX = 1
 GMTKJT_PATTERN_LIKELIHOOD_MATCH_INDEX = 2
 
@@ -2721,7 +2721,8 @@ class Runner(object):
         with open(self.validation_int_filelistpath, "a") as int_filelist_fd:
             print(int_filepath, file=int_filelist_fd)
 
-        with open(self.validation_float_filelistpath, "a") as float_filelist_fd:
+        with open(self.validation_float_filelistpath, "a") as \
+             float_filelist_fd:
             print(float_filepath, file=float_filelist_fd)
 
         if self.reverse_worlds:
@@ -3022,15 +3023,15 @@ class Runner(object):
         if (self.validate and
                 self.recover_dirname):
             # recover last set of best results
-            result = \
-                TrainInstanceResults(log_likelihood=log_likelihood,
-                                     num_segs=self.num_segs,
-                                     validation_likelihood=validation_likelihood,
-                                     input_master_filename=self.input_master_filename,
-                                     params_filename=self.best_params_filename,
-                                     log_likelihood_filename=self.log_likelihood_filename,
-                                     validation_output_filename=self.validation_output_winner_filename,
-                                     validation_sum_filename=self.validation_sum_winner_filename)
+            result = TrainInstanceResults(
+             log_likelihood=log_likelihood,
+             num_segs=self.num_segs,
+             validation_likelihood=validation_likelihood,
+             input_master_filename=self.input_master_filename,
+             params_filename=self.best_params_filename,
+             log_likelihood_filename=self.log_likelihood_filename,
+             validation_output_filename=self.validation_output_winner_filename,
+             validation_sum_filename=self.validation_sum_winner_filename)
 
         while (round_index < self.max_em_iters and
                ((self.minibatch_fraction != MINIBATCH_DEFAULT) or
@@ -3046,8 +3047,9 @@ class Runner(object):
                     self.load_validation_log_likelihood()
 
                 full_validation_output = \
-                    self.get_full_validation_output(validation_window_indices,
-                                                    validation_window_likelihoods)
+                    self.get_full_validation_output(
+                        validation_window_indices,
+                        validation_window_likelihoods)
 
                 # log full set of validation likelihoods for this round
                 with open(self.validation_output_tab_filename, "a") as logfile:
@@ -3075,29 +3077,30 @@ class Runner(object):
                     copy2(self.validation_sum_filename,
                           self.validation_sum_winner_filename)
 
-                    result = \
-                        TrainInstanceResults(log_likelihood=log_likelihood,
-                                             num_segs=self.num_segs,
-                                             validation_likelihood=validation_likelihood,
-                                             input_master_filename=self.input_master_filename,
-                                             params_filename=self.best_params_filename,
-                                             log_likelihood_filename=self.log_likelihood_filename,
-                                             validation_output_filename=self.validation_output_winner_filename,
-                                             validation_sum_filename=self.validation_sum_winner_filename)
+                    result = TrainInstanceResults(
+                        log_likelihood=log_likelihood,
+                        num_segs=self.num_segs,
+                        validation_likelihood=validation_likelihood,
+                        input_master_filename=self.input_master_filename,
+                        params_filename=self.best_params_filename,
+                        log_likelihood_filename=self.log_likelihood_filename,
+                        validation_output_filename=self.validation_output_winner_filename,  # noqa: E501
+                        validation_sum_filename=self.validation_sum_winner_filename)  # noqa: E501
+
                     best_validation_likelihood = validation_likelihood
 
             round_index += 1
 
         if not self.validate:
-            result = \
-                TrainInstanceResults(log_likelihood=log_likelihood,
-                                     num_segs=self.num_segs,
-                                     validation_likelihood=validation_likelihood,
-                                     input_master_filename=self.input_master_filename,
-                                     params_filename=self.last_params_filename,
-                                     log_likelihood_filename=self.log_likelihood_filename,
-                                     validation_output_filename=self.validation_output_winner_filename,
-                                     validation_sum_filename=self.validation_sum_winner_filename)
+            result = TrainInstanceResults(
+             log_likelihood=log_likelihood,
+             num_segs=self.num_segs,
+             validation_likelihood=validation_likelihood,
+             input_master_filename=self.input_master_filename,
+             params_filename=self.last_params_filename,
+             log_likelihood_filename=self.log_likelihood_filename,
+             validation_output_filename=self.validation_output_winner_filename,
+             validation_sum_filename=self.validation_sum_winner_filename)
 
         # log_likelihood, num_segs and a list of src_filenames to save
         return result
@@ -3302,7 +3305,8 @@ class Runner(object):
                 res = RestartableJobDict(self.session, self.job_log_file)
                 for validation_window in self.validation_windows:
                     restartable_job = \
-                        self.queue_save_validation_set_window(validation_window)
+                        self.queue_save_validation_set_window(
+                            validation_window)
                     res.queue(restartable_job)
                 res.wait()
         self.session = None
@@ -3324,9 +3328,10 @@ class Runner(object):
 
             # write results from each instance to their own file
             for index, instance_param in enumerate(instance_params):
-                result_filename = make_default_filename(TRAIN_RESULTS_TMPL,
-                                                        SUBDIRNAME_INTERMEDIATE,
-                                                        index)
+                result_filename = make_default_filename(
+                    TRAIN_RESULTS_TMPL,
+                    SUBDIRNAME_INTERMEDIATE,
+                    index)
                 self.save_tab_file(instance_param, TRAIN_RESULT_TYPES,
                                    result_filename)
 
@@ -3465,7 +3470,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             if not recover_validation_sum_tab_filepath.isfile():
                 recover_validation_sum_tab_filepath = \
                     Path(self.make_validation_sum_tab_filename(None,
-                                                               recover_dirname))
+                         recover_dirname))
 
             # recover validation output tabfile
             recover_validation_output_tab_filepath = \
@@ -3474,7 +3479,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             if not recover_validation_output_tab_filepath.isfile():
                 recover_validation_output_tab_filepath = \
                     Path(self.make_validation_output_tab_filename(None,
-                                                                  recover_dirname))
+                         recover_dirname))
 
             # recover last validation sum
             recover_validation_sum_filename = \
@@ -3923,7 +3928,7 @@ posterior               infer posterior probabilities of each label across a gen
 
 Use `segway COMMAND --help` for help specific to command COMMAND.
 
-    """
+    """  # noqa: E501
 
     tasks = parser.add_subparsers(title="list of commands", dest="task_spec",
                                   metavar=subtask_description)
@@ -4303,7 +4308,7 @@ def check_gmtk_version():
     # checkin date: Fri Oct 30 10:51:44 2015 -0700
 
     # Older versions:
-    # GMTK 1.4.0 (Mercurial id: bdf2718cc6ce tip checkin date: Thu Jun 25 12:31:56 2015 -0700)
+    # GMTK 1.4.0 (Mercurial id: bdf2718cc6ce tip checkin date: Thu Jun 25 12:31:56 2015 -0700)  # noqa
 
     # Try to open gmtkTriangulate to get the version
     try:

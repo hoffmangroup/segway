@@ -302,7 +302,8 @@ def get_downsampled_supervision_data_and_presence(input_array, resolution):
         zeros(calc_downsampled_shape(input_array, resolution),
               input_array.dtype)
     # For each input partition find its mode
-    for index, input_partition in enumerate(resolution_partitioned_input_array):
+    for index, input_partition in enumerate(
+         resolution_partitioned_input_array):
         # Get the number of times each index occurs in the input partition.
         # bincount(a) returns an array where the elements are the number
         # of times each index occurs in a.
@@ -534,7 +535,7 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
     for index, prior_input in enumerate(prior_input_array):
         # Only priors which were specified in the input file will be set
         # Unset labels will still be none
-        num_prior_labels = numpy_sum(prior_input != None)
+        num_prior_labels = numpy_sum(prior_input != None)  # noqa: E711
         if num_prior_labels:
             prior_list_values = list(filter(None, prior_input))
 
@@ -546,7 +547,7 @@ def fill_virtual_evidence_cells(prior_input_array, num_labels):
 
             # divide remaining probability uniformly amongst the
             # remaining labels
-            prior_input[prior_input == None] = (remaining_probability /
+            prior_input[prior_input == None] = (remaining_probability /  # noqa: E501 E711
                                                 (num_labels-num_prior_labels))
 
             prior_array[index] = prior_input
@@ -580,8 +581,8 @@ def make_virtual_evidence_cells(coords, priors,
         label = list(prior_dict.keys())[0]
         # copy data to all positions
         if res[label][(label_start - start):(label_end - start)].any():
-            raise ValueError("VE label {} overlaps in coordinates {}-{}".format(label,
-                             label_start, label_end))
+            raise ValueError("VE label {} overlaps in coordinates {}-{}".
+                             format(label, label_start, label_end))
         res[label][(label_start - start):(label_end - start)] = \
             (list(prior_dict.values()) *
              ((label_end - start)-(label_start - start)))
@@ -598,7 +599,8 @@ def make_virtual_evidence_cells(coords, priors,
     is_close = check_is_close(res.sum(axis=POSITION_AXIS), 1.0)
     if not is_close:
         close_indexes = where(res.sum(axis=POSITION_AXIS) > 1.0)[0]
-        warn("Prior labels sum to greater than one in on genomic indexes {}".format(close_indexes + start),
+        warn("Prior labels sum to greater than one in on genomic indexes {}".
+             format(close_indexes + start),
              VirtualEvidenceWarning)
 
     return res
@@ -700,7 +702,8 @@ def _save_window(float_filename_or_file, int_filename_or_file,
 
         # separately save VE priors CPT in a temporary file
         # done using write since ndarray.tofile does not format correctly
-        # Produces error: observation file 0 '/tmp/segway.qvHHEnnQV4/ve.gradckoq.list' segment 0: couldn't read 0'th item in frame 0
+        # Produces error:
+        # observation file 0 '/tmp/segway.qvHHEnnQV4/ve.gradckoq.list' segment 0: couldn't read 0'th item in frame 0  # noqa E501
         for prior in virtual_evidence_data_array:
             virtual_evidence_filename_or_file.write(
                 " ".join(["{}".format(prob) for prob in prior]) + "\n")
@@ -886,7 +889,8 @@ class Observations(object):
         Returns validation windows
         """
         validation_windows = []
-        for chrom, starts, ends in generate_coords_from_dict(self.validation_coords):
+        for chrom, starts, ends in generate_coords_from_dict(
+             self.validation_coords):
             chr_exclude_coords = get_chrom_coords(exclude_coords, chrom)
 
             while len(starts) > 0:

@@ -4,7 +4,8 @@ from __future__ import (absolute_import, division, print_function,
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2009, 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2008-2009, 2011-2013
+# Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from collections import defaultdict, namedtuple
 from contextlib import closing
@@ -424,7 +425,7 @@ def parse_posterior(iterable, output_label):
     """
     if output_label != "seg":
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+),"
-                                        "subseg\((\d+)\)=(\d+)$")
+                                        r"subseg\((\d+)\)=(\d+)$")
     else:
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
 
