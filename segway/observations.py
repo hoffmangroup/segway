@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function
 
 """observations.py: prepare and save GMTK observations
 """

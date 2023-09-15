@@ -1,6 +1,4 @@
 #!/usr/bin/env python
-from __future__ import (absolute_import, division, print_function,
-                        with_statement)
 
 """winner.py: pick winning paramters when training run is cut short
 """
