@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division
 
 """input_master.py: write input master files
 """
