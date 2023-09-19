@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division
 
 """structure.py: write structure file
 """
 
 __version__ = "$Revision$"
 
-## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from itertools import count
 
@@ -18,6 +17,7 @@ from ._util import (resource_substitute, Saver, SUPERVISION_UNSUPERVISED,
 MAX_WEIGHT_SCALE = 25
 
 SUPERVISIONLABEL_WEIGHT_MULTIPLIER = 1
+
 
 def add_observation(observations, resourcename, **kwargs):
     observations.append(resource_substitute(resourcename)(**kwargs))
@@ -51,9 +51,9 @@ class StructureSaver(Saver):
         """
 
         missing_spec = "CONDITIONALPARENTS_NIL_CONTINUOUS"
-        present_spec = 'CONDITIONALPARENTS_OBS ' \
+        present_spec = "CONDITIONALPARENTS_OBS " \
             'using mixture collection("collection_seg_%s") ' \
-            'MAPPING_OBS' % trackname
+            "MAPPING_OBS" % trackname
 
         # The switching parent ("presence__...") is overloaded for
         # both switching weight and switching conditional parents. If
@@ -62,14 +62,15 @@ class StructureSaver(Saver):
         # parent
         return " | ".join([missing_spec] + [present_spec] * self.resolution)
 
-    def add_supervision_observation(self, observation_items, next_int_track_index):
+    def add_supervision_observation(self, observation_items,
+                                    next_int_track_index):
         # SUPERVISIONLABEL_WEIGHT_MULTIPLIER = 1 since we are
         # not normalising against the max length of the data tracks
         weight_spec = self.make_weight_spec(SUPERVISIONLABEL_WEIGHT_MULTIPLIER)
 
         # create the supervision label's conditional parents
         # using GMTK specification
-        spec = 'supervisionLabel(0), seg(0) '\
+        spec = "supervisionLabel(0), seg(0) "\
             'using DeterministicCPT("supervisionLabel_seg_alwaysTrue")'
         conditionalparents_spec = " | ".join([spec] * (self.resolution+1))
 
@@ -80,7 +81,8 @@ class StructureSaver(Saver):
                         weight_spec=weight_spec)
         return
 
-    def add_virtual_evidence_observation(self, observation_items, next_int_track_index):
+    def add_virtual_evidence_observation(self, observation_items,
+                                         next_int_track_index):
         weight_spec = self.make_weight_spec(self.virtual_evidence_weight)
 
         # create the supervision label's conditional parents
@@ -92,7 +94,7 @@ class StructureSaver(Saver):
         # since VE only adds one int block and writes prior observations
         # in a separate file
         add_observation(observation_items, "virtual_evidence.tmpl",
-                        presence_index=next_int_track_index, 
+                        presence_index=next_int_track_index,
                         conditionalparents_spec=conditionalparents_spec,
                         weight_spec=weight_spec)
         return
@@ -128,8 +130,9 @@ class StructureSaver(Saver):
             if self.track_weight:
                 weight_multiplier = self.track_weight
             else:
-                weight_multiplier = min(max_num_datapoints_track
-                                        / num_datapoints_track, MAX_WEIGHT_SCALE)
+                weight_multiplier = min((max_num_datapoints_track
+                                         / num_datapoints_track),
+                                        MAX_WEIGHT_SCALE)
 
             conditionalparents_spec = \
                 self.make_conditionalparents_spec(trackname)
@@ -157,12 +160,13 @@ class StructureSaver(Saver):
             next_int_track_index += 2
 
         if self.supervision_type != SUPERVISION_UNSUPERVISED:
-            self.add_supervision_observation(observation_items, next_int_track_index)
+            self.add_supervision_observation(observation_items,
+                                             next_int_track_index)
             next_int_track_index += 2
 
-        #if self.virtual_evidence:
-        self.add_virtual_evidence_observation(observation_items, next_int_track_index)
-        next_int_track_index += 1 # only adds one int block--presence data
+        self.add_virtual_evidence_observation(observation_items,
+                                              next_int_track_index)
+        next_int_track_index += 1  # only adds one int block--presence data
 
         assert observation_items  # must be at least one track
         observations = "\n".join(observation_items)

@@ -1,6 +1,12 @@
-include segway/data/*
-include docker/*
-recursive-include doc/*
-include NEWS
-include LICENSE
-include *.md
+# setuptools-scm currently includes all version controlled files in the sdist
+
+# Exclude build/CI files
+prune Docker
+prune .github
+
+# Exclude ignore files
+exclude .gitignore
+
+# Exclude readthedocs configuration
+exclude .readthedocs.yml
+exclude environment.yml

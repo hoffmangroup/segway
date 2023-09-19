@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function
 
 """compare_directory.py: compare two directories, using regexes
 
 XXX: want to keep track of all files in new directory
 """
 
-## Copyright 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 import filecmp
 from os import walk
@@ -15,15 +14,16 @@ import sys
 import tarfile
 
 from path import Path
+from segway._util import maybe_gzip_open, SEGWAY_ENCODING
+from segway.version import __version__
 from six import viewitems, viewkeys
 from six.moves import zip
 
-from segway._util import maybe_gzip_open, SEGWAY_ENCODING
-from segway.version import __version__
 
 # marker for matching anywhere in file
 ANY_LINE_MARKER = b"(%__ANY_LINE__%)"
 ANY_LINE_MARKER_LENGTH = len(ANY_LINE_MARKER)
+
 
 def get_dir_filenames(dirname):
     if (not Path(dirname).exists()):
@@ -50,14 +50,17 @@ def get_dir_filenames(dirname):
             filename_absolute = str(dirbasepath / filename)
             yield filename_relative, filename_absolute
 
+
 # regular expression unescape
-re_unescape = re_compile(b"\(%.*?%\)")
+re_unescape = re_compile(r"\(%.*?%\)")
+
 
 def make_regex(text):
     """
     make regex, escaping things that aren't with (% %)
     """
-    spans = [match.span() for match in re_unescape.finditer(text)]
+    spans = [match.span() for match in re_unescape.finditer(
+        text.decode(SEGWAY_ENCODING))]
 
     res = [b"^"]
     last_end = 0
@@ -66,7 +69,7 @@ def make_regex(text):
         res.append(text[start + 2:end - 2])  # eliminate (% and %)
         last_end = end
     res.extend([escape(text[last_end:]), b"$"])
-    
+
     return re_compile(b"".join(res))
 
 
@@ -77,13 +80,13 @@ def compare_file(template_filename, query_filename):
 
     # If the files are different find and report the differences based on
     # embedded regex criteria
-    
-    # Create a template held out set for lines that can match elsewhere 
+
+    # Create a template held out set for lines that can match elsewhere
     match_anywhere_regexs = set()
 
     res = True
-    with maybe_gzip_open(template_filename, mode = "rb") as template_file:
-        with maybe_gzip_open(query_filename, mode = "rb") as query_file:
+    with maybe_gzip_open(template_filename, mode="rb") as template_file:
+        with maybe_gzip_open(query_filename, mode="rb") as query_file:
             for line_number, lines in enumerate(
                     zip(template_file, query_file),
                     start=1):
@@ -108,7 +111,7 @@ def compare_file(template_filename, query_filename):
     # If there are lines that may be matched anywhere
     if match_anywhere_regexs:
         # Fo each line in the the query file
-        with maybe_gzip_open(query_filename, mode = "rb") as query_file:
+        with maybe_gzip_open(query_filename, mode="rb") as query_file:
             for query_line in query_file:
                 # If a query line matches the regex in the match anywhere set
                 regex_matches = []
@@ -155,11 +158,13 @@ def compare_directory(template_dirname, query_dirname):
 
     template_filenames = get_dir_filenames(template_dirname)
     for template_filename_relative, template_filename in template_filenames:
-        re_template_filename_relative = make_regex(template_filename_relative.encode(SEGWAY_ENCODING))
+        re_template_filename_relative = make_regex(
+            template_filename_relative.encode(SEGWAY_ENCODING))
 
         query_filenames_items = viewitems(query_filenames)
         for query_filename_relative, query_filename in query_filenames_items:
-            if re_template_filename_relative.match(query_filename_relative.encode(SEGWAY_ENCODING)):
+            if re_template_filename_relative.match(
+               query_filename_relative.encode(SEGWAY_ENCODING)):
                 del query_filenames[query_filename_relative]
                 if compare_file(template_filename, query_filename):
                     counter.success()
@@ -222,6 +227,7 @@ def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
     return compare_directory(*args)
+
 
 if __name__ == "__main__":
     sys.exit(main())

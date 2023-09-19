@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function, with_statement
 
 __version__ = "$Revision$"
 
@@ -26,7 +25,7 @@ else:
         DRIVER_NAME_OVERRIDE = DRIVER_NAME_LOCAL  # no DRMAA available
         from .local import ExitTimeoutException, JobState, Session
 
-from .._util import constant
+from .._util import constant  # noqa: E402
 
 MSG_JOB_ERROR = """
 Submitted Job (%s) failed. Failed Job: %s.
@@ -45,8 +44,8 @@ try:
 except KeyError:
     MIN_JOB_WAIT_SLEEP_TIME = 3.0
 
-## credited for min time so that there is some buffer when considering
-## whether to submit more jobs or not
+# credited for min time so that there is some buffer when considering
+# whether to submit more jobs or not
 
 NOMINAL_MIN_JOB_WAIT_SLEEP_TIME = MIN_JOB_WAIT_SLEEP_TIME + 3
 MAX_JOB_WAIT_SLEEP_TIME = 10  # max time to wait between checking job status
@@ -69,7 +68,7 @@ def get_driver_name(session):
     # XXX: find out what Son of Grid Engine and GridScheduler report
     if (drms_info.startswith("GE") or drms_info.startswith("SGE")
             or drms_info.startswith("UGE") or drms_info.startswith("OGS/GE")):
-        return "sge" # XXX: should probably change to GE
+        return "sge"  # XXX: should probably change to GE
     elif "Platform LSF" in drms_info:  # includes "IBM Platform LSF"
         return "lsf"
     elif drms_info.startswith("SLURM"):
@@ -81,6 +80,7 @@ def get_driver_name(session):
         msg = ("unsupported distributed resource management system: %s"
                % drms_info)
         raise ValueError(msg)
+
 
 # non-reentrant code
 with Session() as _session:
@@ -125,7 +125,7 @@ class RestartableJob(object):
         mem_usage_key = self.mem_usage_key
         trial_index = global_mem_usage[mem_usage_key]
 
-        #print >>sys.stderr, ("self.trial_index=%d; trial_index=%d"
+        # print >>sys.stderr, ("self.trial_index=%d; trial_index=%d"
         #                     % (self.trial_index, trial_index))
 
         # if this index was tried before and unsuccessful, increment
@@ -156,7 +156,8 @@ class RestartableJob(object):
         else:
             job_location = "queued"
 
-        print("%s %s: %s (%s)" % (job_location, res, jobname, res_req), file=sys.stderr)
+        print("%s %s: %s (%s)" % (job_location, res, jobname, res_req),
+              file=sys.stderr)
 
         return res
 
@@ -164,6 +165,7 @@ class RestartableJob(object):
         # the JobTemplateFactory should delete its own job template object
         # when it's no longer needed
         self.job_tmpl_factory.delete_job_template(self.session)
+
 
 class RestartableJobDict(dict):
     def __init__(self, session, job_log_file, *args, **kwargs):

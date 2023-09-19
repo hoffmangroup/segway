@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division
 
 """input_master.py: write input master files
 """
 
 __version__ = "$Revision$"
 
-## Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from math import frexp, ldexp
 from string import Template
@@ -17,24 +16,24 @@ from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
                    vectorize, where, zeros)
 from six.moves import map, range
 
-from ._util import (copy_attrs, data_string, DISTRIBUTION_GAMMA,
-                    DISTRIBUTION_NORM, DISTRIBUTION_ASINH_NORMAL,
+from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
+                    DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
                     OFFSET_END, OFFSET_START, OFFSET_STEP,
                     resource_substitute, Saver, SEGWAY_ENCODING,
-                    SUPERVISION_UNSUPERVISED,
                     SUPERVISION_SEMISUPERVISED,
-                    SUPERVISION_SUPERVISED, USE_MFSDG,
+                    SUPERVISION_SUPERVISED,
+                    SUPERVISION_UNSUPERVISED, USE_MFSDG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
 
-# NB: Currently Segway relies on older (Numpy < 1.14) printed representations of
-# scalars and vectors in the parameter output. By default in newer (> 1.14)
+# NB: Currently Segway relies on older (Numpy < 1.14) printed representations
+# of scalars and vectors in the parameter output. By default in newer (> 1.14)
 # versions printed output "giv[es] the shortest unique representation".
 # See Numpy 1.14 release notes: https://docs.scipy.org/doc/numpy/release.html
 # Under heading 'Many changes to array printing, disableable with the new
 # "legacy" printing mode'
 try:
     # If it is a possibility, use the older printing style
-    set_printoptions(legacy='1.13')
+    set_printoptions(legacy="1.13")
 except TypeError:
     # Otherwise ignore the attempt
     pass
@@ -99,7 +98,7 @@ def make_spec(name, iterable):
 
     all_lines = header_lines + indexed_items
 
-    # In Python 2, convert from unicode to bytes to prevent 
+    # In Python 2, convert from unicode to bytes to prevent
     # __str__method from being called twice
     # Specifically in the string template standard library provided by Python
     # 2, there is a call to a string escape sequence + tuple, e.g.:
@@ -153,6 +152,7 @@ def jitter_cell(cell, random_state):
     max_noise = ldexp(1, frexp(cell)[1] - JITTER_ORDERS_MAGNITUDE)
 
     return cell + random_state.uniform(-max_noise, max_noise)
+
 
 jitter = vectorize(jitter_cell)
 
@@ -399,7 +399,6 @@ class TableParamSpec(ParamSpec):
 
         return res
 
-
     @staticmethod
     def make_dirichlet_name(name):
         return "dirichlet_%s" % name
@@ -523,7 +522,7 @@ class DirichletTabParamSpec(TableParamSpec):
         if self.len_seg_strength > 0:
             dirichlet_table = self.make_dirichlet_table()
             yield self.make_table_spec(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION,
-                                   dirichlet_table)
+                                       dirichlet_table)
 
 
 class NameCollectionParamSpec(ParamSpec):
@@ -564,10 +563,12 @@ class NameCollectionParamSpec(ParamSpec):
 
 class MeanParamSpec(ParamSpec):
     type_name = "MEAN"
-    object_tmpl = "mean_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
+    object_tmpl = \
+        "mean_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
     jitter_std_bound = 0.2
 
-    copy_attrs = ParamSpec.copy_attrs + ["means", "num_mix_components", "random_state", "vars"]
+    copy_attrs = ParamSpec.copy_attrs + ["means", "num_mix_components",
+                                         "random_state", "vars"]
 
     def make_data(self):
         num_segs = self.num_segs
@@ -582,11 +583,10 @@ class MeanParamSpec(ParamSpec):
         stds_tiled = vstack_tile(stds, num_segs, num_subsegs)
 
         jitter_std_bound = self.jitter_std_bound
-        noise = self.random_state.uniform(-jitter_std_bound,
-                jitter_std_bound, stds_tiled.shape)
+        noise = self.random_state.uniform(-jitter_std_bound, jitter_std_bound,
+                                          stds_tiled.shape)
 
         return means_tiled + (stds_tiled * noise)
-
 
     def generate_objects(self):
         """
@@ -604,7 +604,8 @@ class MeanParamSpec(ParamSpec):
                 if data is not None:
                     seg_index = mapping["seg_index"]
                     subseg_index = mapping["subseg_index"]
-                    mapping["datum"] = data[seg_index, subseg_index, track_index]
+                    mapping["datum"] = data[seg_index, subseg_index,
+                                            track_index]
                     mapping["track"] = mapping["track"]
                     mapping["component_suffix"] = \
                         self.get_template_component_suffix(component)
@@ -615,13 +616,14 @@ class MeanParamSpec(ParamSpec):
 
 class CovarParamSpec(ParamSpec):
     type_name = "COVAR"
-    object_tmpl = "covar_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
+    object_tmpl = \
+        "covar_${seg}_${subseg}_${track}${component_suffix} 1 ${datum}"
 
     copy_attrs = ParamSpec.copy_attrs + ["num_mix_components", "vars"]
 
     def make_data(self):
         return vstack_tile(self.vars, self.num_segs, self.num_subsegs)
-    
+
     def generate_objects(self):
         """
         returns: iterable of strs containing gmtk parameter objects starting
@@ -637,14 +639,15 @@ class CovarParamSpec(ParamSpec):
                 if data is not None:
                     seg_index = mapping["seg_index"]
                     subseg_index = mapping["subseg_index"]
-                    mapping["datum"] = data[seg_index, subseg_index, track_index]
+                    mapping["datum"] = data[seg_index, subseg_index,
+                                            track_index]
                     mapping["track"] = mapping["track"]
                     mapping["component_suffix"] = \
                         self.get_template_component_suffix(component)
 
                     mapping["datum"] = mapping["datum"]
                     yield substitute(mapping)
-    
+
 
 class TiedCovarParamSpec(CovarParamSpec):
     object_tmpl = "covar_${track}${component_suffix} 1 ${datum}"
@@ -713,8 +716,9 @@ class NormMCParamSpec(MCParamSpec):
     else:
         # dimensionality component_type name mean covar
         object_tmpl = "1 COMPONENT_TYPE_DIAG_GAUSSIAN" \
-            " mc_${distribution}_${seg}_${subseg}_${track}${component_suffix}" \
-            " mean_${seg}_${subseg}_${track}${component_suffix} covar_${track}${component_suffix}"
+            " mc_${distribution}_${seg}_${subseg}_${track}${component_suffix}"\
+            " mean_${seg}_${subseg}_${track}${component_suffix}" \
+            " covar_${track}${component_suffix}"
 
     def generate_objects(self):
         """
@@ -742,6 +746,7 @@ class GammaMCParamSpec(MCParamSpec):
 
 class MXParamSpec(ParamSpec):
     type_name = "MX"
+
     def generate_objects(self):
         """
         returns: iterable of strs containing gmtk parameter objects starting
@@ -777,6 +782,7 @@ class MXParamSpec(ParamSpec):
                 mapping["datum"] = data[seg_index, subseg_index, track_index]
             yield substitute(mapping)
 
+
 class DPMFParamSpec(DenseCPTParamSpec):
     type_name = "DPMF"
     copy_attrs = ParamSpec.copy_attrs + ["num_mix_components"]
@@ -795,8 +801,10 @@ class DPMFParamSpec(DenseCPTParamSpec):
         else:
             # Create a dense probability mass function of dirichlet constants
             # with the same amount of mixture components
-            object_tmpl = "dpmf_${seg}_${subseg}_${track} ${num_mix_components} "\
-                        "DirichletConst %s ${weights}" % GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
+            object_tmpl = "dpmf_${seg}_${subseg}_${track} " \
+                          "${num_mix_components} " \
+                          "DirichletConst %s ${weights}" % \
+                          GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT
             component_weight = str(round(1.0 / self.num_mix_components,
                                          ROUND_NDIGITS))
             weights = (" " + component_weight) * self.num_mix_components
@@ -812,21 +820,25 @@ class DPMFParamSpec(DenseCPTParamSpec):
                 if data is not None:
                     seg_index = mapping["seg_index"]
                     subseg_index = mapping["subseg_index"]
-                    mapping["datum"] = data[seg_index, subseg_index, track_index]
+                    mapping["datum"] = data[seg_index, subseg_index,
+                                            track_index]
                 yield substitute(mapping)
+
 
 class VirtualEvidenceSpec(ParamSpec):
     type_name = "VE_CPT"
 
     # According to GMTK specification (tksrc/GMTK_VECPT.cc)
-    # this should be of the format: 
+    # this should be of the format:
     # CPT_name num_par par_card self_card VE_CPT_FILE
     # nfs:nfloats nis:nints ... fmt:obsformat ... END
     object_tmpl = "seg_virtualEvidence 1 %s 2 %s nfs:%s nis:0 fmt:ascii END"
     copy_attrs = ParamSpec.copy_attrs + ["virtual_evidence", "num_segs"]
 
     def make_virtual_evidence_spec(self):
-        return self.object_tmpl % (self.num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME, self.num_segs)
+        return self.object_tmpl % (self.num_segs,
+                                   VIRTUAL_EVIDENCE_LIST_FILENAME,
+                                   self.num_segs)
 
     def generate_objects(self):
         yield self.make_virtual_evidence_spec()
@@ -837,10 +849,10 @@ class InputMasterSaver(Saver):
     copy_attrs = ["num_bases", "num_segs", "num_subsegs",
                   "num_track_groups", "card_seg_countdown",
                   "seg_countdowns_initial", "seg_table", "distribution",
-                  "len_seg_strength", "resolution", "random_state", "supervision_type",
-                  "use_dinucleotide", "mins", "means", "vars",
-                  "gmtk_include_filename_relative", "track_groups",
-                  "num_mix_components", "virtual_evidence"] 
+                  "len_seg_strength", "resolution", "random_state",
+                  "supervision_type", "use_dinucleotide", "mins", "means",
+                  "vars", "gmtk_include_filename_relative", "track_groups",
+                  "num_mix_components", "virtual_evidence"]
 
     def make_mapping(self):
         # the locals of this function are used as the template mapping

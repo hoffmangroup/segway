@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division
 
 """local.py: local mode instead of using cluster
 """
 
 __version__ = "$Revision$"
 
-## Copyright 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from os import environ
 from resource import getrusage, RUSAGE_CHILDREN
@@ -14,12 +13,13 @@ from subprocess import Popen
 from threading import Lock
 from time import sleep
 
-from .common import (CLEAN_SAFE_TIME, _JobTemplateFactory,
+from .common import (_JobTemplateFactory, CLEAN_SAFE_TIME,
                      make_native_spec)
 
 # Allow this to throw an error if the environment variable is not an integer
 MAX_PARALLEL_JOBS = int(environ.get("SEGWAY_NUM_LOCAL_JOBS", 32))
 JOB_WAIT_SLEEP_TIME = 3.0
+
 
 class JobTemplate(object):
     """mimics a DRMAA job template object
@@ -61,7 +61,7 @@ class Job(object):
             self.proc.terminate()
             self.proc.wait()
             self._close()
-        except OSError: # Ignore exception if process is no longer running
+        except OSError:  # Ignore exception if process is no longer running
             pass
 
     def _close(self):
@@ -117,7 +117,7 @@ class Session(object):
         self.drmsInfo = "local"
         self.next_jobid = 1
         self.jobs = {}
-        self.running_jobs = set() # set(jobid)
+        self.running_jobs = set()  # set(jobid)
 
         # This lock controls access to the jobs and running_jobs objects.
         # These objects are modified in the runJob() and wait() functions.
@@ -188,7 +188,7 @@ class JobState:
 
 
 class ExitTimeoutException(Exception):
-    "mimics drmaa.ExitTimeoutException"
+    """mimics drmaa.ExitTimeoutException"""
 
 
 class JobTemplateFactory(_JobTemplateFactory):
@@ -206,5 +206,5 @@ def get_job_max_query_lifetime():
     return CLEAN_SAFE_TIME
 
 
-## here only for imports:
+# here only for imports:
 make_native_spec
