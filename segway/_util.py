@@ -197,23 +197,8 @@ def get_col_index(chromosome, trackname):
 
 
 def get_label_color(label):
-    # Use hash_label to replicate hashing across subprocesses, as the Python
-    # hash() method does not replicate across runs
-    color = SCHEME[hash_label(label) % NUM_COLORS]
+    color = SCHEME[label % NUM_COLORS]
     return ",".join(map(str, color))
-
-
-def hash_label(label):
-    """
-    If label is an integer or a string containing an integer, return it as
-    an integer.
-    Otherwise, hash the label string as the sum of the Unicode
-    representations of its characters.
-    """
-    if ((isinstance(label, intc) or isinstance(label, int)) or
-            label.isnumeric()):
-        return intc(label)
-    return sum(ord(character) for character in label)
 
 
 # XXX: suggest as default
