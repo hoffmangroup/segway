@@ -440,6 +440,19 @@ You can supply your own custom or modified models to Segway by using the
 uses. To learn more about using GMTK to create your own models there 
 the `GMTK documentation`_.
 
+The **train** and **annotate** modes of Segway accepts models where states 
+are given labeled names, rather than using the default GMTK numeric labels. 
+To assign label names to states of a random variable, the ``.str`` structure 
+file desciption of that variable should contain the line 
+``symboltable: collection("labels_name")`` where the desired list of label 
+names is in a name collection in the ``input.master`` file named 
+``labels_name``. Consult the `GMTK documentation`_ for more detailed 
+information. 
+
+These names must contain only alphanumeric characters and will be written to 
+the output annotation file. This feature is not supported for the **posterior** 
+mode.
+
 .. _GMTK documentation: https://github.com/melodi-lab/gmtk/blob/master/documentation.pdf
 
 .. _segment-duration-model:
