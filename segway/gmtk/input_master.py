@@ -489,14 +489,14 @@ class InlineMCSection(InlineSection):
     """
     Special InlineSection subclass which contains MC objects.
     Attributes:
-        mean: InlineSection object which point to InputMaster.mean
-        covar: InlineSection object which point to InputMaster.covar
+        mean: the InlineSection object stored at InputMaster.mean
+        covar: the InlineSection object stored at InputMaster.covar
     """
     def __init__(self, mean: InlineSection, covar: InlineSection):
         """
-        :param mean: InlineSection: InlineSection object which point to
+        :param mean: InlineSection: the InlineSection object stored at
         InputMaster.mean
-        :param covar: InlineSection: InlineSection object which point to
+        :param covar: InlineSection: the InlineSection object stored at
         InputMaster.covar
         """
         super().__init__(OBJ_KIND_MC)
@@ -535,20 +535,16 @@ class InlineMXSection(InlineSection):
     """
     Special InlineSection subclass which contains MX objects.
     Attributes:
-        dpmf: InlineSection object which point to InputMaster.dpmf
-        mc: InlineSection object which point to InputMaster.mc
+        dpmf: the InlineSection object stored at InputMaster.dpmf
     """
 
-    def __init__(self, dpmf: InlineSection, mc: InlineSection):
+    def __init__(self, dpmf: InlineSection):
         """
-        :param dpmf: InlineSection: InlineSection object which point to
+        :param dpmf: InlineSection: the InlineSection object stored at
         InputMaster.dpmf
-        :param mc: InlineSection: InlineSection object which point to
-        InputMaster.mc
         """
         super().__init__(OBJ_KIND_MX)
         self.dpmf = dpmf
-        self.mc = mc
 
     def __str__(self) -> str:
         """
@@ -607,7 +603,7 @@ class InputMaster:
         self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
         self.dpmf = InlineSection(OBJ_KIND_DPMF)
         self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
-        self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
+        self.mx = InlineMXSection(dpmf=self.dpmf)
 
     def __str__(self) -> str:
         """

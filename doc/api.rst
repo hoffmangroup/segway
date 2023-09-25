@@ -476,10 +476,3 @@ the user.
         The value of ``dpmf`` parameters in :py:class:`MX` objects should be 
         keys in this object. 
 
-    .. py:attribute:: mc
-        :type: InlineSection
-
-        An :py:class:`InlineSection` object storing :py:class:`MC` objects. 
-        The value of ``covar`` parameters in :py:class:`MX` objects should be 
-        keys in this object.  
-
