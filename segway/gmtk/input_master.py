@@ -536,14 +536,14 @@ class InlineMXSection(InlineSection):
     Special InlineSection subclass which contains MX objects.
     Attributes:
         dpmf: InlineSection object which point to InputMaster.dpmf
-        components: InlineSection object which point to InputMaster.mc
+        mc: InlineSection object which point to InputMaster.mc
     """
 
     def __init__(self, dpmf: InlineSection, mc: InlineSection):
         """
         :param dpmf: InlineSection: InlineSection object which point to
         InputMaster.dpmf
-        :param components: InlineSection: InlineSection object which point to
+        :param mc: InlineSection: InlineSection object which point to
         InputMaster.mc
         """
         super().__init__(OBJ_KIND_MX)

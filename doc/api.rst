@@ -1,19 +1,19 @@
 ====================
-Segway API Reference
+GMTK API Reference
 ====================
 
 Description
 ===========
 
-The Segway API provides a Python framework to design dynamic Bayesian models for custom 
+The GMTK API provides a Python framework to design dynamic Bayesian models for custom 
 tasks. Segway can perform training and inference using these user-defined models.
 
-The Segway API is installed with Segway automatically. 
+The GMTK API is installed with Segway automatically. 
 
 Workflow
 ========
 
-The Segway API describes the model using two files:
+The GMTK API describes the model using two files:
 
   1. A structure file describing the graphical network's nodes and 
   edges. This should be written using the GMTK structure language. The GMTK 
@@ -21,7 +21,7 @@ The Segway API describes the model using two files:
   `GMTK Documentation <https://github.com/melodi-lab/gmtk/blob/master/documentation.pdf>`_.
 
   2. A Python file describing the initial parameter settings and Segway 
-  commands for training and inference. The classes provided by the Segway API
+  commands for training and inference. The classes provided by the GMTK API
   for writing this file are described below. It should contain 3 sections:
 
     1. Code defining an :py:class:`InputMaster` object and setting its 
@@ -34,7 +34,8 @@ The Segway API describes the model using two files:
     trained model. More information on running Segway is available in 
     :ref:`python-interface`.
 
-A worked example applying the Segway API can be seen in the CNVway code.
+The CNVway code provides a worked example applying the GMTK API to defining,
+training, and running a new model.
 
 .. todo: other section? flip sentence order? link?
 
@@ -48,20 +49,21 @@ Central class storing all parameter information.
     .. py:attribute:: name_collection
         :type: InlineSection
     
-    Stores the names of hidden states (segmentation labels) in the model. 
+    Stores the names of distributions and their state names. 
     
-    Behaves as a dictionary where keys are the hidden variable names, which 
+    Behaves as a dictionary where keys are distribution names, which 
     can be referenced in the structure file, and each value should be set to 
-    a list of state names or a :py:class:`NameCollection` object initialized 
-    with state names. If a Python list is given, it is converted to a 
-    :py:class:`NameCollection` object using :py:meth:`NameCollection.__init__`.
+    a list of that distribution's state names or a :py:class:`NameCollection` 
+    object initialized with state names. If a Python list is given, it is 
+    converted to a :py:class:`NameCollection` object using 
+    :py:meth:`NameCollection.__init__`.
 
     .. py:attribute:: mean
         :type: InlineSection
 
-    Stores the means of emission distributions for each hidden state. 
+    Stores the mean parameters for named distributions. 
     
-    Behaves as a dictionary where keys are names for later reference and each
+    Behaves as a dictionary where keys are distribution names and each
     value should be set to the mean value or a :py:class:`Mean` object 
     initialized with the mean value. If a Python float or list of floats is 
     given, it is converted to a :py:class:`Mean` object using 
@@ -70,9 +72,9 @@ Central class storing all parameter information.
     .. py:attribute:: covar
         :type: InlineSection
 
-    Stores the covariance of emission distributions for each hidden state.
+    Stores the covariance parameters for named distributions.
     
-    Behaves as a dictionary where keys are names for later reference and each
+    Behaves as a dictionary where keys are distribution names and each
     value should be set to the covariance value or a :py:class:`Covar` object 
     initialized with the covariance value. If a Python float or list of floats is 
     given, it is converted to a :py:class:`Covar` object using 
@@ -81,29 +83,30 @@ Central class storing all parameter information.
     .. py:attribute:: dpmf
         :type: InlineSection
 
-    Stores the Dense Probability Mass Function (DPMF), which can later be used
+    Stores dense probability mass dunction (DPMF) objects, which can later be used
     to define Gaussian Mixture models. 
     
-    Behaves as a dictionary where keys are names for later reference and each 
-    value should be set to a :py:class:`DPMF` object. 
+    Behaves as a dictionary where keys are distribution names and each value 
+    should be set to a :py:class:`DPMF` object. 
 
     .. py:attribute:: mc
         :type: InlineMCSection
         :value: InlineMCSection(mean = self.mean, covar = self.covar)
 
     Stores Gaussians acting as mixture components (MC) for a Gaussian mixture
-    model on the emission distribution. 
+    model.
     
-    Behaves as a dictionary where keys are names for later reference and each 
-    value should be set to an :py:class:`MC` object.
+    Behaves as a dictionary where keys are distribution names and each value 
+    should be set to an :py:class:`MC` object.
 
     .. py:attribute:: mx
         :type: InlineMXSection
     
     Store Gaussian mixture (mx) distributions constructed from above-defined mixture 
-    components. 
+    components and dense probability mass functions.
     
-    Behaves as a dictionary where keys are hidden variable names (from 
+    Behaves as a dictionary where keys are distribution names, usually 
+    corresponding to hidden state names of an emission variable (from 
     :py:attr:`self.name_collection`) and each value is an :py:class:`MX` object.
 
     .. py:attribute:: dense_cpt
@@ -164,7 +167,7 @@ Class representing user-defined model parameters.
 
         Create a :py:class:`NameCollection` object containing the provided names.
 
-        :param names: List of names or names as multiple arguments.
+        :param names: List of names
         :type names: list[str]
 
 Usage example:
@@ -193,13 +196,6 @@ Usage example:
         :param args: The mean value which is interpreted by the Numpy ``array`` constructor. 
         :type args: array_like
 
-    .. py:method:: get_header_info(self)
-
-        Return a string describing the dimension and values.
-
-        :return: String description for input.master
-        :rtype: str
-
 Usage example:
 
 .. code-block:: python
@@ -223,13 +219,6 @@ Usage example:
 
         :param args: The covariance value which is interpreted by the Numpy ``array`` constructor. 
         :type args: array_like
-
-    .. py:method:: get_header_info(self)
-
-        Return a string describing the dimension and values.
-
-        :return: String description for input.master
-        :rtype: str
 
 Usage example:
 
@@ -262,13 +251,6 @@ Usage example:
         :type shape: int
         :returns: DPMF with given shape and uniform probabilities.
         :rtype: DPMF
-
-    .. py:method:: get_header_info(self)
-
-        Return a string describing the dimension and values.
-
-        :return: String description for input.master
-        :rtype: str
 
 Usage example:
 
@@ -373,20 +355,13 @@ Usage example:
         A class method for creating a :py:class:`DenseCPT` object with the provided 
         shape.
         If the table is 2 or 3 dimensional, the diagonal entries of the table 
-        are set to the ``self_transition`` parameter (default 0) and all other 
+        are set to the ``self_transition`` parameter (default 0.0) and all other 
         entries are set to be uniform. 
 
         :param shape: Shape of Dense CPT table
         :type shape: Array_like or multiple arguments
         :param self_transition: Value for diagonal entries in the table. Defaults to 0.0
         :type self: float
-
-    .. py:method:: get_header_info(self)
-
-        Return a string describing the number of parents and cardinality.
-
-        :return: Header describing object for input.master
-        :rtype: str
 
 Usage example:
 
@@ -434,13 +409,6 @@ Usage example:
         :param dt: Name of an existing decision tree 
         :type dt: str 
 
-    .. py:method:: get_header_info(self)
-
-        Return header information for this object, which is an empty string.
-
-        :return: Empty header string for input.master
-        :rtype: str
-
 
 Section Classes
 ===============
@@ -482,7 +450,7 @@ the user.
         The value of ``mean`` parameters in :py:class:`MC` objects should be 
         keys in this object. 
 
-    .. py:attribute:: cover
+    .. py:attribute:: covar
         :type: InlineSection
 
         An :py:class:`InlineSection` object storing :py:class:`Covar` objects. 
