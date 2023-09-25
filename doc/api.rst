@@ -286,8 +286,7 @@ Usage example:
 
         :param mean: Name of a Mean object for the distribution mean
         :type mean: str
-        :param covar: Name of a Covar object for the diagonal covariance 
-        vector of the distribution
+        :param covar: Name of a Covar object for the diagonal covariance vector of the distribution
         :type covar: str
 
 Usage example:
