@@ -34,8 +34,8 @@ The GMTK API describes the model using two files:
     trained model. More information on running Segway is available in 
     :ref:`python-interface`.
 
-The CNVway code provides a worked example applying the GMTK API to defining,
-training, and running a new model.
+The `CNVway code <https://github.com/hoffmangroup/cnvway>`_ provides a worked 
+example applying the GMTK API to defining, training, and running a new model.
 
 .. todo: other section? flip sentence order? link?
 
@@ -150,7 +150,7 @@ Usage example:
     # Set parameters
     ...
     # Save to output file
-    input_master.save(outfile)
+    input_master.save("input.master")
 
 
 Parameter Classes
@@ -232,9 +232,10 @@ Usage example:
 
 .. py:class:: DPMF
 
-    A Numpy ``ndarray`` representing a DPMF with a specialized string method 
-    for writing to the parameter file. As it is intended for use in Gaussian 
-    mixture models, it supports monovariate distributions only. 
+    A Numpy ``ndarray`` representing a dense probability mass function (DPMF) 
+    with a specialized string method for writing to the parameter file. As it 
+    is intended for use in Gaussian mixture models, it supports monovariate 
+    distributions only. 
 
     .. py:method:: __init__(self, *args)
 
@@ -264,8 +265,9 @@ Usage example:
 
 .. py:class:: DiagGaussianMC
 
-    A Gaussian distribution with diagonal covariance. Currently the only 
-    concrete MC subclass which can be used as a mixture component. 
+    A Gaussian distribution with a diagonal covariance matrix, for use as a 
+    mixture component (MC) in a Gaussian mixture model. Currently the only 
+    concrete MC subclass. 
 
     .. py:attribute:: mean
         :type: str
@@ -304,13 +306,14 @@ Usage example:
 
 .. py:class:: MX
 
-    A Gaussian mixture model built from Gaussian mixture components.
+    A Gaussian mixture (MX) model built from Gaussian mixture components.
 
     .. py:attribute:: dpmf
         :type: str
 
-        Name of a :py:class:`DPMF` object representing the contribution of 
-        each Gaussian mixture component to the mixture model.
+        Name of a dense probabiliy mass function :py:class:`DPMF` object 
+        representing the contribution of each Gaussian mixture component to 
+        the mixture model.
     
     .. py:attribute:: components
         :type: str or list[str]
@@ -339,8 +342,9 @@ Usage example:
 
 .. py:class:: DenseCPT
 
-    A Numpy ``ndarray`` representing a dense CPT with a specialized string method 
-    for writing to the parameter file. Supports up to 3 dimensional tables.
+    A Numpy ``ndarray`` representing a dense conditional probability table 
+    (CPT) with a specialized string method for writing to the parameter file. 
+    Supports up to 3 dimensional tables.
     
     .. py:method:: __init__(self, *args)
 
@@ -378,8 +382,9 @@ Usage example:
 
 .. py:class:: DeterministicCPT
 
-    A deterministic CPT described using an existing decision tree with a 
-    specialized string method for writing to the parameter file.
+    A deterministic conditional probability table (CPT) described using an 
+    existing decision tree with a specialized string method for writing to 
+    the parameter file.
 
     .. py:attribute:: cardinality_parents
         :type: tuple[int]
