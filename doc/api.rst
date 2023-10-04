@@ -83,7 +83,7 @@ Central class storing all parameter information.
     .. py:attribute:: dpmf
         :type: InlineSection
 
-    Stores dense probability mass dunction (DPMF) objects, which can later be used
+    Stores dense probability mass function (DPMF) objects, which can later be used
     to define Gaussian Mixture models. 
     
     Behaves as a dictionary where keys are distribution names and each value 
