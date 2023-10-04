@@ -63,9 +63,9 @@ from .bed import parse_bed4, read_native
 from .cluster import (is_running_locally, JobTemplateFactory, make_native_spec,
                       RestartableJob, RestartableJobDict, Session)
 from .include import IncludeSaver
-from .segway_input_master import InputMasterSaver
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
+from .segway_input_master import InputMasterSaver
 from .structure import StructureSaver
 from .task import MSG_SUCCESS
 from .version import __version__
