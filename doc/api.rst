@@ -414,12 +414,18 @@ Usage example:
         :type dt: str 
 
 
+Internal Classes
+================
+
+These classes are internal to the operation of the GMTK API, so the user
+should not need to define or interact with these. However, they are documented
+here for any developers interested in expanding or customizing the GMTK API.
+
 Section Classes
-===============
+---------------
 
 Classes to store multiple objects that form one section of the parameter file.
-These are used within the ``InputMaster`` object and need not be defined by 
-the user.
+These are used within the ``InputMaster`` object.
 
 .. py:class:: InlineSection
 
@@ -480,4 +486,51 @@ the user.
         An :py:class:`InlineSection` object storing :py:class:`DPMF` objects. 
         The value of ``dpmf`` parameters in :py:class:`MX` objects should be 
         keys in this object. 
+
+
+Abstract Parameter Classes
+--------------------------
+
+Abstract superclasses of the concrete Parameter classes described above. 
+
+.. py:class:: Array
+
+    An abstract class for array-like data, which inherits from Numpy's ``ndarray`` class.
+
+    The ``__new__`` method (called on creating a new member of the class) is overwritten.
+    It verifies the provided arguments have type ``int``, ``float``, or ``ndarray`` before 
+    creating a class object containing those arguments. It also accepts the optional
+    argument ``keep_shape``, which defaults to false. If 0-dimensional data (a single value)
+    is provided and ``keep_shape`` is true, the created object will have 0 dimensions. 
+    Otherwise, the created object will have 1 dimension and that value as the only item.
+
+.. py:class:: OneLineKind
+    
+    An abstract class which is the parent for Array-like GMTK parameter 
+    classes which have a one-line string representation, such as 
+    :py:class:`Mean`, :py:class:`Covar`, and :py:class:`DPMF`.
+
+    As a child of :py:class:`Array`, it behaves like a Numpy ``ndarray`` for data storage.
+    However, when written to the input master file, its header and contents are printed 
+    as a single line.
+
+.. py:class:: Section
+
+    A type-enforced dictionary with an additional string method for writing 
+    to the parameter file. 
+
+    .. py:attribute:: kind
+        :type: str or None
+        :value: None
+
+        A string denoting the type which can be values in this 
+        object. If not given, it is set by the first item. This should not be 
+        changed by user.
+
+    .. py:method:: __init__(self, kind)
+
+        Create a Section object with the specified kind.
+
+        :param kind: The kind for this section. All dictionary values in the section must have this string as their ``kind`` attribute.
+        :type kind: str or None
 
