@@ -866,6 +866,8 @@ seperating the two, in the form <task>-<step>. For example, to run
 **init** for the **train** step, a user would call
 segway train-init GENOMEDATA TRAINDIR
 
+.. _python-interface:
+
 Python interface
 ================
 I have designed Segway such that eventually one may call different

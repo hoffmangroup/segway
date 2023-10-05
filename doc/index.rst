@@ -46,6 +46,7 @@ For a preprint of a protocol on using Segway see:
 
    quick
    segway
+   api
    technical
    faq
    troubleshooting
