@@ -74,7 +74,7 @@ class DenseCPT(Array):
     """
     kind = OBJ_KIND_DENSECPT
 
-    # todo check if sums to 1.0
+    # XXX: check if sums to 1.0
 
     def __str__(self) -> str:
         """
@@ -169,7 +169,7 @@ class NameCollection(list):
 
     def __str__(self) -> str:
         """
-        Returns string format of NameCollection object to be printed into the
+        Return string format of NameCollection object to be printed into the
         input.master file (new lines to be added)
         """
         return "\n".join(list(self))
