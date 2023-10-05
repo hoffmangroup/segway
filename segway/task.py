@@ -19,10 +19,11 @@ from numpy import argmax, array, diff, empty, r_, where, zeros
 import optbuild
 from six.moves import map, range, zip
 
-from ._util import (ceildiv, DTYPE_IDENTIFY, EXT_FLOAT, EXT_INT, EXT_LIST,
-                    EXT_VIRTUAL_EVIDENCE, fill_array, find_segment_starts,
-                    POSTERIOR_PROG, POSTERIOR_SCALE_FACTOR, read_posterior,
-                    SEGWAY_ENCODING, TRAIN_PROG, VALIDATE_PROG,
+from ._util import (ceildiv, DTYPE_ANNOTATE, DTYPE_POSTERIOR, EXT_FLOAT,
+                    EXT_INT, EXT_LIST, EXT_VIRTUAL_EVIDENCE, fill_array,
+                    find_segment_starts, POSTERIOR_PROG,
+                    POSTERIOR_SCALE_FACTOR, read_posterior, SEGWAY_ENCODING,
+                    TRAIN_PROG, VALIDATE_PROG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER, VITERBI_PROG)
 from .observations import (_save_window, make_continuous_cells,
                            make_supervision_cells,
@@ -33,7 +34,7 @@ MSG_SUCCESS = "____ PROGRAM ENDED SUCCESSFULLY WITH STATUS 0 AT"
 SCORE_MIN = 100
 SCORE_MAX = 1000
 
-SEG_INVALID = -1
+SEG_INVALID = "-1"
 
 EXT_OPTIONS = {}
 EXT_OPTIONS[EXT_FLOAT] = "-of1"  # duplicative of run.py
@@ -286,7 +287,7 @@ def divide_posterior_array(posterior_code, num_frames, num_sublabels):
     provide the find_segment_starts() function with data in the same format
     as during the viterbi task.
     """
-    res = zeros((2, num_frames), DTYPE_IDENTIFY)
+    res = zeros((2, num_frames), DTYPE_POSTERIOR)
     for frame_index in range(num_frames):
         total_label = posterior_code[frame_index]
         label, sublabel = divmod(total_label, num_sublabels)
@@ -296,7 +297,7 @@ def divide_posterior_array(posterior_code, num_frames, num_sublabels):
 
 def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     """
-    returns: numpy.ndarray of size (num_frames,), type DTYPE_IDENTIFY
+    returns: numpy.ndarray of size (num_frames,), type DTYPE_ANNOTATE
     """
     lines = iter(lines)
 
@@ -324,12 +325,11 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
     # if output_label == "subseg" or "full", need to catch
     # subseg output
     if output_label != "seg":
-        re_seg = re.compile(r"^(seg|subseg)\((\d+)\)=(\d+)$")
+        re_seg = re.compile(r"^(seg|subseg)\((\d+)\)=(\w+)$")
     else:
-        re_seg = re.compile(r"^(seg)\((\d+)\)=(\d+)$")
-
+        re_seg = re.compile(r"^(seg)\((\d+)\)=(\w+)$")
     # sentinel value
-    res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_IDENTIFY)
+    res = fill_array(SEG_INVALID, (2, num_frames), DTYPE_ANNOTATE)
     for line in lines:
         # Ptn-0 P': seg(0)=24,seg(1)=24
         if line.startswith(MSG_SUCCESS):
@@ -347,6 +347,8 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
         values = line.rpartition(": ")[2]
 
         for pair in values.split(","):
+            # matches should be: "sub" or "subseg"; numeric variable index;
+            # and the string state label
             match = re_seg.match(pair)
             if not match:
                 continue
@@ -355,7 +357,7 @@ def parse_viterbi(lines, do_reverse=False, output_label="seg"):
             if do_reverse:
                 index = -1 - index  # -1, -2, -3, etc.
 
-            val = int(match.group(3))
+            val = match.group(3)
             seg_index = seg_dict[match.group(1)]
             res[seg_index][index] = val
 
@@ -420,10 +422,13 @@ def read_posterior_save_bed(coord, resolution, do_reverse,
 
     # Write posterior code file
     posterior_code = argmax(probs, axis=1)
+    print(posterior_code)
     if output_label != "seg":
         posterior_code = divide_posterior_array(posterior_code, num_frames,
                                                 num_sublabels)
+
     start_pos, labels = find_segment_starts(posterior_code, output_label)
+
     bed_filename = outfilename_tmpl % "_code"
     save_bed(bed_filename, start_pos, labels, coord, resolution,
              int(num_labels))

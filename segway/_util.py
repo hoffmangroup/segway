@@ -17,8 +17,7 @@ from string import Template
 import sys
 
 import colorbrewer
-from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
-                   zeros)
+from numpy import (append, array, empty, insert, intc, maximum, str_, zeros)
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
 from pkg_resources import resource_filename, resource_string
@@ -56,7 +55,8 @@ SUFFIX_TAB = extsep + EXT_TAB
 
 DELIMITER_BED = "\t"  # whitespace or tab is allowed
 
-DTYPE_IDENTIFY = intc
+DTYPE_ANNOTATE = "U64"  # typestring denoting 64 unicode characters
+DTYPE_POSTERIOR = intc
 DTYPE_OBS_INT = intc
 DTYPE_SEG_LEN = intc
 
@@ -198,7 +198,6 @@ def get_col_index(chromosome, trackname):
 
 def get_label_color(label):
     color = SCHEME[label % NUM_COLORS]
-
     return ",".join(map(str, color))
 
 
@@ -351,14 +350,13 @@ def iter_chroms_coords(filenames, coords):
 
 def extract_superlabel(label):
     """
-    label is either an integer or a string with a superlabel and
-    sublabel part, in which case only the superlabel part is
-    returned
+    label is either an integer superlabel, a string superlabel, or a string
+    with a superlabel and sublabel part separated by a period. In this last
+    case, only the superlabel part is returned. In all cases, return a string.
     """
-    if isinstance(label, str):
-        return label.partition(".")[0]
-    else:
-        return label
+    if (isinstance(label, str_) or isinstance(label, str)) and "." in label:
+        return label.split(".")[0]  # Return superlabel only
+    return str(label)  # Otherwise, label is superlabel
 
 
 def find_segment_starts(data, output_label):
@@ -374,19 +372,23 @@ def find_segment_starts(data, output_label):
     else:
         len_data = len(data)
 
-    # unpack tuple, ignore rest
-    seg_diffs = absolute(diff(data))
-
     # if output_label is set to "full" or "subseg"
     if output_label != "seg":
+        # Equivalent to diff(data) != 0, so True where labels change
+        # Applied to both rows (seg and subseg) separately
+        seg_diffs = (data[:, 1:] != data[:, :-1])
+        # pos_diffs records if either superlabel or sublabel change
         pos_diffs = maximum(seg_diffs[0], seg_diffs[1])
     else:
-        pos_diffs = seg_diffs
-    end_pos, = pos_diffs.nonzero()
+        # Equivalent to diff(data) != 0, so True where labels change
+        pos_diffs = (data[1:] != data[:-1])
+
+    end_pos, = pos_diffs.nonzero()  # Convert boolean array to indices
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
     if output_label == "full":
-        labels = array(["%d.%d" % segs for segs in zip(*data[:, start_pos])])
+        labels = array([f"{segs[0]}.{segs[1]}"
+                        for segs in zip(*data[:, start_pos])])
     elif output_label == "subseg":
         labels = data[1][start_pos]
     else:
