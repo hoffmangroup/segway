@@ -18,8 +18,8 @@ from six.moves import map, range
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
                     DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
-                    OFFSET_END, OFFSET_START, OFFSET_STEP,
-                    resource_substitute, Saver, SEGWAY_ENCODING,
+                    make_default_filename, OFFSET_END, OFFSET_START,
+                    OFFSET_STEP, resource_substitute, Saver, SEGWAY_ENCODING,
                     SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED,
                     SUPERVISION_UNSUPERVISED, USE_MFSDG,
@@ -183,7 +183,6 @@ f"""#include "{include_filename}"
 """
     input_master.preamble = segway_preamble
 
-
     # Decision Trees
     segCountDown_tree = make_segCountDown_tree(runner)
 
@@ -228,7 +227,7 @@ f"""4
 """
     input_master.dt["map_seg_subseg_obs"] = \
         DecisionTree(map_seg_subseg_obs_tree)
-    
+
     if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
         map_supervisionLabel_seg_alwaysTrue = \
 """2              % num parents
@@ -390,7 +389,7 @@ f"""4
                     dpmf_name = "dpmf_always"
                 else:
                     dpmf_name = f"dpmf_{seg_name}_{subseg_name}_{track_name}"
-                
+
                 mx_components = []
                 for component in range(runner.num_mix_components):
                     if runner.num_mix_components == 1:
@@ -521,7 +520,7 @@ def calc_prob_transition(resolution, length):
 
 
 def make_dense_cpt_seg_dinucleotide(runner):
-    dinucleotide_table = [make_dinucleotide_table_row(runner) 
+    dinucleotide_table = [make_dinucleotide_table_row(runner)
                           for _ in range(runner.num_segs)]
     return DenseCPT(dinucleotide_table)
 
