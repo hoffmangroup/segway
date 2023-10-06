@@ -49,7 +49,7 @@ from .bed import parse_bed4, read_native
 from .cluster import (is_running_locally, make_native_spec, JobTemplateFactory,
                       RestartableJob, RestartableJobDict, Session)
 from .include import IncludeSaver
-from .input_master import InputMasterSaver, INPUT_MASTER_NAME, save_input_master
+from .segway_input_master import InputMasterSaver, INPUT_MASTER_NAME, save_input_master
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
 from .structure import StructureSaver
