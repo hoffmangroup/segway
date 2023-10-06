@@ -18,9 +18,10 @@ from six.moves import map, range
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
                     DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
-                    make_default_filename, OFFSET_END, OFFSET_START,
-                    OFFSET_STEP, resource_substitute, Saver, SEGWAY_ENCODING,
-                    SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED,
+                    OFFSET_END, OFFSET_START, OFFSET_STEP,
+                    resource_substitute, Saver, SEGWAY_ENCODING,
+                    SUPERVISION_SEMISUPERVISED,
+                    SUPERVISION_SUPERVISED,
                     SUPERVISION_UNSUPERVISED, USE_MFSDG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
 from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
