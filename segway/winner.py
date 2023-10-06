@@ -1,12 +1,11 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function, with_statement
 
 """winner.py: pick winning paramters when training run is cut short
 """
 
 __version__ = "$Revision$"
 
-## Copyright 2011, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2011, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from operator import itemgetter
 from os import extsep
@@ -15,7 +14,7 @@ import sys
 
 from path import Path
 
-from ._util import (extjoin, EXT_MASTER, EXT_PARAMS, EXT_TAB, PREFIX_INPUT,
+from ._util import (EXT_MASTER, EXT_PARAMS, EXT_TAB, extjoin, PREFIX_INPUT,
                     PREFIX_LIKELIHOOD, PREFIX_PARAMS, SUBDIRNAME_LOG,
                     SUBDIRNAME_PARAMS)
 
@@ -24,6 +23,7 @@ PAT_LIKELIHOOD = extjoin(PREFIX_LIKELIHOOD, "*", EXT_TAB)
 
 def extjoin_escape(*args):
     return escape(extsep).join(args)
+
 
 re_likelihood = re_compile(extjoin_escape(escape(PREFIX_LIKELIHOOD), "(.*)",
                                           escape(EXT_TAB)))
@@ -130,6 +130,7 @@ def main(args=sys.argv[1:]):
 
     return winner(args[0], params=params, input_master=input_master,
                   copy=options.copy, clobber=options.clobber)
+
 
 if __name__ == "__main__":
     sys.exit(main())

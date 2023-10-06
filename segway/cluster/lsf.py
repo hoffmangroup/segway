@@ -1,9 +1,8 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division
-
 __version__ = "$Revision$"
 
-# Copyright 2009, 2011, 2012, 2014 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2009, 2011, 2012, 2014
+# Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from os import environ
 import sys
@@ -11,10 +10,11 @@ from tempfile import gettempdir
 
 from path import path
 
+from .common import (_JobTemplateFactory, BASH_CMD, CLEAN_SAFE_TIME,
+                     make_native_spec, NULL_FILENAME)
 from .._configparser import OneSectionRawConfigParser
 from .._util import ceildiv, data_filename
-from .common import (BASH_CMD, CLEAN_SAFE_TIME, _JobTemplateFactory,
-                     make_native_spec, NULL_FILENAME)
+
 
 # use SI (not binary) prefixes. I can't find any documentation for
 # this but Tim Cutts seems to assume this is how it works
@@ -48,6 +48,7 @@ PREEXEC_CMDLINE = "/bin/true"
 
 RES_CLEAN = "segway-clean.sh"
 TEMP_DIRNAME = gettempdir()
+
 
 class JobTemplateFactory(_JobTemplateFactory):
     # eliminate default overwrite behavior for DRMAA/LSF, go to append

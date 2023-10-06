@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division
 
 __version__ = "$Revision$"
 
@@ -8,13 +7,15 @@ __version__ = "$Revision$"
 from math import ceil
 import sys
 
-from .._util import MB
-from .common import (CLEAN_SAFE_TIME, _JobTemplateFactory,
+from .common import (_JobTemplateFactory, CLEAN_SAFE_TIME,
                      make_native_spec, NULL_FILENAME)
+from .._util import MB
+
 
 # pbs_drmaa requires that keep_completed be set on the server or queue
 # level in order to keep job information and allow its inspection
 # (such as for exit status)
+
 
 class JobTemplateFactory(_JobTemplateFactory):
     # override outputPath and errorPath
@@ -41,6 +42,7 @@ class JobTemplateFactory(_JobTemplateFactory):
         res = " ".join([self.native_spec, res_spec])
 
         return res
+
 
 def make_single_res_req(name, mem):
     # round up to the next mebibyte

@@ -1,15 +1,14 @@
-from __future__ import absolute_import
 from os import remove
 from os.path import isfile, sep
 from tempfile import gettempdir
 import unittest
 
 from numpy import allclose, array, empty
-
-from segway.observations import (merge_windows, VirtualEvidenceWarning,
-                                 get_downsampled_virtual_evidence_data_and_presence)
+from segway._util import EXT_FLOAT, EXT_INT, EXT_VIRTUAL_EVIDENCE
+from segway.observations import (
+    get_downsampled_virtual_evidence_data_and_presence,
+    merge_windows, VirtualEvidenceWarning)
 from segway.task import prepare_gmtk_observations, prepare_virtual_evidence
-from segway._util import EXT_INT, EXT_FLOAT, EXT_VIRTUAL_EVIDENCE
 
 
 class TestObservations(unittest.TestCase):
@@ -35,10 +34,12 @@ class TestObservations(unittest.TestCase):
 class TestTask(unittest.TestCase):
 
     def test_prepare_observations(self):
-        gmtk_args = ["baz", "-of1", "foo", "-of2", "bar", "-cppCommandOptions","-DVIRTUAL_EVIDENCE_LIST_FILENAME=VE_PLACEHOLDER"]
+        gmtk_args = ["baz", "-of1", "foo", "-of2", "bar", "-cppCommandOptions",
+                     "-DVIRTUAL_EVIDENCE_LIST_FILENAME=VE_PLACEHOLDER"]
 
         [float_obs_filename, int_obs_filename, virtual_evidence_filename,
-         float_obs_list_filename, int_obs_list_filename, virtual_evidence_list_filename] = \
+         float_obs_list_filename, int_obs_list_filename,
+         virtual_evidence_list_filename] = \
             prepare_gmtk_observations(gmtk_args, "chr1", 0, 8000, empty(0), 1,
                                       None)
 
@@ -55,12 +56,14 @@ class TestTask(unittest.TestCase):
 
         self.assertTrue(virtual_evidence_filename.startswith(
                             proper_obs_filename_prefix))
-        self.assertTrue(virtual_evidence_filename.endswith(EXT_VIRTUAL_EVIDENCE))
+        self.assertTrue(virtual_evidence_filename.endswith(
+            EXT_VIRTUAL_EVIDENCE))
 
         # Test filenames exist in the given environment's tempdir
         self.assertTrue(float_obs_list_filename.startswith(current_tmp_dir))
         self.assertTrue(int_obs_list_filename.startswith(current_tmp_dir))
-        self.assertTrue(virtual_evidence_list_filename.startswith(current_tmp_dir))
+        self.assertTrue(virtual_evidence_list_filename.startswith(
+            current_tmp_dir))
         self.assertTrue(float_obs_filename.startswith(current_tmp_dir))
         self.assertTrue(int_obs_filename.startswith(current_tmp_dir))
         self.assertTrue(virtual_evidence_filename.startswith(current_tmp_dir))
@@ -82,7 +85,8 @@ class TestTask(unittest.TestCase):
             self.assertTrue(line.startswith(proper_obs_filename_prefix))
             self.assertTrue(line.endswith(EXT_INT))
 
-        with open(virtual_evidence_list_filename) as virtual_evidence_list_file:
+        with open(virtual_evidence_list_filename) as \
+             virtual_evidence_list_file:
             line = virtual_evidence_list_file.readlines()[0].strip()
             self.assertTrue(line.startswith(proper_obs_filename_prefix))
             self.assertTrue(line.endswith(EXT_VIRTUAL_EVIDENCE))
@@ -92,7 +96,8 @@ class TestTask(unittest.TestCase):
         # -of2 option
         self.assertEqual(gmtk_args[4], int_obs_list_filename)
         # virtual evidence cpp directive
-        self.assertEqual(gmtk_args[6], "-DVIRTUAL_EVIDENCE_LIST_FILENAME=%s" % virtual_evidence_list_filename)
+        self.assertEqual(gmtk_args[6], "-DVIRTUAL_EVIDENCE_LIST_FILENAME=%s" %
+                         virtual_evidence_list_filename)
 
         remove(float_obs_list_filename)
         remove(int_obs_list_filename)
@@ -115,8 +120,9 @@ class TestVirtualEvidence(unittest.TestCase):
                           [0, 0, 0, 0]])
         self.assertTrue(allclose(raw, expected))
 
-        downsampled, presence = get_downsampled_virtual_evidence_data_and_presence(
-            raw, resolution=5, num_labels=4)
+        downsampled, presence = \
+            get_downsampled_virtual_evidence_data_and_presence(
+             raw, resolution=5, num_labels=4)
         self.assertTrue(allclose(downsampled, array([0.1, 0.3, 0.45, 0.15])))
         print(presence)
 
@@ -134,8 +140,8 @@ class TestVirtualEvidence(unittest.TestCase):
         virtual_evidence_priors = "[{1: 0.8}, {0: 0}]"
 
         expected = prepare_virtual_evidence(1, 0, 5, 3,
-                                           virtual_evidence_coords,
-                                           virtual_evidence_priors)
+                                            virtual_evidence_coords,
+                                            virtual_evidence_priors)
         self.assertTrue((expected[4] == array([0, 0.5, 0.5])).all())
 
     def test_negative_priors(self):

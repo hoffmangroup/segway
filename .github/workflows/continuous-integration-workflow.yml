@@ -12,18 +12,40 @@ on:
 jobs:
   build-and-test:
     runs-on: ubuntu-latest
-    # Run job for both python versions in the docker image
     container:
       image: hoffmanlab/segway-test:latest
       env:
         SEGWAY_TEST_PYTHON_VERSION: 3
 
     steps:
-      - uses: actions/checkout@v2
+
+      # Github actions runners do not have the same user permissions as jobs running in a container
+      # Git will ignore .git directories with different permissions:
+      # "fatal: detected dubious ownership in repository at '/github/workspace'"
+      # This is the current issue: https://github.com/actions/runner/issues/2033
+      # Can set 'options: --user 1001' on the container to match the UID of the Github runner, ref:
+      # https://github.com/actions/runner/blob/8415f13babf8199551f817eb16b718dcdd5b31e2/images/Dockerfile#L38
+      
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      # Fix ownership of the checkout dir
+      - name: Set ownership
+        run: |
+          chown -R $(id -u):$(id -g) $PWD
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+      - name: Install test dependencies
+        run: |
+          python3 -m pip install --upgrade pip setuptools build flake8 flake8-import-order flake8-quotes
       - name: Build repository
         run: |
-          python${SEGWAY_TEST_PYTHON_VERSION} -m pip install --verbose .
-          pip list
+          python3 -m build
+      - name: Install
+        run: |
+          python3 -m pip install .
       - name: Run tests
         run: |
           gmtkPrint -version
@@ -35,3 +57,8 @@ jobs:
           name: test-results
           path: |
             test/**/*-changes.tar.gz
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: segway-build
+          path: dist/*

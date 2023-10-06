@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function, with_statement
 
 """
 sge_setup: setup mem_requested on each node
@@ -27,7 +26,8 @@ USERNAME = "fakeuser"
 
 # XXX: this may be fragile
 OUTPUT_RECORD_SEPARATOR = \
-    "----------------------------------------------------------------------------\n"
+    "----------------------------------------------------------------------------\n"  # noqa: E501
+
 
 def add_complex_mem_requested():
     """add the mem_requested complex to GE configuration
@@ -41,8 +41,10 @@ def add_complex_mem_requested():
 
     tempfile.close()
 
-    # XXX: would be better if this were robust to mem_requested already existing
+    # XXX: would be better if this were robust to mem_requested already
+    # existing
     QCONF_PROG(Mc=tempfile.name)
+
 
 def get_mem_totals():
     stat_texts_text = QSTAT_PROG.getoutput(F="hostname,mem_total", u=USERNAME)
@@ -70,12 +72,14 @@ def get_mem_totals():
 
     return res
 
+
 def modify_complex_values_mem_requested():
     mem_totals = get_mem_totals()
 
     for hostname, mem_total in viewitems(mem_totals):
         QCONF_PROG("-mattr", "exechost", "complex_values",
                    "mem_requested=%s" % mem_total, hostname)
+
 
 def sge_setup():
     add_complex_mem_requested()
@@ -106,6 +110,7 @@ qhost -F mem_requested
 
 # XXX: a dry-run option would be good
 
+
 def parse_options(args):
     from optparse import OptionParser
 
@@ -120,10 +125,12 @@ def parse_options(args):
 
     return options, args
 
+
 def main(args=sys.argv[1:]):
     options, args = parse_options(args)
 
     return sge_setup(*args)
+
 
 if __name__ == "__main__":
     sys.exit(main())

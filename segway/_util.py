@@ -1,9 +1,9 @@
 #!/usr/bin/env python
-from __future__ import absolute_import, division, print_function, with_statement
 
 __version__ = "$Revision$"
 
-# Copyright 2008-2009, 2011-2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
+# Copyright 2008-2009, 2011-2013
+# Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from collections import defaultdict, namedtuple
 from contextlib import closing
@@ -17,8 +17,7 @@ from string import Template
 import sys
 
 import colorbrewer
-from numpy import (absolute, append, array, diff, empty, insert, intc, maximum,
-                    zeros)
+from numpy import (append, array, empty, insert, intc, maximum, str_, zeros)
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
 from pkg_resources import resource_filename, resource_string
@@ -54,9 +53,10 @@ SUFFIX_BED = extsep + EXT_BED
 SUFFIX_GZ = extsep + EXT_GZ
 SUFFIX_TAB = extsep + EXT_TAB
 
-DELIMITER_BED = '\t'  # whitespace or tab is allowed
+DELIMITER_BED = "\t"  # whitespace or tab is allowed
 
-DTYPE_IDENTIFY = intc
+DTYPE_ANNOTATE = "U64"  # typestring denoting 64 unicode characters
+DTYPE_POSTERIOR = intc
 DTYPE_OBS_INT = intc
 DTYPE_SEG_LEN = intc
 
@@ -75,7 +75,7 @@ PREFIX_VALIDATION_OUTPUT = "validation.output"
 
 VIRTUAL_EVIDENCE_LIST_FILENAME = "VIRTUAL_EVIDENCE_LIST_FILENAME"
 
-# cppCommandOption which will be replaced in GMTK commands 
+# cppCommandOption which will be replaced in GMTK commands
 # by the actual names of the temporary filelists once they are created
 VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER = "VE_PLACEHOLDER"
 
@@ -95,8 +95,11 @@ OFFSET_END = 1
 OFFSET_STEP = 2
 
 data_filename = partial(resource_filename, PKG_DATA)
+
+
 def data_string(resource):
     return resource_string(PKG_DATA, resource).decode(SEGWAY_ENCODING)
+
 
 NUM_COLORS = 8
 SCHEME = colorbrewer.Dark2[NUM_COLORS]
@@ -120,8 +123,9 @@ LABEL_INDEX = 3
 
 BED_SCORE = "1000"
 BED_STRAND = "."
-INDEX_BED_START = 1
-INDEX_BED_THICKSTART = INDEX_BED_START + 5
+INDEX_BED_CHROMSTART = 1
+INDEX_BED_NAME = 3
+INDEX_BED_THICKSTART = 6
 
 # use the GMTK MissingFeatureScaledDiagGaussian feature?
 USE_MFSDG = False
@@ -140,6 +144,7 @@ def extjoin(*args):
 def extjoin_not_none(*args):
     return extjoin(*[str(arg) for arg in args
                      if arg is not None])
+
 
 _Window = namedtuple("Window", ["world", "chrom", "start", "end"])
 
@@ -195,7 +200,6 @@ def get_col_index(chromosome, trackname):
 
 def get_label_color(label):
     color = SCHEME[label % NUM_COLORS]
-
     return ",".join(map(str, color))
 
 
@@ -245,6 +249,7 @@ def constant(val):
     constant values for defaultdict
     """
     return partial(next, repeat(val))
+
 
 array_factory = constant(array([]))
 
@@ -347,14 +352,13 @@ def iter_chroms_coords(filenames, coords):
 
 def extract_superlabel(label):
     """
-    label is either an integer or a string with a superlabel and
-    sublabel part, in which case only the superlabel part is
-    returned
+    label is either an integer superlabel, a string superlabel, or a string
+    with a superlabel and sublabel part separated by a period. In this last
+    case, only the superlabel part is returned. In all cases, return a string.
     """
-    if isinstance(label, str):
-        return label.split(".")[0]
-    else:
-        return label
+    if (isinstance(label, str_) or isinstance(label, str)) and "." in label:
+        return label.split(".")[0]  # Return superlabel only
+    return str(label)  # Otherwise, label is superlabel
 
 
 def find_segment_starts(data, output_label):
@@ -370,19 +374,23 @@ def find_segment_starts(data, output_label):
     else:
         len_data = len(data)
 
-    # unpack tuple, ignore rest
-    seg_diffs = absolute(diff(data))
-
     # if output_label is set to "full" or "subseg"
     if output_label != "seg":
+        # Equivalent to diff(data) != 0, so True where labels change
+        # Applied to both rows (seg and subseg) separately
+        seg_diffs = (data[:, 1:] != data[:, :-1])
+        # pos_diffs records if either superlabel or sublabel change
         pos_diffs = maximum(seg_diffs[0], seg_diffs[1])
     else:
-        pos_diffs = seg_diffs
-    end_pos, = pos_diffs.nonzero()
+        # Equivalent to diff(data) != 0, so True where labels change
+        pos_diffs = (data[1:] != data[:-1])
+
+    end_pos, = pos_diffs.nonzero()  # Convert boolean array to indices
     # add one to get the start positions, and add a 0 at the beginning
     start_pos = insert(end_pos + 1, 0, 0)
     if output_label == "full":
-        labels = array(["%d.%d" % segs for segs in zip(*data[:, start_pos])])
+        labels = array([f"{segs[0]}.{segs[1]}"
+                        for segs in zip(*data[:, start_pos])])
     elif output_label == "subseg":
         labels = data[1][start_pos]
     else:
@@ -398,7 +406,7 @@ def find_segment_starts(data, output_label):
 # XXX: Accepts float inputs without complaint. When float inputs are given,
 #      float output is returned. Is this desirable?
 def ceildiv(dividend, divisor):
-    "integer ceiling division"
+    """Integer ceiling division"""
 
     # int(bool) means 0 -> 0, 1+ -> 1
     return (dividend // divisor) + int(bool(dividend % divisor))
@@ -412,19 +420,21 @@ def parse_posterior(iterable, output_label):
     index: (int) frame index
     label: (int) segment label
     prob: (float) prob value
-    
+
     in the case that output_label is set to output sublabels as well,
     the label variable will be of the form (int, int) for the segment
     label and sublabel
     """
     if output_label != "seg":
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+),"
-                                         "subseg\((\d+)\)=(\d+)$")
+                                        r"subseg\((\d+)\)=(\d+)$")
     else:
         re_posterior_entry = re.compile(r"^\d+: (\S+) seg\((\d+)\)=(\d+)$")
+
     # ignores non-matching lines
     for line in iterable:
-        m_posterior_entry = re_posterior_entry.match(line.rstrip().decode(SEGWAY_ENCODING))
+        m_posterior_entry = \
+            re_posterior_entry.match(line.rstrip().decode(SEGWAY_ENCODING))
 
         if m_posterior_entry:
             group = m_posterior_entry.group
@@ -435,7 +445,7 @@ def parse_posterior(iterable, output_label):
                 yield (int(group(2)), int(group(3)), float(group(1)))
 
 
-def read_posterior(infile, num_frames, num_labels, 
+def read_posterior(infile, num_frames, num_labels,
                    num_sublabels, output_label):
     """
     returns an array (num_frames, num_labels)
@@ -449,7 +459,7 @@ def read_posterior(infile, num_frames, num_labels,
             seg_index = label * num_sublabels + sublabel
             if sublabel >= num_sublabels:
                 raise ValueError("saw sublabel %s but num_sublabels is only %s"
-                                % (sublabel, num_sublabels))
+                                 % (sublabel, num_sublabels))
         else:
             seg_index = label
         if label >= num_labels:
@@ -533,6 +543,7 @@ def make_prefix_fmt(num):
 
 def main(args=sys.argv[1:]):
     pass
+
 
 if __name__ == "__main__":
     sys.exit(main())
