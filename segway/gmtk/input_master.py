@@ -6,9 +6,7 @@ from numpy import array, asarray, empty, ndarray, squeeze
 
 
 INPUT_MASTER_PREAMBLE = \
-"""#define COMPONENT_TYPE_DIAG_GAUSSIAN 0
-
-"""
+    """#define COMPONENT_TYPE_DIAG_GAUSSIAN 0"""
 
 
 COMPONENT_TYPE_DIAG_GAUSSIAN = 0
@@ -46,17 +44,19 @@ NumericArrayLike = Union[float, int, ndarray]
 
 
 class Array(ndarray):
-    def __new__(cls, *args: NumericArrayLike, keep_shape: bool = False) -> Array:
+    def __new__(cls, *args: NumericArrayLike, keep_shape: bool = False) \
+            -> Array:
         """
         Create a new Array containing the provided value(s).
-        If passed a single value and keep_shape is False, insert a new first 
-        dimension of size 1. This is needed for creating vector arrays 
+        If passed a single value and keep_shape is False, insert a new first
+        dimension of size 1. This is needed for creating vector arrays
         (dimension 1) from a single scalar input value.
         """
         # Ensure all arguments belong to the correct type
         if not all(isinstance(arg, NumericArrayLike) for arg in args):
             # If union iterable, fix. Otherwise, hardwrite
-            raise TypeError(f"Argument has incompatible tupe. Expected {NumericArrayLike}")
+            raise TypeError("Argument has incompatible tupe."
+                            f"Expected {NumericArrayLike}")
 
         input_array = array(args)
 
@@ -67,7 +67,7 @@ class Array(ndarray):
         # If keep_shape is true, remove the new dimension
         if len(args) == 1 and keep_shape:
             res = squeeze(res, axis=0)
-        
+
         return res
 
 
@@ -87,7 +87,7 @@ class DenseCPT(Array):
 
     def get_header_info(self) -> str:
         """
-        Return number of parents, cardinality line, for header in 
+        Return number of parents, cardinality line, for header in
         input.master section.
         """
         line = [str(len(self.shape) - 1)]  # number of parents
@@ -99,12 +99,12 @@ class DenseCPT(Array):
     def uniform_from_shape(cls, *shape: int,
                            self_transition: float = 0.0) -> DenseCPT:
         """
-        Create a Dense CPT with the specified self_transition probability 
-        (diagonal entries) and a uniform probability for all other 
+        Create a Dense CPT with the specified self_transition probability
+        (diagonal entries) and a uniform probability for all other
         transitions (non-diagonal entries).
-        
+
         :param: shape: int: shape of DenseCPT
-        :param: self_transition: float: optional value for diagonal entry of 
+        :param: self_transition: float: optional value for diagonal entry of
         DenseCPT (default is 0.0)
         :return: DenseCPT with given shape and specified probabilities
         """
@@ -128,9 +128,9 @@ class DenseCPT(Array):
             # len(shape) = 3 => seg_subseg_subseg
             # => num_segs x (square matrix of num_subseg x num_subseg)
             if len(shape) == 3:
-                # In a 3 dimensional CPT, for each segment's square matrix, 
+                # In a 3 dimensional CPT, for each segment's square matrix,
                 # set the diagonal entries to self_transition.
-                # Begin by creating the list of indices for diagonal entries 
+                # Begin by creating the list of indices for diagonal entries
                 # in a segment's square matrix
                 diag_index = []
                 for subseg_index in range(shape[-1]):
@@ -145,12 +145,12 @@ class DenseCPT(Array):
                         index.extend(subseg_indices)
                         final_indices.append(tuple(index))
 
-                # Set all diagonal entries of each segment's square matrix 
+                # Set all diagonal entries of each segment's square matrix
                 # to self_transition
                 for index in final_indices:
                     values[index] = self_transition
 
-        return DenseCPT(values, keep_shape = True)
+        return DenseCPT(values, keep_shape=True)
 
 
 class NameCollection(list):
@@ -176,7 +176,6 @@ class NameCollection(list):
         input.master file (new lines to be added)
         """
         return "\n".join(list(self))
-    
 
     def get_header_info(self) -> str:
         """
@@ -187,17 +186,17 @@ class NameCollection(list):
 
 class OneLineKind(Array):
     """
-    An abstract Python class acting as the parent for Python classes 
-    representing Array-like GMTK kinds that have one-line string 
-    representations in input.master. 
-    It inherits the Array data structure for data storage and defines 
+    An abstract Python class acting as the parent for Python classes
+    representing Array-like GMTK kinds that have one-line string
+    representations in input.master.
+    It inherits the Array data structure for data storage and defines
     the __str__ method for writing this data as one line.
     """
 
     def get_header_info(self) -> str:
         """
-        Return string representation of own information, for header in 
-        input.master section..
+        Return string representation of own information, for header in
+        input.master section.
         """
         line = [str(len(self))]  # dimension
         line.append(array2text(self))  # array values
@@ -206,7 +205,7 @@ class OneLineKind(Array):
 
 class Mean(OneLineKind):
     """
-    A single Mean object. 
+    A single Mean object.
     __init__ and __str__ methods defined in superclass.
     """
     kind = OBJ_KIND_MEAN
@@ -218,7 +217,7 @@ class Covar(OneLineKind):
     __init__ and __str__ methods defined in superclass.
     """
     kind = OBJ_KIND_COVAR
-        
+
 
 # These types must be defined before they are referenced, so these constants
 # are defined here rather than the top of the file.
@@ -231,14 +230,17 @@ CONVERTIBLE_CLASSES = {
 }
 
 # Types which can be auto-converted by convert
-ConvertableGMTKObjectType = Union[tuple(cls for cls in CONVERTIBLE_CLASSES.values())]
+ConvertableGMTKObjectType = Union[tuple(cls for cls in
+                                        CONVERTIBLE_CLASSES.values())]
+
 
 def convert(
         cls: ConvertableGMTKObjectType,
-        value: Union[NumericArrayLike, ConvertableGMTKObjectType, List[str], str]
+        value: Union[NumericArrayLike, ConvertableGMTKObjectType, List[str],
+                     str]
 ) -> ConvertableGMTKObjectType:
     """
-    Convert a provided attribute of input_master which a non-GMTK object into 
+    Convert a provided attribute of input_master which a non-GMTK object into
     a GMTK object of the provided class.
     :param cls: GMTK class
     :param value: Value to convert to GMTK object
@@ -246,7 +248,7 @@ def convert(
     # If provided value matches the desired class, no conversion needed
     if isinstance(value, cls):
         return value  # type: ignore[return-value]
-    
+
     # Otherwise, create new object of with provided data
     return cls(value)
 
@@ -257,21 +259,21 @@ class DPMF(OneLineKind):
     """
     kind = OBJ_KIND_DPMF
 
-    # todo check if sums to 1.0
+    # XXX: check if sums to 1.0
 
     @classmethod
     def uniform_from_shape(cls, shape: int) -> DPMF:
         """
-        :param: shape: int: shape of DPMF, which must be 1-dimensional. 
+        :param: shape: int: shape of DPMF, which must be 1-dimensional.
         :return: DPMF with uniform probabilities and given shape
         """
         dpmf_values = empty(shape)
         value = 1.0 / shape
         dpmf_values.fill(value)
 
-        return DPMF(dpmf_values, keep_shape = True)
-    
-    
+        return DPMF(dpmf_values, keep_shape=True)
+
+
 class MC:
     """
     A single mixture component (MC) object.
@@ -283,7 +285,7 @@ class MC:
     def __init__(self, component_type: str):
         """
         Initialize a single MC object.
-        :param component_type: str: type of MC, such as COMPONENT_TYPE_DIAG_GAUSSIAN
+        :param component_type: str: type of MC
         """
         self.component_type = component_type
 
@@ -300,7 +302,7 @@ class DiagGaussianMC(MC, object):
         covar: str: name of Covar obejct associated to this MC
         suffix: str: suffix string to add after mean and covar
     """
-    def __init__(self, mean: str, covar: str, suffix: str=""):
+    def __init__(self, mean: str, covar: str, suffix: str = ""):
         """
         Initialize a single DiagGaussianMC object.
         :param mean: name of Mean object associated to this MC
@@ -354,7 +356,7 @@ class MX:
         line.append(self.dpmf)  # dpmf name
         line.append(" ".join(self.components))  # component names
         return " ".join(line)
-    
+
     def get_header_info(self) -> str:
         # No additional header information needed in input.master.
         return ""
@@ -378,7 +380,7 @@ class DeterministicCPT:
         :param cardinality_parents: tuple[str]: cardinality of parents
         (if empty, then number of parents = 0)
         :param cardinality: str: cardinality of self
-        :param dt: str: name existing Decision Tree (DT) associated with 
+        :param dt: str: name existing Decision Tree (DT) associated with
         this DeterministicCPT
         """
         if not isinstance(cardinality_parents, tuple):
@@ -392,7 +394,7 @@ class DeterministicCPT:
         """
         Return string representation of this DeterministicCPT.
         """
-        line = [str(len(self.cardinality_parents))] # number of parents
+        line = [str(len(self.cardinality_parents))]  # number of parents
         cardinalities = list(self.cardinality_parents)
         cardinalities.append(self.cardinality)
 
@@ -400,11 +402,11 @@ class DeterministicCPT:
         line.append(" ".join(map(str, cardinalities)))
         line.append(f"{self.dt}\n")
         return "\n".join(line)
-    
+
     def get_header_info(self) -> str:
         # No additional header information needed in input.master.
         return ""
-    
+
 
 class ArbitraryString:
     """
@@ -418,19 +420,18 @@ class ArbitraryString:
         Initialize an arbitrary string class.
         :param contents: arbitrary string to write to input.master
         """
-        self.contents = contents 
+        self.contents = contents
 
     def __str__(self) -> str:
         """
         Return the stored string.
         """
         return self.contents
-    
+
     def get_header_info(self) -> str:
         # No additional header information
         return ""
 
-    
 
 class DecisionTree(ArbitraryString):
     """
@@ -520,16 +521,16 @@ class InlineSection(Section):
 
         lines = self.get_header_lines()
         for index, (key, value) in enumerate(self.items()):
-            obj_header = [str(index), key] # Index and name of GMTK object
+            obj_header = [str(index), key]  # Index and name of GMTK object
 
             # Special header information for some GMTK types
             obj_header.append(value.get_header_info())
 
-            # Use rstrip to remove the trailing space for GMTK types with 
+            # Use rstrip to remove the trailing space for GMTK types with
             # no additional header information
-            lines.append(" ".join(obj_header).rstrip()) 
+            lines.append(" ".join(obj_header).rstrip())
 
-            # If not one line kind, write the object's remaining lines 
+            # If not one line kind, write the object's remaining lines
             if not isinstance(value, OneLineKind):
                 lines.append(str(value))
 
@@ -550,7 +551,7 @@ class InlineMCSection(InlineSection):
         :param covar: InlineSection: InlineSection object which point to
         InputMaster.covar
         """
-        super().__init__(OBJ_KIND_MC) 
+        super().__init__(OBJ_KIND_MC)
         self.mean = mean
         self.covar = covar
 
@@ -569,9 +570,9 @@ class InlineMCSection(InlineSection):
             covar_ndim = len(self.covar[obj.covar])
             if mean_ndim != covar_ndim:
                 raise ValueError("Inconsistent dimensions of mean and covar.")
-            
+
             obj_line = [str(index)]  # index of MC object
-            obj_line.append(str(mean_ndim)) # MC dimension
+            obj_line.append(str(mean_ndim))  # MC dimension
             obj_line.append(str(obj.component_type))
             obj_line.append(name)  # name of MC
 
@@ -617,7 +618,7 @@ class InlineMXSection(InlineSection):
                 raise ValueError(
                     "Dimension of DPMF must be equal to the "
                     "number of components associated with this MX object.")
-            
+
             obj_line = [str(index)]  # index of MX object
             obj_line.append(str(dpmf_ndim))  # dimension of MX
             obj_line.append(name)  # name of MX
@@ -646,7 +647,7 @@ class InputMaster:
         input master
     """
 
-    def __init__(self, preamble = INPUT_MASTER_PREAMBLE):
+    def __init__(self, preamble=INPUT_MASTER_PREAMBLE):
         """
         Initialize InputMaster instance with empty attributes (InlineSection
         and its subclasses).
@@ -668,9 +669,9 @@ class InputMaster:
         Return string representation of all the attributes (GMTK types) by
         calling the attributes' (InlineSection and its subclasses) `__str__()`.
         """
-        sections = [self.preamble, self.dt, self.deterministic_cpt, 
-                    self.name_collection, self.mean, self.covar, 
-                    self.dense_cpt, self.dpmf, self.mc, self.mx, 
+        sections = [self.preamble, self.dt, self.deterministic_cpt,
+                    self.name_collection, self.mean, self.covar,
+                    self.dense_cpt, self.dpmf, self.mc, self.mx,
                     self.virtual_evidence]
 
         return "\n".join([str(section) for section in sections])

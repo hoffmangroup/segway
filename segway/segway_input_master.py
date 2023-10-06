@@ -8,7 +8,6 @@ __version__ = "$Revision$"
 # Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from math import frexp, ldexp
-from itertools import product
 from string import Template
 import sys
 
@@ -19,14 +18,14 @@ from six.moves import map, range
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
                     DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
-                    OFFSET_END, OFFSET_START, OFFSET_STEP,
-                    resource_substitute, Saver, SEGWAY_ENCODING,
-                    SUPERVISION_SEMISUPERVISED,
-                    SUPERVISION_SUPERVISED, USE_MFSDG,
-                    VIRTUAL_EVIDENCE_LIST_FILENAME, make_default_filename)
-
-from .gmtk.input_master import (InputMaster, DiagGaussianMC, MX, DPMF, DeterministicCPT, 
-                   DenseCPT, DecisionTree, VirtualEvidence)
+                    make_default_filename, OFFSET_END, OFFSET_START,
+                    OFFSET_STEP, resource_substitute, Saver, SEGWAY_ENCODING,
+                    SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED,
+                    SUPERVISION_UNSUPERVISED, USE_MFSDG,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME)
+from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
+                                DiagGaussianMC, DPMF, InputMaster, MX,
+                                VirtualEvidence)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations
 # of scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -162,14 +161,14 @@ def jitter_cell(cell, random_state):
 jitter = vectorize(jitter_cell)
 
 
-def save_input_master(runner, input_master_filename, params_dirpath=None, 
+def save_input_master(runner, input_master_filename, params_dirpath=None,
                       clobber=False, instance_index=None):
     """
-    Save the input.master file using the GMTK API. 
+    Save the input.master file using the GMTK API.
     """
 
     input_master = InputMaster()
-    
+
     # Preamble
     include_filename = runner.gmtk_include_filename_relative
     card_seg = runner.num_segs
@@ -224,7 +223,7 @@ f"""4
 
     map_seg_subseg_obs_tree = \
 """2       % num parents
-        -1 { p0*CARD_SUBSEG + p1 } 
+        -1 { p0*CARD_SUBSEG + p1 }
 """
     input_master.dt["map_seg_subseg_obs"] = \
         DecisionTree(map_seg_subseg_obs_tree)
@@ -264,40 +263,45 @@ f"""4
 
     # Deterministic CPTs
     input_master.deterministic_cpt["seg_segCountDown"] = \
-        DeterministicCPT(("CARD_SEG", ), "CARD_SEGCOUNTDOWN", 
+        DeterministicCPT(("CARD_SEG", ), "CARD_SEGCOUNTDOWN",
                          "map_seg_segCountDown")
     input_master.deterministic_cpt["frameIndex_ruler"] = \
-        DeterministicCPT(("CARD_FRAMEINDEX", ), "CARD_RULER", 
+        DeterministicCPT(("CARD_FRAMEINDEX", ), "CARD_RULER",
                          "map_frameIndex_ruler")
     input_master.deterministic_cpt["segTransition_ruler_seg_segCountDown_segCountDown"] = \
-        DeterministicCPT(("CARD_SEGTRANSITION", "CARD_RULER", "CARD_SEG", 
-                          "CARD_SEGCOUNTDOWN"), "CARD_SEGCOUNTDOWN", 
+        DeterministicCPT(("CARD_SEGTRANSITION", "CARD_RULER", "CARD_SEG",
+                          "CARD_SEGCOUNTDOWN"), "CARD_SEGCOUNTDOWN",
                          "map_segTransition_ruler_seg_segCountDown_segCountDown")
     input_master.deterministic_cpt["seg_seg_copy"] = \
-        DeterministicCPT(("CARD_SEG", ), "CARD_SEG", 
+        DeterministicCPT(("CARD_SEG", ), "CARD_SEG",
                          "internal:copyParent")
     input_master.deterministic_cpt["subseg_subseg_copy"] = \
-        DeterministicCPT(("CARD_SUBSEG", ), "CARD_SUBSEG", 
+        DeterministicCPT(("CARD_SUBSEG", ), "CARD_SUBSEG",
                          "internal:copyParent")
     if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
         input_master.deterministic_cpt["supervisionLabel_seg_alwaysTrue"] = \
-        DeterministicCPT(("CARD_SUPERVISIONLABEL", "CARD_SEG"), "CARD_BOOLEAN", 
-                         "map_supervisionLabel_seg_alwaysTrue")
+            DeterministicCPT(("CARD_SUPERVISIONLABEL", "CARD_SEG"),
+                             "CARD_BOOLEAN",
+                             "map_supervisionLabel_seg_alwaysTrue")
     else:
-        assert (runner.supervision_type == SUPERVISION_SUPERVISED or 
+        assert (runner.supervision_type == SUPERVISION_SUPERVISED or
                 runner.supervision_type == SUPERVISION_UNSUPERVISED)
-
 
     # Dense CPTs
     num_segs = runner.num_segs
     num_subsegs = runner.num_subsegs
     input_master.dense_cpt["start_seg"] = DenseCPT.uniform_from_shape(num_segs)
-    input_master.dense_cpt["seg_subseg"] = DenseCPT.uniform_from_shape(num_segs, num_subsegs)
-    input_master.dense_cpt["seg_seg"] = DenseCPT.uniform_from_shape(num_segs, num_segs)
-    input_master.dense_cpt["seg_subseg_subseg"] = DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs)
-    input_master.dense_cpt["segCountDown_seg_segTransition"] = make_dense_cpt_segCountDown_seg_segTransition(runner)
+    input_master.dense_cpt["seg_subseg"] = \
+        DenseCPT.uniform_from_shape(num_segs, num_subsegs)
+    input_master.dense_cpt["seg_seg"] = \
+        DenseCPT.uniform_from_shape(num_segs, num_segs)
+    input_master.dense_cpt["seg_subseg_subseg"] = \
+        DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs)
+    input_master.dense_cpt["segCountDown_seg_segTransition"] = \
+        make_dense_cpt_segCountDown_seg_segTransition(runner)
     if runner.use_dinucleotide:
-        input_master.dense_cpt["seg_dinucleotide"] = make_dense_cpt_seg_dinucleotide()
+        input_master.dense_cpt["seg_dinucleotide"] = \
+            make_dense_cpt_seg_dinucleotide()
 
     distribution = runner.distribution
     # Normal distributions
@@ -317,33 +321,43 @@ f"""4
                             component_suffix = ""
                         else:
                             component_suffix = f"_component{component}"
-                        mean_name = f"mean_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
-                        
-                        input_master.mean[mean_name] = mean_data[seg_index, subseg_index, track_index]
+                        mean_name = f"mean_{seg_name}_{subseg_name}_"
+                        f"{track_name}{component_suffix}"
 
-                        # If COVAR_TIED, write one covar per track and component
+                        input_master.mean[mean_name] = \
+                            mean_data[seg_index, subseg_index, track_index]
+
+                        # If COVAR_TIED, write one covar per track and
+                        # component
                         if COVAR_TIED:
-                            covar_name = f"covar_{track_name}{component_suffix}"
+                            covar_name = f"covar_{track_name}"
+                            f"{component_suffix}"
                             if seg_index == 0 and subseg_index == 0:
-                                input_master.covar[covar_name] = covar_data[seg_index, subseg_index, track_index]
+                                input_master.covar[covar_name] = \
+                                    covar_data[seg_index, subseg_index,
+                                               track_index]
                         else:  # Otherwise, write for every seg and subseg
-                            covar_name = f"covar_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
-                            input_master.covar[covar_name] = covar_data[seg_index, subseg_index, track_index]
+                            covar_name = f"covar_{seg_name}_{subseg_name}_"
+                            f"{track_name}{component_suffix}"
+                            input_master.covar[covar_name] = \
+                                covar_data[seg_index, subseg_index,
+                                           track_index]
 
                         # Diag Gaussian MC with mean and covar name
-                        mc_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
+                        mc_name = f"mc_{distribution}_{seg_name}_"
+                        f"{subseg_name}_{track_name}{component_suffix}"
                         if USE_MFSDG:  # Add weights to end of Gaussian
                             suffix = "matrix_weightscale_1x1"
                         else:
                             suffix = ""
-                        input_master.mc[mc_name] = DiagGaussianMC(mean=mean_name, covar=covar_name, suffix=suffix)
-
+                        input_master.mc[mc_name] = \
+                            DiagGaussianMC(mean=mean_name, covar=covar_name,
+                                           suffix=suffix)
 
         # if USE_MFSDG:
         #     real_mat_spec = RealMatParamSpec(self)
         # else:
         #     real_mat_spec = ""
-
 
     # elif distribution == DISTRIBUTION_GAMMA:
     #     mean_spec = ""
@@ -382,11 +396,13 @@ f"""4
                         component_suffix = ""
                     else:
                         component_suffix = f"_component{component}"
-                    mx_components.append(f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}")
+                    mx_components.append(f"mc_{distribution}_{seg_name}_"
+                                         f"{subseg_name}_{track_name}"
+                                         f"{component_suffix}")
 
                 input_master.mx[mx_name] = MX(dpmf_name, mx_components)
-        input_master.name_collection[name_collection_name] = name_collection_items
-
+        input_master.name_collection[name_collection_name] = \
+            name_collection_items
 
     # DPMF
     if runner.num_mix_components == 1:
@@ -401,19 +417,24 @@ f"""4
 
                     dpmf_name = f"dpmf_{seg_name}_{subseg_name}_{track_name}"
                     # TODO: Does not include "DirichletConst 100"
-                    input_master.dpmf[dpmf_name] = DPMF.uniform_from_shape(runner.num_mix_components)
-
+                    input_master.dpmf[dpmf_name] = \
+                        DPMF.uniform_from_shape(runner.num_mix_components)
 
     # Virtual Evidence
-    # TODO: This is written on multiple lines, while the template is a single 
+    # TODO: This is written on multiple lines, while the template is a single
     # line. How to fix without changing gmtk api significantly?
     if runner.virtual_evidence:
-        virtual_evidence = f"1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} nfs:{num_segs} nis:0 fmt:ascii END"
-        input_master.virtual_evidence["seg_virtualEvidence"] = VirtualEvidence(virtual_evidence)
+        virtual_evidence = f"1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} "
+        f"nfs:{num_segs} nis:0 fmt:ascii END"
+        input_master.virtual_evidence["seg_virtualEvidence"] = \
+            VirtualEvidence(virtual_evidence)
 
     if not input_master_filename:
-        input_master_filename = make_default_filename(input_master_filename, params_dirpath, instance_index)
-    input_master.save(input_master_filename + '.test')
+        input_master_filename = \
+            make_default_filename(input_master_filename, params_dirpath,
+                                  instance_index)
+
+    input_master.save(input_master_filename + ".test")
 
 
 def make_segCountDown_tree(runner):
@@ -421,8 +442,8 @@ def make_segCountDown_tree(runner):
     seg_countdowns_initial = runner.seg_countdowns_initial
 
     header = ([str(num_segs)] +
-                [str(num_seg) for num_seg in range(num_segs - 1)] +
-                ["default"])
+              [str(num_seg) for num_seg in range(num_segs - 1)] +
+              ["default"])
 
     lines = [" ".join(header)]
 
@@ -433,58 +454,58 @@ def make_segCountDown_tree(runner):
 
 
 def make_dense_cpt_segCountDown_seg_segTransition(runner):  # noqa
-        # first values are the ones where segCountDown = 0 therefore
-        # the transitions to segTransition = 2 occur early on
-        card_seg_countdown = runner.card_seg_countdown
+    # first values are the ones where segCountDown = 0 therefore
+    # the transitions to segTransition = 2 occur early on
+    card_seg_countdown = runner.card_seg_countdown
 
-        # by default, when segCountDown is high, never transition
-        res = empty((card_seg_countdown, runner.num_segs, CARD_SEGTRANSITION))
+    # by default, when segCountDown is high, never transition
+    res = empty((card_seg_countdown, runner.num_segs, CARD_SEGTRANSITION))
 
-        prob_seg_self_self, prob_seg_self_other = \
-            calc_prob_transition(runner.resolution, LEN_SEG_EXPECTED)
+    prob_seg_self_self, prob_seg_self_other = \
+        calc_prob_transition(runner.resolution, LEN_SEG_EXPECTED)
 
-        prob_subseg_self_self, prob_subseg_self_other = \
-            calc_prob_transition(runner.resolution, LEN_SUBSEG_EXPECTED)
+    prob_subseg_self_self, prob_subseg_self_other = \
+        calc_prob_transition(runner.resolution, LEN_SUBSEG_EXPECTED)
 
-        # 0: no transition
-        # 1: subseg transition (no transition when CARD_SUBSEG == 1)
-        # 2: seg transition
-        probs_allow_transition = \
-            array([prob_seg_self_self * prob_subseg_self_self,
-                   prob_seg_self_self * prob_subseg_self_other,
-                   prob_seg_self_other])
+    # 0: no transition
+    # 1: subseg transition (no transition when CARD_SUBSEG == 1)
+    # 2: seg transition
+    probs_allow_transition = \
+        array([prob_seg_self_self * prob_subseg_self_self,
+               prob_seg_self_self * prob_subseg_self_other,
+               prob_seg_self_other])
 
-        probs_prevent_transition = array([prob_subseg_self_self,
-                                          prob_subseg_self_other,
-                                          0.0])
+    probs_prevent_transition = array([prob_subseg_self_self,
+                                      prob_subseg_self_other,
+                                      0.0])
 
-        # find the labels with maximum segment lengths and those without
-        table = runner.seg_table
-        ends = table[:, OFFSET_END]
-        bitmap_without_maximum = ends == 0
+    # find the labels with maximum segment lengths and those without
+    table = runner.seg_table
+    ends = table[:, OFFSET_END]
+    bitmap_without_maximum = ends == 0
 
-        # where() returns a tuple; this unpacks it
-        labels_with_maximum, = where(~bitmap_without_maximum)
-        labels_without_maximum, = where(bitmap_without_maximum)
+    # where() returns a tuple; this unpacks it
+    labels_with_maximum, = where(~bitmap_without_maximum)
+    labels_without_maximum, = where(bitmap_without_maximum)
 
-        # labels without a maximum
-        res[0, labels_without_maximum] = probs_allow_transition
-        res[1:, labels_without_maximum] = probs_prevent_transition
+    # labels without a maximum
+    res[0, labels_without_maximum] = probs_allow_transition
+    res[1:, labels_without_maximum] = probs_prevent_transition
 
-        # labels with a maximum
-        seg_countdowns_initial = runner.seg_countdowns_initial
+    # labels with a maximum
+    seg_countdowns_initial = runner.seg_countdowns_initial
 
-        res[0, labels_with_maximum] = array([0.0, 0.0, 1.0])
-        for label in labels_with_maximum:
-            seg_countdown_initial = seg_countdowns_initial[label]
-            minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
+    res[0, labels_with_maximum] = array([0.0, 0.0, 1.0])
+    for label in labels_with_maximum:
+        seg_countdown_initial = seg_countdowns_initial[label]
+        minimum = table[label, OFFSET_START] // table[label, OFFSET_STEP]
 
-            seg_countdown_allow = seg_countdown_initial - minimum + 1
+        seg_countdown_allow = seg_countdown_initial - minimum + 1
 
-            res[1:seg_countdown_allow, label] = probs_allow_transition
-            res[seg_countdown_allow:, label] = probs_prevent_transition
+        res[1:seg_countdown_allow, label] = probs_allow_transition
+        res[seg_countdown_allow:, label] = probs_prevent_transition
 
-        return DenseCPT(res)
+    return DenseCPT(res)
 
 
 def calc_prob_transition(resolution, length):
@@ -534,7 +555,7 @@ def make_mean_data(runner):
 
     jitter_std_bound = 0.2
     noise = runner.random_state.uniform(-jitter_std_bound,
-            jitter_std_bound, stds_tiled.shape)
+                                        jitter_std_bound, stds_tiled.shape)
 
     return means_tiled + (stds_tiled * noise)
 
@@ -1284,9 +1305,9 @@ class InputMasterSaver(Saver):
             mc_spec = NormMCParamSpec(self)
 
             # if COVAR_TIED:
-                # num_free_params += (fullnum_subsegs + 1) * num_track_groups
+            #     num_free_params += (fullnum_subsegs + 1) * num_track_groups
             # else:
-                # num_free_params += (fullnum_subsegs * 2) * num_track_groups
+            #     num_free_params += (fullnum_subsegs * 2) * num_track_groups
         elif distribution == DISTRIBUTION_GAMMA:
             mean_spec = ""
             covar_spec = ""

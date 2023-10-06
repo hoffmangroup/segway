@@ -63,35 +63,12 @@ from .bed import parse_bed4, read_native
 from .cluster import (is_running_locally, JobTemplateFactory, make_native_spec,
                       RestartableJob, RestartableJobDict, Session)
 from .include import IncludeSaver
-from .segway_input_master import InputMasterSaver, INPUT_MASTER_NAME, save_input_master
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
-from .segway_input_master import InputMasterSaver
+from .segway_input_master import (INPUT_MASTER_NAME, InputMasterSaver,
+                                  save_input_master)
 from .structure import StructureSaver
 from .task import MSG_SUCCESS
-from ._util import (ceildiv, data_filename, DTYPE_OBS_INT, DISTRIBUTION_NORM,
-                    DISTRIBUTION_GAMMA, DISTRIBUTION_ASINH_NORMAL,
-                    DELIMITER_BED,
-                    EXT_BED, EXT_TRACK, EXT_FLOAT, EXT_GZ, EXT_INT, 
-                    EXT_PARAMS, EXT_TAB, extjoin, extjoin_not_none, GB,
-                    ISLAND_BASE_NA, ISLAND_LST_NA, load_coords,
-                    make_default_filename, make_filelistpath,
-                    make_prefix_fmt, MB, memoized_property,
-                    OFFSET_START, OFFSET_END, OFFSET_STEP,
-                    OptionBuilder_GMTK, POSTERIOR_PROG,
-                    PREFIX_LIKELIHOOD, PREFIX_PARAMS,
-                    PREFIX_VALIDATION_OUTPUT,
-                    PREFIX_VALIDATION_SUM,
-                    PREFIX_VALIDATION_OUTPUT_WINNER,
-                    PREFIX_VALIDATION_SUM_WINNER,
-                    SEG_TABLE_WIDTH,
-                    SUBDIRNAME_LOG, SUBDIRNAME_PARAMS, SUBDIRNAME_INTERMEDIATE,
-                    SUPERVISION_LABEL_OFFSET,
-                    SUPERVISION_UNSUPERVISED,
-                    SUPERVISION_SEMISUPERVISED, USE_MFSDG,
-                    VALIDATE_PROG, VITERBI_PROG,
-                    VIRTUAL_EVIDENCE_LIST_FILENAME,
-                    VIRTUAL_EVIDENCE_LIST_FILENAME_PLACEHOLDER)
 from .version import __version__
 
 # GMTK runtime requirements
@@ -2069,7 +2046,8 @@ class Runner(object):
         _, input_master_filename_is_new = \
             InputMasterSaver(self)(input_master_filename, self.params_dirpath,
                                    self.clobber, instance_index)
-        save_input_master(self, input_master_filename, self.params_dirpath, self.clobber, instance_index)
+        save_input_master(self, input_master_filename, self.params_dirpath,
+                          self.clobber, instance_index)
 
     def load_supervision(self):
         # The semi-supervised mode changes the DBN structure so there is an
@@ -3254,7 +3232,8 @@ class Runner(object):
         input_master_filename, input_master_filename_is_new = \
             InputMasterSaver(self)(self.input_master_filename,
                                    self.params_dirpath, self.clobber)
-        save_input_master(self, input_master_filename, self.params_dirpath, self.clobber)
+        save_input_master(self, input_master_filename, self.params_dirpath,
+                          self.clobber)
 
         self.input_master_filename = input_master_filename
 
