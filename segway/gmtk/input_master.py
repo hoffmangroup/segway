@@ -20,6 +20,7 @@ OBJ_KIND_MC = "MC"
 OBJ_KIND_MX = "MX"
 OBJ_KIND_DT = "DT"
 OBJ_KIND_VE_CPT = "VE_CPT"
+OBJ_KIND_ARBITRARY_STRING = "ARBITRARY_STRING"
 
 
 # "kind" refers to a kind of GMTK object. GMTK often calls these classes
@@ -414,6 +415,7 @@ class ArbitraryString:
     Attributes:
         contents: str: Arbitrary string to write to input.master
     """
+    kind = OBJ_KIND_ARBITRARY_STRING
 
     def __init__(self, contents: str):
         """
@@ -445,20 +447,6 @@ class DecisionTree(ArbitraryString):
         :param tree: String representation of the tree
         """
         super().__init__(tree)
-
-
-class VirtualEvidence(ArbitraryString):
-    """
-    A Virtual Evidence object.
-    """
-    kind = OBJ_KIND_VE_CPT
-
-    def __init__(self, ve: str):
-        """
-        Initialize a VirtualEvidence object.
-        :param ve: String representation of the virtual evidence
-        """
-        super().__init__(ve)
 
 
 class Section(dict):
@@ -518,7 +506,20 @@ class InlineSection(Section):
         # if this section stores no GMTK objects
         if len(self) == 0:
             return ""
+        
+        # if stored items are arbitrary strings, return them out without
+        # any additional formatting. Otherwise, apply formatting
+        if self.kind == OBJ_KIND_ARBITRARY_STRING:
+            lines = self.get_unformatted_lines()
+        else:
+            lines = self.get_formatted_lines()
 
+        return "\n".join(lines + [""])
+    
+    def get_formatted_lines(self) -> str:
+        """
+        Format the GMTK objects with a section header and object headers 
+        """
         lines = self.get_header_lines()
         for index, (key, value) in enumerate(self.items()):
             obj_header = [str(index), key]  # Index and name of GMTK object
@@ -533,8 +534,16 @@ class InlineSection(Section):
             # If not one line kind, write the object's remaining lines
             if not isinstance(value, OneLineKind):
                 lines.append(str(value))
-
-        return "\n".join(lines + [""])
+        
+        return lines
+    
+    def get_unformatted_lines(self) -> str:
+        """
+        Extract the string representation of all GMTK objects, with no
+        headers or additional formatting. Intended for representing
+        Arbitrary String objects.
+        """
+        return [str(value) for value in self.values()]
 
 
 class InlineMCSection(InlineSection):
@@ -662,7 +671,7 @@ class InputMaster:
         self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
         self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
         self.dt = InlineSection(OBJ_KIND_DT)
-        self.virtual_evidence = InlineSection(OBJ_KIND_VE_CPT)
+        self.hardcoded = InlineSection(OBJ_KIND_ARBITRARY_STRING)
 
     def __str__(self) -> str:
         """
@@ -672,7 +681,7 @@ class InputMaster:
         sections = [self.preamble, self.dt, self.deterministic_cpt,
                     self.name_collection, self.mean, self.covar,
                     self.dense_cpt, self.dpmf, self.mc, self.mx,
-                    self.virtual_evidence]
+                    self.virtual_evidence, self.hardcoded]
 
         return "\n".join([str(section) for section in sections])
 

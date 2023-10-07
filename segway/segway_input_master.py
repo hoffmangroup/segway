@@ -24,9 +24,9 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
                     SUPERVISION_SUPERVISED,
                     SUPERVISION_UNSUPERVISED, USE_MFSDG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
-from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
-                                DiagGaussianMC, DPMF, InputMaster, MX,
-                                VirtualEvidence)
+from .gmtk.input_master import (ArbitraryString, DecisionTree, DenseCPT,
+                                DeterministicCPT, DiagGaussianMC, DPMF,
+                                InputMaster, MX)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations
 # of scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -421,13 +421,17 @@ f"""4
                         DPMF.uniform_from_shape(runner.num_mix_components)
 
     # Virtual Evidence
-    # TODO: This is written on multiple lines, while the template is a single
-    # line. How to fix without changing gmtk api significantly?
+    # TODO: This is a hardcoded string rather than a custom type as the one
+    # line type supports only array-like data
     if runner.virtual_evidence:
-        virtual_evidence = f"1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} "
-        f"nfs:{num_segs} nis:0 fmt:ascii END"
-        input_master.virtual_evidence["seg_virtualEvidence"] = \
-            VirtualEvidence(virtual_evidence)
+        virtual_evidence = \
+f"""VE_CPT_IN_FILE inline
+1
+
+0 seg_virtualEvidence 1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} nfs:{num_segs} nis:0 fmt:ascii END
+"""
+        input_master.hardcoded["virtualEvidence"] = \
+            ArbitraryString(virtual_evidence)
 
     if not input_master_filename:
         input_master_filename = \
