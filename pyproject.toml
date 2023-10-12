@@ -30,7 +30,7 @@ description = "Segway is a tool for easy pattern discovery and identification in
 dynamic = ["version"]
 name = "segway"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 
 [project.license]
 text = "GPL-2.0-only"
