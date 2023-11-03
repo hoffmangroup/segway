@@ -17,7 +17,7 @@ dependencies = [
   "autolog>=0.2.0",
   "colorbrewer>=0.2.0",
   "drmaa>=0.4a3",
-  "genomedata>=1.7",
+  "genomedata>=1.7.2",
   "numpy",
   "optbuild>=0.2.0",
   "optplus>=0.2.0",
