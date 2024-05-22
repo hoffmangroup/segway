@@ -327,8 +327,7 @@ f"""4
                             component_suffix = ""
                         else:
                             component_suffix = f"_component{component}"
-                        mean_name = f"mean_{seg_name}_{subseg_name}_"
-                        f"{track_name}{component_suffix}"
+                        mean_name = f"mean_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
 
                         input_master.mean[mean_name] = \
                             mean_data[seg_index, subseg_index, track_index]
@@ -336,22 +335,19 @@ f"""4
                         # If COVAR_TIED, write one covar per track and
                         # component
                         if COVAR_TIED:
-                            covar_name = f"covar_{track_name}"
-                            f"{component_suffix}"
+                            covar_name = f"covar_{track_name}{component_suffix}"
                             if seg_index == 0 and subseg_index == 0:
                                 input_master.covar[covar_name] = \
                                     covar_data[seg_index, subseg_index,
                                                track_index]
                         else:  # Otherwise, write for every seg and subseg
-                            covar_name = f"covar_{seg_name}_{subseg_name}_"
-                            f"{track_name}{component_suffix}"
+                            covar_name = f"covar_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
                             input_master.covar[covar_name] = \
                                 covar_data[seg_index, subseg_index,
                                            track_index]
 
                         # Diag Gaussian MC with mean and covar name
-                        mc_name = f"mc_{distribution}_{seg_name}_"
-                        f"{subseg_name}_{track_name}{component_suffix}"
+                        mc_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
                         if USE_MFSDG:  # Add weights to end of Gaussian
                             input_master.mc[mc_name] = \
                                 MissingFeatureDiagGaussianMC(mean=mean_name,
@@ -423,9 +419,8 @@ f"""4
                         component_suffix = ""
                     else:
                         component_suffix = f"_component{component}"
-                    mx_components.append(f"mc_{distribution}_{seg_name}_"
-                                         f"{subseg_name}_{track_name}"
-                                         f"{component_suffix}")
+                    mx_component_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
+                    mx_components.append(mx_component_name)
 
                 input_master.mx[mx_name] = MX(dpmf_name, mx_components)
         input_master.name_collection[name_collection_name] = \

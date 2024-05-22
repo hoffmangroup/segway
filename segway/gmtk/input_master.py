@@ -783,11 +783,11 @@ class InputMaster:
         Return string representation of all the attributes (GMTK types) by
         calling the attributes' (InlineSection and its subclasses) `__str__()`.
         """
-        sections = [self.preamble, self.dt, self.deterministic_cpt,
-                    self.name_collection, self.mean, self.covar,
-                    self.dense_cpt, self.dpmf, self.mc, self.mx,
-                    self.hardcoded, self.gamma_scale,
-                    self.gamma_shape, self.dirichlet, self.real_mat]
+        sections = [self.preamble, self.dt, self.name_collection, self.mean, 
+                    self.deterministic_cpt, self.covar, self.dense_cpt, 
+                    self.dpmf, self.mc, self.mx, self.hardcoded, 
+                    self.gamma_scale, self.gamma_shape, self.dirichlet, 
+                    self.real_mat]
 
         return "\n".join([str(section) for section in sections])
 
