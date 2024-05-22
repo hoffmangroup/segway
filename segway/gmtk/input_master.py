@@ -772,7 +772,7 @@ class InputMaster:
         self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
         self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
         self.dt = InlineSection(OBJ_KIND_DT)
-        self.hardcoded = InlineSection(OBJ_KIND_ARBITRARYSTRING)
+        self.virtual_evidence = InlineSection(OBJ_KIND_ARBITRARYSTRING)
         self.gamma_scale = InlineSection(OBJ_KIND_RM)
         self.gamma_shape = InlineSection(OBJ_KIND_RM)
         self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
@@ -783,11 +783,10 @@ class InputMaster:
         Return string representation of all the attributes (GMTK types) by
         calling the attributes' (InlineSection and its subclasses) `__str__()`.
         """
-        sections = [self.preamble, self.dt, self.name_collection, self.mean, 
-                    self.deterministic_cpt, self.covar, self.dense_cpt, 
-                    self.dpmf, self.mc, self.mx, self.hardcoded, 
-                    self.gamma_scale, self.gamma_shape, self.dirichlet, 
-                    self.real_mat]
+        sections = [self.preamble, self.dt, self.name_collection,
+                    self.dirichlet, self.deterministic_cpt, self.virtual_evidence,
+                    self.dense_cpt, self.mean, self.covar, self.dpmf, self.mc,
+                    self.mx, self.gamma_scale, self.gamma_shape, self.real_mat]
 
         return "\n".join([str(section) for section in sections])
 

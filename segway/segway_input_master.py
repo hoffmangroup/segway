@@ -452,7 +452,7 @@ f"""VE_CPT_IN_FILE inline
 
 0 seg_virtualEvidence 1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} nfs:{num_segs} nis:0 fmt:ascii END
 """
-        input_master.hardcoded["virtualEvidence"] = \
+        input_master.virtual_evidence["virtualEvidence"] = \
             ArbitraryString(virtual_evidence)
 
     if not input_master_filename:
