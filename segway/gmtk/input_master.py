@@ -86,7 +86,7 @@ class MultiDimArray(Array):
         """
         return f"{array2text(self)}\n"
 
-    def get_header_info(self, dirichlet_name = None) -> str:
+    def get_header_info(self) -> str:
         """
         Return number of parents, cardinality line, for header in
         input.master section.
@@ -105,15 +105,21 @@ class DenseCPT(MultiDimArray):
 
     # todo check if sums to 1.0
 
+    def set_dirichlet_table(self, dirichlet_name) -> str:
+        """
+        Set the name of a Dirichlet table which this CPT will reference.
+        """
+        self.dirichlet_name = dirichlet_name
+
     def get_header_info(self, dirichlet_name = None) -> str:
         """
         Return multidimensional array header with dimensions.
-        If the dirichlet_name parameter is provided, include an additional line
+        If the dirichlet_name attribute was set, include an additional line
         in the header referencing the DirichletTable with that name.
         """
         line = MultiDimArray.get_header_info(self)
-        if dirichlet_name is not None:
-            dirichlet_line = f"DirichletTable dirichlet_{dirichlet_name}"
+        if hasattr(self, "dirichlet_name"):
+            dirichlet_line = f"DirichletTable dirichlet_{self.dirichlet_name}"
             line = "\n".join((line, dirichlet_line))
         return line
 
