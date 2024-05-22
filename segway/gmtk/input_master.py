@@ -19,8 +19,10 @@ OBJ_KIND_DETERMINISTICCPT = "DETERMINISTIC_CPT"
 OBJ_KIND_MC = "MC"
 OBJ_KIND_MX = "MX"
 OBJ_KIND_DT = "DT"
-OBJ_KIND_VE_CPT = "VE_CPT"
-OBJ_KIND_ARBITRARY_STRING = "ARBITRARY_STRING"
+OBJ_KIND_VECPT = "VE_CPT"
+OBJ_KIND_ARBITRARYSTRING = "ARBITRARY_STRING"
+OBJ_KIND_RM = "REAL_MAT"
+OBJ_KIND_DIRICHLETTAB = "DIRICHLET_TAB"
 
 
 # "kind" refers to a kind of GMTK object. GMTK often calls these classes
@@ -56,7 +58,7 @@ class Array(ndarray):
         # Ensure all arguments belong to the correct type
         if not all(isinstance(arg, NumericArrayLike) for arg in args):
             # If union iterable, fix. Otherwise, hardwrite
-            raise TypeError("Argument has incompatible tupe."
+            raise TypeError("Argument has incompatible type."
                             f"Expected {NumericArrayLike}")
 
         input_array = array(args)
@@ -72,21 +74,19 @@ class Array(ndarray):
         return res
 
 
-class DenseCPT(Array):
+class MultiDimArray(Array):
     """
-    A single DenseCPT object.
+    Abstract class providing features for multidimensional arrays which are
+    represented on multiple lines.
     """
-    kind = OBJ_KIND_DENSECPT
-
-    # todo check if sums to 1.0
-
+    
     def __str__(self) -> str:
         """
         Return string representation of this DenseCPT object.
         """
         return f"{array2text(self)}\n"
 
-    def get_header_info(self) -> str:
+    def get_header_info(self, dirichlet_name = None) -> str:
         """
         Return number of parents, cardinality line, for header in
         input.master section.
@@ -95,6 +95,27 @@ class DenseCPT(Array):
         cardinality_line = map(str, self.shape)
         line.append(" ".join(cardinality_line))  # cardinalities
         return " ".join(line)
+
+
+class DenseCPT(MultiDimArray):
+    """
+    A single DenseCPT object.
+    """
+    kind = OBJ_KIND_DENSECPT
+
+    # todo check if sums to 1.0
+
+    def get_header_info(self, dirichlet_name = None) -> str:
+        """
+        Return multidimensional array header with dimensions.
+        If the dirichlet_name parameter is provided, include an additional line
+        in the header referencing the DirichletTable with that name.
+        """
+        line = MultiDimArray.get_header_info(self)
+        if dirichlet_name is not None:
+            dirichlet_line = f"DirichletTable dirichlet_{dirichlet_name}"
+            line = "\n".join((line, dirichlet_line))
+        return line
 
     @classmethod
     def uniform_from_shape(cls, *shape: int,
@@ -154,6 +175,13 @@ class DenseCPT(Array):
         return DenseCPT(values, keep_shape=True)
 
 
+class DirichletTable(MultiDimArray):
+    """
+    A single DirichletTable object.
+    """
+    kind = OBJ_KIND_DIRICHLETTAB
+
+
 class NameCollection(list):
     """
     A single NameCollection object.
@@ -165,7 +193,7 @@ class NameCollection(list):
         Initialize a single NameCollection object.
         :param names: List[str]: names in this NameCollection
         """
-        # Ensure all list items are strings
+        # Ensure all arguments are strings or lists of strings
         if not all(isinstance(name, str) for name in names):
             raise TypeError("All arguments must be str instances.")
 
@@ -218,6 +246,24 @@ class Covar(OneLineKind):
     __init__ and __str__ methods defined in superclass.
     """
     kind = OBJ_KIND_COVAR
+
+
+class RealMat(OneLineKind):
+    """
+    An entry in a Real matrix object. Also used for Gamma real matrices.
+    __init__ and __str__ methods defined in superclass.
+    """
+    kind = OBJ_KIND_RM
+
+    def get_header_info(self) -> str:
+        """
+        Return string representation of own information, for header in
+        input.master section.
+        """
+        # TODO: Should the second 1 be hardcoded? Or is this 2D data?
+        line = [str(len(self)), "1"]  # dimension, additional value
+        line.append(array2text(self))  # array values
+        return " ".join(line)
 
 
 # These types must be defined before they are referenced, so these constants
@@ -298,29 +344,78 @@ class MC:
 class DiagGaussianMC(MC, object):
     """
     Attributes:
-        component_type = 0
+        component_type = "COMPONENT_TYPE_DIAG_GAUSSIAN" = 0
         mean: str: name of Mean object associated to this MC
         covar: str: name of Covar obejct associated to this MC
-        suffix: str: suffix string to add after mean and covar
     """
-    def __init__(self, mean: str, covar: str, suffix: str = ""):
+    def __init__(self, mean: str, covar: str):
         """
         Initialize a single DiagGaussianMC object.
         :param mean: name of Mean object associated to this MC
         :param covar: name of Covar obejct associated to this MC
-        :param suffix: suffix string to add after mean and covar
         """
         # more component types?
         super().__init__("COMPONENT_TYPE_DIAG_GAUSSIAN")
         self.mean = mean
         self.covar = covar
-        self.suffix = suffix
 
     def __str__(self) -> str:
         """
         Return string representation of this MC object.
         """
-        return " ".join([self.mean, self.covar, self.suffix])
+        return " ".join([self.mean, self.covar])
+    
+
+class MissingFeatureDiagGaussianMC(MC, object):
+    """
+    Attributes:
+        component_type = "COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN"
+        mean: str: name of Mean object associated to this MC
+        covar: str: name of Covar obejct associated to this MC
+    """
+    def __init__(self, mean: str, covar: str):
+        """
+        Initialize a single MissingFeatureDiagGaussianMC object.
+        :param mean: name of Mean object associated to this MC
+        :param covar: name of Covar obejct associated to this MC
+        """
+        # more component types?
+        super().__init__("COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN")
+        self.mean = mean
+        self.covar = covar
+
+    def __str__(self) -> str:
+        """
+        Return string representation of this MC object.
+        """
+        return " ".join([self.mean, self.covar, "matrix_weightscale_1x1"])
+
+
+class GammaMC(MC, object):
+    """
+    Attributes:
+        component_type = COMPONENT_TYPE_GAMMA
+        min_track: str: value less than a minimum in the track
+        scale: str: name of RealMat object for scale associated to this MC
+        shape: str: name of RealMat object for shape associated to this MC
+    """
+    def __init__(self, min_track, scale, shape):
+        """
+        Initialie a single GammaMC object.
+        :param min_track: value less than a minimum in the trac
+        :param scale: name of RealMat object for scale associated to this MC
+        :param scale: name of RealMat object for shape associated to this MC
+        """
+        super().__init__("COMPONENT_TYPE_GAMMA")
+        self.min_track = min_track
+        self.scale = scale
+        self.shape = shape
+
+    def __str__(self) -> str:
+        """
+        Return string representation of this MC object.
+        """
+        return " ".join([self.min_track, self.scale, self.shape])
 
 
 class MX:
@@ -415,7 +510,7 @@ class ArbitraryString:
     Attributes:
         contents: str: Arbitrary string to write to input.master
     """
-    kind = OBJ_KIND_ARBITRARY_STRING
+    kind = OBJ_KIND_ARBITRARYSTRING
 
     def __init__(self, contents: str):
         """
@@ -509,7 +604,7 @@ class InlineSection(Section):
         
         # if stored items are arbitrary strings, return them out without
         # any additional formatting. Otherwise, apply formatting
-        if self.kind == OBJ_KIND_ARBITRARY_STRING:
+        if self.kind == OBJ_KIND_ARBITRARYSTRING:
             lines = self.get_unformatted_lines()
         else:
             lines = self.get_formatted_lines()
@@ -671,7 +766,11 @@ class InputMaster:
         self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
         self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
         self.dt = InlineSection(OBJ_KIND_DT)
-        self.hardcoded = InlineSection(OBJ_KIND_ARBITRARY_STRING)
+        self.hardcoded = InlineSection(OBJ_KIND_ARBITRARYSTRING)
+        self.gamma_scale = InlineSection(OBJ_KIND_RM)
+        self.gamma_shape = InlineSection(OBJ_KIND_RM)
+        self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
+        self.real_mat = InlineSection(OBJ_KIND_RM)
 
     def __str__(self) -> str:
         """
@@ -681,7 +780,8 @@ class InputMaster:
         sections = [self.preamble, self.dt, self.deterministic_cpt,
                     self.name_collection, self.mean, self.covar,
                     self.dense_cpt, self.dpmf, self.mc, self.mx,
-                    self.virtual_evidence, self.hardcoded]
+                    self.hardcoded, self.gamma_scale,
+                    self.gamma_shape, self.dirichlet, self.real_mat]
 
         return "\n".join([str(section) for section in sections])
 

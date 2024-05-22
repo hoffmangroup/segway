@@ -25,8 +25,9 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
                     SUPERVISION_UNSUPERVISED, USE_MFSDG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
 from .gmtk.input_master import (ArbitraryString, DecisionTree, DenseCPT,
-                                DeterministicCPT, DiagGaussianMC, DPMF,
-                                InputMaster, MX)
+                                DeterministicCPT, DiagGaussianMC, 
+                                DirichletTable, DPMF, GammaMC, InputMaster,
+                                MissingFeatureDiagGaussianMC, MX, RealMat)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations
 # of scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -255,11 +256,16 @@ f"""4
         input_master.dt["map_supervisionLabel_seg_alwaysTrue"] = \
             DecisionTree(map_supervisionLabel_seg_alwaysTrue)
 
-    # TODO: Dirichlet Table param spec
-    # if self.len_seg_strength > 0:
-    #         dirichlet_spec = DirichletTabParamSpec(self)
-    #     else:
-    #         dirichlet_spec = ""
+    if runner.len_seg_strength > 0:
+        # Make Dirichlet table data
+        probs = make_dense_cpt_segCountDown_seg_segTransition(runner)
+        total_pseudocounts = runner.len_seg_strength * runner.num_bases
+        divisor = runner.card_seg_countdown * runner.num_segs
+        pseudocounts_per_row = total_pseudocounts / divisor
+        pseudocounts = (probs * pseudocounts_per_row).astype(int)
+
+        input_master.dirichlet["dirichlet_segCountDown_seg_segTransition"] = \
+            DirichletTable(pseudocounts)
 
     # Deterministic CPTs
     input_master.deterministic_cpt["seg_segCountDown"] = \
@@ -298,10 +304,10 @@ f"""4
     input_master.dense_cpt["seg_subseg_subseg"] = \
         DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs)
     input_master.dense_cpt["segCountDown_seg_segTransition"] = \
-        make_dense_cpt_segCountDown_seg_segTransition(runner)
+        make_dense_cpt_segCountDown_seg_segTransition_cpt(runner)
     if runner.use_dinucleotide:
         input_master.dense_cpt["seg_dinucleotide"] = \
-            make_dense_cpt_seg_dinucleotide()
+            make_dense_cpt_seg_dinucleotide_cpt()
 
     distribution = runner.distribution
     # Normal distributions
@@ -347,30 +353,51 @@ f"""4
                         mc_name = f"mc_{distribution}_{seg_name}_"
                         f"{subseg_name}_{track_name}{component_suffix}"
                         if USE_MFSDG:  # Add weights to end of Gaussian
-                            suffix = "matrix_weightscale_1x1"
+                            input_master.mc[mc_name] = \
+                                MissingFeatureDiagGaussianMC(mean=mean_name,
+                                                             covar=covar_name)
                         else:
-                            suffix = ""
-                        input_master.mc[mc_name] = \
-                            DiagGaussianMC(mean=mean_name, covar=covar_name,
-                                           suffix=suffix)
+                            input_master.mc[mc_name] = \
+                                DiagGaussianMC(mean=mean_name, covar=covar_name)
 
-        # if USE_MFSDG:
-        #     real_mat_spec = RealMatParamSpec(self)
-        # else:
-        #     real_mat_spec = ""
+        if USE_MFSDG:
+            input_master.real_mat["matrix_weightscale_1x1"] = RealMat(1.0)
 
-    # elif distribution == DISTRIBUTION_GAMMA:
-    #     mean_spec = ""
-    #     covar_spec = ""
+    elif distribution == DISTRIBUTION_GAMMA:
 
         # XXX: another option is to calculate an ML estimate for
         # the gamma distribution rather than the ML estimate for the
         # mean and converting
-    #     real_mat_spec = GammaRealMatParamSpec(self)
-    #     mc_spec = GammaMCParamSpec(self)
 
-    # else:
-    #     raise ValueError("distribution %s not supported" % distribution)
+        # TODO: Should GammaRealMat be a different class for clarification?
+        # Should there be further subclasses for shape and scale?
+        scales = make_scales_data(runner)
+        shapes = make_shapes_data(runner)
+        for seg_index in range(num_segs):
+            seg_name = f"seg{seg_index}"
+            for subseg_index in range(num_subsegs):
+                subseg_name = f"subseg{subseg_index}"
+                for track_index, track_group in enumerate(runner.track_groups):
+                    track_name = track_group[0].name
+
+                    # Make GammaRealMat scale
+                    scale = jitter(scales[track_index], runner.random_state)
+                    rm_scale_name = f"gammascale_{seg_name}_{subseg_name}_{track_name}"
+                    input_master.gamma_scale[rm_scale_name] = RealMat(scale)
+
+                    # Make GammaRealMat shape
+                    shape = jitter(shapes[track_index], runner.random_state)
+                    rm_shape_name = f"gammashape_{seg_name}_{subseg_name}_{track_name}"
+                    input_master.gamma_shape[rm_shape_name] = RealMat(shape)
+
+                    # Make GammaMCParam
+                    min_track = get_track_lt_min(runner, track_index)
+                    gamma_mc_name = f"mc_gamma_{seg_name}_{subseg_name}_{track_name}"
+                    input_master.mc[gamma_mc_name] = \
+                        GammaMC(min_track, rm_scale_name, rm_shape_name)
+
+    else:
+        raise ValueError("distribution %s not supported" % distribution)
 
     # Mixtures and Name Collection
     for track_index, track_group in enumerate(runner.track_groups):
@@ -509,7 +536,18 @@ def make_dense_cpt_segCountDown_seg_segTransition(runner):  # noqa
         res[1:seg_countdown_allow, label] = probs_allow_transition
         res[seg_countdown_allow:, label] = probs_prevent_transition
 
-    return DenseCPT(res)
+    return res
+
+
+def make_dense_cpt_segCountDown_seg_segTransition_cpt(runner):
+    probs = make_dense_cpt_segCountDown_seg_segTransition(runner)
+
+    if runner.len_seg_strength > 0:
+        dirichlet_name = "segCountDown_seg_segTransition"
+    else:
+        dirichlet_name = None
+
+    return DenseCPT(probs, dirichlet_name)
 
 
 def calc_prob_transition(resolution, length):
@@ -523,7 +561,7 @@ def calc_prob_transition(resolution, length):
     return prob_self_self, prob_self_other
 
 
-def make_dense_cpt_seg_dinucleotide(runner):
+def make_dense_cpt_seg_dinucleotide_cpt(runner):
     dinucleotide_table = [make_dinucleotide_table_row(runner)
                           for _ in range(runner.num_segs)]
     return DenseCPT(dinucleotide_table)
@@ -566,6 +604,29 @@ def make_mean_data(runner):
 
 def make_covar_data(runner):
     return vstack_tile(runner.vars, runner.num_segs, runner.num_subsegs)
+
+
+def make_scales_data(runner):
+    return runner.vars / runner.means
+
+
+def make_shapes_data(runner):
+    return (runner.means ** 2) / runner.vars
+
+
+def get_track_lt_min(runner, track_index):
+    """
+    return a value less than the minimum in a track
+    """
+    # TODO: Still refactor? (copied comment from original)
+    min_track = runner.mins[track_index]
+
+    # fudge by a small amount
+    # TODO: Does this still need to be restored after GMTK issues are fixed? 
+    # (copied comment) from original
+    min_track_f32 = float32(min_track)
+    assert (min_track_f32 - float32(ABSOLUTE_FUDGE) != min_track_f32)
+    return min_track_f32 - ABSOLUTE_FUDGE
 
 
 class ParamSpec(object):
