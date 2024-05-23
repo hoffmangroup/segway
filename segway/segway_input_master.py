@@ -488,7 +488,7 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
             make_default_filename(input_master_filename, params_dirpath,
                                   instance_index)
 
-    input_master.save(input_master_filename + ".test")
+    input_master.save(input_master_filename)
 
 
 def make_segCountDown_tree(runner):
