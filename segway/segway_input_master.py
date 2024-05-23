@@ -565,7 +565,7 @@ def make_dense_cpt_segCountDown_seg_segTransition(runner):  # noqa
 
 def make_dense_cpt_segCountDown_seg_segTransition_cpt(runner):
     probs = make_dense_cpt_segCountDown_seg_segTransition(runner)
-    res = DenseCPT(probs)
+    res = DenseCPT(probs, keep_shape=True)
 
     if runner.len_seg_strength > 0:
        res.set_dirichlet_table("segCountDown_seg_segTransition")
