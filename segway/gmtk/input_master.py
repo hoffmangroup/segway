@@ -788,9 +788,11 @@ class InputMaster:
         calling the attributes' (InlineSection and its subclasses) `__str__()`.
         """
         sections = [self.preamble, self.dt, self.name_collection,
-                    self.dirichlet, self.deterministic_cpt, self.virtual_evidence,
+                    self.dirichlet, self.deterministic_cpt,
+                    self.virtual_evidence, self.if_input_params, 
                     self.dense_cpt, self.mean, self.covar, self.dpmf, self.mc,
-                    self.mx, self.gamma_scale, self.gamma_shape, self.real_mat]
+                    self.mx, self.else_input_params, self.gamma_scale,
+                    self.gamma_shape, self.real_mat]
 
         return "\n".join([str(section) for section in sections])
 
