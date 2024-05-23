@@ -1418,6 +1418,3 @@ class InputMasterSaver(Saver):
         ve_spec = VirtualEvidenceSpec(self)
 
         return locals()  # dict of vars set in this function
-    
-    def __call__(self, filename, *args, **kwargs):
-        super().__call__(self, filename + ".fromtmpl", *args, **kwargs)
