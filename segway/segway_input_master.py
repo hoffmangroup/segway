@@ -559,6 +559,7 @@ def make_dense_cpt_segCountDown_seg_segTransition(runner):  # noqa
         res[1:seg_countdown_allow, label] = probs_allow_transition
         res[seg_countdown_allow:, label] = probs_prevent_transition
 
+    res = res.squeeze() # Remove leading dimension of size 1
     return res
 
 
