@@ -763,19 +763,23 @@ class InputMaster:
         and its subclasses).
         """
         self.preamble = preamble
+        self.dt = InlineSection(OBJ_KIND_DT)
+        self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
+        self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
+        self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
+        self.virtual_evidence = InlineSection(OBJ_KIND_ARBITRARYSTRING)
+        self.if_input_params = InlineSection(OBJ_KIND_ARBITRARYSTRING)
+        self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
         self.mean = InlineSection(OBJ_KIND_MEAN)
         self.covar = InlineSection(OBJ_KIND_COVAR)
         self.dpmf = InlineSection(OBJ_KIND_DPMF)
-        self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
-        self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
         self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
         self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
-        self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
-        self.dt = InlineSection(OBJ_KIND_DT)
-        self.virtual_evidence = InlineSection(OBJ_KIND_ARBITRARYSTRING)
+        self.else_input_params = InlineSection(OBJ_KIND_ARBITRARYSTRING)
+        # TODO: This prints these as separate sections. Will that create
+        # problems compared to including them in a single section?
         self.gamma_scale = InlineSection(OBJ_KIND_RM)
         self.gamma_shape = InlineSection(OBJ_KIND_RM)
-        self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
         self.real_mat = InlineSection(OBJ_KIND_RM)
 
     def __str__(self) -> str:

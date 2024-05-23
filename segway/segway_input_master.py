@@ -169,6 +169,7 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     Save the input.master file using the GMTK API.
     """
 
+    # Initialize InputMaster option
     input_master = InputMaster()
 
     # Preamble
@@ -184,7 +185,7 @@ f"""#include "{include_filename}"
 """
     input_master.preamble = segway_preamble
 
-    # Decision Trees
+    # Decision Trees (DT_IN_FILE)
     segCountDown_tree = make_segCountDown_tree(runner)
 
     map_frameIndex_ruler_tree = \
@@ -256,6 +257,7 @@ f"""4
         input_master.dt["map_supervisionLabel_seg_alwaysTrue"] = \
             DecisionTree(map_supervisionLabel_seg_alwaysTrue)
 
+    # Dirichlet Table
     if runner.len_seg_strength > 0:
         # Make Dirichlet table data
         probs = make_dense_cpt_segCountDown_seg_segTransition(runner)
@@ -310,6 +312,7 @@ f"""4
             make_dense_cpt_seg_dinucleotide_cpt()
 
     distribution = runner.distribution
+
     # Normal distributions
     if distribution in DISTRIBUTIONS_LIKE_NORM:
         # Mean and Covar
@@ -327,13 +330,14 @@ f"""4
                             component_suffix = ""
                         else:
                             component_suffix = f"_component{component}"
-                        mean_name = f"mean_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
 
+                        # Mean (MEAN_IN_FILE)
+                        mean_name = f"mean_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
                         input_master.mean[mean_name] = \
                             mean_data[seg_index, subseg_index, track_index]
 
-                        # If COVAR_TIED, write one covar per track and
-                        # component
+                        # Covar (COVAR_IN_FILE)
+                        # If COVAR_TIED, write one covar per track and component
                         if COVAR_TIED:
                             covar_name = f"covar_{track_name}{component_suffix}"
                             if seg_index == 0 and subseg_index == 0:
@@ -346,7 +350,7 @@ f"""4
                                 covar_data[seg_index, subseg_index,
                                            track_index]
 
-                        # Diag Gaussian MC with mean and covar name
+                        # Diag Gaussian MC with mean and covar name (MC_IN_FILE)
                         mc_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
                         if USE_MFSDG:  # Add weights to end of Gaussian
                             input_master.mc[mc_name] = \
@@ -356,6 +360,7 @@ f"""4
                             input_master.mc[mc_name] = \
                                 DiagGaussianMC(mean=mean_name, covar=covar_name)
 
+        # RealMat
         if USE_MFSDG:
             input_master.real_mat["matrix_weightscale_1x1"] = RealMat(1.0)
 
@@ -376,17 +381,17 @@ f"""4
                 for track_index, track_group in enumerate(runner.track_groups):
                     track_name = track_group[0].name
 
-                    # Make GammaRealMat scale
+                    # Make GammaRealMat scale (in RealMat)
                     scale = jitter(scales[track_index], runner.random_state)
                     rm_scale_name = f"gammascale_{seg_name}_{subseg_name}_{track_name}"
                     input_master.gamma_scale[rm_scale_name] = RealMat(scale)
 
-                    # Make GammaRealMat shape
+                    # Make GammaRealMat shape (In RealMat)
                     shape = jitter(shapes[track_index], runner.random_state)
                     rm_shape_name = f"gammashape_{seg_name}_{subseg_name}_{track_name}"
                     input_master.gamma_shape[rm_shape_name] = RealMat(shape)
 
-                    # Make GammaMCParam
+                    # Make GammaMCParam (MC_IN_FILE)
                     min_track = get_track_lt_min(runner, track_index)
                     gamma_mc_name = f"mc_gamma_{seg_name}_{subseg_name}_{track_name}"
                     input_master.mc[gamma_mc_name] = \
@@ -405,8 +410,7 @@ f"""4
             for subseg_index in range(num_subsegs):
                 subseg_name = f"subseg{subseg_index}"
 
-                mx_name = f"mx_{seg_name}_{subseg_name}_{track_name}"
-                name_collection_items.append(mx_name)
+                # Mixture model (MX_IN_FILE)
 
                 if runner.num_mix_components == 1:
                     dpmf_name = "dpmf_always"
@@ -422,11 +426,15 @@ f"""4
                     mx_component_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
                     mx_components.append(mx_component_name)
 
+                mx_name = f"mx_{seg_name}_{subseg_name}_{track_name}"
+                name_collection_items.append(mx_name)
                 input_master.mx[mx_name] = MX(dpmf_name, mx_components)
+
+        # Name Collection (NAME_COLLECTION_IN_LINE)
         input_master.name_collection[name_collection_name] = \
             name_collection_items
 
-    # DPMF
+    # DPMF (DPMF_IN_FILE)
     if runner.num_mix_components == 1:
         input_master.dpmf["dpmf_always"] = DPMF.uniform_from_shape(1)
     else:
@@ -442,7 +450,7 @@ f"""4
                     input_master.dpmf[dpmf_name] = \
                         DPMF.uniform_from_shape(runner.num_mix_components)
 
-    # Virtual Evidence
+    # Virtual Evidence (VE_CPT_IN_FILE)
     # TODO: This is a hardcoded string rather than a custom type as the one
     # line type supports only array-like data
     if runner.virtual_evidence:
@@ -454,6 +462,26 @@ f"""VE_CPT_IN_FILE inline
 """
         input_master.virtual_evidence["virtualEvidence"] = \
             ArbitraryString(virtual_evidence)
+        
+    # if condition on INPUT_PARAMS_FILENAME
+    if_input_params_clause = "#ifndef INPUT_PARAMS_FILENAME"
+    else_input_params_clause = \
+"""
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
+MC_IN_FILE INPUT_PARAMS_FILENAME ascii
+MX_IN_FILE INPUT_PARAMS_FILENAME ascii
+
+#endif
+"""
+    input_master.if_input_params["if_clause"] = \
+        ArbitraryString(if_input_params_clause)
+    input_master.else_input_params["else_clause"] = \
+        ArbitraryString(else_input_params_clause)
 
     if not input_master_filename:
         input_master_filename = \
