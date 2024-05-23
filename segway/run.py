@@ -2044,7 +2044,7 @@ class Runner(object):
             input_master_filename = self.input_master_filename
 
         _, input_master_filename_is_new = \
-            InputMasterSaver(self)(input_master_filename +  + ".fromtmpl", 
+            InputMasterSaver(self)(input_master_filename + ".fromtmpl", 
                                    self.params_dirpath, self.clobber, 
                                    instance_index)
         save_input_master(self, input_master_filename, self.params_dirpath,
