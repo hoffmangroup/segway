@@ -26,7 +26,7 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
 from .gmtk.input_master import (ArbitraryString, DecisionTree, DenseCPT,
                                 DeterministicCPT, DiagGaussianMC, 
-                                DirichletTable, DPMF, GammaMC, InputMaster,
+                                DirichletTable, DPMF, InputMaster,
                                 MissingFeatureDiagGaussianMC, MX, RealMat)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations
