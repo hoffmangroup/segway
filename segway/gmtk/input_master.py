@@ -256,7 +256,7 @@ class Covar(OneLineKind):
 
 class RealMat(OneLineKind):
     """
-    An entry in a Real matrix object. Also used for Gamma real matrices.
+    An entry in a Real matrix object.
     __init__ and __str__ methods defined in superclass.
     """
     kind = OBJ_KIND_RM
@@ -395,33 +395,6 @@ class MissingFeatureDiagGaussianMC(MC, object):
         Return string representation of this MC object.
         """
         return " ".join([self.mean, self.covar, "matrix_weightscale_1x1"])
-
-
-class GammaMC(MC, object):
-    """
-    Attributes:
-        component_type = COMPONENT_TYPE_GAMMA
-        min_track: str: value less than a minimum in the track
-        scale: str: name of RealMat object for scale associated to this MC
-        shape: str: name of RealMat object for shape associated to this MC
-    """
-    def __init__(self, min_track, scale, shape):
-        """
-        Initialie a single GammaMC object.
-        :param min_track: value less than a minimum in the trac
-        :param scale: name of RealMat object for scale associated to this MC
-        :param scale: name of RealMat object for shape associated to this MC
-        """
-        super().__init__("COMPONENT_TYPE_GAMMA")
-        self.min_track = min_track
-        self.scale = scale
-        self.shape = shape
-
-    def __str__(self) -> str:
-        """
-        Return string representation of this MC object.
-        """
-        return " ".join([self.min_track, self.scale, self.shape])
 
 
 class MX:
@@ -776,10 +749,6 @@ class InputMaster:
         self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
         self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
         self.else_input_params = InlineSection(OBJ_KIND_ARBITRARYSTRING)
-        # TODO: This prints these as separate sections. Will that create
-        # problems compared to including them in a single section?
-        self.gamma_scale = InlineSection(OBJ_KIND_RM)
-        self.gamma_shape = InlineSection(OBJ_KIND_RM)
         self.real_mat = InlineSection(OBJ_KIND_RM)
 
     def __str__(self) -> str:
@@ -791,8 +760,7 @@ class InputMaster:
                     self.dirichlet, self.deterministic_cpt,
                     self.virtual_evidence, self.if_input_params, 
                     self.dense_cpt, self.mean, self.covar, self.dpmf, self.mc,
-                    self.mx, self.else_input_params, self.gamma_scale,
-                    self.gamma_shape, self.real_mat]
+                    self.mx, self.else_input_params, self.real_mat]
 
         return "\n".join([str(section) for section in sections])
 

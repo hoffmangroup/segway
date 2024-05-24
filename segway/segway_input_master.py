@@ -364,39 +364,6 @@ f"""4
         if USE_MFSDG:
             input_master.real_mat["matrix_weightscale_1x1"] = RealMat(1.0)
 
-    elif distribution == DISTRIBUTION_GAMMA:
-
-        # XXX: another option is to calculate an ML estimate for
-        # the gamma distribution rather than the ML estimate for the
-        # mean and converting
-
-        # TODO: Should GammaRealMat be a different class for clarification?
-        # Should there be further subclasses for shape and scale?
-        scales = make_scales_data(runner)
-        shapes = make_shapes_data(runner)
-        for seg_index in range(num_segs):
-            seg_name = f"seg{seg_index}"
-            for subseg_index in range(num_subsegs):
-                subseg_name = f"subseg{subseg_index}"
-                for track_index, track_group in enumerate(runner.track_groups):
-                    track_name = track_group[0].name
-
-                    # Make GammaRealMat scale (in RealMat)
-                    scale = jitter(scales[track_index], runner.random_state)
-                    rm_scale_name = f"gammascale_{seg_name}_{subseg_name}_{track_name}"
-                    input_master.gamma_scale[rm_scale_name] = RealMat(scale)
-
-                    # Make GammaRealMat shape (In RealMat)
-                    shape = jitter(shapes[track_index], runner.random_state)
-                    rm_shape_name = f"gammashape_{seg_name}_{subseg_name}_{track_name}"
-                    input_master.gamma_shape[rm_shape_name] = RealMat(shape)
-
-                    # Make GammaMCParam (MC_IN_FILE)
-                    min_track = get_track_lt_min(runner, track_index)
-                    gamma_mc_name = f"mc_gamma_{seg_name}_{subseg_name}_{track_name}"
-                    input_master.mc[gamma_mc_name] = \
-                        GammaMC(min_track, rm_scale_name, rm_shape_name)
-
     else:
         raise ValueError("distribution %s not supported" % distribution)
 
@@ -411,7 +378,6 @@ f"""4
                 subseg_name = f"subseg{subseg_index}"
 
                 # Mixture model (MX_IN_FILE)
-
                 if runner.num_mix_components == 1:
                     dpmf_name = "dpmf_always"
                 else:
@@ -627,29 +593,6 @@ def make_mean_data(runner):
 
 def make_covar_data(runner):
     return vstack_tile(runner.vars, runner.num_segs, runner.num_subsegs)
-
-
-def make_scales_data(runner):
-    return runner.vars / runner.means
-
-
-def make_shapes_data(runner):
-    return (runner.means ** 2) / runner.vars
-
-
-def get_track_lt_min(runner, track_index):
-    """
-    return a value less than the minimum in a track
-    """
-    # TODO: Still refactor? (copied comment from original)
-    min_track = runner.mins[track_index]
-
-    # fudge by a small amount
-    # TODO: Does this still need to be restored after GMTK issues are fixed? 
-    # (copied comment) from original
-    min_track_f32 = float32(min_track)
-    assert (min_track_f32 - float32(ABSOLUTE_FUDGE) != min_track_f32)
-    return min_track_f32 - ABSOLUTE_FUDGE
 
 
 class ParamSpec(object):
