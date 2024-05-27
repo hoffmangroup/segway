@@ -2047,8 +2047,15 @@ class Runner(object):
         #     InputMasterSaver(self)(input_master_filename, 
         #                            self.params_dirpath, self.clobber, 
         #                            instance_index)
-        save_input_master(self, input_master_filename, self.params_dirpath,
-                          self.clobber, instance_index)
+        if input_master_filename:
+            is_new = self.clobber or not Path(input_master_filename).exists()
+        else:
+            input_master_filename = make_default_filename(input_master_filename, self.params_dirpath, instance_index)
+            is_new = True
+
+        if is_new:
+            save_input_master(self, input_master_filename, self.params_dirpath,
+                            self.clobber, instance_index)
 
     def load_supervision(self):
         # The semi-supervised mode changes the DBN structure so there is an
@@ -3233,8 +3240,15 @@ class Runner(object):
         # input_master_filename, input_master_filename_is_new = \
         #     InputMasterSaver(self)(self.input_master_filename,
         #                            self.params_dirpath, self.clobber)
-        save_input_master(self, input_master_filename, self.params_dirpath,
-                          self.clobber)
+        if self.input_master_filename:
+            is_new = self.clobber or not Path(self.input_master_filename).exists()
+        else:
+            input_master_filename = make_default_filename(self.input_master_filename, self.params_dirpath, None)
+            is_new = True
+
+        if is_new:
+            save_input_master(self, input_master_filename, self.params_dirpath,
+                              self.clobber, None)
 
         self.input_master_filename = input_master_filename
 
