@@ -3243,14 +3243,12 @@ class Runner(object):
         if self.input_master_filename:
             is_new = self.clobber or not Path(self.input_master_filename).exists()
         else:
-            input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, None)
+            self.input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, None)
             is_new = True
 
         if is_new:
-            save_input_master(self, input_master_filename, self.params_dirpath,
+            save_input_master(self, self.input_master_filename, self.params_dirpath,
                               self.clobber, None)
-
-        self.input_master_filename = input_master_filename
 
         # save file locations to tab-delimited file
         self.save_tab_file(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
