@@ -267,7 +267,7 @@ f"""4
         pseudocounts = (probs * pseudocounts_per_row).astype(int)
 
         input_master.dirichlet["dirichlet_segCountDown_seg_segTransition"] = \
-            DirichletTable(pseudocounts)
+            DirichletTable(pseudocounts, keep_shape=True)
 
     # Deterministic CPTs
     input_master.deterministic_cpt["seg_segCountDown"] = \

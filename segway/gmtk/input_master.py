@@ -111,7 +111,7 @@ class DenseCPT(MultiDimArray):
         """
         self.dirichlet_name = dirichlet_name
 
-    def get_header_info(self, dirichlet_name = None) -> str:
+    def get_header_info(self) -> str:
         """
         Return multidimensional array header with dimensions.
         If the dirichlet_name attribute was set, include an additional line
