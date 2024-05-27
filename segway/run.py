@@ -2043,10 +2043,10 @@ class Runner(object):
         else:
             input_master_filename = self.input_master_filename
 
-        _, input_master_filename_is_new = \
-            InputMasterSaver(self)(input_master_filename, 
-                                   self.params_dirpath, self.clobber, 
-                                   instance_index)
+        # _, input_master_filename_is_new = \
+        #     InputMasterSaver(self)(input_master_filename, 
+        #                            self.params_dirpath, self.clobber, 
+        #                            instance_index)
         save_input_master(self, input_master_filename, self.params_dirpath,
                           self.clobber, instance_index)
 
@@ -3230,9 +3230,9 @@ class Runner(object):
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
 
-        input_master_filename, input_master_filename_is_new = \
-            InputMasterSaver(self)(self.input_master_filename,
-                                   self.params_dirpath, self.clobber)
+        # input_master_filename, input_master_filename_is_new = \
+        #     InputMasterSaver(self)(self.input_master_filename,
+        #                            self.params_dirpath, self.clobber)
         save_input_master(self, input_master_filename, self.params_dirpath,
                           self.clobber)
 
