@@ -598,8 +598,9 @@ class InlineSection(Section):
             return ""
         
         # if line_before is set, use it to begin the section's lines
+        lines = []
         if self.line_before is not None:
-            lines = [self.line_before]
+            lines += [self.line_before]
         
         # if stored items are arbitrary strings, return them out without
         # any additional formatting. Otherwise, apply formatting
@@ -671,8 +672,9 @@ class InlineMCSection(InlineSection):
             return ""
         
         # if line_before is set, use it to begin the section's lines
+        lines = []
         if self.line_before is not None:
-            lines = [self.line_before]
+            lines += [self.line_before]
 
         lines += self.get_header_lines()
         for index, (name, obj) in enumerate(list(self.items())):
@@ -726,8 +728,9 @@ class InlineMXSection(InlineSection):
             return ""
         
         # if line_before is set, use it to begin the section's lines
+        lines = []
         if self.line_before is not None:
-            lines = [self.line_before]
+            lines += [self.line_before]
 
         lines += self.get_header_lines()
         for index, (name, obj) in enumerate(list(self.items())):
