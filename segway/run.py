@@ -3269,7 +3269,7 @@ class Runner(object):
                     self.random_state = RandomState(instance_random_seed)
                 self.save_input_master(index, True)
 
-        if not input_master_filename_is_new:
+        if not is_new:
             # do not overwrite existing file
             input_master_filename = None
 
