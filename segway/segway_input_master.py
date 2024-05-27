@@ -295,6 +295,8 @@ f"""4
         assert (runner.supervision_type == SUPERVISION_SUPERVISED or
                 runner.supervision_type == SUPERVISION_UNSUPERVISED)
 
+    # DenseCPT begins the block conditional on INPUT_PARAMS_FILENAME
+    input_master.dense_cpt.line_before = "#ifndef INPUT_PARAMS_FILENAME"
     # Dense CPTs
     num_segs = runner.num_segs
     num_subsegs = runner.num_subsegs
@@ -399,6 +401,21 @@ f"""4
         # Name Collection (NAME_COLLECTION_IN_LINE)
         input_master.name_collection[name_collection_name] = \
             name_collection_items
+        
+    # Mixture collection ends the block conditional on INPUT_PARAMS_FILENAME
+    input_master.mx.line_after = \
+"""
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
+MC_IN_FILE INPUT_PARAMS_FILENAME ascii
+MX_IN_FILE INPUT_PARAMS_FILENAME ascii
+
+#endif
+"""
 
     # DPMF (DPMF_IN_FILE)
     if runner.num_mix_components == 1:
@@ -422,36 +439,15 @@ f"""4
     if runner.virtual_evidence:
         virtual_evidence = \
 f"""
-#if VIRTUAL_EVIDENCE == 1
 VE_CPT_IN_FILE inline
 1
 
 0 seg_virtualEvidence 1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} nfs:{num_segs} nis:0 fmt:ascii END
-
-#endif
 """
         input_master.virtual_evidence["virtualEvidence"] = \
             ArbitraryString(virtual_evidence)
-        
-    # if condition on INPUT_PARAMS_FILENAME
-    if_input_params_clause = "#ifndef INPUT_PARAMS_FILENAME"
-    else_input_params_clause = \
-"""
-#else
-
-DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
-MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
-COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
-DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
-MC_IN_FILE INPUT_PARAMS_FILENAME ascii
-MX_IN_FILE INPUT_PARAMS_FILENAME ascii
-
-#endif
-"""
-    input_master.if_input_params["if_clause"] = \
-        ArbitraryString(if_input_params_clause)
-    input_master.else_input_params["else_clause"] = \
-        ArbitraryString(else_input_params_clause)
+        input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
+        input_master.virtual_evidence.line_after = "#endif"
 
     if not input_master_filename:
         input_master_filename = \

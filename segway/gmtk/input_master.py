@@ -539,8 +539,12 @@ class Section(dict):
     Key: name of GMTK object
     Value: GMTK object
     Attributes:
-            kind: str: specifies the kind of GMTK object
-            (default assumes that `self` has no kind)
+            kind: str: specifies the kind of GMTK object (default assumes that
+                `self` has no kind)
+            line_before: str: string to print before the section, often a
+                preprocessor rule
+            line_after: str: string to print after the section, often a
+                preprocessor rule
     """
     def __init__(self, kind: Optional[str] = None):
         """
@@ -548,6 +552,8 @@ class Section(dict):
         """
         super().__init__()
         self.kind = kind
+        self.line_before = None
+        self.line_after = None
 
     def __setitem__(
             self,
@@ -591,16 +597,24 @@ class InlineSection(Section):
         if len(self) == 0:
             return ""
         
+        # if line_before is set, use it to begin the section's lines
+        if self.line_before is not None:
+            lines = [self.line_before]
+        
         # if stored items are arbitrary strings, return them out without
         # any additional formatting. Otherwise, apply formatting
         if self.kind == OBJ_KIND_ARBITRARYSTRING:
-            lines = self.get_unformatted_lines()
+            lines += self.get_unformatted_lines()
         else:
-            lines = self.get_formatted_lines()
+            lines += self.get_formatted_lines()
+
+        # if line_after is set, use it to end the section's lines
+        if self.line_after is not None:
+            lines += [self.line_after]
 
         return "\n".join(lines + [""])
     
-    def get_formatted_lines(self) -> str:
+    def get_formatted_lines(self) -> List[str]:
         """
         Format the GMTK objects with a section header and object headers 
         """
@@ -621,7 +635,7 @@ class InlineSection(Section):
         
         return lines
     
-    def get_unformatted_lines(self) -> str:
+    def get_unformatted_lines(self) -> List[str]:
         """
         Extract the string representation of all GMTK objects, with no
         headers or additional formatting. Intended for representing
@@ -655,8 +669,12 @@ class InlineMCSection(InlineSection):
         """
         if len(self) == 0:
             return ""
+        
+        # if line_before is set, use it to begin the section's lines
+        if self.line_before is not None:
+            lines = [self.line_before]
 
-        lines = self.get_header_lines()
+        lines += self.get_header_lines()
         for index, (name, obj) in enumerate(list(self.items())):
             # check if dimension of Mean and Covar of this MC are the same
             mean_ndim = len(self.mean[obj.mean])
@@ -672,6 +690,10 @@ class InlineMCSection(InlineSection):
             # string representation of MC obj
             obj_line.append(str(obj))
             lines.append(" ".join(obj_line))
+
+        # if line_after is set, use it to end the section's lines
+        if self.line_after is not None:
+            lines += [self.line_after]
 
         return "\n".join(lines + [""])
 
@@ -702,8 +724,12 @@ class InlineMXSection(InlineSection):
         """
         if len(self) == 0:
             return ""
+        
+        # if line_before is set, use it to begin the section's lines
+        if self.line_before is not None:
+            lines = [self.line_before]
 
-        lines = self.get_header_lines()
+        lines += self.get_header_lines()
         for index, (name, obj) in enumerate(list(self.items())):
             # Assert number of components is equal to length of DPMF
             dpmf_ndim = len(self.dpmf[obj.dpmf])
@@ -719,6 +745,10 @@ class InlineMXSection(InlineSection):
 
             # string representation of this MX object
             lines.append(" ".join(obj_line))
+
+        # if line_after is set, use it to end the section's lines
+        if self.line_after is not None:
+            lines += [self.line_after]
 
         return "\n".join(lines + [""])
 
@@ -751,14 +781,12 @@ class InputMaster:
         self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
         self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
         self.virtual_evidence = InlineSection(OBJ_KIND_ARBITRARYSTRING)
-        self.if_input_params = InlineSection(OBJ_KIND_ARBITRARYSTRING)
         self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
         self.mean = InlineSection(OBJ_KIND_MEAN)
         self.covar = InlineSection(OBJ_KIND_COVAR)
         self.dpmf = InlineSection(OBJ_KIND_DPMF)
         self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
         self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
-        self.else_input_params = InlineSection(OBJ_KIND_ARBITRARYSTRING)
         self.real_mat = InlineSection(OBJ_KIND_RM)
 
     def __str__(self) -> str:
@@ -768,9 +796,8 @@ class InputMaster:
         """
         sections = [self.preamble, self.dt, self.name_collection,
                     self.dirichlet, self.deterministic_cpt,
-                    self.virtual_evidence, self.if_input_params, 
-                    self.dense_cpt, self.mean, self.covar, self.dpmf, self.mc,
-                    self.mx, self.else_input_params, self.real_mat]
+                    self.virtual_evidence, self.dense_cpt, self.mean,
+                    self.covar, self.dpmf, self.mc, self.mx, self.real_mat]
 
         return "\n".join([str(section) for section in sections])
 
