@@ -229,7 +229,7 @@ class NameCollection(list):
         return str(len(self))
 
 
-class OneLineKind(Array):
+class OneLineArray(Array):
     """
     An abstract Python class acting as the parent for Python classes
     representing Array-like GMTK kinds that have one-line string
@@ -248,7 +248,7 @@ class OneLineKind(Array):
         return " ".join(line)
 
 
-class Mean(OneLineKind):
+class Mean(OneLineArray):
     """
     A single Mean object.
     __init__ and __str__ methods defined in superclass.
@@ -256,7 +256,7 @@ class Mean(OneLineKind):
     kind = OBJ_KIND_MEAN
 
 
-class Covar(OneLineKind):
+class Covar(OneLineArray):
     """
     A single Covar object.
     __init__ and __str__ methods defined in superclass.
@@ -264,7 +264,7 @@ class Covar(OneLineKind):
     kind = OBJ_KIND_COVAR
 
 
-class RealMat(OneLineKind):
+class RealMat(OneLineArray):
     """
     An entry in a Real matrix object.
     __init__ and __str__ methods defined in superclass.
@@ -280,6 +280,36 @@ class RealMat(OneLineKind):
         line = [str(len(self)), "1"]  # dimension, additional value
         line.append(array2text(self))  # array values
         return " ".join(line)
+    
+
+class VirtualEvidence:
+    """
+    A Virtual Evidence object, with syntax inferred from the input.master 
+    template implementation.
+    Intended to be printed as one line.
+    Attributes:
+        num_segs: int: number of segments for this Virtual Evidence
+        ve_list_filename: str: filename (or C preprocessor macro) containing
+            the Virtual Evidence list
+    """
+    kind = OBJ_KIND_VECPT
+
+    def __init__(self, num_segs: int, ve_list_filename):
+        """
+        Initialize a sinlge Virtual Evidence object.
+        :param num_segs: int: number of segments
+        :param ve_list_filename: str: filename containing Virtual Evidence list
+        """
+        self.num_segs = num_segs
+        self.ve_list_filename = ve_list_filename
+    
+    def get_header_info(self) -> str:
+        """
+        Return string representation of own information, for header in
+        input.master section.
+        """
+        
+        return f"1 {self.num_segs} 2 {self.ve_list_filename} nfs:{self.num_segs} nis:0 fmt:ascii END"
 
 
 # These types must be defined before they are referenced, so these constants
@@ -316,7 +346,7 @@ def convert(
     return cls(value)
 
 
-class DPMF(OneLineKind):
+class DPMF(OneLineArray):
     """
     A single DPMF object.
     """
@@ -631,7 +661,8 @@ class InlineSection(Section):
             lines.append(" ".join(obj_header).rstrip())
 
             # If not one line kind, write the object's remaining lines
-            if not isinstance(value, OneLineKind):
+            if not (isinstance(value, OneLineArray) or 
+                    isinstance(value, VirtualEvidence)):
                 lines.append(str(value))
         
         return lines

@@ -24,10 +24,10 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
                     SUPERVISION_SUPERVISED,
                     SUPERVISION_UNSUPERVISED, USE_MFSDG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
-from .gmtk.input_master import (ArbitraryString, DecisionTree, DenseCPT,
-                                DeterministicCPT, DiagGaussianMC, 
-                                DirichletTable, DPMF, InputMaster,
-                                MissingFeatureDiagGaussianMC, MX, RealMat)
+from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
+                                DiagGaussianMC, DirichletTable, DPMF,
+                                InputMaster, MissingFeatureDiagGaussianMC, MX,
+                                RealMat, VirtualEvidence)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations
 # of scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -444,8 +444,8 @@ VE_CPT_IN_FILE inline
 
 0 seg_virtualEvidence 1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} nfs:{num_segs} nis:0 fmt:ascii END
 """
-        input_master.virtual_evidence["virtualEvidence"] = \
-            ArbitraryString(virtual_evidence)
+        input_master.virtual_evidence["seg_virtualEvidence"] = \
+            VirtualEvidence(num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME)
         input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
         input_master.virtual_evidence.line_after = "#endif"
 
