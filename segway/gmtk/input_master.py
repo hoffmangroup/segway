@@ -814,7 +814,7 @@ class InputMaster:
         self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
         self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
         self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
-        self.virtual_evidence = InlineSection(OBJ_KIND_ARBITRARYSTRING)
+        self.virtual_evidence = InlineSection(OBJ_KIND_VECPT)
         self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
         self.mean = InlineSection(OBJ_KIND_MEAN)
         self.covar = InlineSection(OBJ_KIND_COVAR)
