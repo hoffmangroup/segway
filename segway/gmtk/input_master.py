@@ -187,6 +187,16 @@ class DirichletTable(MultiDimArray):
     """
     kind = OBJ_KIND_DIRICHLETTAB
 
+    def get_header_info(self) -> str:
+        """
+        Return number of parents, cardinality line, for header in
+        input.master section.
+        """
+        line = [str(len(self.shape))]  # number of parents
+        cardinality_line = map(str, self.shape)
+        line.append(" ".join(cardinality_line))  # cardinalities
+        return " ".join(line)
+
 
 class NameCollection(list):
     """
