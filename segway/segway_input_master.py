@@ -437,13 +437,6 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
     # TODO: This is a hardcoded string rather than a custom type as the one
     # line type supports only array-like data
     if runner.virtual_evidence:
-        virtual_evidence = \
-f"""
-VE_CPT_IN_FILE inline
-1
-
-0 seg_virtualEvidence 1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} nfs:{num_segs} nis:0 fmt:ascii END
-"""
         input_master.virtual_evidence["seg_virtualEvidence"] = \
             VirtualEvidence(num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME)
         input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
