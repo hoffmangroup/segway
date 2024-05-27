@@ -2050,7 +2050,7 @@ class Runner(object):
         if input_master_filename:
             is_new = self.clobber or not Path(input_master_filename).exists()
         else:
-            input_master_filename = make_default_filename(input_master_filename, self.params_dirpath, instance_index)
+            input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, instance_index)
             is_new = True
 
         if is_new:
@@ -3243,7 +3243,7 @@ class Runner(object):
         if self.input_master_filename:
             is_new = self.clobber or not Path(self.input_master_filename).exists()
         else:
-            input_master_filename = make_default_filename(self.input_master_filename, self.params_dirpath, None)
+            input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, None)
             is_new = True
 
         if is_new:
