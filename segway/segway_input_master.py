@@ -421,10 +421,14 @@ f"""4
     # line type supports only array-like data
     if runner.virtual_evidence:
         virtual_evidence = \
-f"""VE_CPT_IN_FILE inline
+f"""
+#if VIRTUAL_EVIDENCE == 1
+VE_CPT_IN_FILE inline
 1
 
 0 seg_virtualEvidence 1 {num_segs} 2 {VIRTUAL_EVIDENCE_LIST_FILENAME} nfs:{num_segs} nis:0 fmt:ascii END
+
+#endif
 """
         input_master.virtual_evidence["virtualEvidence"] = \
             ArbitraryString(virtual_evidence)
