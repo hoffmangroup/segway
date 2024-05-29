@@ -169,9 +169,6 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     Save the input.master file using the GMTK API.
     """
 
-    # Initialize InputMaster option
-    input_master = InputMaster()
-
     # Preamble
     include_filename = runner.gmtk_include_filename_relative
     card_seg = runner.num_segs
@@ -183,7 +180,9 @@ f"""#include "{include_filename}"
 #endif
 
 """
-    input_master.preamble = segway_preamble
+
+    # Initialize InputMaster option
+    input_master = InputMaster(preamble=segway_preamble)
 
     # Decision Trees (DT_IN_FILE)
     segCountDown_tree = make_segCountDown_tree(runner)
@@ -434,8 +433,6 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
                         DPMF.uniform_from_shape(runner.num_mix_components)
 
     # Virtual Evidence (VE_CPT_IN_FILE)
-    # TODO: This is a hardcoded string rather than a custom type as the one
-    # line type supports only array-like data
     if runner.virtual_evidence:
         input_master.virtual_evidence["seg_virtualEvidence"] = \
             VirtualEvidence(num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME)
