@@ -2047,8 +2047,15 @@ class Runner(object):
         #     InputMasterSaver(self)(input_master_filename, 
         #                            self.params_dirpath, self.clobber, 
         #                            instance_index)
-        save_input_master(self, input_master_filename, self.params_dirpath,
-                          instance_index)
+        if input_master_filename:
+            is_new = self.clobber or not Path(input_master_filename).exists()
+        else:
+            input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, instance_index)
+            is_new = True
+
+        if is_new:
+            save_input_master(self, input_master_filename, self.params_dirpath,
+                            self.clobber, instance_index)
 
     def load_supervision(self):
         # The semi-supervised mode changes the DBN structure so there is an
@@ -3233,8 +3240,15 @@ class Runner(object):
         # input_master_filename, input_master_filename_is_new = \
         #     InputMasterSaver(self)(self.input_master_filename,
         #                            self.params_dirpath, self.clobber)
-        save_input_master(self, self.input_master_filename, self.params_dirpath,
-                          None)
+        if self.input_master_filename:
+            is_new = self.clobber or not Path(self.input_master_filename).exists()
+        else:
+            self.input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, None)
+            is_new = True
+
+        if is_new:
+            save_input_master(self, self.input_master_filename, self.params_dirpath,
+                              self.clobber, None)
 
         # save file locations to tab-delimited file
         self.save_tab_file(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
@@ -3252,6 +3266,10 @@ class Runner(object):
                     instance_random_seed = self.random_seed + index
                     self.random_state = RandomState(instance_random_seed)
                 self.save_input_master(index, True)
+
+        if not is_new:
+            # do not overwrite existing file
+            input_master_filename = None
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
