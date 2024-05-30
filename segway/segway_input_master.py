@@ -167,9 +167,10 @@ jitter = vectorize(jitter_cell)
 
 
 def save_input_master(runner, input_master_filename, params_dirpath=None,
-                      instance_index=None):
+                      instance_index=None) -> bool:
     """
     Save the input.master file using the GMTK API.
+    Returns if the input.master file is new (was newly created or already existed)
     """
     # Determine if the given input.master file already exits. 
     # If input_master_filename is None, use the default name input.master
@@ -183,7 +184,7 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
 
     # If the input.master file already exits, do not create it and exit
     if not is_new:
-        return
+        return False
     # Otherwise, create the new input.master file
 
     # Preamble
@@ -462,6 +463,8 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
                                   instance_index)
 
     input_master.save(input_master_filename)
+
+    return True
 
 
 def make_segCountDown_tree(runner):
