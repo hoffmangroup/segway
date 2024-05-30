@@ -177,9 +177,9 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     if input_master_filename:
         is_new = runner.clobber or not Path(input_master_filename).exists()
     else:
-        input_master_filebasename = \
-            extjoin_not_none(INPUT_MASTER_PREFIX, instance_index, INPUT_MASTER_EXT)
-        input_master_filename = Path(runner.params_dirpath) / input_master_filebasename
+        input_master_filename = make_default_filename(INPUT_MASTER_NAME,
+                                                      params_dirpath,
+                                                      instance_index)
         is_new = True
 
     # If the input.master file already exits, do not create it and exit
@@ -456,11 +456,6 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
             VirtualEvidence(num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME)
         input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
         input_master.virtual_evidence.line_after = "#endif"
-
-    if not input_master_filename:
-        input_master_filename = \
-            make_default_filename(input_master_filename, params_dirpath,
-                                  instance_index)
 
     input_master.save(input_master_filename)
 
