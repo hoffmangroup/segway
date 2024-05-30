@@ -10,6 +10,7 @@ __version__ = "$Revision$"
 from math import frexp, ldexp
 from string import Template
 import sys
+from path import Path
 
 from genomedata._util import fill_array
 from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
@@ -17,7 +18,7 @@ from numpy import (array, empty, float32, outer, set_printoptions, sqrt, tile,
 from six.moves import map, range
 
 from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
-                    DISTRIBUTION_GAMMA, DISTRIBUTION_NORM,
+                    DISTRIBUTION_GAMMA, DISTRIBUTION_NORM, extjoin_not_none,
                     make_default_filename, OFFSET_END, OFFSET_START,
                     OFFSET_STEP, resource_substitute, Saver, SEGWAY_ENCODING,
                     SUPERVISION_SEMISUPERVISED,
@@ -73,6 +74,8 @@ DISTRIBUTIONS_LIKE_NORM = frozenset([DISTRIBUTION_NORM,
 ROUND_NDIGITS = 12
 
 INPUT_MASTER_NAME = "input.master.tmpl"
+INPUT_MASTER_PREFIX = "input"
+INPUT_MASTER_EXT = "master"
 
 
 def vstack_tile(array_like, *reps):
@@ -164,10 +167,25 @@ jitter = vectorize(jitter_cell)
 
 
 def save_input_master(runner, input_master_filename, params_dirpath=None,
-                      clobber=False, instance_index=None):
+                      instance_index=None) -> bool:
     """
     Save the input.master file using the GMTK API.
+    Returns if the input.master file is new (was newly created or already existed)
     """
+    # Determine if the given input.master file already exits. 
+    # If input_master_filename is None, use the default name input.master
+    if input_master_filename:
+        is_new = runner.clobber or not Path(input_master_filename).exists()
+    else:
+        input_master_filename = make_default_filename(INPUT_MASTER_NAME,
+                                                      params_dirpath,
+                                                      instance_index)
+        is_new = True
+
+    # If the input.master file already exits, do not create it and exit
+    if not is_new:
+        return False
+    # Otherwise, create the new input.master file
 
     # Preamble
     include_filename = runner.gmtk_include_filename_relative
@@ -439,12 +457,9 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
         input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
         input_master.virtual_evidence.line_after = "#endif"
 
-    if not input_master_filename:
-        input_master_filename = \
-            make_default_filename(input_master_filename, params_dirpath,
-                                  instance_index)
-
     input_master.save(input_master_filename)
+
+    return True
 
 
 def make_segCountDown_tree(runner):
