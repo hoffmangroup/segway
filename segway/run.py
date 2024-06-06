@@ -65,8 +65,7 @@ from .cluster import (is_running_locally, JobTemplateFactory, make_native_spec,
 from .include import IncludeSaver
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
-from .segway_input_master import (INPUT_MASTER_NAME, InputMasterSaver,
-                                  save_input_master)
+from .segway_input_master import (INPUT_MASTER_NAME, save_input_master)
 from .structure import StructureSaver
 from .task import MSG_SUCCESS
 from .version import __version__
@@ -2043,10 +2042,6 @@ class Runner(object):
         else:
             input_master_filename = self.input_master_filename
 
-        # _, input_master_filename_is_new = \
-        #     InputMasterSaver(self)(input_master_filename, 
-        #                            self.params_dirpath, self.clobber, 
-        #                            instance_index)
         if input_master_filename:
             is_new = self.clobber or not Path(input_master_filename).exists()
         else:
@@ -3237,9 +3232,6 @@ class Runner(object):
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
 
-        # input_master_filename, input_master_filename_is_new = \
-        #     InputMasterSaver(self)(self.input_master_filename,
-        #                            self.params_dirpath, self.clobber)
         if self.input_master_filename:
             is_new = self.clobber or not Path(self.input_master_filename).exists()
         else:
