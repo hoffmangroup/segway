@@ -2051,6 +2051,8 @@ class Runner(object):
         if is_new:
             save_input_master(self, input_master_filename, self.params_dirpath,
                             self.clobber, instance_index)
+        
+        return input_master_filename
 
     def load_supervision(self):
         # The semi-supervised mode changes the DBN structure so there is an
@@ -3232,15 +3234,15 @@ class Runner(object):
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
 
-        if self.input_master_filename:
-            is_new = self.clobber or not Path(self.input_master_filename).exists()
-        else:
-            self.input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, None)
-            is_new = True
+        # if self.input_master_filename:
+        #     is_new = self.clobber or not Path(self.input_master_filename).exists()
+        # else:
+        #     self.input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, None)
+        #     is_new = True
 
-        if is_new:
-            save_input_master(self, self.input_master_filename, self.params_dirpath,
-                              self.clobber, None)
+        # if is_new:
+        self.input_master_filename = \
+            self.save_input_master()
 
         # save file locations to tab-delimited file
         self.save_tab_file(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
@@ -3259,9 +3261,9 @@ class Runner(object):
                     self.random_state = RandomState(instance_random_seed)
                 self.save_input_master(index, True)
 
-        if not is_new:
-            # do not overwrite existing file
-            input_master_filename = None
+        # if not is_new:
+        #     # do not overwrite existing file
+        #     input_master_filename = None
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
