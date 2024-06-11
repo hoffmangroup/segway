@@ -8,7 +8,6 @@ __version__ = "$Revision$"
 # Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
 from math import frexp, ldexp
-from string import Template
 import sys
 
 from genomedata._util import fill_array
@@ -45,10 +44,6 @@ if USE_MFSDG:
 else:
     COVAR_TIED = True
 
-ABSOLUTE_FUDGE = 0.001
-
-# define the pseudocount for training the mixture distribution weights
-GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT = 100
 
 # here to avoid duplication
 NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
@@ -78,45 +73,6 @@ def vstack_tile(array_like, *reps):
     return tile(array_like, reps)
 
 
-def array2text(a):
-    ndim = a.ndim
-    if ndim == 1:
-        return " ".join(map(str, a))
-    else:
-        delimiter = "\n" * (ndim - 1)
-        return delimiter.join(array2text(row) for row in a)
-
-
-def make_spec(name, iterable):
-    """
-    name: str, name of GMTK object type
-    iterable: iterable of strs
-    """
-    items = list(iterable)
-
-    header_lines = ["%s_IN_FILE inline" % name, str(len(items)), ""]
-
-    indexed_items = ["%d %s" % indexed_item
-                     for indexed_item in enumerate(items)]
-
-    all_lines = header_lines + indexed_items
-
-    # In Python 2, convert from unicode to bytes to prevent
-    # __str__method from being called twice
-    # Specifically in the string template standard library provided by Python
-    # 2, there is a call to a string escape sequence + tuple, e.g.:
-    # print("%s" % (some_string,))
-    # This "some_string" has its own __str__ method called *twice* if if it is
-    # a unicode string in Python 2. Python 3 does not have this issue. This
-    # causes downstream issues since strings are generated often in our case
-    # for random numbers. Calling __str__ twice will often cause re-iterating
-    # the RNG which makes for inconsitent results between Python versions.
-    if sys.version[0] == "2":
-        all_lines = [line.encode(SEGWAY_ENCODING) for line in all_lines]
-
-    return "\n".join(all_lines) + "\n"
-
-
 def prob_transition_from_expected_len(length):
     # formula from Meta-MEME paper, Grundy WN et al. CABIOS 13:397
     # see also Reynolds SM et al. PLoS Comput Biol 4:e1000213
@@ -124,44 +80,8 @@ def prob_transition_from_expected_len(length):
     return length / (1 + length)
 
 
-def make_zero_diagonal_table(length):
-    if length == 1:
-        return array([1.0])  # always return to self
-
-    prob_self_self = 0.0
-    prob_self_other = (1.0 - prob_self_self) / (length - 1)
-
-    # set everywhere (diagonal to be rewritten)
-    res = fill_array(prob_self_other, (length, length))
-
-    # set diagonal
-    range_cpt = range(length)
-    res[range_cpt, range_cpt] = prob_self_self
-
-    return res
-
-
-def format_indexed_strs(fmt, num):
-    full_fmt = fmt + "%d"
-    return [full_fmt % index for index in range(num)]
-
-
-def jitter_cell(cell, random_state):
-    """
-    adds some random noise
-    """
-    # get the binary exponent and subtract JITTER_ORDERS_MAGNITUDE
-    # e.g. 3 * 2**10 --> 1 * 2**5
-    max_noise = ldexp(1, frexp(cell)[1] - JITTER_ORDERS_MAGNITUDE)
-
-    return cell + random_state.uniform(-max_noise, max_noise)
-
-
-jitter = vectorize(jitter_cell)
-
-
 def save_input_master(runner, input_master_filename, params_dirpath=None,
-                      clobber=False, instance_index=None):
+                      instance_index=None):
     """
     Save the input.master file using the GMTK API.
     """
@@ -303,7 +223,7 @@ f"""4
         DenseCPT.uniform_from_shape(num_segs, num_segs)
     input_master.dense_cpt["seg_subseg_subseg"] = \
         DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs)
-    input_master.dense_cpt["segCountDown_seg_segTransition"] = \
+    input_master.dense_cpt[NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION] = \
         make_dense_cpt_segCountDown_seg_segTransition_cpt(runner)
     if runner.use_dinucleotide:
         input_master.dense_cpt["seg_dinucleotide"] = \
@@ -521,7 +441,7 @@ def make_dense_cpt_segCountDown_seg_segTransition_cpt(runner):
     res = DenseCPT(probs, keep_shape=True)
 
     if runner.len_seg_strength > 0:
-       res.set_dirichlet_table("segCountDown_seg_segTransition")
+       res.set_dirichlet_table(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION)
 
     return res
 

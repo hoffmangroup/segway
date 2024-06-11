@@ -2050,7 +2050,7 @@ class Runner(object):
 
         if is_new:
             save_input_master(self, input_master_filename, self.params_dirpath,
-                            self.clobber, instance_index)
+                              instance_index)
         
         return input_master_filename
 
