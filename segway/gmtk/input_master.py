@@ -75,7 +75,7 @@ class MultiDimArray(Array):
     Abstract class providing features for multidimensional arrays which are
     represented on multiple lines.
     """
-    
+
     def __str__(self) -> str:
         """
         Return string representation of this DenseCPT object.
@@ -101,9 +101,12 @@ class DenseCPT(MultiDimArray):
 
     # todo check if sums to 1.0
 
-    def set_dirichlet_table(self, dirichlet_name) -> str:
+    def set_dirichlet_table(self, dirichlet_name: str):
         """
         Set the name of a Dirichlet table which this CPT will reference.
+
+        :param: dirichlet_name: str: Dirichlet table name for this DenseCPT to
+        reference within its header
         """
         self.dirichlet_name = dirichlet_name
 
@@ -276,11 +279,11 @@ class RealMat(OneLineArray):
         line = [str(len(self)), "1"]  # dimension, additional value
         line.append(array2text(self))  # array values
         return " ".join(line)
-    
+
 
 class VirtualEvidence:
     """
-    A Virtual Evidence object, with syntax inferred from the input.master 
+    A Virtual Evidence object, with syntax inferred from the input.master
     template implementation.
     Intended to be printed as one line.
     Attributes:
@@ -290,7 +293,7 @@ class VirtualEvidence:
     """
     kind = OBJ_KIND_VECPT
 
-    def __init__(self, num_segs: int, ve_list_filename):
+    def __init__(self, num_segs: int, ve_list_filename: str):
         """
         Initialize a sinlge Virtual Evidence object.
         :param num_segs: int: number of segments
@@ -298,13 +301,13 @@ class VirtualEvidence:
         """
         self.num_segs = num_segs
         self.ve_list_filename = ve_list_filename
-    
+
     def get_header_info(self) -> str:
         """
         Return string representation of own information, for header in
         input.master section.
         """
-        
+
         return f"1 {self.num_segs} 2 {self.ve_list_filename} nfs:{self.num_segs} nis:0 fmt:ascii END"
 
 
@@ -406,7 +409,7 @@ class DiagGaussianMC(MC, object):
         Return string representation of this MC object.
         """
         return " ".join([self.mean, self.covar])
-    
+
 
 class MissingFeatureDiagGaussianMC(MC, object):
     """
@@ -622,12 +625,12 @@ class InlineSection(Section):
         # if this section stores no GMTK objects
         if len(self) == 0:
             return ""
-        
+
         # if line_before is set, use it to begin the section's lines
         lines = []
         if self.line_before is not None:
             lines += [self.line_before]
-        
+
         # if stored items are arbitrary strings, return them out without
         # any additional formatting. Otherwise, apply formatting
         if self.kind == OBJ_KIND_ARBITRARYSTRING:
@@ -640,10 +643,10 @@ class InlineSection(Section):
             lines += [self.line_after]
 
         return "\n".join(lines + [""])
-    
+
     def get_formatted_lines(self) -> List[str]:
         """
-        Format the GMTK objects with a section header and object headers 
+        Format the GMTK objects with a section header and object headers
         """
         lines = self.get_header_lines()
         for index, (key, value) in enumerate(self.items()):
@@ -657,12 +660,12 @@ class InlineSection(Section):
             lines.append(" ".join(obj_header).rstrip())
 
             # If not one line kind, write the object's remaining lines
-            if not (isinstance(value, OneLineArray) or 
+            if not (isinstance(value, OneLineArray) or
                     isinstance(value, VirtualEvidence)):
                 lines.append(str(value))
-        
+
         return lines
-    
+
     def get_unformatted_lines(self) -> List[str]:
         """
         Extract the string representation of all GMTK objects, with no
@@ -697,7 +700,7 @@ class InlineMCSection(InlineSection):
         """
         if len(self) == 0:
             return ""
-        
+
         # if line_before is set, use it to begin the section's lines
         lines = []
         if self.line_before is not None:
@@ -753,7 +756,7 @@ class InlineMXSection(InlineSection):
         """
         if len(self) == 0:
             return ""
-        
+
         # if line_before is set, use it to begin the section's lines
         lines = []
         if self.line_before is not None:
