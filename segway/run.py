@@ -2045,13 +2045,15 @@ class Runner(object):
         if input_master_filename:
             is_new = self.clobber or not Path(input_master_filename).exists()
         else:
-            input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, instance_index)
+            input_master_filename = make_default_filename(INPUT_MASTER_NAME,
+                                                          self.params_dirpath,
+                                                          instance_index)
             is_new = True
 
         if is_new:
             save_input_master(self, input_master_filename, self.params_dirpath,
                               instance_index)
-        
+
         return input_master_filename
 
     def load_supervision(self):
@@ -3234,13 +3236,6 @@ class Runner(object):
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
 
-        # if self.input_master_filename:
-        #     is_new = self.clobber or not Path(self.input_master_filename).exists()
-        # else:
-        #     self.input_master_filename = make_default_filename("input.master.tmpl", self.params_dirpath, None)
-        #     is_new = True
-
-        # if is_new:
         self.input_master_filename = \
             self.save_input_master()
 

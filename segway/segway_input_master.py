@@ -7,17 +7,12 @@ __version__ = "$Revision$"
 
 # Copyright 2012, 2013 Michael M. Hoffman <michael.hoffman@utoronto.ca>
 
-from math import frexp, ldexp
-import sys
-
-from genomedata._util import fill_array
-from numpy import (array, empty, outer, set_printoptions, sqrt, tile,
-                   vectorize, where)
-from six.moves import map, range
+from numpy import (array, empty, outer, set_printoptions, sqrt, tile, where)
+from six.moves import range
 
 from ._util import (DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_NORM,
                     make_default_filename, OFFSET_END, OFFSET_START,
-                    OFFSET_STEP, SEGWAY_ENCODING, SUPERVISION_SEMISUPERVISED,
+                    OFFSET_STEP, SUPERVISION_SEMISUPERVISED,
                     SUPERVISION_SUPERVISED, SUPERVISION_UNSUPERVISED,
                     USE_MFSDG, VIRTUAL_EVIDENCE_LIST_FILENAME)
 from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
@@ -111,7 +106,7 @@ f"""#include "{include_filename}"
 """
     input_master.dt["map_frameIndex_ruler"] = \
         DecisionTree(map_frameIndex_ruler_tree)
-    
+
     map_seg_segCountDown_tree = \
 f"""1
 % this is only used at the beginning of an observation track
@@ -119,7 +114,7 @@ f"""1
 """
     input_master.dt["map_seg_segCountDown"] = \
         DecisionTree(map_seg_segCountDown_tree)
-    
+
     map_segTransition_ruler_seg_segCountDown_segCountDown_tree = \
 f"""4
     0 2 2 default
@@ -317,7 +312,7 @@ f"""4
         # Name Collection (NAME_COLLECTION_IN_LINE)
         input_master.name_collection[name_collection_name] = \
             name_collection_items
-        
+
     # Mixture collection ends the block conditional on INPUT_PARAMS_FILENAME
     input_master.mx.line_after = \
 """
@@ -432,7 +427,7 @@ def make_dense_cpt_segCountDown_seg_segTransition(runner):  # noqa
         res[1:seg_countdown_allow, label] = probs_allow_transition
         res[seg_countdown_allow:, label] = probs_prevent_transition
 
-    res = res.squeeze() # Remove leading dimension of size 1
+    res = res.squeeze()  # Remove leading dimension of size 1
     return res
 
 
@@ -441,7 +436,7 @@ def make_dense_cpt_segCountDown_seg_segTransition_cpt(runner):
     res = DenseCPT(probs, keep_shape=True)
 
     if runner.len_seg_strength > 0:
-       res.set_dirichlet_table(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION)
+        res.set_dirichlet_table(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION)
 
     return res
 
