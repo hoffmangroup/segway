@@ -4,6 +4,12 @@ from typing import List, Optional, Union
 
 from numpy import array, asarray, empty, ndarray, squeeze
 
+DEFAULT_PREAMBLE = \
+"""
+#define COMPONENT_TYPE_DIAG_GAUSSIAN 0
+#define COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN 5
+"""
+
 
 COMPONENT_TYPE_DIAG_GAUSSIAN = 0
 OBJ_KIND_MEAN = "MEAN"
@@ -823,7 +829,7 @@ class InputMaster:
         input master
     """
 
-    def __init__(self, preamble=""):
+    def __init__(self, preamble=DEFAULT_PREAMBLE):
         """
         Initialize InputMaster instance with empty attributes (InlineSection
         and its subclasses).
