@@ -65,7 +65,7 @@ from .cluster import (is_running_locally, JobTemplateFactory, make_native_spec,
 from .include import IncludeSaver
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
-from .segway_input_master import (INPUT_MASTER_NAME, save_input_master)
+from .input_master import (INPUT_MASTER_NAME, save_input_master)
 from .structure import StructureSaver
 from .task import MSG_SUCCESS
 from .version import __version__
