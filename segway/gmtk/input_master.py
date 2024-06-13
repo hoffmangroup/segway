@@ -364,14 +364,14 @@ class DPMF(OneLineArray):
         dpmf_values.fill(value)
 
         return DPMF(dpmf_values, keep_shape=True)
-    
+
     def set_dirichlet_pseudocount(self, pseudocount: int):
         """
         Set a pseudocount to include in the header alongside the
         DirichletConst label.
         """
         self.pseudocount = pseudocount
-    
+
     def get_header_info(self) -> str:
         """
         Return string representation of own information, for header in

@@ -346,7 +346,7 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
                     dpmf_obj = \
                         DPMF.uniform_from_shape(runner.num_mix_components)
                     dpmf_obj.set_dirichlet_pseudocount(GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT)
-                    input_master.dpmf[dpmf_name] = dpmf_obj                    
+                    input_master.dpmf[dpmf_name] = dpmf_obj
 
     # Virtual Evidence (VE_CPT_IN_FILE)
     if runner.virtual_evidence:
