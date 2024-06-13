@@ -5,9 +5,13 @@ name: Build and Test
 
 on:
   push:
-      branches: [ master ]
+      branches:
+        - master
+        - develop
   pull_request:
-      branches: [ master ]
+      branches:
+        - master
+        - develop
 
 jobs:
   build-and-test:
@@ -25,7 +29,7 @@ jobs:
       # This is the current issue: https://github.com/actions/runner/issues/2033
       # Can set 'options: --user 1001' on the container to match the UID of the Github runner, ref:
       # https://github.com/actions/runner/blob/8415f13babf8199551f817eb16b718dcdd5b31e2/images/Dockerfile#L38
-      
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
