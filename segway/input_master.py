@@ -43,6 +43,9 @@ else:
 # here to avoid duplication
 NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
 
+# define the pseudocount for training the mixture distribution weights
+GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT = 100
+
 CARD_SEGTRANSITION = 3
 
 # XXX: should be options
@@ -340,9 +343,10 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
                     track_name = track_group[0].name
 
                     dpmf_name = f"dpmf_{seg_name}_{subseg_name}_{track_name}"
-                    # TODO: Does not include "DirichletConst 100"
-                    input_master.dpmf[dpmf_name] = \
+                    dpmf_obj = \
                         DPMF.uniform_from_shape(runner.num_mix_components)
+                    dpmf_obj.set_dirichlet_pseudocount(GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT)
+                    input_master.dpmf[dpmf_name] = dpmf_obj                    
 
     # Virtual Evidence (VE_CPT_IN_FILE)
     if runner.virtual_evidence:

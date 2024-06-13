@@ -364,6 +364,26 @@ class DPMF(OneLineArray):
         dpmf_values.fill(value)
 
         return DPMF(dpmf_values, keep_shape=True)
+    
+    def set_dirichlet_pseudocount(self, pseudocount: int):
+        """
+        Set a pseudocount to include in the header alongside the
+        DirichletConst label.
+        """
+        self.pseudocount = pseudocount
+    
+    def get_header_info(self) -> str:
+        """
+        Return string representation of own information, for header in
+        input.master section.
+        If the pseudocount attribute was set, include the DirichletConst label
+        and that value in the header before the weights.
+        """
+        line = [str(len(self))]  # dimension
+        if hasattr(self, "pseudocount"):
+            line.append(f"DirichletConst {self.pseudocount}")
+        line.append(array2text(self))  # array values
+        return " ".join(line)
 
 
 class MC:
