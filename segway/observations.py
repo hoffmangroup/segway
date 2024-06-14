@@ -794,12 +794,21 @@ class Observations(object):
                 for supercontig, continuous in chromosome.itercontinuous():
                     # If the the supercontig is not empty
                     if continuous is not None:
-                        attrs = supercontig.attrs
+                        # Attempt at getting starts and end coords from
+                        # PyTables / HDF5 metadata
+                        try:
+                            attrs = supercontig.attrs
 
-                        starts = convert_windows(attrs, "chunk_starts")
-                        ends = convert_windows(attrs, "chunk_ends")
+                            starts = convert_windows(attrs, "chunk_starts")
+                            ends = convert_windows(attrs, "chunk_ends")
 
-                        chromosome_windows.extend(zip(starts, ends))
+                            chromosome_windows.extend(zip(starts, ends))
+                        # Otherwise use the start and end coordinate from
+                        # the supercontig
+                        except NotImplementedError:
+                            chromosome_windows.append(
+                                [supercontig.start, supercontig.end]
+                            )
 
             # If at least 1 window exists
             if chromosome_windows:
