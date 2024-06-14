@@ -1,4 +1,3 @@
-map_supervisionLabel_seg_alwaysTrue
 2              % num parents
 % first parent is the label: 0 = no label; 1+ = (desired-1)
 % second parent is target

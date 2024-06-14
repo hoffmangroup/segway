@@ -10,11 +10,12 @@ __version__ = "$Revision$"
 from numpy import (array, empty, outer, set_printoptions, sqrt, tile, where)
 from six.moves import range
 
-from ._util import (DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_NORM,
+from ._util import (data_string, DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_NORM,
                     make_default_filename, OFFSET_END, OFFSET_START,
-                    OFFSET_STEP, SUPERVISION_SEMISUPERVISED,
-                    SUPERVISION_SUPERVISED, SUPERVISION_UNSUPERVISED,
-                    USE_MFSDG, VIRTUAL_EVIDENCE_LIST_FILENAME)
+                    OFFSET_STEP, resource_substitute,
+                    SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED,
+                    SUPERVISION_UNSUPERVISED, USE_MFSDG,
+                    VIRTUAL_EVIDENCE_LIST_FILENAME)
 from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
                                 DiagGaussianMC, DirichletTable, DPMF,
                                 InputMaster, MissingFeatureDiagGaussianMC, MX,
@@ -100,76 +101,32 @@ f"""#include "{include_filename}"
     input_master = InputMaster(preamble=segway_preamble)
 
     # Decision Trees (DT_IN_FILE)
-    segCountDown_tree = make_segCountDown_tree(runner)
-
-    map_frameIndex_ruler_tree = \
-"""1
-% is the frameIndex divisible by RULER_SCALE
-    -1 { mod(p0, RULER_SCALE) == 0 }
-"""
+    map_frameIndex_ruler_tree = data_string("map_frameIndex_ruler.dt.txt")
     input_master.dt["map_frameIndex_ruler"] = \
         DecisionTree(map_frameIndex_ruler_tree)
 
     map_seg_segCountDown_tree = \
-f"""1
-% this is only used at the beginning of an observation track
-0 {segCountDown_tree}
-"""
+        make_segCountDown_tree_spec(runner, "map_seg_segCountDown.dt.tmpl")
     input_master.dt["map_seg_segCountDown"] = \
         DecisionTree(map_seg_segCountDown_tree)
 
     map_segTransition_ruler_seg_segCountDown_segCountDown_tree = \
-f"""4
-    0 2 2 default
-      % segTransition(0) == 2 (seg transition):
-      % reinitialize the segCountDown value based on the usual tree
-      % used at the beginning of a segment
-      2 {segCountDown_tree}
-
-      % segTransition(0) in (0, 1) (no transition, subseg transition):
-      1 2 0 default
-            % ruler(0) == 0:
-            -1 {{ p3 }} % not at ruler mark -> copy previous value
-
-            % ruler(0) == 1:
-            -1 {{ max(p3-1, 0) }} % subtract 1 from previous value, or 0
-"""
+        make_segCountDown_tree_spec(runner,
+                                    "map_segTransition_ruler_seg_segCountDown_segCountDown.dt.tmpl")
     input_master.dt["map_segTransition_ruler_seg_segCountDown_segCountDown"] = \
         DecisionTree(map_segTransition_ruler_seg_segCountDown_segCountDown_tree)
 
-    map_seg_subseg_obs_tree = \
-"""2       % num parents
-        -1 { p0*CARD_SUBSEG + p1 }
-"""
+    map_seg_subseg_obs_tree = data_string("map_seg_subseg_obs.dt.txt")
     input_master.dt["map_seg_subseg_obs"] = \
         DecisionTree(map_seg_subseg_obs_tree)
 
     if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
         map_supervisionLabel_seg_alwaysTrue = \
-"""2              % num parents
-% first parent is the label: 0 = no label; 1+ = (desired-1)
-% second parent is target
-    0 2 0 default
-        % no label
-        -1 1 % does not matter, observed child is always true
-
-        % label set
-        #if SUPERVISIONLABEL_EXTENSION == 1
-            %% if only one supervision label is allowed
-            %%% if the target == label - 1: then observed child is true
-            %%% if the target != label - 1: then observed child is false => impossible
-            -1 { p1 == (p0-SUPERVISION_LABEL_OFFSET) }
-        #else
-            %% if multiple supervision label is allowed
-            %%% if the target in range [label - 1, label - 1 + label_range):
-            %%% then observed child is true
-            %%% if the target not in range [label - 1, label - 1 + label_range):
-            %%% then observed child is false => impossible
-            -1 { (p1 > (p0-SUPERVISION_LABEL_OFFSET-1)) && (p1 < (p0-SUPERVISION_LABEL_OFFSET+SUPERVISIONLABEL_RANGE_SIZE)) }
-        #endif
-"""
+            data_string("map_supervisionLabel_seg_alwaysTrue_semisupervised.dt.txt")
         input_master.dt["map_supervisionLabel_seg_alwaysTrue"] = \
             DecisionTree(map_supervisionLabel_seg_alwaysTrue)
+    else:
+        assert runner.supervision_type == SUPERVISION_UNSUPERVISED
 
     # Dirichlet Table
     if runner.len_seg_strength > 0:
@@ -363,7 +320,7 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
     input_master.save(input_master_filename)
 
 
-def make_segCountDown_tree(runner):
+def make_segCountDown_tree_spec(runner, resourcename):
     num_segs = runner.num_segs
     seg_countdowns_initial = runner.seg_countdowns_initial
 
@@ -376,7 +333,9 @@ def make_segCountDown_tree(runner):
     for seg_countdown_initial in seg_countdowns_initial:
         lines.append(f"    -1 {seg_countdown_initial}")
 
-    return "\n".join(lines)
+    tree = "\n".join(lines)
+
+    return resource_substitute(resourcename)(tree=tree)
 
 
 def make_dense_cpt_segCountDown_seg_segTransition(runner):  # noqa
