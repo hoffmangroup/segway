@@ -58,7 +58,8 @@ class Array(ndarray):
         (dimension 1) from a single scalar input value.
         """
         # Ensure all arguments belong to the correct type
-        if not all(isinstance(arg, NumericArrayLike) for arg in args):
+        if not all((isinstance(arg, float) or isinstance(arg, int) or
+                    isinstance(arg, ndarray)) for arg in args):
             # If union iterable, fix. Otherwise, hardwrite
             raise TypeError("Argument has incompatible type."
                             f"Expected {NumericArrayLike}")
