@@ -119,8 +119,6 @@ VITERBI_PROG = OptionBuilder_GMTK("gmtkViterbi")
 POSTERIOR_PROG = OptionBuilder_GMTK("gmtkJT")
 VALIDATE_PROG = OptionBuilder_GMTK("gmtkJT")
 
-LABEL_INDEX = 3
-
 BED_SCORE = "1000"
 BED_STRAND = "."
 INDEX_BED_CHROMSTART = 1

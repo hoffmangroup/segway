@@ -3256,10 +3256,6 @@ class Runner(object):
                     self.random_state = RandomState(instance_random_seed)
                 self.save_input_master(index, True)
 
-        # if not is_new:
-        #     # do not overwrite existing file
-        #     input_master_filename = None
-
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
             return self.run_train_multithread

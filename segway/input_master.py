@@ -11,11 +11,10 @@ from numpy import (array, empty, outer, set_printoptions, sqrt, tile, where)
 from six.moves import range
 
 from ._util import (data_string, DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_NORM,
-                    make_default_filename, OFFSET_END, OFFSET_START,
-                    OFFSET_STEP, resource_substitute,
-                    SUPERVISION_SEMISUPERVISED, SUPERVISION_SUPERVISED,
-                    SUPERVISION_UNSUPERVISED, USE_MFSDG,
-                    VIRTUAL_EVIDENCE_LIST_FILENAME)
+                    fill_array, make_default_filename, OFFSET_END,
+                    OFFSET_START, OFFSET_STEP, resource_substitute,
+                    SUPERVISION_SEMISUPERVISED, SUPERVISION_UNSUPERVISED,
+                    USE_MFSDG, VIRTUAL_EVIDENCE_LIST_FILENAME)
 from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
                                 DiagGaussianMC, DirichletTable, DPMF,
                                 InputMaster, MissingFeatureDiagGaussianMC, MX,
@@ -128,7 +127,24 @@ f"""#include "{include_filename}"
     else:
         assert runner.supervision_type == SUPERVISION_UNSUPERVISED
 
-    # Dirichlet Table
+    # Name Collection (NAME_COLLECTION_IN_LINE)
+    num_segs = runner.num_segs
+    num_subsegs = runner.num_subsegs
+    for track_index, track_group in enumerate(runner.track_groups):
+        track_name = track_group[0].name
+        name_collection_name = f"collection_seg_{track_name}"
+        name_collection_items = []
+        for seg_index in range(num_segs):
+            seg_name = f"seg{seg_index}"
+            for subseg_index in range(num_subsegs):
+                subseg_name = f"subseg{subseg_index}"
+                mx_name = f"mx_{seg_name}_{subseg_name}_{track_name}"
+                name_collection_items.append(mx_name)
+        # Name Collection (NAME_COLLECTION_IN_LINE)
+        input_master.name_collection[name_collection_name] = \
+            name_collection_items
+
+    # Dirichlet Table (DIRICHLET_TAB_IN_FILE)
     if runner.len_seg_strength > 0:
         # Make Dirichlet table data
         probs = make_dense_cpt_segCountDown_seg_segTransition(runner)
@@ -140,7 +156,9 @@ f"""#include "{include_filename}"
         input_master.dirichlet["dirichlet_segCountDown_seg_segTransition"] = \
             DirichletTable(pseudocounts, keep_shape=True)
 
-    # Deterministic CPTs
+    # Deterministic CPTs (DETERMINISTIC_CPT_IN_FILE) for the unsupervised case
+    input_master.deterministic_cpt.line_before = \
+        "#if CARD_SUPERVISIONLABEL == -1"
     input_master.deterministic_cpt["seg_segCountDown"] = \
         DeterministicCPT(("CARD_SEG", ), "CARD_SEGCOUNTDOWN",
                          "map_seg_segCountDown")
@@ -157,27 +175,54 @@ f"""#include "{include_filename}"
     input_master.deterministic_cpt["subseg_subseg_copy"] = \
         DeterministicCPT(("CARD_SUBSEG", ), "CARD_SUBSEG",
                          "internal:copyParent")
-    if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
-        input_master.deterministic_cpt["supervisionLabel_seg_alwaysTrue"] = \
-            DeterministicCPT(("CARD_SUPERVISIONLABEL", "CARD_SEG"),
-                             "CARD_BOOLEAN",
-                             "map_supervisionLabel_seg_alwaysTrue")
-    else:
-        assert (runner.supervision_type == SUPERVISION_SUPERVISED or
-                runner.supervision_type == SUPERVISION_UNSUPERVISED)
+    input_master.deterministic_cpt.line_after = \
+        "#endif"
+
+    # Deterministic CPTs (DETERMINISTIC_CPT_IN_FILE) for the semisupervised case
+    input_master.deterministic_cpt_semisupervised.line_before = \
+        "#if CARD_SUPERVISIONLABEL != -1"
+    input_master.deterministic_cpt_semisupervised["seg_segCountDown"] = \
+        DeterministicCPT(("CARD_SEG", ), "CARD_SEGCOUNTDOWN",
+                         "map_seg_segCountDown")
+    input_master.deterministic_cpt_semisupervised["frameIndex_ruler"] = \
+        DeterministicCPT(("CARD_FRAMEINDEX", ), "CARD_RULER",
+                         "map_frameIndex_ruler")
+    input_master.deterministic_cpt_semisupervised["segTransition_ruler_seg_segCountDown_segCountDown"] = \
+        DeterministicCPT(("CARD_SEGTRANSITION", "CARD_RULER", "CARD_SEG",
+                          "CARD_SEGCOUNTDOWN"), "CARD_SEGCOUNTDOWN",
+                         "map_segTransition_ruler_seg_segCountDown_segCountDown")
+    input_master.deterministic_cpt_semisupervised["seg_seg_copy"] = \
+        DeterministicCPT(("CARD_SEG", ), "CARD_SEG",
+                         "internal:copyParent")
+    input_master.deterministic_cpt_semisupervised["subseg_subseg_copy"] = \
+        DeterministicCPT(("CARD_SUBSEG", ), "CARD_SUBSEG",
+                         "internal:copyParent")
+    input_master.deterministic_cpt_semisupervised["supervisionLabel_seg_alwaysTrue"] = \
+        DeterministicCPT(("CARD_SUPERVISIONLABEL", "CARD_SEG"),
+                         "CARD_BOOLEAN",
+                         "map_supervisionLabel_seg_alwaysTrue")
+    input_master.deterministic_cpt_semisupervised.line_after = \
+        "#endif"
+
+    # Virtual Evidence (VE_CPT_IN_FILE)
+    input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
+    input_master.virtual_evidence["seg_virtualEvidence"] = \
+        VirtualEvidence(num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME)
+    input_master.virtual_evidence.line_after = "#endif"
 
     # DenseCPT begins the block conditional on INPUT_PARAMS_FILENAME
     input_master.dense_cpt.line_before = "#ifndef INPUT_PARAMS_FILENAME"
-    # Dense CPTs
-    num_segs = runner.num_segs
-    num_subsegs = runner.num_subsegs
+    # Dense CPTs (DENSE_CPT_IN_FILE)
     input_master.dense_cpt["start_seg"] = DenseCPT.uniform_from_shape(num_segs)
     input_master.dense_cpt["seg_subseg"] = \
-        DenseCPT.uniform_from_shape(num_segs, num_subsegs)
+        DenseCPT(fill_array(1.0 / num_subsegs, (num_segs, num_subsegs)),
+                 keep_shape=True)
     input_master.dense_cpt["seg_seg"] = \
-        DenseCPT.uniform_from_shape(num_segs, num_segs)
+        DenseCPT.uniform_from_shape(num_segs, num_segs,
+                                    self_transition=0)
     input_master.dense_cpt["seg_subseg_subseg"] = \
-        DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs)
+        DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs,
+                                    self_transition=0)
     input_master.dense_cpt[NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION] = \
         make_dense_cpt_segCountDown_seg_segTransition_cpt(runner)
     if runner.use_dinucleotide:
@@ -186,9 +231,8 @@ f"""#include "{include_filename}"
 
     distribution = runner.distribution
 
-    # Normal distributions
+    # Objects for normal distributions
     if distribution in DISTRIBUTIONS_LIKE_NORM:
-        # Mean and Covar
         for component in range(runner.num_mix_components):
             mean_data = make_mean_data(runner)
             covar_data = make_covar_data(runner)
@@ -233,60 +277,12 @@ f"""#include "{include_filename}"
                             input_master.mc[mc_name] = \
                                 DiagGaussianMC(mean=mean_name, covar=covar_name)
 
-        # RealMat
+        # RealMat (REAL_MAT_IN_FILE)
         if USE_MFSDG:
             input_master.real_mat["matrix_weightscale_1x1"] = RealMat(1.0)
 
     else:
         raise ValueError("distribution %s not supported" % distribution)
-
-    # Mixtures and Name Collection
-    for track_index, track_group in enumerate(runner.track_groups):
-        track_name = track_group[0].name
-        name_collection_name = f"collection_seg_{track_name}"
-        name_collection_items = []
-        for seg_index in range(num_segs):
-            seg_name = f"seg{seg_index}"
-            for subseg_index in range(num_subsegs):
-                subseg_name = f"subseg{subseg_index}"
-
-                # Mixture model (MX_IN_FILE)
-                if runner.num_mix_components == 1:
-                    dpmf_name = "dpmf_always"
-                else:
-                    dpmf_name = f"dpmf_{seg_name}_{subseg_name}_{track_name}"
-
-                mx_components = []
-                for component in range(runner.num_mix_components):
-                    if runner.num_mix_components == 1:
-                        component_suffix = ""
-                    else:
-                        component_suffix = f"_component{component}"
-                    mx_component_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
-                    mx_components.append(mx_component_name)
-
-                mx_name = f"mx_{seg_name}_{subseg_name}_{track_name}"
-                name_collection_items.append(mx_name)
-                input_master.mx[mx_name] = MX(dpmf_name, mx_components)
-
-        # Name Collection (NAME_COLLECTION_IN_LINE)
-        input_master.name_collection[name_collection_name] = \
-            name_collection_items
-
-    # Mixture collection ends the block conditional on INPUT_PARAMS_FILENAME
-    input_master.mx.line_after = \
-"""
-#else
-
-DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
-MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
-COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
-DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
-MC_IN_FILE INPUT_PARAMS_FILENAME ascii
-MX_IN_FILE INPUT_PARAMS_FILENAME ascii
-
-#endif
-"""
 
     # DPMF (DPMF_IN_FILE)
     if runner.num_mix_components == 1:
@@ -305,12 +301,45 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
                     dpmf_obj.set_dirichlet_pseudocount(GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT)
                     input_master.dpmf[dpmf_name] = dpmf_obj
 
-    # Virtual Evidence (VE_CPT_IN_FILE)
-    if runner.virtual_evidence:
-        input_master.virtual_evidence["seg_virtualEvidence"] = \
-            VirtualEvidence(num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME)
-        input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
-        input_master.virtual_evidence.line_after = "#endif"
+    # Mixtures (MX_IN_FILE)
+    for seg_index in range(num_segs):
+        seg_name = f"seg{seg_index}"
+        for subseg_index in range(num_subsegs):
+            subseg_name = f"subseg{subseg_index}"
+            for track_index, track_group in enumerate(runner.track_groups):
+                track_name = track_group[0].name
+                mx_name = f"mx_{seg_name}_{subseg_name}_{track_name}"
+
+                if runner.num_mix_components == 1:
+                    dpmf_name = "dpmf_always"
+                else:
+                    dpmf_name = f"dpmf_{seg_name}_{subseg_name}_{track_name}"
+
+                mx_components = []
+                for component in range(runner.num_mix_components):
+                    if runner.num_mix_components == 1:
+                        component_suffix = ""
+                    else:
+                        component_suffix = f"_component{component}"
+                    mx_component_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
+                    mx_components.append(mx_component_name)
+
+                input_master.mx[mx_name] = MX(dpmf_name, mx_components)
+
+    # Mixture collection ends the block conditional on INPUT_PARAMS_FILENAME
+    input_master.mx.line_after = \
+"""
+#else
+
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
+MC_IN_FILE INPUT_PARAMS_FILENAME ascii
+MX_IN_FILE INPUT_PARAMS_FILENAME ascii
+
+#endif
+"""
 
     if not input_master_filename:
         input_master_filename = \

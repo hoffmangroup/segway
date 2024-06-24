@@ -62,7 +62,7 @@ class Array(ndarray):
                     isinstance(arg, ndarray)) for arg in args):
             # If union iterable, fix. Otherwise, hardwrite
             raise TypeError("Argument has incompatible type."
-                            f"Expected {NumericArrayLike}")
+                            "Expected float, int, or ndarray.")
 
         input_array = array(args)
 
@@ -549,18 +549,18 @@ class DeterministicCPT:
         return ""
 
 
-class ArbitraryString:
+class GenericString:
     """
-    A class storing an arbitrary string to write to input.master.
+    A class storing a generic string to write to input.master.
     Attributes:
-        contents: str: Arbitrary string to write to input.master
+        contents: str: Generic string to write to input.master
     """
     kind = OBJ_KIND_ARBITRARYSTRING
 
     def __init__(self, contents: str):
         """
-        Initialize an arbitrary string class.
-        :param contents: arbitrary string to write to input.master
+        Initialize a generic string class.
+        :param contents: generic string to write to input.master
         """
         self.contents = contents
 
@@ -575,7 +575,7 @@ class ArbitraryString:
         return ""
 
 
-class DecisionTree(ArbitraryString):
+class DecisionTree(GenericString):
     """
     A Decision Tree object.
     """
@@ -655,7 +655,7 @@ class InlineSection(Section):
 
         # if line_before is set, use it to begin the section's lines
         lines = []
-        if self.line_before is not None:
+        if self.line_before:
             lines += [self.line_before]
 
         # if stored items are arbitrary strings, return them out without
@@ -666,7 +666,7 @@ class InlineSection(Section):
             lines += self.get_formatted_lines()
 
         # if line_after is set, use it to end the section's lines
-        if self.line_after is not None:
+        if self.line_after:
             lines += [self.line_after]
 
         return "\n".join(lines + [""])
@@ -686,7 +686,8 @@ class InlineSection(Section):
             # no additional header information
             lines.append(" ".join(obj_header).rstrip())
 
-            # If not one line kind, write the object's remaining lines
+            # Unless a class where all data is on one line (OneLineArray and
+            # VirtualEvidence), write the object's remaining lines
             if not (isinstance(value, OneLineArray) or
                     isinstance(value, VirtualEvidence)):
                 lines.append(str(value))
@@ -730,7 +731,7 @@ class InlineMCSection(InlineSection):
 
         # if line_before is set, use it to begin the section's lines
         lines = []
-        if self.line_before is not None:
+        if self.line_before:
             lines += [self.line_before]
 
         lines += self.get_header_lines()
@@ -751,7 +752,7 @@ class InlineMCSection(InlineSection):
             lines.append(" ".join(obj_line))
 
         # if line_after is set, use it to end the section's lines
-        if self.line_after is not None:
+        if self.line_after:
             lines += [self.line_after]
 
         return "\n".join(lines + [""])
@@ -786,7 +787,7 @@ class InlineMXSection(InlineSection):
 
         # if line_before is set, use it to begin the section's lines
         lines = []
-        if self.line_before is not None:
+        if self.line_before:
             lines += [self.line_before]
 
         lines += self.get_header_lines()
@@ -807,7 +808,7 @@ class InlineMXSection(InlineSection):
             lines.append(" ".join(obj_line))
 
         # if line_after is set, use it to end the section's lines
-        if self.line_after is not None:
+        if self.line_after:
             lines += [self.line_after]
 
         return "\n".join(lines + [""])
@@ -840,6 +841,7 @@ class InputMaster:
         self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
         self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
         self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
+        self.deterministic_cpt_semisupervised = InlineSection(OBJ_KIND_DETERMINISTICCPT)
         self.virtual_evidence = InlineSection(OBJ_KIND_VECPT)
         self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
         self.mean = InlineSection(OBJ_KIND_MEAN)
@@ -856,6 +858,7 @@ class InputMaster:
         """
         sections = [self.preamble, self.dt, self.name_collection,
                     self.dirichlet, self.deterministic_cpt,
+                    self.deterministic_cpt_semisupervised,
                     self.virtual_evidence, self.dense_cpt, self.mean,
                     self.covar, self.dpmf, self.mc, self.mx, self.real_mat]
 
