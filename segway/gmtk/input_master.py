@@ -4,8 +4,11 @@ from typing import List, Optional, Union
 
 from numpy import array, asarray, empty, ndarray, squeeze
 
-INPUT_MASTER_PREAMBLE = \
-    """#define COMPONENT_TYPE_DIAG_GAUSSIAN 0"""
+DEFAULT_PREAMBLE = \
+"""
+#define COMPONENT_TYPE_DIAG_GAUSSIAN 0
+#define COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN 5
+"""
 
 
 COMPONENT_TYPE_DIAG_GAUSSIAN = 0
@@ -17,6 +20,11 @@ OBJ_KIND_DENSECPT = "DENSE_CPT"
 OBJ_KIND_DETERMINISTICCPT = "DETERMINISTIC_CPT"
 OBJ_KIND_MC = "MC"
 OBJ_KIND_MX = "MX"
+OBJ_KIND_DT = "DT"
+OBJ_KIND_VECPT = "VE_CPT"
+OBJ_KIND_ARBITRARYSTRING = "ARBITRARY_STRING"
+OBJ_KIND_RM = "REAL_MAT"
+OBJ_KIND_DIRICHLETTAB = "DIRICHLET_TAB"
 
 
 # "kind" refers to a kind of GMTK object. GMTK often calls these classes
@@ -50,10 +58,11 @@ class Array(ndarray):
         (dimension 1) from a single scalar input value.
         """
         # Ensure all arguments belong to the correct type
-        if not all(isinstance(arg, NumericArrayLike) for arg in args):
+        if not all((isinstance(arg, float) or isinstance(arg, int) or
+                    isinstance(arg, ndarray)) for arg in args):
             # If union iterable, fix. Otherwise, hardwrite
-            raise TypeError("Argument has incompatible type. "
-                            f"Expected {NumericArrayLike}")
+            raise TypeError("Argument has incompatible type."
+                            "Expected float, int, or ndarray.")
 
         input_array = array(args)
 
@@ -68,13 +77,11 @@ class Array(ndarray):
         return res
 
 
-class DenseCPT(Array):
+class MultiDimArray(Array):
     """
-    A single DenseCPT object.
+    Abstract class providing features for multidimensional arrays which are
+    represented on multiple lines.
     """
-    kind = OBJ_KIND_DENSECPT
-
-    # XXX: check if sums to 1.0
 
     def __str__(self) -> str:
         """
@@ -91,6 +98,36 @@ class DenseCPT(Array):
         cardinality_line = map(str, self.shape)
         line.append(" ".join(cardinality_line))  # cardinalities
         return " ".join(line)
+
+
+class DenseCPT(MultiDimArray):
+    """
+    A single DenseCPT object.
+    """
+    kind = OBJ_KIND_DENSECPT
+
+    # todo check if sums to 1.0
+
+    def set_dirichlet_table(self, dirichlet_name: str):
+        """
+        Set the name of a Dirichlet table which this CPT will reference.
+
+        :param: dirichlet_name: str: Dirichlet table name for this DenseCPT to
+        reference within its header
+        """
+        self.dirichlet_name = dirichlet_name
+
+    def get_header_info(self) -> str:
+        """
+        Return multidimensional array header with dimensions.
+        If the dirichlet_name attribute was set, include an additional line
+        in the header referencing the DirichletTable with that name.
+        """
+        line = MultiDimArray.get_header_info(self)
+        if hasattr(self, "dirichlet_name"):
+            dirichlet_line = f"DirichletTable dirichlet_{self.dirichlet_name}"
+            line = "\n".join((line, dirichlet_line))
+        return line
 
     @classmethod
     def uniform_from_shape(cls, *shape: int,
@@ -150,6 +187,23 @@ class DenseCPT(Array):
         return DenseCPT(values, keep_shape=True)
 
 
+class DirichletTable(MultiDimArray):
+    """
+    A single DirichletTable object.
+    """
+    kind = OBJ_KIND_DIRICHLETTAB
+
+    def get_header_info(self) -> str:
+        """
+        Return number of parents, cardinality line, for header in
+        input.master section.
+        """
+        line = [str(len(self.shape))]  # number of parents
+        cardinality_line = map(str, self.shape)
+        line.append(" ".join(cardinality_line))  # cardinalities
+        return " ".join(line)
+
+
 class NameCollection(list):
     """
     A single NameCollection object.
@@ -169,7 +223,7 @@ class NameCollection(list):
 
     def __str__(self) -> str:
         """
-        Return string format of NameCollection object to be printed into the
+        Returns string format of NameCollection object to be printed into the
         input.master file (new lines to be added)
         """
         return "\n".join(list(self))
@@ -181,7 +235,7 @@ class NameCollection(list):
         return str(len(self))
 
 
-class OneLineKind(Array):
+class OneLineArray(Array):
     """
     An abstract Python class acting as the parent for Python classes
     representing Array-like GMTK kinds that have one-line string
@@ -200,7 +254,7 @@ class OneLineKind(Array):
         return " ".join(line)
 
 
-class Mean(OneLineKind):
+class Mean(OneLineArray):
     """
     A single Mean object.
     __init__ and __str__ methods defined in superclass.
@@ -208,12 +262,60 @@ class Mean(OneLineKind):
     kind = OBJ_KIND_MEAN
 
 
-class Covar(OneLineKind):
+class Covar(OneLineArray):
     """
     A single Covar object.
     __init__ and __str__ methods defined in superclass.
     """
     kind = OBJ_KIND_COVAR
+
+
+class RealMat(OneLineArray):
+    """
+    An entry in a Real matrix object.
+    __init__ and __str__ methods defined in superclass.
+    """
+    kind = OBJ_KIND_RM
+
+    def get_header_info(self) -> str:
+        """
+        Return string representation of own information, for header in
+        input.master section.
+        """
+        # TODO: Should the second 1 be hardcoded? Or is this 2D data?
+        line = [str(len(self)), "1"]  # dimension, additional value
+        line.append(array2text(self))  # array values
+        return " ".join(line)
+
+
+class VirtualEvidence:
+    """
+    A Virtual Evidence object, with syntax inferred from the input.master
+    template implementation.
+    Intended to be printed as one line.
+    Attributes:
+        num_segs: int: number of segments for this Virtual Evidence
+        ve_list_filename: str: filename (or C preprocessor macro) containing
+            the Virtual Evidence list
+    """
+    kind = OBJ_KIND_VECPT
+
+    def __init__(self, num_segs: int, ve_list_filename: str):
+        """
+        Initialize a sinlge Virtual Evidence object.
+        :param num_segs: int: number of segments
+        :param ve_list_filename: str: filename containing Virtual Evidence list
+        """
+        self.num_segs = num_segs
+        self.ve_list_filename = ve_list_filename
+
+    def get_header_info(self) -> str:
+        """
+        Return string representation of own information, for header in
+        input.master section.
+        """
+
+        return f"1 {self.num_segs} 2 {self.ve_list_filename} nfs:{self.num_segs} nis:0 fmt:ascii END"
 
 
 # These types must be defined before they are referenced, so these constants
@@ -250,13 +352,13 @@ def convert(
     return cls(value)
 
 
-class DPMF(OneLineKind):
+class DPMF(OneLineArray):
     """
     A single DPMF object.
     """
     kind = OBJ_KIND_DPMF
 
-    # todo check if sums to 1.0
+    # XXX: check if sums to 1.0
 
     @classmethod
     def uniform_from_shape(cls, shape: int) -> DPMF:
@@ -270,6 +372,26 @@ class DPMF(OneLineKind):
 
         return DPMF(dpmf_values, keep_shape=True)
 
+    def set_dirichlet_pseudocount(self, pseudocount: int):
+        """
+        Set a pseudocount to include in the header alongside the
+        DirichletConst label.
+        """
+        self.pseudocount = pseudocount
+
+    def get_header_info(self) -> str:
+        """
+        Return string representation of own information, for header in
+        input.master section.
+        If the pseudocount attribute was set, include the DirichletConst label
+        and that value in the header before the weights.
+        """
+        line = [str(len(self))]  # dimension
+        if hasattr(self, "pseudocount"):
+            line.append(f"DirichletConst {self.pseudocount}")
+        line.append(array2text(self))  # array values
+        return " ".join(line)
+
 
 class MC:
     """
@@ -282,8 +404,7 @@ class MC:
     def __init__(self, component_type: str):
         """
         Initialize a single MC object.
-        :param component_type: str: type of MC, such as
-            COMPONENT_TYPE_DIAG_GAUSSIAN
+        :param component_type: str: type of MC
         """
         self.component_type = component_type
 
@@ -295,7 +416,7 @@ class MC:
 class DiagGaussianMC(MC, object):
     """
     Attributes:
-        component_type = 0
+        component_type = "COMPONENT_TYPE_DIAG_GAUSSIAN" = 0
         mean: str: name of Mean object associated to this MC
         covar: str: name of Covar obejct associated to this MC
     """
@@ -315,6 +436,31 @@ class DiagGaussianMC(MC, object):
         Return string representation of this MC object.
         """
         return " ".join([self.mean, self.covar])
+
+
+class MissingFeatureDiagGaussianMC(MC, object):
+    """
+    Attributes:
+        component_type = "COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN"
+        mean: str: name of Mean object associated to this MC
+        covar: str: name of Covar obejct associated to this MC
+    """
+    def __init__(self, mean: str, covar: str):
+        """
+        Initialize a single MissingFeatureDiagGaussianMC object.
+        :param mean: name of Mean object associated to this MC
+        :param covar: name of Covar obejct associated to this MC
+        """
+        # more component types?
+        super().__init__("COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN")
+        self.mean = mean
+        self.covar = covar
+
+    def __str__(self) -> str:
+        """
+        Return string representation of this MC object.
+        """
+        return " ".join([self.mean, self.covar, "matrix_weightscale_1x1"])
 
 
 class MX:
@@ -368,15 +514,15 @@ class DeterministicCPT:
     """
     kind = OBJ_KIND_DETERMINISTICCPT
 
-    def __init__(self, cardinality_parents: Union[tuple[int], int],
-                 cardinality: int, dt: str):
+    def __init__(self, cardinality_parents: Union[tuple[str], str],
+                 cardinality: str, dt: str):
         """
         Initialize a single DeterministicCPT object.
-        :param cardinality_parents: tuple[int]: cardinality of parents
-        (if empty, then number of parents = 0
-        :param cardinality: int: cardinality of self
-        :param dt: name existing Decision Tree (DT) associated with this
-        DeterministicCPT
+        :param cardinality_parents: tuple[str]: cardinality of parents
+        (if empty, then number of parents = 0)
+        :param cardinality: str: cardinality of self
+        :param dt: str: name existing Decision Tree (DT) associated with
+        this DeterministicCPT
         """
         if not isinstance(cardinality_parents, tuple):
             self.cardinality_parents = (cardinality_parents, )
@@ -389,7 +535,7 @@ class DeterministicCPT:
         """
         Return string representation of this DeterministicCPT.
         """
-        line = [str(len(self.cardinality_parents))]  # lines
+        line = [str(len(self.cardinality_parents))]  # number of parents
         cardinalities = list(self.cardinality_parents)
         cardinalities.append(self.cardinality)
 
@@ -399,10 +545,48 @@ class DeterministicCPT:
         return "\n".join(line)
 
     def get_header_info(self) -> str:
-        """
-        No additional header information needed in input.master.
-        """
+        # No additional header information needed in input.master.
         return ""
+
+
+class GenericString:
+    """
+    A class storing a generic string to write to input.master.
+    Attributes:
+        contents: str: Generic string to write to input.master
+    """
+    kind = OBJ_KIND_ARBITRARYSTRING
+
+    def __init__(self, contents: str):
+        """
+        Initialize a generic string class.
+        :param contents: generic string to write to input.master
+        """
+        self.contents = contents
+
+    def __str__(self) -> str:
+        """
+        Return the stored string.
+        """
+        return self.contents
+
+    def get_header_info(self) -> str:
+        # No additional header information
+        return ""
+
+
+class DecisionTree(GenericString):
+    """
+    A Decision Tree object.
+    """
+    kind = OBJ_KIND_DT
+
+    def __init__(self, tree: str):
+        """
+        Initialize a DecisionTree object.
+        :param tree: String representation of the tree
+        """
+        super().__init__(tree)
 
 
 class Section(dict):
@@ -411,8 +595,12 @@ class Section(dict):
     Key: name of GMTK object
     Value: GMTK object
     Attributes:
-            kind: str: specifies the kind of GMTK object
-            (default assumes that `self` has no kind)
+            kind: str: specifies the kind of GMTK object (default assumes that
+                `self` has no kind)
+            line_before: str: string to print before the section, often a
+                preprocessor rule
+            line_after: str: string to print after the section, often a
+                preprocessor rule
     """
     def __init__(self, kind: Optional[str] = None):
         """
@@ -420,6 +608,8 @@ class Section(dict):
         """
         super().__init__()
         self.kind = kind
+        self.line_before = None
+        self.line_after = None
 
     def __setitem__(
             self,
@@ -431,9 +621,9 @@ class Section(dict):
         if cls is not None:
             value = convert(cls, value)
 
-        # self.kind is undefined for objects that don't support type conversion
+        # self.kind is undefined for objects that dont support type conversion
         if not self.kind:
-            # Set self.kind as the kind of first GMTK type value passed
+            # sets self.kind as the kind of first GMTK type value passed
             # consistency of kind for all values are checked in InlineSection
             # as the whole dictionary could be checked at once
             self.kind = value.kind
@@ -444,7 +634,7 @@ class Section(dict):
         """
         Generate header lines for this Section object.
         """
-        # object title and total number of GMTK objects
+        # object title and total number of GMTK/MC/MX objects
         return [f"{self.kind}_IN_FILE inline", f"{len(self)}\n"]
 
 
@@ -463,40 +653,68 @@ class InlineSection(Section):
         if len(self) == 0:
             return ""
 
-        # The section generates the index and name of GMTK object
+        # if line_before is set, use it to begin the section's lines
+        lines = []
+        if self.line_before:
+            lines += [self.line_before]
+
+        # if stored items are arbitrary strings, return them out without
+        # any additional formatting. Otherwise, apply formatting
+        if self.kind == OBJ_KIND_ARBITRARYSTRING:
+            lines += self.get_unformatted_lines()
+        else:
+            lines += self.get_formatted_lines()
+
+        # if line_after is set, use it to end the section's lines
+        if self.line_after:
+            lines += [self.line_after]
+
+        return "\n".join(lines + [""])
+
+    def get_formatted_lines(self) -> List[str]:
+        """
+        Format the GMTK objects with a section header and object headers
+        """
         lines = self.get_header_lines()
         for index, (key, value) in enumerate(self.items()):
-            # Use section information to generate index and name of GMTK object
-            obj_header = [str(index), key]
+            obj_header = [str(index), key]  # Index and name of GMTK object
 
-            # Use GMTK object to generate additional special header information
-            # Append this to the index and name above
+            # Special header information for some GMTK types
             obj_header.append(value.get_header_info())
 
             # Use rstrip to remove the trailing space for GMTK types with
             # no additional header information
             lines.append(" ".join(obj_header).rstrip())
 
-            # One line kind objects have all data included in the header
-            # If not one line kind, write the object's remaining data lines
-            if not isinstance(value, OneLineKind):
+            # Unless a class where all data is on one line (OneLineArray and
+            # VirtualEvidence), write the object's remaining lines
+            if not (isinstance(value, OneLineArray) or
+                    isinstance(value, VirtualEvidence)):
                 lines.append(str(value))
 
-        return "\n".join(lines + [""])
+        return lines
+
+    def get_unformatted_lines(self) -> List[str]:
+        """
+        Extract the string representation of all GMTK objects, with no
+        headers or additional formatting. Intended for representing
+        Arbitrary String objects.
+        """
+        return [str(value) for value in self.values()]
 
 
 class InlineMCSection(InlineSection):
     """
     Special InlineSection subclass which contains MC objects.
     Attributes:
-        mean: the InlineSection object stored at InputMaster.mean
-        covar: the InlineSection object stored at InputMaster.covar
+        mean: InlineSection object which point to InputMaster.mean
+        covar: InlineSection object which point to InputMaster.covar
     """
     def __init__(self, mean: InlineSection, covar: InlineSection):
         """
-        :param mean: InlineSection: the InlineSection object stored at
+        :param mean: InlineSection: InlineSection object which point to
         InputMaster.mean
-        :param covar: InlineSection: the InlineSection object stored at
+        :param covar: InlineSection: InlineSection object which point to
         InputMaster.covar
         """
         super().__init__(OBJ_KIND_MC)
@@ -511,7 +729,12 @@ class InlineMCSection(InlineSection):
         if len(self) == 0:
             return ""
 
-        lines = self.get_header_lines()
+        # if line_before is set, use it to begin the section's lines
+        lines = []
+        if self.line_before:
+            lines += [self.line_before]
+
+        lines += self.get_header_lines()
         for index, (name, obj) in enumerate(list(self.items())):
             # check if dimension of Mean and Covar of this MC are the same
             mean_ndim = len(self.mean[obj.mean])
@@ -528,6 +751,10 @@ class InlineMCSection(InlineSection):
             obj_line.append(str(obj))
             lines.append(" ".join(obj_line))
 
+        # if line_after is set, use it to end the section's lines
+        if self.line_after:
+            lines += [self.line_after]
+
         return "\n".join(lines + [""])
 
 
@@ -535,16 +762,20 @@ class InlineMXSection(InlineSection):
     """
     Special InlineSection subclass which contains MX objects.
     Attributes:
-        dpmf: the InlineSection object stored at InputMaster.dpmf
+        dpmf: InlineSection object which point to InputMaster.dpmf
+        components: InlineSection object which point to InputMaster.mc
     """
 
-    def __init__(self, dpmf: InlineSection):
+    def __init__(self, dpmf: InlineSection, mc: InlineSection):
         """
-        :param dpmf: InlineSection: the InlineSection object stored at
+        :param dpmf: InlineSection: InlineSection object which point to
         InputMaster.dpmf
+        :param components: InlineSection: InlineSection object which point to
+        InputMaster.mc
         """
         super().__init__(OBJ_KIND_MX)
         self.dpmf = dpmf
+        self.mc = mc
 
     def __str__(self) -> str:
         """
@@ -554,7 +785,12 @@ class InlineMXSection(InlineSection):
         if len(self) == 0:
             return ""
 
-        lines = self.get_header_lines()
+        # if line_before is set, use it to begin the section's lines
+        lines = []
+        if self.line_before:
+            lines += [self.line_before]
+
+        lines += self.get_header_lines()
         for index, (name, obj) in enumerate(list(self.items())):
             # Assert number of components is equal to length of DPMF
             dpmf_ndim = len(self.dpmf[obj.dpmf])
@@ -570,6 +806,10 @@ class InlineMXSection(InlineSection):
 
             # string representation of this MX object
             lines.append(" ".join(obj_line))
+
+        # if line_after is set, use it to end the section's lines
+        if self.line_after:
+            lines += [self.line_after]
 
         return "\n".join(lines + [""])
 
@@ -591,37 +831,45 @@ class InputMaster:
         input master
     """
 
-    def __init__(self):
+    def __init__(self, preamble=DEFAULT_PREAMBLE):
         """
         Initialize InputMaster instance with empty attributes (InlineSection
         and its subclasses).
         """
-        self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
+        self.preamble = preamble
+        self.dt = InlineSection(OBJ_KIND_DT)
         self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
+        self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
+        self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
+        self.deterministic_cpt_semisupervised = InlineSection(OBJ_KIND_DETERMINISTICCPT)
+        self.virtual_evidence = InlineSection(OBJ_KIND_VECPT)
+        self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
         self.mean = InlineSection(OBJ_KIND_MEAN)
         self.covar = InlineSection(OBJ_KIND_COVAR)
-        self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
         self.dpmf = InlineSection(OBJ_KIND_DPMF)
         self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
-        self.mx = InlineMXSection(dpmf=self.dpmf)
+        self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
+        self.real_mat = InlineSection(OBJ_KIND_RM)
 
     def __str__(self) -> str:
         """
         Return string representation of all the attributes (GMTK types) by
         calling the attributes' (InlineSection and its subclasses) `__str__()`.
         """
-        sections = [self.deterministic_cpt, self.name_collection, self.mean,
-                    self.covar, self.dense_cpt, self.dpmf, self.mc, self.mx]
+        sections = [self.preamble, self.dt, self.name_collection,
+                    self.dirichlet, self.deterministic_cpt,
+                    self.deterministic_cpt_semisupervised,
+                    self.virtual_evidence, self.dense_cpt, self.mean,
+                    self.covar, self.dpmf, self.mc, self.mx, self.real_mat]
 
-        return "\n".join(str(section) for section in sections)
+        return "\n".join([str(section) for section in sections])
 
     def save(self, filename: str) -> None:
         """
-        Write the specified InputMaster object as a string representation to
-        the provided filename
-        Open filename for writing and write the string representation
+        Opens filename for writing and writes out
+        the contents of its attributes.
         :param: filename: str: path to input master file
+        (default assumes path to `traindir` is "traindir")
         """
-        with open(filename, "w") as outfile:
-            print(INPUT_MASTER_PREAMBLE, file=outfile)
-            print(self, file=outfile)
+        with open(filename, "w") as file:
+            print(self, file=file)

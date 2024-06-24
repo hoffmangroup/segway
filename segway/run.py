@@ -63,9 +63,9 @@ from .bed import parse_bed4, read_native
 from .cluster import (is_running_locally, JobTemplateFactory, make_native_spec,
                       RestartableJob, RestartableJobDict, Session)
 from .include import IncludeSaver
+from .input_master import (INPUT_MASTER_NAME, save_input_master)
 from .observations import Observations
 from .output import IdentifySaver, PosteriorSaver
-from .segway_input_master import InputMasterSaver
 from .structure import StructureSaver
 from .task import MSG_SUCCESS
 from .version import __version__
@@ -252,7 +252,6 @@ BEDGRAPH_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BEDGRAPH, EXT_GZ)
 
 # "posterior%s.%%d.bedgraph.gz"
 BEDGRAPH_FILEBASEFMT = extjoin(PREFIX_POSTERIOR, "%%d", EXT_BEDGRAPH, EXT_GZ)
-
 
 # "posterior%s.bed.gz"
 POSTERIOR_BED_FILEBASENAME = extjoin(PREFIX_POSTERIOR, EXT_BED, EXT_GZ)
@@ -549,7 +548,7 @@ class TrainThread(Thread):
         self.num_segs = num_segs
         self.instance_index = instance_index
         self.runner.input_master_filename = make_default_filename(
-            InputMasterSaver.resource_name, runner.params_dirpath,
+            INPUT_MASTER_NAME, runner.params_dirpath,
             instance_index)
 
         Thread.__init__(self)
@@ -2043,9 +2042,19 @@ class Runner(object):
         else:
             input_master_filename = self.input_master_filename
 
-        _, input_master_filename_is_new = \
-            InputMasterSaver(self)(input_master_filename, self.params_dirpath,
-                                   self.clobber, instance_index)
+        if input_master_filename:
+            is_new = self.clobber or not Path(input_master_filename).exists()
+        else:
+            input_master_filename = make_default_filename(INPUT_MASTER_NAME,
+                                                          self.params_dirpath,
+                                                          instance_index)
+            is_new = True
+
+        if is_new:
+            save_input_master(self, input_master_filename, self.params_dirpath,
+                              instance_index)
+
+        return input_master_filename
 
     def load_supervision(self):
         # The semi-supervised mode changes the DBN structure so there is an
@@ -3227,10 +3236,8 @@ class Runner(object):
         # must be before file creation. Otherwise
         # input_master_filename_is_new will be wrong
 
-        input_master_filename, input_master_filename_is_new = \
-            InputMasterSaver(self)(self.input_master_filename,
-                                   self.params_dirpath, self.clobber)
-        self.input_master_filename = input_master_filename
+        self.input_master_filename = \
+            self.save_input_master()
 
         # save file locations to tab-delimited file
         self.save_tab_file(self, TRAIN_OPTION_TYPES, TRAIN_FILEBASENAME)
@@ -3248,10 +3255,6 @@ class Runner(object):
                     instance_random_seed = self.random_seed + index
                     self.random_state = RandomState(instance_random_seed)
                 self.save_input_master(index, True)
-
-        if not input_master_filename_is_new:
-            # do not overwrite existing file
-            input_master_filename = None
 
     def get_thread_run_func(self):
         if len(self.num_segs_range) > 1 or self.num_instances > 1:
@@ -3418,7 +3421,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # only want "input.master" not "input.0.master" if there is
         # only one instance
         if (not self.instance_make_new_params and
-           resource == InputMasterSaver.resource_name):
+           resource == INPUT_MASTER_NAME):
             instance_index = None
 
         old_filename = make_default_filename(resource,
@@ -3455,7 +3458,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             # into our current one. If just using train-run-round, these will
             # already be present.
             self.input_master_filename = \
-                self.recover_filename(InputMasterSaver.resource_name)
+                self.recover_filename(INPUT_MASTER_NAME)
             log_likelihood_tab_filename = self.log_likelihood_tab_filename
             recover_log_likelihood_tab_filepath.copy2(
                 log_likelihood_tab_filename)
@@ -4055,7 +4058,7 @@ Use `segway COMMAND --help` for help specific to command COMMAND.
     group.add_argument("-i", "--input-master", metavar="FILE",
                        help="use or create input master in FILE"
                        " (default %s)" %
-                       make_default_filename(InputMasterSaver.resource_name,
+                       make_default_filename(INPUT_MASTER_NAME,
                                              DIRPATH_PARAMS))
 
     group.add_argument("-s", "--structure", metavar="FILE",
