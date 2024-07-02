@@ -18,7 +18,7 @@ from ._util import (data_string, DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_NORM,
 from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
                                 DiagGaussianMC, DirichletTable, DPMF,
                                 InputMaster, MissingFeatureDiagGaussianMC, MX,
-                                RealMat, VirtualEvidence)
+                                VirtualEvidence)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations
 # of scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -276,10 +276,6 @@ f"""#include "{include_filename}"
                         else:
                             input_master.mc[mc_name] = \
                                 DiagGaussianMC(mean=mean_name, covar=covar_name)
-
-        # RealMat (REAL_MAT_IN_FILE)
-        if USE_MFSDG:
-            input_master.real_mat["matrix_weightscale_1x1"] = RealMat(1.0)
 
     else:
         raise ValueError("distribution %s not supported" % distribution)

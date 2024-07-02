@@ -23,7 +23,6 @@ OBJ_KIND_MX = "MX"
 OBJ_KIND_DT = "DT"
 OBJ_KIND_VECPT = "VE_CPT"
 OBJ_KIND_ARBITRARYSTRING = "ARBITRARY_STRING"
-OBJ_KIND_RM = "REAL_MAT"
 OBJ_KIND_DIRICHLETTAB = "DIRICHLET_TAB"
 
 
@@ -268,24 +267,6 @@ class Covar(OneLineArray):
     __init__ and __str__ methods defined in superclass.
     """
     kind = OBJ_KIND_COVAR
-
-
-class RealMat(OneLineArray):
-    """
-    An entry in a Real matrix object.
-    __init__ and __str__ methods defined in superclass.
-    """
-    kind = OBJ_KIND_RM
-
-    def get_header_info(self) -> str:
-        """
-        Return string representation of own information, for header in
-        input.master section.
-        """
-        # TODO: Should the second 1 be hardcoded? Or is this 2D data?
-        line = [str(len(self)), "1"]  # dimension, additional value
-        line.append(array2text(self))  # array values
-        return " ".join(line)
 
 
 class VirtualEvidence:
@@ -849,7 +830,6 @@ class InputMaster:
         self.dpmf = InlineSection(OBJ_KIND_DPMF)
         self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
         self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
-        self.real_mat = InlineSection(OBJ_KIND_RM)
 
     def __str__(self) -> str:
         """
@@ -860,7 +840,7 @@ class InputMaster:
                     self.dirichlet, self.deterministic_cpt,
                     self.deterministic_cpt_semisupervised,
                     self.virtual_evidence, self.dense_cpt, self.mean,
-                    self.covar, self.dpmf, self.mc, self.mx, self.real_mat]
+                    self.covar, self.dpmf, self.mc, self.mx]
 
         return "\n".join([str(section) for section in sections])
 
