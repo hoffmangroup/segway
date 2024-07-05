@@ -495,13 +495,13 @@ class DeterministicCPT:
     """
     kind = OBJ_KIND_DETERMINISTICCPT
 
-    def __init__(self, cardinality_parents: Union[tuple[str], str],
+    def __init__(self, cardinality_parents: Union[tuple[int], int],
                  cardinality: str, dt: str):
         """
         Initialize a single DeterministicCPT object.
-        :param cardinality_parents: tuple[str]: cardinality of parents
+        :param cardinality_parents: tuple[int]: cardinality of parents
         (if empty, then number of parents = 0)
-        :param cardinality: str: cardinality of self
+        :param cardinality: int: cardinality of self
         :param dt: str: name existing Decision Tree (DT) associated with
         this DeterministicCPT
         """
@@ -822,7 +822,6 @@ class InputMaster:
         self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
         self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
         self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
-        self.deterministic_cpt_semisupervised = InlineSection(OBJ_KIND_DETERMINISTICCPT)
         self.virtual_evidence = InlineSection(OBJ_KIND_VECPT)
         self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
         self.mean = InlineSection(OBJ_KIND_MEAN)
@@ -838,7 +837,6 @@ class InputMaster:
         """
         sections = [self.preamble, self.dt, self.name_collection,
                     self.dirichlet, self.deterministic_cpt,
-                    self.deterministic_cpt_semisupervised,
                     self.virtual_evidence, self.dense_cpt, self.mean,
                     self.covar, self.dpmf, self.mc, self.mx]
 

@@ -40,13 +40,17 @@ else:
     COVAR_TIED = True
 
 
-# here to avoid duplication
 NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION = "segCountDown_seg_segTransition"
 
 # define the pseudocount for training the mixture distribution weights
 GAUSSIAN_MIXTURE_WEIGHTS_PSEUDOCOUNT = 100
 
+# Cardinality of Segment Transition
 CARD_SEGTRANSITION = 3
+
+# Cardinality of Boolean variables
+CARD_BOOL = 2
+CARD_RULER = CARD_BOOL
 
 # XXX: should be options
 LEN_SEG_EXPECTED = 100000
@@ -81,34 +85,32 @@ def prob_transition_from_expected_len(length):
 def save_input_master(runner, input_master_filename, params_dirpath=None,
                       instance_index=None):
     """
-    Save the input.master file using the GMTK API.
+    Save the input.master file using the Segway Toolkit.
     """
 
     # Preamble
-    include_filename = runner.gmtk_include_filename_relative
+    include_file = runner.gmtk_include_filename_relative
     card_seg = runner.num_segs
-    segway_preamble = \
-f"""#include "{include_filename}"
-
-#if CARD_SEG != {card_seg}
-#error Specified number of segment labels (CARD_SEG) does not match the number used for this input master file ({card_seg})
-#endif
-
-"""
+    segway_preamble = make_preamble(include_file=include_file,
+                                    card_seg=card_seg)
 
     # Initialize InputMaster option
     input_master = InputMaster(preamble=segway_preamble)
 
     # Decision Trees (DT_IN_FILE)
+    # Decision Tree describing ruler from current frameIndex
     map_frameIndex_ruler_tree = data_string("map_frameIndex_ruler.dt.txt")
     input_master.dt["map_frameIndex_ruler"] = \
         DecisionTree(map_frameIndex_ruler_tree)
 
+    # Decision Tree describing initial segCountDown from current segment variable
     map_seg_segCountDown_tree = \
         make_segCountDown_tree_spec(runner, "map_seg_segCountDown.dt.tmpl")
     input_master.dt["map_seg_segCountDown"] = \
         DecisionTree(map_seg_segCountDown_tree)
 
+    # Decision Tree describing segCountDown from current segTransition,
+    # current ruler, current segment, and previous segCountDown
     map_segTransition_ruler_seg_segCountDown_segCountDown_tree = \
         make_segCountDown_tree_spec(runner,
                                     "map_segTransition_ruler_seg_segCountDown_segCountDown.dt.tmpl")
@@ -120,6 +122,7 @@ f"""#include "{include_filename}"
         DecisionTree(map_seg_subseg_obs_tree)
 
     if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
+        # Decision Tree used set segment under supervision
         map_supervisionLabel_seg_alwaysTrue = \
             data_string("map_supervisionLabel_seg_alwaysTrue_semisupervised.dt.txt")
         input_master.dt["map_supervisionLabel_seg_alwaysTrue"] = \
@@ -128,15 +131,17 @@ f"""#include "{include_filename}"
         assert runner.supervision_type == SUPERVISION_UNSUPERVISED
 
     # Name Collection (NAME_COLLECTION_IN_LINE)
-    num_segs = runner.num_segs
-    num_subsegs = runner.num_subsegs
+    # For each track, create a name collection with a name for each choice of
+    # segment and subsegment
+    card_seg = runner.num_segs
+    card_subseg = runner.num_subsegs
     for track_index, track_group in enumerate(runner.track_groups):
         track_name = track_group[0].name
         name_collection_name = f"collection_seg_{track_name}"
         name_collection_items = []
-        for seg_index in range(num_segs):
+        for seg_index in range(card_seg):
             seg_name = f"seg{seg_index}"
-            for subseg_index in range(num_subsegs):
+            for subseg_index in range(card_subseg):
                 subseg_name = f"subseg{subseg_index}"
                 mx_name = f"mx_{seg_name}_{subseg_name}_{track_name}"
                 name_collection_items.append(mx_name)
@@ -157,75 +162,74 @@ f"""#include "{include_filename}"
             DirichletTable(pseudocounts, keep_shape=True)
 
     # Deterministic CPTs (DETERMINISTIC_CPT_IN_FILE) for the unsupervised case
-    input_master.deterministic_cpt.line_before = \
-        "#if CARD_SUPERVISIONLABEL == -1"
+    card_segCountDown = runner.card_seg_countdown
+    # DeterministicCPT using map_seg_segCountDown Decision Tree to describe
+    # initial segCountDown from current segment variable
     input_master.deterministic_cpt["seg_segCountDown"] = \
-        DeterministicCPT(("CARD_SEG", ), "CARD_SEGCOUNTDOWN",
+        DeterministicCPT((card_seg, ), card_segCountDown,
                          "map_seg_segCountDown")
+    card_frameIndex = runner.max_frames
+    # DeterministicCPT using map_frameIndex_ruler Decision Tree to describe
+    # ruler from current frameIndex
     input_master.deterministic_cpt["frameIndex_ruler"] = \
-        DeterministicCPT(("CARD_FRAMEINDEX", ), "CARD_RULER",
+        DeterministicCPT((card_frameIndex, ), CARD_RULER,
                          "map_frameIndex_ruler")
+    # DeterministicCPT using
+    # map_segTransition_ruler_seg_segCountDown_segCountDown Decision Tree to
+    # describe segCountDown from current segTransition, current ruler, current
+    # segment, and previous segCountDown
     input_master.deterministic_cpt["segTransition_ruler_seg_segCountDown_segCountDown"] = \
-        DeterministicCPT(("CARD_SEGTRANSITION", "CARD_RULER", "CARD_SEG",
-                          "CARD_SEGCOUNTDOWN"), "CARD_SEGCOUNTDOWN",
+        DeterministicCPT((CARD_SEGTRANSITION, CARD_RULER, card_seg,
+                          card_segCountDown), card_segCountDown,
                          "map_segTransition_ruler_seg_segCountDown_segCountDown")
+    # DeterministicCPT which sets a segment from the previous segment value
     input_master.deterministic_cpt["seg_seg_copy"] = \
-        DeterministicCPT(("CARD_SEG", ), "CARD_SEG",
+        DeterministicCPT((card_seg, ), card_seg,
                          "internal:copyParent")
+    # DeterministicCPT which sets a subsegment from the previous subsegment
+    # value
     input_master.deterministic_cpt["subseg_subseg_copy"] = \
-        DeterministicCPT(("CARD_SUBSEG", ), "CARD_SUBSEG",
+        DeterministicCPT((card_subseg, ), card_subseg,
                          "internal:copyParent")
-    input_master.deterministic_cpt.line_after = \
-        "#endif"
-
-    # Deterministic CPTs (DETERMINISTIC_CPT_IN_FILE) for the semisupervised case
-    input_master.deterministic_cpt_semisupervised.line_before = \
-        "#if CARD_SUPERVISIONLABEL != -1"
-    input_master.deterministic_cpt_semisupervised["seg_segCountDown"] = \
-        DeterministicCPT(("CARD_SEG", ), "CARD_SEGCOUNTDOWN",
-                         "map_seg_segCountDown")
-    input_master.deterministic_cpt_semisupervised["frameIndex_ruler"] = \
-        DeterministicCPT(("CARD_FRAMEINDEX", ), "CARD_RULER",
-                         "map_frameIndex_ruler")
-    input_master.deterministic_cpt_semisupervised["segTransition_ruler_seg_segCountDown_segCountDown"] = \
-        DeterministicCPT(("CARD_SEGTRANSITION", "CARD_RULER", "CARD_SEG",
-                          "CARD_SEGCOUNTDOWN"), "CARD_SEGCOUNTDOWN",
-                         "map_segTransition_ruler_seg_segCountDown_segCountDown")
-    input_master.deterministic_cpt_semisupervised["seg_seg_copy"] = \
-        DeterministicCPT(("CARD_SEG", ), "CARD_SEG",
-                         "internal:copyParent")
-    input_master.deterministic_cpt_semisupervised["subseg_subseg_copy"] = \
-        DeterministicCPT(("CARD_SUBSEG", ), "CARD_SUBSEG",
-                         "internal:copyParent")
-    input_master.deterministic_cpt_semisupervised["supervisionLabel_seg_alwaysTrue"] = \
-        DeterministicCPT(("CARD_SUPERVISIONLABEL", "CARD_SEG"),
-                         "CARD_BOOLEAN",
+    
+    card_supervisionlabel = runner.card_supervision_label
+    # Additional Deterministic CPT for the semisupervised case
+    if card_supervisionlabel != -1:
+        # Deterministic CPT which uses map_supervisionLabel_seg_alwaysTrue
+        # Decision Tree to set a segment under supervision
+        input_master.deterministic_cpt["supervisionLabel_seg_alwaysTrue"] = \
+        DeterministicCPT((card_supervisionlabel, card_seg),
+                         CARD_BOOL,
                          "map_supervisionLabel_seg_alwaysTrue")
-    input_master.deterministic_cpt_semisupervised.line_after = \
-        "#endif"
 
     # Virtual Evidence (VE_CPT_IN_FILE)
     input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
     input_master.virtual_evidence["seg_virtualEvidence"] = \
-        VirtualEvidence(num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME)
+        VirtualEvidence(card_seg, VIRTUAL_EVIDENCE_LIST_FILENAME)
     input_master.virtual_evidence.line_after = "#endif"
 
     # DenseCPT begins the block conditional on INPUT_PARAMS_FILENAME
     input_master.dense_cpt.line_before = "#ifndef INPUT_PARAMS_FILENAME"
     # Dense CPTs (DENSE_CPT_IN_FILE)
-    input_master.dense_cpt["start_seg"] = DenseCPT.uniform_from_shape(num_segs)
+    # Dense CPT describing initial segment probabilities
+    input_master.dense_cpt["start_seg"] = DenseCPT.uniform_from_shape(card_seg)
+    # Dense CPT describing subsegment probabilities given segment
     input_master.dense_cpt["seg_subseg"] = \
-        DenseCPT(fill_array(1.0 / num_subsegs, (num_segs, num_subsegs)),
+        DenseCPT(fill_array(1.0 / card_subseg, (card_seg, card_subseg)),
                  keep_shape=True)
+    # DenseCPT describing segment to segment transition
     input_master.dense_cpt["seg_seg"] = \
-        DenseCPT.uniform_from_shape(num_segs, num_segs,
+        DenseCPT.uniform_from_shape(card_seg, card_seg,
                                     self_transition=0)
+    # Dense CPT describing segment-subsegment to subsegment transition
     input_master.dense_cpt["seg_subseg_subseg"] = \
-        DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs,
+        DenseCPT.uniform_from_shape(card_seg, card_subseg, card_subseg,
                                     self_transition=0)
+    # Dense CPT describing SEGTRANSITION variable probability from
+    # SEGCOUNTDOWN and segment variables
     input_master.dense_cpt[NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION] = \
         make_dense_cpt_segCountDown_seg_segTransition_cpt(runner)
-    if runner.use_dinucleotide:
+    if runner.use_dinucleotide: 
         input_master.dense_cpt["seg_dinucleotide"] = \
             make_dense_cpt_seg_dinucleotide_cpt()
 
@@ -233,12 +237,15 @@ f"""#include "{include_filename}"
 
     # Objects for normal distributions
     if distribution in DISTRIBUTIONS_LIKE_NORM:
+        # For each choice of track, segment, and subsegment, create
+        # num_mix_component Gaussian mixture components each with a unique
+        # mean and covariance value
         for component in range(runner.num_mix_components):
             mean_data = make_mean_data(runner)
             covar_data = make_covar_data(runner)
-            for seg_index in range(num_segs):
+            for seg_index in range(card_seg):
                 seg_name = f"seg{seg_index}"
-                for subseg_index in range(num_subsegs):
+                for subseg_index in range(card_subseg):
                     subseg_name = f"subseg{subseg_index}"
                     for track_index, track_group in enumerate(runner.track_groups):
                         track_name = track_group[0].name
@@ -282,11 +289,14 @@ f"""#include "{include_filename}"
 
     # DPMF (DPMF_IN_FILE)
     if runner.num_mix_components == 1:
+        # Create a uniform DPMF over one variable
         input_master.dpmf["dpmf_always"] = DPMF.uniform_from_shape(1)
     else:
-        for seg_index in range(num_segs):
+        # For each choice of segment and subsegment, create a unique DPMF with
+        # a uniform distribution over num_mix_components variables
+        for seg_index in range(card_seg):
             seg_name = f"seg{seg_index}"
-            for subseg_index in range(num_subsegs):
+            for subseg_index in range(card_subseg):
                 subseg_name = f"subseg{subseg_index}"
                 for track_index, track_group in enumerate(runner.track_groups):
                     track_name = track_group[0].name
@@ -298,9 +308,11 @@ f"""#include "{include_filename}"
                     input_master.dpmf[dpmf_name] = dpmf_obj
 
     # Mixtures (MX_IN_FILE)
-    for seg_index in range(num_segs):
+    # For each choice of track, segment, and subsegment, create a Gaussian
+    # mixture model from that choice's mixture components and DPMF
+    for seg_index in range(card_seg):
         seg_name = f"seg{seg_index}"
-        for subseg_index in range(num_subsegs):
+        for subseg_index in range(card_subseg):
             subseg_name = f"subseg{subseg_index}"
             for track_index, track_group in enumerate(runner.track_groups):
                 track_name = track_group[0].name
@@ -343,6 +355,12 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
                                   instance_index)
 
     input_master.save(input_master_filename)
+
+
+def make_preamble(include_file, card_seg):
+    preamble_tmpl = "segway_preamble.tmpl"
+    return resource_substitute(preamble_tmpl)(include_file=include_file,
+                                              card_seg=card_seg)
 
 
 def make_segCountDown_tree_spec(runner, resourcename):
