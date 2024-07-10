@@ -536,7 +536,7 @@ class GenericString:
     Attributes:
         contents: str: Generic string to write to input.master
     """
-    kind = OBJ_KIND_ARBITRARYSTRING
+    kind = OBJ_KIND_GENERICSTRING
 
     def __init__(self, contents: str):
         """
@@ -639,9 +639,9 @@ class InlineSection(Section):
         if self.line_before:
             lines += [self.line_before]
 
-        # if stored items are arbitrary strings, return them out without
+        # if stored items are generic strings, return them out without
         # any additional formatting. Otherwise, apply formatting
-        if self.kind == OBJ_KIND_ARBITRARYSTRING:
+        if self.kind == OBJ_KIND_GENERICSTRING:
             lines += self.get_unformatted_lines()
         else:
             lines += self.get_formatted_lines()
@@ -679,7 +679,7 @@ class InlineSection(Section):
         """
         Extract the string representation of all GMTK objects, with no
         headers or additional formatting. Intended for representing
-        Arbitrary String objects.
+        Generic String objects.
         """
         return [str(value) for value in self.values()]
 
