@@ -191,7 +191,7 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     input_master.deterministic_cpt["subseg_subseg_copy"] = \
         DeterministicCPT((card_subseg, ), card_subseg,
                          "internal:copyParent")
-    
+
     card_supervisionlabel = runner.card_supervision_label
     # Additional Deterministic CPT for the semisupervised case
     if card_supervisionlabel != -1:
@@ -229,7 +229,7 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     # SEGCOUNTDOWN and segment variables
     input_master.dense_cpt[NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION] = \
         make_dense_cpt_segCountDown_seg_segTransition_cpt(runner)
-    if runner.use_dinucleotide: 
+    if runner.use_dinucleotide:
         input_master.dense_cpt["seg_dinucleotide"] = \
             make_dense_cpt_seg_dinucleotide_cpt()
 
