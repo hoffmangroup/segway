@@ -15,7 +15,7 @@ from ._util import (data_string, DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_NORM,
                     OFFSET_START, OFFSET_STEP, resource_substitute,
                     SUPERVISION_SEMISUPERVISED, SUPERVISION_UNSUPERVISED,
                     USE_MFSDG, VIRTUAL_EVIDENCE_LIST_FILENAME)
-from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
+from .gmtk.params import (DecisionTree, DenseCPT, DeterministicCPT,
                                 DiagGaussianMC, DirichletTable, DPMF,
                                 InputMaster, MissingFeatureDiagGaussianMC, MX,
                                 VirtualEvidence)
