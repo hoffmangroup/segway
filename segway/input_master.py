@@ -16,9 +16,9 @@ from ._util import (data_string, DISTRIBUTION_ASINH_NORMAL, DISTRIBUTION_NORM,
                     SUPERVISION_SEMISUPERVISED, SUPERVISION_UNSUPERVISED,
                     USE_MFSDG, VIRTUAL_EVIDENCE_LIST_FILENAME)
 from .gmtk.params import (DecisionTree, DenseCPT, DeterministicCPT,
-                                DiagGaussianMC, DirichletTable, DPMF,
-                                InputMaster, MissingFeatureDiagGaussianMC, MX,
-                                VirtualEvidence)
+                          DiagGaussianMC, DirichletTable, DPMF,
+                          InputMaster, MissingFeatureDiagGaussianMC, MX,
+                          VirtualEvidence)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations
 # of scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -91,11 +91,11 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     # Preamble
     include_file = runner.gmtk_include_filename_relative
     card_seg = runner.num_segs
-    segway_preamble = make_preamble(include_file=include_file,
+    preamble = make_preamble(include_file=include_file,
                                     card_seg=card_seg)
 
     # Initialize InputMaster option
-    input_master = InputMaster(preamble=segway_preamble)
+    input_master = InputMaster(preamble=preamble)
 
     # Decision Trees (DT_IN_FILE)
     # Decision Tree describing ruler from current frameIndex
@@ -103,7 +103,8 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     input_master.dt["map_frameIndex_ruler"] = \
         DecisionTree(map_frameIndex_ruler_tree)
 
-    # Decision Tree describing initial segCountDown from current segment variable
+    # Decision Tree describing initial segCountDown from current segment
+    # variable
     map_seg_segCountDown_tree = \
         make_segCountDown_tree_spec(runner, "map_seg_segCountDown.dt.tmpl")
     input_master.dt["map_seg_segCountDown"] = \
@@ -117,6 +118,7 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     input_master.dt["map_segTransition_ruler_seg_segCountDown_segCountDown"] = \
         DecisionTree(map_segTransition_ruler_seg_segCountDown_segCountDown_tree)
 
+    # XXXopt: good candidate for a linear combination C deterministic mapper
     map_seg_subseg_obs_tree = data_string("map_seg_subseg_obs.dt.txt")
     input_master.dt["map_seg_subseg_obs"] = \
         DecisionTree(map_seg_subseg_obs_tree)
@@ -198,9 +200,9 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
         # Deterministic CPT which uses map_supervisionLabel_seg_alwaysTrue
         # Decision Tree to set a segment under supervision
         input_master.deterministic_cpt["supervisionLabel_seg_alwaysTrue"] = \
-        DeterministicCPT((card_supervisionlabel, card_seg),
-                         CARD_BOOL,
-                         "map_supervisionLabel_seg_alwaysTrue")
+            DeterministicCPT((card_supervisionlabel, card_seg),
+                             CARD_BOOL,
+                             "map_supervisionLabel_seg_alwaysTrue")
 
     # Virtual Evidence (VE_CPT_IN_FILE)
     input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
@@ -261,9 +263,11 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
                             mean_data[seg_index, subseg_index, track_index]
 
                         # Covar (COVAR_IN_FILE)
-                        # If COVAR_TIED, write one covar per track and component
+                        # If COVAR_TIED, write one covar per track and
+                        # component
                         if COVAR_TIED:
-                            covar_name = f"covar_{track_name}{component_suffix}"
+                            covar_name = \
+                                f"covar_{track_name}{component_suffix}"
                             if seg_index == 0 and subseg_index == 0:
                                 input_master.covar[covar_name] = \
                                     covar_data[seg_index, subseg_index,
@@ -274,7 +278,8 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
                                 covar_data[seg_index, subseg_index,
                                            track_index]
 
-                        # Diag Gaussian MC with mean and covar name (MC_IN_FILE)
+                        # Diag Gaussian MC with mean and covar name
+                        # (MC_IN_FILE)
                         mc_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
                         if USE_MFSDG:  # Add weights to end of Gaussian
                             input_master.mc[mc_name] = \
@@ -358,7 +363,7 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
 
 
 def make_preamble(include_file, card_seg):
-    preamble_tmpl = "segway_preamble.tmpl"
+    preamble_tmpl = "preamble.tmpl"
     return resource_substitute(preamble_tmpl)(include_file=include_file,
                                               card_seg=card_seg)
 

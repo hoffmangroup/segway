@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Optional, Union
+from typing import get_args, List, Optional, Union
 
 from numpy import array, asarray, empty, ndarray, squeeze
 
@@ -43,6 +43,18 @@ def array2text(a: Array) -> str:
     return delimiter.join(array2text(row) for row in a)
 
 
+def make_cardinality_line(shape: ndarray) -> str:
+    """
+    Create a string representation of the cardinality of an array with the
+    specified shape. This string includes the number of parents and the
+    cardinality of each parent.
+    """
+    num_parents = len(shape)
+    cardinalities = shape
+
+    return " ".join(map(str, [num_parents, *cardinalities]))
+
+
 # Types of array data
 NumericArrayLike = Union[float, int, ndarray]
 
@@ -57,11 +69,12 @@ class Array(ndarray):
         (dimension 1) from a single scalar input value.
         """
         # Ensure all arguments belong to the correct type
-        if not all((isinstance(arg, float) or isinstance(arg, int) or
-                    isinstance(arg, ndarray)) for arg in args):
+        # Python before v3.10 does not support using Union objects as the
+        # classinfo argument of isinstance. A tuple is used instead,
+        if not all(isinstance(arg, (float, int, ndarray)) for arg in args):
             # If union iterable, fix. Otherwise, hardwrite
-            raise TypeError("Argument has incompatible type."
-                            "Expected float, int, or ndarray.")
+            raise TypeError(f"Expected {get_args(NumericArrayLike)}. "
+                            "Argument has incompatible type.")
 
         input_array = array(args)
 
@@ -107,6 +120,28 @@ class DenseCPT(MultiDimArray):
 
     # todo check if sums to 1.0
 
+    def __new__(cls, *args: NumericArrayLike, keep_shape: bool = False) \
+            -> Array:
+        """
+        Create a new DenseCPT containing the provided value(s).
+        Verify the args sum to 1.0 (within floating point error) and set the
+        dirichlet_name attribute to None for no Dirichlet table referenced.
+        """
+        # Create the new DenseCPT. Ensure all args have valid types.
+        res = super().__new__(cls, args, keep_shape=keep_shape)
+        # Sum all probabilities in the DenseCPT. Aggregate ints and floats
+        # arguments directly and aggregate the sum of ndarray arguments.
+        args_sum = sum(arg if isinstance(arg, (int, float)) else arg.sum()
+                       for arg in args)
+        # Permit 1e-05 error for floating point errors.
+        if abs(args_sum - 1.0) > (10 ** (-5)):
+            raise ValueError("Expected arguments to sum to 1.0 but instead "
+                             f"summed to {args_sum}")
+
+        res.dirichlet_name = None
+
+        return res
+
     def set_dirichlet_table(self, dirichlet_name: str):
         """
         Set the name of a Dirichlet table which this CPT will reference.
@@ -119,14 +154,14 @@ class DenseCPT(MultiDimArray):
     def get_header_info(self) -> str:
         """
         Return multidimensional array header with dimensions.
-        If the dirichlet_name attribute was set, include an additional line
+        If the dirichlet_name attribute is not None, include an additional line
         in the header referencing the DirichletTable with that name.
         """
-        line = MultiDimArray.get_header_info(self)
-        if hasattr(self, "dirichlet_name"):
+        res = MultiDimArray.get_header_info(self)
+        if self.dirichlet_name:
             dirichlet_line = f"DirichletTable dirichlet_{self.dirichlet_name}"
-            line = "\n".join((line, dirichlet_line))
-        return line
+            res = "\n".join((res, dirichlet_line))
+        return res
 
     @classmethod
     def uniform_from_shape(cls, *shape: int,
@@ -197,10 +232,7 @@ class DirichletTable(MultiDimArray):
         Return number of parents, cardinality line, for header in
         input.master section.
         """
-        line = [str(len(self.shape))]  # number of parents
-        cardinality_line = map(str, self.shape)
-        line.append(" ".join(cardinality_line))  # cardinalities
-        return " ".join(line)
+        return make_cardinality_line(self.shape)
 
 
 class NameCollection(list):
@@ -222,7 +254,7 @@ class NameCollection(list):
 
     def __str__(self) -> str:
         """
-        Returns string format of NameCollection object to be printed into the
+        Return string format of NameCollection object to be printed into the
         input.master file (new lines to be added)
         """
         return "\n".join(list(self))
@@ -339,7 +371,27 @@ class DPMF(OneLineArray):
     """
     kind = OBJ_KIND_DPMF
 
-    # XXX: check if sums to 1.0
+    def __new__(cls, *args: NumericArrayLike, keep_shape: bool = False) \
+            -> Array:
+        """
+        Create a new DPMF containing the provided value(s).
+        Verify the args sum to 1.0 (within floating point error) and set the
+        pseudocount attribute to None for no pseudocount.
+        """
+        # Create the new DenseCPT. Ensure all args have valid types.
+        res = super().__new__(cls, args, keep_shape=keep_shape)
+        # Sum all probabilities in the DenseCPT. Aggregate ints and floats
+        # arguments directly and aggregate the sum of ndarray arguments.
+        args_sum = sum(arg if isinstance(arg, (int, float)) else arg.sum()
+                       for arg in args)
+        # Permit 1e-05 error for floating point errors.
+        if abs(args_sum - 1.0) > (10 ** (-5)):
+            raise ValueError("Expected arguments to sum to 1.0 but instead "
+                             f"summed to {args_sum}")
+
+        res.pseudocount = None
+
+        return res
 
     @classmethod
     def uniform_from_shape(cls, shape: int) -> DPMF:
@@ -368,9 +420,10 @@ class DPMF(OneLineArray):
         and that value in the header before the weights.
         """
         line = [str(len(self))]  # dimension
-        if hasattr(self, "pseudocount"):
+        if self.pseudocount:
             line.append(f"DirichletConst {self.pseudocount}")
         line.append(array2text(self))  # array values
+
         return " ".join(line)
 
 
@@ -378,7 +431,8 @@ class MC:
     """
     A single mixture component (MC) object.
     Attributes:
-        component_type: str: type of MC
+        component_type: str: type of MC, such as "COMPONENT_TYPE_DIAG_GAUSSIAN"
+            or "COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN"
     """
     kind = OBJ_KIND_MC
 
@@ -432,7 +486,6 @@ class MissingFeatureDiagGaussianMC(MC, object):
         :param mean: name of Mean object associated to this MC
         :param covar: name of Covar obejct associated to this MC
         """
-        # more component types?
         super().__init__("COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN")
         self.mean = mean
         self.covar = covar
@@ -530,26 +583,13 @@ class DeterministicCPT:
         return ""
 
 
-class GenericString:
+class GenericString(str):
     """
     A class storing a generic string to write to input.master.
     Attributes:
         contents: str: Generic string to write to input.master
     """
     kind = OBJ_KIND_GENERICSTRING
-
-    def __init__(self, contents: str):
-        """
-        Initialize a generic string class.
-        :param contents: generic string to write to input.master
-        """
-        self.contents = contents
-
-    def __str__(self) -> str:
-        """
-        Return the stored string.
-        """
-        return self.contents
 
     def get_header_info(self) -> str:
         # No additional header information
@@ -576,11 +616,10 @@ class Section(dict):
     Key: name of GMTK object
     Value: GMTK object
     Attributes:
-            kind: str: specifies the kind of GMTK object (default assumes that
-                `self` has no kind)
-            line_before: str: string to print before the section, often a
+            kind: str: specifies the kind of GMTK object (default is None)
+            str_before: str: string to print before the section, often a
                 preprocessor rule
-            line_after: str: string to print after the section, often a
+            str_after: str: string to print after the section, often a
                 preprocessor rule
     """
     def __init__(self, kind: Optional[str] = None):
@@ -589,8 +628,8 @@ class Section(dict):
         """
         super().__init__()
         self.kind = kind
-        self.line_before = None
-        self.line_after = None
+        self.str_before = None
+        self.str_after = None
 
     def __setitem__(
             self,
@@ -604,7 +643,7 @@ class Section(dict):
 
         # self.kind is undefined for objects that dont support type conversion
         if not self.kind:
-            # sets self.kind as the kind of first GMTK type value passed
+            # set self.kind as the kind of first GMTK type value passed
             # consistency of kind for all values are checked in InlineSection
             # as the whole dictionary could be checked at once
             self.kind = value.kind
@@ -615,7 +654,7 @@ class Section(dict):
         """
         Generate header lines for this Section object.
         """
-        # object title and total number of GMTK/MC/MX objects
+        # object title and total number of GMTK objects
         return [f"{self.kind}_IN_FILE inline", f"{len(self)}\n"]
 
 
@@ -634,21 +673,21 @@ class InlineSection(Section):
         if len(self) == 0:
             return ""
 
-        # if line_before is set, use it to begin the section's lines
+        # if str_before is set, use it to begin the section's lines
         lines = []
-        if self.line_before:
-            lines += [self.line_before]
+        if self.str_before:
+            lines.append(self.str_before)
 
         # if stored items are generic strings, return them out without
         # any additional formatting. Otherwise, apply formatting
         if self.kind == OBJ_KIND_GENERICSTRING:
-            lines += self.get_unformatted_lines()
+            lines.extend(self.get_unformatted_lines())
         else:
-            lines += self.get_formatted_lines()
+            lines.extend(self.get_formatted_lines())
 
-        # if line_after is set, use it to end the section's lines
-        if self.line_after:
-            lines += [self.line_after]
+        # if str_after is set, use it to end the section's lines
+        if self.str_after:
+            lines.append(self.str_after)
 
         return "\n".join(lines + [""])
 
@@ -669,8 +708,7 @@ class InlineSection(Section):
 
             # Unless a class where all data is on one line (OneLineArray and
             # VirtualEvidence), write the object's remaining lines
-            if not (isinstance(value, OneLineArray) or
-                    isinstance(value, VirtualEvidence)):
+            if not isinstance(value, (OneLineArray, VirtualEvidence)):
                 lines.append(str(value))
 
         return lines
@@ -688,14 +726,14 @@ class InlineMCSection(InlineSection):
     """
     Special InlineSection subclass which contains MC objects.
     Attributes:
-        mean: InlineSection object which point to InputMaster.mean
-        covar: InlineSection object which point to InputMaster.covar
+        mean: InlineSection object referred to by InputMaster.mean
+        covar: InlineSection object referred to by InputMaster.covar
     """
     def __init__(self, mean: InlineSection, covar: InlineSection):
         """
-        :param mean: InlineSection: InlineSection object which point to
+        :param mean: InlineSection: InlineSection object referred to by
         InputMaster.mean
-        :param covar: InlineSection: InlineSection object which point to
+        :param covar: InlineSection: InlineSection object referred to by
         InputMaster.covar
         """
         super().__init__(OBJ_KIND_MC)
@@ -710,12 +748,12 @@ class InlineMCSection(InlineSection):
         if len(self) == 0:
             return ""
 
-        # if line_before is set, use it to begin the section's lines
+        # if str_before is set, use it to begin the section's lines
         lines = []
-        if self.line_before:
-            lines += [self.line_before]
+        if self.str_before:
+            lines.append(self.str_before)
 
-        lines += self.get_header_lines()
+        lines.extend(self.get_header_lines())
         for index, (name, obj) in enumerate(list(self.items())):
             # check if dimension of Mean and Covar of this MC are the same
             mean_ndim = len(self.mean[obj.mean])
@@ -732,9 +770,9 @@ class InlineMCSection(InlineSection):
             obj_line.append(str(obj))
             lines.append(" ".join(obj_line))
 
-        # if line_after is set, use it to end the section's lines
-        if self.line_after:
-            lines += [self.line_after]
+        # if str_after is set, use it to end the section's lines
+        if self.str_after:
+            lines.append(self.str_after)
 
         return "\n".join(lines + [""])
 
@@ -743,15 +781,15 @@ class InlineMXSection(InlineSection):
     """
     Special InlineSection subclass which contains MX objects.
     Attributes:
-        dpmf: InlineSection object which point to InputMaster.dpmf
-        components: InlineSection object which point to InputMaster.mc
+        dpmf: InlineSection object referred to by InputMaster.dpmf
+        components: InlineSection object referred to by InputMaster.mc
     """
 
     def __init__(self, dpmf: InlineSection, mc: InlineSection):
         """
-        :param dpmf: InlineSection: InlineSection object which point to
+        :param dpmf: InlineSection: InlineSection object referred to by
         InputMaster.dpmf
-        :param components: InlineSection: InlineSection object which point to
+        :param components: InlineSection: InlineSection object referred to by
         InputMaster.mc
         """
         super().__init__(OBJ_KIND_MX)
@@ -766,12 +804,12 @@ class InlineMXSection(InlineSection):
         if len(self) == 0:
             return ""
 
-        # if line_before is set, use it to begin the section's lines
+        # if str_before is set, use it to begin the section's lines
         lines = []
-        if self.line_before:
-            lines += [self.line_before]
+        if self.str_before:
+            lines.append(self.str_before)
 
-        lines += self.get_header_lines()
+        lines.extend(self.get_header_lines())
         for index, (name, obj) in enumerate(list(self.items())):
             # Assert number of components is equal to length of DPMF
             dpmf_ndim = len(self.dpmf[obj.dpmf])
@@ -788,9 +826,9 @@ class InlineMXSection(InlineSection):
             # string representation of this MX object
             lines.append(" ".join(obj_line))
 
-        # if line_after is set, use it to end the section's lines
-        if self.line_after:
-            lines += [self.line_after]
+        # if str_after is set, use it to end the section's lines
+        if self.str_after:
+            lines.append(self.str_after)
 
         return "\n".join(lines + [""])
 
