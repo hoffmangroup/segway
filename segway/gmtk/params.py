@@ -43,15 +43,12 @@ def array2text(a: Array) -> str:
     return delimiter.join(array2text(row) for row in a)
 
 
-def make_cardinality_line(shape: ndarray) -> str:
+def make_cardinality_line(num_parents: int, cardinalities: ndarray) -> str:
     """
     Create a string representation of the cardinality of an array with the
     specified shape. This string includes the number of parents and the
     cardinality of each parent.
     """
-    num_parents = len(shape)
-    cardinalities = shape
-
     return " ".join(map(str, [num_parents, *cardinalities]))
 
 
@@ -106,10 +103,7 @@ class MultiDimArray(Array):
         Return number of parents, cardinality line, for header in
         input.master section.
         """
-        line = [str(len(self.shape) - 1)]  # number of parents
-        cardinality_line = map(str, self.shape)
-        line.append(" ".join(cardinality_line))  # cardinalities
-        return " ".join(line)
+        return make_cardinality_line(len(self.shape) - 1, self.shape)
 
 
 class DenseCPT(MultiDimArray):
@@ -232,7 +226,7 @@ class DirichletTable(MultiDimArray):
         Return number of parents, cardinality line, for header in
         input.master section.
         """
-        return make_cardinality_line(self.shape)
+        return make_cardinality_line(len(self.shape), self.shape)
 
 
 class NameCollection(list):
