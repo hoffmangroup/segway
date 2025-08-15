@@ -457,7 +457,7 @@ def is_training_progressing(last_ll, curr_ll,
 
 
 def set_cwd_job_tmpl(job_tmpl):
-    job_tmpl.workingDirectory = Path.getcwd()
+    job_tmpl.workingDirectory = Path.cwd()
 
 
 def rewrite_cliques(rewriter, frame, output_label):
@@ -1217,7 +1217,7 @@ class Runner(object):
         try:
             self.make_dir(res)
         except OSError as err:
-            if not (err.errno == EEXIST and res.isdir()):
+            if not (err.errno == EEXIST and res.is_dir()):
                 raise
 
         return res
@@ -1238,7 +1238,7 @@ class Runner(object):
         # try:
         #     self.make_dir(res)
         # except OSError, err:
-        #     if not (err.errno == EEXIST and res.isdir()):
+        #     if not (err.errno == EEXIST and res.is_dir()):
         #         raise
 
         return res
@@ -1957,7 +1957,7 @@ class Runner(object):
         except OSError as err:
             # if the error is because directory exists, but it's
             # empty, then do nothing
-            if (err.errno != EEXIST or not dirpath.isdir() or
+            if (err.errno != EEXIST or not dirpath.is_dir() or
                     dirpath.listdir()):
                 raise
 
@@ -3820,7 +3820,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         with open(cmdline_top_filename, "a") as cmdline_top_file:
             print(run_msg, file=cmdline_top_file)
             print(file=cmdline_top_file)
-            print("cd", maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
+            print("cd", maybe_quote_arg(Path.cwd()), file=cmdline_top_file)
             print(cmdline2text(), file=cmdline_top_file)
 
         return run_msg
@@ -3883,7 +3883,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # XXX: register atexit for cleanup_resources
 
         work_dirname = self.work_dirname
-        if not Path(work_dirname).isdir() or self.clobber:
+        if not Path(work_dirname).is_dir() or self.clobber:
             self.make_dir(work_dirname, self.clobber)
 
         self.run(*args, **kwargs)

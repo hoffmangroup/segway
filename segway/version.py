@@ -1,5 +1,5 @@
-from pkg_resources import get_distribution
+from importlib.metadata import version
 
-# Allow raising a DistributionNotFound error if somehow segway was not
+# Allow raising a PackageNotFoundError if somehow segway was not
 # installed
-__version__ = get_distribution(__name__.partition(".")[0]).version
+__version__ = version("segway")
