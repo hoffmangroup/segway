@@ -14,6 +14,7 @@ from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
+from importlib.metadata import distribution
 from itertools import count, product
 from math import ceil, ldexp
 from operator import attrgetter
@@ -37,7 +38,6 @@ from numpy.random import RandomState
 from optbuild import AddableMixin
 from optplus import str2slice_or_int
 from path import Path
-from pkg_resources import parse_version, Requirement, working_set
 from six import PY2, viewitems, viewvalues
 from six.moves import map, range, zip
 from six.moves.urllib.parse import quote
@@ -51,6 +51,7 @@ from ._util import (ceildiv, data_filename, DELIMITER_BED,
                     load_coords, make_default_filename, make_filelistpath,
                     make_prefix_fmt, MB, memoized_property, OFFSET_END,
                     OFFSET_START, OFFSET_STEP, OptionBuilder_GMTK,
+                    parse_gmtk_version,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
                     PREFIX_VALIDATION_OUTPUT, PREFIX_VALIDATION_OUTPUT_WINNER,
                     PREFIX_VALIDATION_SUM, PREFIX_VALIDATION_SUM_WINNER,
@@ -71,7 +72,7 @@ from .task import MSG_SUCCESS
 from .version import __version__
 
 # GMTK runtime requirements
-MINIMUM_GMTK_VERSION = parse_version("1.4.2")
+MINIMUM_GMTK_VERSION = parse_gmtk_version("1.4.2")
 GMTK_VERSION_ERROR_MSG = """
 GMTK version %s was detected.
 Segway requires GMTK version %s or later to be installed.
@@ -3812,7 +3813,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def make_run_msg(self):
         now = datetime.now()
-        pkg_desc = working_set.find(Requirement.parse(__package__))
+        dist = distribution(__package__)
+        pkg_desc = f"{dist.name} {dist.version}"
         run_msg = "## %s run %s at %s" % (pkg_desc, self.uuid, now)
 
         cmdline_top_filename = self.make_script_filename(PREFIX_CMDLINE_TOP)
@@ -4334,7 +4336,7 @@ def check_gmtk_version():
     current_gmtk_version_string = first_output_line.split()[version_word_index]
 
     # Get the version number to compare with the minimum version
-    current_gmtk_version = parse_version(current_gmtk_version_string)
+    current_gmtk_version = parse_gmtk_version(current_gmtk_version_string)
 
     if current_gmtk_version < MINIMUM_GMTK_VERSION:
         # Raise a runtime error stating the version found and the
