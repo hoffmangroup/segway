@@ -1959,7 +1959,7 @@ class Runner(object):
             # if the error is because directory exists, but it's
             # empty, then do nothing
             if (err.errno != EEXIST or not dirpath.is_dir() or
-                    dirpath.listdir()):
+                    dirpath.iterdir()):
                 raise
 
     def make_subdir(self, subdirname):
