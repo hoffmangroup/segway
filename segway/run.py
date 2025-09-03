@@ -3441,7 +3441,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             Path(self.make_log_likelihood_tab_filename(instance_index,
                                                        recover_dirname))
 
-        if not recover_log_likelihood_tab_filepath.isfile():
+        if not recover_log_likelihood_tab_filepath.is_file():
             # If the likelihood tab file does not exist in this case, then it
             # means the recover directory was running a single instance which
             # would not generate any tab file with an instance labeled suffix.
@@ -3466,7 +3466,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             recover_validation_sum_tab_filepath = \
                 Path(self.make_validation_sum_tab_filename(instance_index,
                                                            recover_dirname))
-            if not recover_validation_sum_tab_filepath.isfile():
+            if not recover_validation_sum_tab_filepath.is_file():
                 recover_validation_sum_tab_filepath = \
                     Path(self.make_validation_sum_tab_filename(None,
                          recover_dirname))
@@ -3475,7 +3475,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             recover_validation_output_tab_filepath = \
                 Path(self.make_validation_output_tab_filename(instance_index,
                                                               recover_dirname))
-            if not recover_validation_output_tab_filepath.isfile():
+            if not recover_validation_output_tab_filepath.is_file():
                 recover_validation_output_tab_filepath = \
                     Path(self.make_validation_output_tab_filename(None,
                          recover_dirname))
@@ -3486,7 +3486,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
-            if not recover_validation_sum_filename.isfile():
+            if not recover_validation_sum_filename.is_file():
                 recover_validation_sum_filename = \
                     Path(self.make_filename(PREFIX_VALIDATION_SUM,
                                             None, EXT_LIKELIHOOD,
@@ -3499,7 +3499,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
-            if not recover_validation_output_filename.isfile():
+            if not recover_validation_output_filename.is_file():
                 recover_validation_output_filename = \
                     Path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
                                             None, EXT_LIKELIHOOD,
@@ -3512,7 +3512,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
-            if not recover_validation_sum_winner_filename.isfile():
+            if not recover_validation_sum_winner_filename.is_file():
                 recover_validation_sum_winner_filename = \
                     Path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
                                             None, EXT_LIKELIHOOD,
@@ -3525,7 +3525,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
-            if not recover_validation_output_winner_filename.isfile():
+            if not recover_validation_output_winner_filename.is_file():
                 recover_validation_output_winner_filename = \
                     Path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
                                             None, EXT_LIKELIHOOD,
@@ -3546,7 +3546,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                       self.validation_output_winner_filename)
 
         # Check if a round had been finished, and produced a likelihood
-        if recover_log_likelihood_tab_filepath.isfile():
+        if recover_log_likelihood_tab_filepath.is_file():
             with open(recover_log_likelihood_tab_filepath) \
                     as log_likelihood_tab_file:
                 log_likelihoods = [float(line.rstrip())
