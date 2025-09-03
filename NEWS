@@ -1,3 +1,6 @@
+3.0.6:
+* fix pathlib and pkg_resources deprecations
+
 3.0.5:
 * segway: fix inconsistent thickStart values when merging for final BED output
 
@@ -88,11 +91,11 @@
 * segway: fix --bigBed for assemblies with alt chromosomes not being sorted
   correctly
 * segway: --num-minibatch-windows can now be seeded with SEGWAY_RAND_SEED and
-  will select the same windows with when given the same seed 
+  will select the same windows with when given the same seed
   (thanks to Rachel Chan)
 * segway: fix --prior-strength option
 * segway: local job submission now appends error logs instead of rewriting them
-* segway: add resolution functionality for semisupervised mode 
+* segway: add resolution functionality for semisupervised mode
   (thanks to Rachel Chan)
 * segway: add 'annotate' as an alias for 'identify' (thanks to Rachel Chan)
 * segway: fix memory leak due to DRMAA job templates not being deleted
@@ -155,18 +158,18 @@
 
 1.3.0:
 * segway: fixed improper version reporting from --version option
-* segway: added semi-supervsied mode support for soft assignment. See documentation 
-  for more details. 
+* segway: added semi-supervsied mode support for soft assignment. See documentation
+  for more details.
 * segway: added the ability to use multiple genomedata archives
 * segway: Added support for the SEGWAY_NUM_LOCAL_JOBS environment variable,
-  which controls the number of concurrent processes used when 
+  which controls the number of concurrent processes used when
   SEGWAY_CLUSTER=local is set (default: 32). (thanks to Max Libbrecht)
 
 
 1.2.2:
 * segway: updated test benchmark for better compatability with Torque/PBS
-* segway: fixed a bug when the 0-index training instance wins and fails to 
-  copy the result. Segway will now store the resulting winning likelihood file 
+* segway: fixed a bug when the 0-index training instance wins and fails to
+  copy the result. Segway will now store the resulting winning likelihood file
   and likelihood tab file without the instance index as a suffix.
 * segway: removed exported bash functions in for job environment submission
   after the shellshock patch (functions starting with "BASH_FUNC") since it can
@@ -593,7 +596,7 @@ Documentation:
 * optplus package is now a prerequisite
 * 20090302 version of GMTK is now a prerequisite
 * genomedata-load-data, genomedata-load-seq, genomedata-name-tracks, genomedata-save-metadata: moved to genomedata package
-* segway: changed args from a number of h5filenames to a single genomedata directory 
+* segway: changed args from a number of h5filenames to a single genomedata directory
 * segway: added extra discrete variable called "state" to the default
   model. seg is now a child of this. transitions all occur state to
   state rather than seg to seg
