@@ -13,6 +13,7 @@ from importlib import resources
 from itertools import repeat
 from math import floor, log10
 from os import extsep
+from packaging.version import parse as parse_version
 import re
 from string import Template
 import sys
@@ -141,7 +142,9 @@ def parse_gmtk_version(version_string):
         e.g. input: "1.4.2"
              output: (1, 4, 2)
     """
-    return tuple(int(x) for x in version_string.split("."))
+
+    # NB: the release attribute contains the version tuple
+    return parse_version(version_string).release
 
 
 def extjoin(*args):
