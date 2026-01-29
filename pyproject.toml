@@ -15,12 +15,12 @@ classifiers = [
 ]
 dependencies = [
   "autolog>=0.2.0",
-  "colorbrewer>=0.2.0",
   "drmaa>=0.4a3",
   "genomedata>=1.7",
   "numpy",
   "optbuild>=0.2.0",
   "optplus>=0.2.0",
+  "palettable>=3.3.3",
   "path.py>=11",
   "six",
   "tables>2.0.4",

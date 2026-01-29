@@ -18,7 +18,7 @@ import re
 from string import Template
 import sys
 
-import colorbrewer
+from palettable import colorbrewer
 from numpy import (append, array, empty, insert, intc, maximum, str_, zeros)
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
 from path import Path
@@ -96,7 +96,7 @@ OFFSET_END = 1
 OFFSET_STEP = 2
 
 NUM_COLORS = 8
-SCHEME = colorbrewer.Dark2[NUM_COLORS]
+SCHEME = colorbrewer.qualitative.Dark2_8.colors
 
 KB = 2 ** 10
 MB = 2 ** 20
