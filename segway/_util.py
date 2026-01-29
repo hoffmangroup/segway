@@ -13,14 +13,14 @@ from importlib import resources
 from itertools import repeat
 from math import floor, log10
 from os import extsep
-from packaging.version import parse as parse_version
 import re
 from string import Template
 import sys
 
-from palettable import colorbrewer
 from numpy import (append, array, empty, insert, intc, maximum, str_, zeros)
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
+from packaging.version import parse as parse_version
+from palettable import colorbrewer
 from path import Path
 from six import viewitems
 from six.moves import map, zip
