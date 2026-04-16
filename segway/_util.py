@@ -9,6 +9,7 @@ from collections import defaultdict, namedtuple
 from contextlib import closing
 from functools import partial
 from gzip import open as _gzip_open
+from importlib import resources
 from itertools import repeat
 from math import floor, log10
 from os import extsep
@@ -16,11 +17,11 @@ import re
 from string import Template
 import sys
 
-import colorbrewer
 from numpy import (append, array, empty, insert, intc, maximum, str_, zeros)
 from optbuild import Mixin_UseFullProgPath, OptionBuilder_ShortOptWithSpace_TF
+from packaging.version import parse as parse_version
+from palettable import colorbrewer
 from path import Path
-from pkg_resources import resource_filename, resource_string
 from six import viewitems
 from six.moves import map, zip
 from tables import Filters, NoSuchNodeError, open_file
@@ -94,15 +95,8 @@ OFFSET_START = 0
 OFFSET_END = 1
 OFFSET_STEP = 2
 
-data_filename = partial(resource_filename, PKG_DATA)
-
-
-def data_string(resource):
-    return resource_string(PKG_DATA, resource).decode(SEGWAY_ENCODING)
-
-
 NUM_COLORS = 8
-SCHEME = colorbrewer.Dark2[NUM_COLORS]
+SCHEME = colorbrewer.qualitative.Dark2_8.colors
 
 KB = 2 ** 10
 MB = 2 ** 20
@@ -133,6 +127,24 @@ SUPERVISION_SEMISUPERVISED = 1
 SUPERVISION_SUPERVISED = 2
 
 SUPERVISION_LABEL_OFFSET = 1
+
+
+def data_filename(resource):
+    return str(resources.files(PKG_DATA) / resource)
+
+
+def data_string(resource):
+    return resources.read_text(PKG_DATA, resource, encoding=SEGWAY_ENCODING)
+
+
+def parse_gmtk_version(version_string):
+    """Returns a tuple of 3 integers of from the GMTK version string.
+        e.g. input: "1.4.2"
+             output: (1, 4, 2)
+    """
+
+    # NB: the release attribute contains the version tuple
+    return parse_version(version_string).release
 
 
 def extjoin(*args):

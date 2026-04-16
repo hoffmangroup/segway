@@ -14,6 +14,7 @@ from datetime import datetime
 from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
+from importlib.metadata import distribution
 from itertools import count, product
 from math import ceil, ldexp
 from operator import attrgetter
@@ -37,7 +38,6 @@ from numpy.random import RandomState
 from optbuild import AddableMixin
 from optplus import str2slice_or_int
 from path import Path
-from pkg_resources import parse_version, Requirement, working_set
 from six import PY2, viewitems, viewvalues
 from six.moves import map, range, zip
 from six.moves.urllib.parse import quote
@@ -51,6 +51,7 @@ from ._util import (ceildiv, data_filename, DELIMITER_BED,
                     load_coords, make_default_filename, make_filelistpath,
                     make_prefix_fmt, MB, memoized_property, OFFSET_END,
                     OFFSET_START, OFFSET_STEP, OptionBuilder_GMTK,
+                    parse_gmtk_version,
                     POSTERIOR_PROG, PREFIX_LIKELIHOOD, PREFIX_PARAMS,
                     PREFIX_VALIDATION_OUTPUT, PREFIX_VALIDATION_OUTPUT_WINNER,
                     PREFIX_VALIDATION_SUM, PREFIX_VALIDATION_SUM_WINNER,
@@ -71,7 +72,7 @@ from .task import MSG_SUCCESS
 from .version import __version__
 
 # GMTK runtime requirements
-MINIMUM_GMTK_VERSION = parse_version("1.4.2")
+MINIMUM_GMTK_VERSION = parse_gmtk_version("1.4.2")
 GMTK_VERSION_ERROR_MSG = """
 GMTK version %s was detected.
 Segway requires GMTK version %s or later to be installed.
@@ -457,7 +458,7 @@ def is_training_progressing(last_ll, curr_ll,
 
 
 def set_cwd_job_tmpl(job_tmpl):
-    job_tmpl.workingDirectory = Path.getcwd()
+    job_tmpl.workingDirectory = Path.cwd()
 
 
 def rewrite_cliques(rewriter, frame, output_label):
@@ -1217,7 +1218,7 @@ class Runner(object):
         try:
             self.make_dir(res)
         except OSError as err:
-            if not (err.errno == EEXIST and res.isdir()):
+            if not (err.errno == EEXIST and res.is_dir()):
                 raise
 
         return res
@@ -1238,7 +1239,7 @@ class Runner(object):
         # try:
         #     self.make_dir(res)
         # except OSError, err:
-        #     if not (err.errno == EEXIST and res.isdir()):
+        #     if not (err.errno == EEXIST and res.is_dir()):
         #         raise
 
         return res
@@ -1957,8 +1958,8 @@ class Runner(object):
         except OSError as err:
             # if the error is because directory exists, but it's
             # empty, then do nothing
-            if (err.errno != EEXIST or not dirpath.isdir() or
-                    dirpath.listdir()):
+            if (err.errno != EEXIST or not dirpath.is_dir() or
+                    dirpath.iterdir()):
                 raise
 
     def make_subdir(self, subdirname):
@@ -3440,7 +3441,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             Path(self.make_log_likelihood_tab_filename(instance_index,
                                                        recover_dirname))
 
-        if not recover_log_likelihood_tab_filepath.isfile():
+        if not recover_log_likelihood_tab_filepath.is_file():
             # If the likelihood tab file does not exist in this case, then it
             # means the recover directory was running a single instance which
             # would not generate any tab file with an instance labeled suffix.
@@ -3465,7 +3466,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             recover_validation_sum_tab_filepath = \
                 Path(self.make_validation_sum_tab_filename(instance_index,
                                                            recover_dirname))
-            if not recover_validation_sum_tab_filepath.isfile():
+            if not recover_validation_sum_tab_filepath.is_file():
                 recover_validation_sum_tab_filepath = \
                     Path(self.make_validation_sum_tab_filename(None,
                          recover_dirname))
@@ -3474,7 +3475,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             recover_validation_output_tab_filepath = \
                 Path(self.make_validation_output_tab_filename(instance_index,
                                                               recover_dirname))
-            if not recover_validation_output_tab_filepath.isfile():
+            if not recover_validation_output_tab_filepath.is_file():
                 recover_validation_output_tab_filepath = \
                     Path(self.make_validation_output_tab_filename(None,
                          recover_dirname))
@@ -3485,7 +3486,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
-            if not recover_validation_sum_filename.isfile():
+            if not recover_validation_sum_filename.is_file():
                 recover_validation_sum_filename = \
                     Path(self.make_filename(PREFIX_VALIDATION_SUM,
                                             None, EXT_LIKELIHOOD,
@@ -3498,7 +3499,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
-            if not recover_validation_output_filename.isfile():
+            if not recover_validation_output_filename.is_file():
                 recover_validation_output_filename = \
                     Path(self.make_filename(PREFIX_VALIDATION_OUTPUT,
                                             None, EXT_LIKELIHOOD,
@@ -3511,7 +3512,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
-            if not recover_validation_sum_winner_filename.isfile():
+            if not recover_validation_sum_winner_filename.is_file():
                 recover_validation_sum_winner_filename = \
                     Path(self.make_filename(PREFIX_VALIDATION_SUM_WINNER,
                                             None, EXT_LIKELIHOOD,
@@ -3524,7 +3525,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                                         instance_index, EXT_LIKELIHOOD,
                                         subdirname=SUBDIRNAME_LIKELIHOOD,
                                         dirname=recover_dirname))
-            if not recover_validation_output_winner_filename.isfile():
+            if not recover_validation_output_winner_filename.is_file():
                 recover_validation_output_winner_filename = \
                     Path(self.make_filename(PREFIX_VALIDATION_OUTPUT_WINNER,
                                             None, EXT_LIKELIHOOD,
@@ -3545,7 +3546,7 @@ to find the winning instance anyway.""" % thread.instance_index)
                       self.validation_output_winner_filename)
 
         # Check if a round had been finished, and produced a likelihood
-        if recover_log_likelihood_tab_filepath.isfile():
+        if recover_log_likelihood_tab_filepath.is_file():
             with open(recover_log_likelihood_tab_filepath) \
                     as log_likelihood_tab_file:
                 log_likelihoods = [float(line.rstrip())
@@ -3812,7 +3813,8 @@ to find the winning instance anyway.""" % thread.instance_index)
 
     def make_run_msg(self):
         now = datetime.now()
-        pkg_desc = working_set.find(Requirement.parse(__package__))
+        dist = distribution(__package__)
+        pkg_desc = f"{dist.name} {dist.version}"
         run_msg = "## %s run %s at %s" % (pkg_desc, self.uuid, now)
 
         cmdline_top_filename = self.make_script_filename(PREFIX_CMDLINE_TOP)
@@ -3820,7 +3822,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         with open(cmdline_top_filename, "a") as cmdline_top_file:
             print(run_msg, file=cmdline_top_file)
             print(file=cmdline_top_file)
-            print("cd", maybe_quote_arg(Path.getcwd()), file=cmdline_top_file)
+            print("cd", maybe_quote_arg(Path.cwd()), file=cmdline_top_file)
             print(cmdline2text(), file=cmdline_top_file)
 
         return run_msg
@@ -3883,7 +3885,7 @@ to find the winning instance anyway.""" % thread.instance_index)
         # XXX: register atexit for cleanup_resources
 
         work_dirname = self.work_dirname
-        if not Path(work_dirname).isdir() or self.clobber:
+        if not Path(work_dirname).is_dir() or self.clobber:
             self.make_dir(work_dirname, self.clobber)
 
         self.run(*args, **kwargs)
@@ -4334,7 +4336,7 @@ def check_gmtk_version():
     current_gmtk_version_string = first_output_line.split()[version_word_index]
 
     # Get the version number to compare with the minimum version
-    current_gmtk_version = parse_version(current_gmtk_version_string)
+    current_gmtk_version = parse_gmtk_version(current_gmtk_version_string)
 
     if current_gmtk_version < MINIMUM_GMTK_VERSION:
         # Raise a runtime error stating the version found and the

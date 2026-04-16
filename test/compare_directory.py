@@ -194,7 +194,7 @@ def compare_directory(template_dirname, query_dirname):
                                       counter.num_success, counter.num_error)
 
         base_directory_name = (Path(template_dirname)
-                               .abspath().dirname().basename())
+                               .absolute().dirname().basename())
         tar_filename = base_directory_name + "-changes.tar.gz"
 
         with tarfile.open(tar_filename, "w:gz") as tar:
