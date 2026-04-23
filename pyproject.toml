@@ -15,12 +15,12 @@ classifiers = [
 ]
 dependencies = [
   "autolog>=0.2.0",
-  "colorbrewer>=0.2.0",
   "drmaa>=0.4a3",
   "genomedata>=1.7",
   "numpy",
   "optbuild>=0.2.0",
   "optplus>=0.2.0",
+  "palettable>=3.3.3",
   "path.py>=11",
   "six",
   "tables>2.0.4",
@@ -30,7 +30,7 @@ description = "Segway is a tool for easy pattern discovery and identification in
 dynamic = ["version"]
 name = "segway"
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.9"
 
 [project.license]
 text = "GPL-2.0-only"

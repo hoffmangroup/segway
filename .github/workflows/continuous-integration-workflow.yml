@@ -5,9 +5,13 @@ name: Build and Test
 
 on:
   push:
-      branches: [ master ]
+      branches:
+        - master
+        - develop
   pull_request:
-      branches: [ master ]
+      branches:
+        - master
+        - develop
 
 jobs:
   build-and-test:
@@ -25,7 +29,7 @@ jobs:
       # This is the current issue: https://github.com/actions/runner/issues/2033
       # Can set 'options: --user 1001' on the container to match the UID of the Github runner, ref:
       # https://github.com/actions/runner/blob/8415f13babf8199551f817eb16b718dcdd5b31e2/images/Dockerfile#L38
-      
+
       - uses: actions/checkout@v3
         with:
           fetch-depth: 0
@@ -36,7 +40,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
-          python-version: '3.9'
+          python-version: '3.10'
       - name: Install test dependencies
         run: |
           python3 -m pip install --upgrade pip setuptools build flake8 flake8-import-order flake8-quotes
@@ -52,13 +56,13 @@ jobs:
           cd test && ./test_all.sh
       - name: Capture test results on failure
         if: ${{ failure () }}
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: test-results
           path: |
             test/**/*-changes.tar.gz
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: segway-build
           path: dist/*
