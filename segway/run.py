@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from copy import copy
 from csv import writer
 from datetime import datetime
-from shutil import which
 from errno import EEXIST, ENOENT
 from functools import partial
 from importlib.metadata import distribution
@@ -22,7 +21,7 @@ from os import (environ, extsep, fdopen, O_CREAT, O_SYNC, O_TRUNC, O_WRONLY,
                 open as os_open)
 import pipes
 import re
-from shutil import copy2
+from shutil import copy2, which
 import stat
 from string import ascii_letters
 import sys
