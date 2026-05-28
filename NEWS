@@ -1,3 +1,6 @@
+3.0.6:
+* remove distutils for python 3.12 compatability
+
 3.0.5:
 * segway: fix inconsistent thickStart values when merging for final BED output
 * replace colorbrewer dependency with palettable
