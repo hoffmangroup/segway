@@ -11,7 +11,6 @@ from contextlib import contextmanager
 from copy import copy
 from csv import writer
 from datetime import datetime
-from distutils.spawn import find_executable
 from errno import EEXIST, ENOENT
 from functools import partial
 from importlib.metadata import distribution
@@ -22,7 +21,7 @@ from os import (environ, extsep, fdopen, O_CREAT, O_SYNC, O_TRUNC, O_WRONLY,
                 open as os_open)
 import pipes
 import re
-from shutil import copy2
+from shutil import copy2, which
 import stat
 from string import ascii_letters
 import sys
@@ -2558,7 +2557,7 @@ class Runner(object):
         name = self.make_job_name_train(instance_index, round_index,
                                         window_index)
 
-        segway_task_path = find_executable("segway-task")
+        segway_task_path = which("segway-task")
         segway_task_verb = "run"
         output_filename = ""  # not used for training
 
@@ -2693,7 +2692,7 @@ class Runner(object):
 
     def queue_save_validation_set_window(self, validation_window,
                                          num_frames=0, **kwargs):
-        segway_task_path = find_executable("segway-task")
+        segway_task_path = which("segway-task")
         segway_task_verb = SAVE_WINDOW_TASK_VERB
         output_filename = ""
 
@@ -2762,7 +2761,7 @@ class Runner(object):
 
         name = self.make_job_name_validate(instance_index, round_index)
 
-        segway_task_path = find_executable("segway-task")
+        segway_task_path = which("segway-task")
         segway_task_verb = VALIDATE_TASK_VERB
 
         chrom = 0
@@ -3692,7 +3691,7 @@ to find the winning instance anyway.""" % thread.instance_index)
             self.get_virtual_evidence_in_window(window)
 
         # Prefix args all get mapped with "str" function!
-        prefix_args = [find_executable("segway-task"), "run", kind,
+        prefix_args = [which("segway-task"), "run", kind,
                        output_filename, window.chrom,
                        window.start, window.end, self.resolution, is_reverse,
                        self.num_segs, self.num_subsegs, self.output_label,
