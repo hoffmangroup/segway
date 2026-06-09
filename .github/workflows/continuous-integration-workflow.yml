@@ -30,7 +30,7 @@ jobs:
       # Can set 'options: --user 1001' on the container to match the UID of the Github runner, ref:
       # https://github.com/actions/runner/blob/8415f13babf8199551f817eb16b718dcdd5b31e2/images/Dockerfile#L38
 
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
       # Fix ownership of the checkout dir
@@ -38,9 +38,9 @@ jobs:
         run: |
           chown -R $(id -u):$(id -g) $PWD
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.14'
       - name: Install test dependencies
         run: |
           python3 -m pip install --upgrade pip setuptools build flake8 flake8-import-order flake8-quotes
