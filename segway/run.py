@@ -19,8 +19,8 @@ from math import ceil, ldexp
 from operator import attrgetter
 from os import (environ, extsep, fdopen, O_CREAT, O_SYNC, O_TRUNC, O_WRONLY,
                 open as os_open)
-import pipes
 import re
+import shlex
 from shutil import copy2, which
 import stat
 from string import ascii_letters
@@ -602,10 +602,8 @@ def cmdline2text(cmdline=sys.argv):
 def _log_cmdline(logfile, cmdline):
     quoted_cmdline_list = []
     for cmdarg in cmdline:
-        # pipes.quote() will only quote arguments that need
-        # quotes to be run on shell commandline
-        # NOTE: move to shlex.quote() when moving to python 3.3
-        quoted_cmdline_list.append(pipes.quote(str(cmdarg)))
+        # shlex.quote() will only quote arguments that need
+        quoted_cmdline_list.append(shlex.quote(str(cmdarg)))
     quoted_cmdline = " ".join(quoted_cmdline_list)
     print(quoted_cmdline, file=logfile)
 
