@@ -1,3 +1,6 @@
+3.0.7:
+* remove pipes package for python 3.13 compatability
+
 3.0.6:
 * remove distutils for python 3.12 compatability
 
