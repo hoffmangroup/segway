@@ -4,6 +4,7 @@
 # Required
 version: 2
 
+# https://docs.readthedocs.com/platform/stable/config-file/v2.html#conda
 conda:
   environment: environment.yml
 
@@ -14,10 +15,9 @@ python:
         path: .
 
 build:
-  os: ubuntu-22.04
+  os: ubuntu-lts-latest
   tools:
-    # Ref: https://github.com/readthedocs/readthedocs.org/issues/9008
-    python: "miniconda3-4.7"
+    python: "miniforge3-latest"
   jobs:
     post_install:
       - make -C doc cmdline-help
