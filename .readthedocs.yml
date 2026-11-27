@@ -14,11 +14,17 @@ python:
       - method: pip
         path: .
 
+# Use latest LTS release for ubuntu
+# Use mamba if possible
+# Check out all tags/version information
+# Build help for command line tools after installation
 build:
   os: ubuntu-lts-latest
   tools:
     python: "miniforge3-latest"
   jobs:
+    post_checkout:
+      - git fetch --unshallow || true
     post_install:
       - make -C doc cmdline-help
 
