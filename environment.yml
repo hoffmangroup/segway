@@ -17,4 +17,5 @@ dependencies:
   - colorbrewer
   - drmaa>=0.4a3
   - ucsc-bedtobigbed
+  - git
   - sphinx-rtd-theme
