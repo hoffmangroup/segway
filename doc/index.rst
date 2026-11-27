@@ -6,11 +6,11 @@
 Segway |version| Documentation
 ==============================
 
-:Homepage: http://pmgenomics.ca/hoffmanlab/proj/segway
+:Homepage: https://segway.hoffmanlab.org
 :Author: Michael M. Hoffman <michael dot hoffman at utoronto dot ca>
 :Organization: Princess Margaret Cancer Centre
 :Address: Toronto Medical Discovery Tower 11-311, 101 College St, M5G 1L7, Toronto, Ontario, Canada
-:Copyright: 2009-2015 Michael M. Hoffman
+:Copyright: 2009-2026 Michael M. Hoffman
 :Last updated: |today|
 
 .. currentmodule:: segway
